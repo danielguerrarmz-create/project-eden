@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f6f4ee;
+  color: #1e1b17;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Fraunces optical settings: soft, organic, a touch eccentric. */
+.font-display {
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 60, 'WONK' 1, 'opsz' 120;
+  letter-spacing: -0.02em;
+}
+
+/* Thin custom scrollbars on paper. */
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(122, 139, 60, 0.35);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Range input styled for the botanical system (openness slider). */
+input[type='range'].botanical {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: #ded8cb;
+  outline: none;
+}
+input[type='range'].botanical::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #7a8b3c;
+  border: 3px solid #f6f4ee;
+  box-shadow: 0 1px 4px rgba(30, 27, 23, 0.25);
+  cursor: pointer;
+}
+input[type='range'].botanical::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #7a8b3c;
+  border: 3px solid #f6f4ee;
+  cursor: pointer;
+}
