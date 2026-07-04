@@ -93,6 +93,30 @@ export function PlotMapper() {
     }
   }
 
+  /** Keyboard path: every handle is focusable; arrows nudge its dimension. */
+  function nudge(kind: Exclude<DragKind, null>) {
+    return (e: React.KeyboardEvent) => {
+      const plus = e.key === 'ArrowRight' || e.key === 'ArrowUp';
+      const minus = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
+      if (!plus && !minus) return;
+      e.preventDefault();
+      const dir = plus ? 1 : -1;
+      switch (kind) {
+        case 'w-left':
+        case 'w-right':
+          setPlot({ widthM: clamp(plot.widthM + 0.5 * dir, MIN_W, MAX_W) });
+          break;
+        case 'd-top':
+        case 'd-bottom':
+          setPlot({ depthM: clamp(plot.depthM + 0.5 * dir, MIN_D, MAX_D) });
+          break;
+        case 'north':
+          setPlot({ northDeg: ((plot.northDeg + 5 * dir) % 360 + 360) % 360 });
+          break;
+      }
+    };
+  }
+
   const areaM2 = (plot.widthM * plot.depthM).toFixed(0);
 
   return (
@@ -102,6 +126,7 @@ export function PlotMapper() {
         viewBox={`0 0 ${W} ${H}`}
         className="w-full max-w-[480px] select-none touch-none"
         style={{ aspectRatio: `${W} / ${H}` }}
+        aria-label="plot mapper: drag or focus a handle and use arrow keys to size the plot and set north"
       >
         {/* Compass ring */}
         <circle cx={CX} cy={CY} r={RING_R} fill="none" stroke="#DED8CB" strokeWidth={1.5} strokeDasharray="3 6" />
@@ -121,11 +146,15 @@ export function PlotMapper() {
         {/* Grid ticks inside the plot (1m) for scale feel */}
         <GridTicks halfW={halfW} halfD={halfD} />
 
-        {/* Edge handles */}
-        <EdgeHandle x={CX - halfW} y={CY} cursor="ew-resize" onDown={start('w-left')} onMove={onMove} onUp={end} />
-        <EdgeHandle x={CX + halfW} y={CY} cursor="ew-resize" onDown={start('w-right')} onMove={onMove} onUp={end} />
-        <EdgeHandle x={CX} y={CY - halfD} cursor="ns-resize" onDown={start('d-top')} onMove={onMove} onUp={end} />
-        <EdgeHandle x={CX} y={CY + halfD} cursor="ns-resize" onDown={start('d-bottom')} onMove={onMove} onUp={end} />
+        {/* Edge handles — draggable AND keyboard-focusable (arrows nudge 0.5 m) */}
+        <EdgeHandle x={CX - halfW} y={CY} cursor="ew-resize" onDown={start('w-left')} onMove={onMove} onUp={end}
+          onKey={nudge('w-left')} label="plot width, left edge" value={plot.widthM} min={MIN_W} max={MAX_W} unit="metres" />
+        <EdgeHandle x={CX + halfW} y={CY} cursor="ew-resize" onDown={start('w-right')} onMove={onMove} onUp={end}
+          onKey={nudge('w-right')} label="plot width, right edge" value={plot.widthM} min={MIN_W} max={MAX_W} unit="metres" />
+        <EdgeHandle x={CX} y={CY - halfD} cursor="ns-resize" onDown={start('d-top')} onMove={onMove} onUp={end}
+          onKey={nudge('d-top')} label="plot depth, top edge" value={plot.depthM} min={MIN_D} max={MAX_D} unit="metres" />
+        <EdgeHandle x={CX} y={CY + halfD} cursor="ns-resize" onDown={start('d-bottom')} onMove={onMove} onUp={end}
+          onKey={nudge('d-bottom')} label="plot depth, bottom edge" value={plot.depthM} min={MIN_D} max={MAX_D} unit="metres" />
 
         {/* Live dimension labels */}
         <text x={CX} y={CY - halfD - 12} textAnchor="middle" className="fill-inkSoft" fontSize={14} fontWeight={600}>
@@ -159,6 +188,14 @@ export function PlotMapper() {
           onPointerDown={start('north')}
           onPointerMove={onMove}
           onPointerUp={end}
+          tabIndex={0}
+          role="slider"
+          aria-label="north orientation"
+          aria-valuemin={0}
+          aria-valuemax={359}
+          aria-valuenow={plot.northDeg}
+          aria-valuetext={`${plot.northDeg} degrees`}
+          onKeyDown={nudge('north')}
         />
         <circle cx={CX} cy={CY} r={3} fill="#57514A" />
       </svg>
@@ -189,6 +226,12 @@ function EdgeHandle({
   onDown,
   onMove,
   onUp,
+  onKey,
+  label,
+  value,
+  min,
+  max,
+  unit,
 }: {
   x: number;
   y: number;
@@ -196,9 +239,28 @@ function EdgeHandle({
   onDown: (e: React.PointerEvent) => void;
   onMove: (e: React.PointerEvent) => void;
   onUp: (e: React.PointerEvent) => void;
+  onKey: (e: React.KeyboardEvent) => void;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
 }) {
   return (
-    <g style={{ cursor }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+    <g
+      style={{ cursor }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      tabIndex={0}
+      role="slider"
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={`${value.toFixed(1)} ${unit}`}
+      onKeyDown={onKey}
+    >
       <circle cx={x} cy={y} r={14} fill="transparent" />
       <circle cx={x} cy={y} r={7} fill="#F6F4EE" stroke="#5E6E2B" strokeWidth={2.5} />
     </g>

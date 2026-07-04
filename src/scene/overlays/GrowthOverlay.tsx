@@ -15,6 +15,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDesign } from '../../state/store';
+import { useReducedMotion } from '../../ui/useReducedMotion';
 import { leafColor } from '../util';
 
 interface Leaf {
@@ -28,6 +29,7 @@ interface Leaf {
 export function GrowthOverlay() {
   const cells = useDesign((s) => s.outputs.strutField.cells);
   const targetCoverage = useDesign((s) => s.outputs.growth.coverageFraction);
+  const reducedMotion = useReducedMotion();
 
   const leaves = useMemo<Leaf[]>(
     () =>
@@ -53,7 +55,12 @@ export function GrowthOverlay() {
 
   useFrame((state, dt) => {
     // Ease the visible coverage toward the target growth stage.
-    current.current += (targetCoverage - current.current) * Math.min(1, dt * 3.2);
+    // Reduced motion: SNAP to the stage instead of animating, and hold still.
+    if (reducedMotion) {
+      current.current = targetCoverage;
+    } else {
+      current.current += (targetCoverage - current.current) * Math.min(1, dt * 3.2);
+    }
     const cov = current.current;
     const t = state.clock.elapsedTime;
 
@@ -71,7 +78,7 @@ export function GrowthOverlay() {
       }
       m.visible = true;
       // Gentle breathing sway proportional to how grown-in it is.
-      const sway = 1 + 0.04 * eased * Math.sin(t * 1.3 + leaf.phase);
+      const sway = reducedMotion ? 1 : 1 + 0.04 * eased * Math.sin(t * 1.3 + leaf.phase);
       m.scale.setScalar(size * sway);
     }
   });

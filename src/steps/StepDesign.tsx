@@ -59,6 +59,7 @@ export function StepDesign() {
                 <button
                   key={k}
                   onClick={() => setSizePreset(k)}
+                  aria-pressed={active}
                   className={`flex-1 rounded-2xl border px-2 py-2.5 text-center transition ${
                     active
                       ? 'border-moss bg-moss/12'
@@ -91,6 +92,7 @@ export function StepDesign() {
             value={openness}
             onChange={(e) => setOpenness(Number(e.target.value))}
             className="botanical mt-3 w-full"
+            aria-label="openness: sheltered bower to airy screen"
           />
           <div className="mt-1.5 flex justify-between text-[11px] text-inkFaint">
             <span>sheltered bower</span>
@@ -108,6 +110,7 @@ export function StepDesign() {
                 <button
                   key={sp.id}
                   onClick={() => setSpecies(sp.id)}
+                  aria-pressed={active}
                   className={`rounded-xl border px-2.5 py-1.5 text-left transition ${
                     active ? 'border-bloom bg-bloom/10' : 'border-line bg-white/40 hover:border-bloom/50'
                   }`}

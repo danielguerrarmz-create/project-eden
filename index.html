@@ -4,12 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>living folly — commission a pollinator pavilion</title>
+    <meta
+      name="description"
+      content="Shape a living garden pavilion: map your plot, pick a climbing species, and the engine designs the timber lattice for how that plant climbs, prices it live, and shows it grown in at year three."
+    />
+    <meta name="theme-color" content="#F6F4EE" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Social cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="living folly — commission a pollinator pavilion" />
+    <meta
+      property="og:description"
+      content="A generative design demo for living garden architecture. Map your plot, choose a climber, watch the folly grow in by year three."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="living folly — commission a pollinator pavilion" />
+    <meta
+      name="twitter:description"
+      content="A generative design demo for living garden architecture. Map your plot, choose a climber, watch the folly grow in by year three."
+    />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Pre-JS loading state: replaced the moment React mounts. */
+      #root:empty::after {
+        content: 'growing the folly…';
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #f6f4ee;
+        color: #8b857b;
+        font: 500 14px/1 'Inter', ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: 0.02em;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

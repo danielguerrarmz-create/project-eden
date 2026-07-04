@@ -40,11 +40,16 @@ export function StepPreview() {
 
             {/* Growth toggle */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              <div className="flex items-center gap-1 rounded-full border border-line/70 bg-paper/85 p-1 shadow-sm backdrop-blur">
+              <div
+                className="flex items-center gap-1 rounded-full border border-line/70 bg-paper/85 p-1 shadow-sm backdrop-blur"
+                role="group"
+                aria-label="growth year"
+              >
                 {GROWTH.years.map((y) => (
                   <button
                     key={y}
                     onClick={() => setYear(y)}
+                    aria-pressed={year === y}
                     className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
                       year === y ? 'bg-moss text-paper' : 'text-inkSoft hover:text-ink'
                     }`}
@@ -87,7 +92,7 @@ export function StepPreview() {
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-[13px] text-inkSoft">
               <span>{species.common}</span>
               <span>{components.totalCount} timber pieces</span>
-              <span>{geometry.spanM} × {geometry.heightM} m</span>
+              <span>{geometry.spanM.toFixed(1)} × {geometry.heightM.toFixed(1)} m</span>
               <span>~{leadTimeWeeks(components.totalCount)} wks</span>
             </div>
 
@@ -143,7 +148,7 @@ export function StepPreview() {
       </div>
 
       <div className="mt-6">
-        <CtaLink label="back to design" onClick={() => setStep(2)} variant="ghost" />
+        <CtaLink label="back to design" onClick={() => setStep(2)} variant="ghost" back />
       </div>
     </div>
   );

@@ -76,6 +76,15 @@ See `docs/SCREENS.md` for the full real-vs-stubbed table.
   placeholder until a real fabrication quote is wired in. The on-screen number is labelled as
   such and should not be presented as a quote.
 
+## Robustness + accessibility
+
+- An error boundary catches any render crash with a calm reload screen; browsers without
+  WebGL get a quiet explanation card instead of a broken canvas.
+- `prefers-reduced-motion` is respected end to end: the stage stops auto-rotating, the growth
+  animation snaps to its stage instead of easing, and CSS transitions are disabled.
+- The plot mapper is fully keyboard-operable: every drag handle is a focusable slider
+  (arrow keys nudge width/depth by 0.5 m and north by 5°), with proper ARIA values throughout.
+
 ## Stack
 
 Vite · React · TypeScript · react-three-fiber / drei · zustand · Tailwind.

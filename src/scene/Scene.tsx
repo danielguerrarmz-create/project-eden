@@ -11,6 +11,8 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import { useDesign } from '../state/store';
+import { useReducedMotion } from '../ui/useReducedMotion';
+import { webglSupported } from '../ui/webgl';
 import { Folly } from './Folly';
 import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
@@ -18,6 +20,9 @@ import { GrowthOverlay } from './overlays/GrowthOverlay';
 
 export function Scene() {
   const overlays = useDesign((s) => s.overlays);
+  const reducedMotion = useReducedMotion();
+
+  if (!webglSupported()) return <NoWebGL />;
 
   return (
     <Canvas
@@ -54,9 +59,27 @@ export function Scene() {
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}
         enablePan={false}
-        autoRotate
+        autoRotate={!reducedMotion}
         autoRotateSpeed={0.35}
       />
     </Canvas>
+  );
+}
+
+/** Paper fallback when the browser can't give us a WebGL context. */
+function NoWebGL() {
+  return (
+    <div className="absolute inset-0 grid place-items-center p-6" role="status">
+      <div className="max-w-sm text-center">
+        <div className="mb-2 text-3xl" aria-hidden>
+          🌿
+        </div>
+        <p className="text-sm font-medium text-ink">this browser can't render the 3D stage</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-inkSoft">
+          The folly preview needs WebGL. Try a current Chrome, Edge, Firefox or Safari, or
+          another device. All the numbers on this page still update live.
+        </p>
+      </div>
+    </div>
   );
 }

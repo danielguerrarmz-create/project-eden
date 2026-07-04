@@ -16,6 +16,38 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Visible keyboard focus everywhere, invisible for mouse users. */
+:focus-visible {
+  outline: 2px solid #5e6e2b;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* SVG plot-mapper handles: Chromium doesn't reliably paint `outline` on
+   focused <g>/<circle>, so give keyboard focus an explicit painted style —
+   the visible knob swells to moss with a thick ring. */
+g[role='slider']:focus-visible circle:last-child,
+circle[role='slider']:focus-visible {
+  stroke: #5e6e2b;
+  stroke-width: 4.5;
+  fill: #7a8b3c;
+}
+circle[role='slider']:focus-visible {
+  fill: #e06a4e; /* north knob keeps its coral identity, ring goes moss */
+}
+
+/* Reduced motion: kill decorative animation + transitions app-wide. The 3D
+   layer handles its own via useReducedMotion (autoRotate off, growth snaps). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Fraunces optical settings: soft, organic, a touch eccentric. */
 .font-display {
   font-optical-sizing: auto;
