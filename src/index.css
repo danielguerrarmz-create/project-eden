@@ -56,8 +56,15 @@ body {
    indicator so it clears WCAG 1.4.11 (3:1) on EVERY ground it can appear on: a
    2px inkBlack outline offset by a 2px vellum ring (box-shadow fills the gap).
    On light grounds the dark outline carries the contrast; on an ink-filled pill
-   the light ring does. Olive alone (1.91:1 on vellum) was insufficient. */
-:focus-visible {
+   the light ring does. Olive alone (1.91:1 on vellum) was insufficient.
+
+   The doubled `:focus-visible:focus-visible` selector is deliberate: it raises
+   specificity to (0,2,0) so the vellum box-shadow ring survives on elements that
+   also carry a Tailwind `ring-*`/`shadow-*` utility (each only (0,1,0)), which
+   would otherwise override box-shadow by source order and drop the light ring.
+   The inkBlack outline is never at risk — those utilities set box-shadow, not
+   outline — so the WCAG-passing indicator holds regardless. */
+:focus-visible:focus-visible {
   outline: 2px solid #17160f;
   outline-offset: 2px;
   box-shadow: 0 0 0 2px #fbf9f3;
