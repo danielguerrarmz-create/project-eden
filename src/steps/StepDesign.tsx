@@ -80,7 +80,7 @@ export function StepDesign() {
                     active
                       ? 'bg-inkBlack text-paperVellum'
                       : 'border border-line text-inkBlack/85 hover:border-inkBlack/40'
-                  } ${recommended ? 'ring-2 ring-accentOlive/70' : ''}`}
+                  } ${recommended && !active ? 'ring-2 ring-accentOlive/70' : ''}`}
                 >
                   {SIZE_PRESETS[k].label}
                 </button>
@@ -118,7 +118,7 @@ export function StepDesign() {
                     active
                       ? 'bg-inkBlack text-paperVellum'
                       : 'border border-line text-inkBlack/85 hover:border-inkBlack/40'
-                  } ${recommended ? 'ring-2 ring-accentOlive/70' : ''}`}
+                  } ${recommended && !active ? 'ring-2 ring-accentOlive/70' : ''}`}
                 >
                   <span className="text-[13px] font-medium leading-none">{sp.common}</span>
                   <span
@@ -160,7 +160,7 @@ export function StepDesign() {
         </span>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-6 flex items-center justify-between">
+      <div className="sticky bottom-4 z-20 -mx-6 mt-6 flex items-center justify-between border-t border-line bg-paperVellum/90 px-6 py-3 backdrop-blur">
         <CtaLink label="back" onClick={() => setStep(1)} variant="ghost" back />
         <CtaLink label="grow your Eden" onClick={() => setStep(3)} />
       </div>

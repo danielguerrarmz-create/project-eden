@@ -156,7 +156,7 @@ export function StepPreview() {
         </div>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-6">
+      <div className="sticky bottom-4 z-20 -mx-6 mt-6 border-t border-line bg-paperVellum/90 px-6 py-3 backdrop-blur">
         <CtaLink label="back to design" onClick={() => setStep(2)} variant="ghost" back />
       </div>
     </div>

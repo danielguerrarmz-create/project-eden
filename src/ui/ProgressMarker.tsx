@@ -31,12 +31,14 @@ export function ProgressMarker() {
         const active = s.n === step;
         const done = s.n < step;
         const summary = done ? summaryFor(s.n) : null;
+        const tipId = `step-${s.n}-summary`;
         return (
           <div key={s.n} className="flex items-center gap-2">
             <div className="group relative flex items-center">
               <button
                 onClick={() => done && setStep(s.n)}
                 disabled={!done && !active}
+                aria-describedby={summary ? tipId : undefined}
                 className={`flex items-center gap-1.5 rounded-full transition ${
                   active ? 'py-1 pl-1 pr-3' : done ? 'cursor-pointer' : 'cursor-default'
                 }`}
@@ -60,6 +62,7 @@ export function ProgressMarker() {
               </button>
               {summary && (
                 <span
+                  id={tipId}
                   role="tooltip"
                   className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-line bg-paperVellum px-2.5 py-1 font-mono text-[10px] tracking-[0.06em] text-inkBlack/70 opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100"
                 >

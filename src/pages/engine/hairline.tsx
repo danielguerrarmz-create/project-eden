@@ -51,6 +51,8 @@ interface DimProps {
   labelOffset?: number;
   tick?: number;
   fontSize?: number;
+  /** Uppercase the label (default). Off for lowercase-unit labels like "8.0 m". */
+  uppercase?: boolean;
 }
 
 /** A dimension line: 0.75px rule, open perpendicular ticks at each end, mono label. */
@@ -64,6 +66,7 @@ export function DimensionLine({
   labelOffset = 7,
   tick = 2,
   fontSize = 6,
+  uppercase = true,
 }: DimProps) {
   const color = useInk(ink);
   const { px, py } = frame(x1, y1, x2, y2);
@@ -91,7 +94,7 @@ export function DimensionLine({
         fontSize={fontSize}
         textAnchor="middle"
         dominantBaseline="middle"
-        className="font-mono uppercase"
+        className={`font-mono${uppercase ? ' uppercase' : ''}`}
         style={{ letterSpacing: '0.04em' }}
       >
         {label}

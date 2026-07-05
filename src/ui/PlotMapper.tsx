@@ -185,7 +185,8 @@ export function PlotMapper() {
             y1={top - 20}
             x2={right}
             y2={top - 20}
-            label={`${plot.widthM.toFixed(1)}M`}
+            label={`${plot.widthM.toFixed(1)} m`}
+            uppercase={false}
             fontSize={13}
             tick={5}
             labelOffset={-12}
@@ -197,7 +198,8 @@ export function PlotMapper() {
             y1={top}
             x2={right + 22}
             y2={bottom}
-            label={`${plot.depthM.toFixed(1)}M`}
+            label={`${plot.depthM.toFixed(1)} m`}
+            uppercase={false}
             fontSize={13}
             tick={5}
             labelOffset={-16}

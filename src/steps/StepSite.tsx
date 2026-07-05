@@ -96,7 +96,7 @@ export function StepSite() {
         </div>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-10 flex justify-center md:justify-end">
+      <div className="sticky bottom-4 z-20 -mx-6 mt-10 flex justify-center border-t border-line bg-paperVellum/90 px-6 py-3 backdrop-blur md:justify-end">
         <CtaLink label="design your Eden" onClick={() => setStep(2)} />
       </div>
     </div>

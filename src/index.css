@@ -52,10 +52,15 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Visible keyboard focus everywhere, invisible for mouse users. */
+/* Visible keyboard focus everywhere, invisible for mouse users. A two-part
+   indicator so it clears WCAG 1.4.11 (3:1) on EVERY ground it can appear on: a
+   2px inkBlack outline offset by a 2px vellum ring (box-shadow fills the gap).
+   On light grounds the dark outline carries the contrast; on an ink-filled pill
+   the light ring does. Olive alone (1.91:1 on vellum) was insufficient. */
 :focus-visible {
-  outline: 2px solid #acc13a;
+  outline: 2px solid #17160f;
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fbf9f3;
   border-radius: 4px;
 }
 
