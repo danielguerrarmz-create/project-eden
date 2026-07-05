@@ -24,9 +24,12 @@ export default function App() {
       <Navbar />
 
       <main className="relative z-10">
-        {step === 1 && <StepSite />}
-        {step === 2 && <StepDesign />}
-        {step === 3 && <StepPreview />}
+        {/* key={step} replays the entrance animation on each step change */}
+        <div key={step} className="step-enter">
+          {step === 1 && <StepSite />}
+          {step === 2 && <StepDesign />}
+          {step === 3 && <StepPreview />}
+        </div>
       </main>
     </div>
   );

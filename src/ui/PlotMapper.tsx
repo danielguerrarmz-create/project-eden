@@ -1,13 +1,20 @@
 /**
- * PlotMapper.tsx — the top-down site mapper (new in v2).
+ * PlotMapper.tsx — the top-down site mapper, rebuilt in the hairline language.
  *
  * A resizable rectangle the user drags by its edge handles to set width x depth
- * in metres (live readout), plus a rotatable north marker on a compass ring that
- * sets orientation. Outputs feed the engine: plot dimensions cap the Eden
- * footprint, north drives the sun-path. Pure SVG + pointer events, no deps.
+ * in metres, plus a rotatable north marker (now the accent-olive highlight) on a
+ * compass ring. It reuses the Engine page's own DimensionLine / ExtensionLine /
+ * AccentMark primitives so the plot mapper is a literal instance of the same
+ * drawing vocabulary, not just a similarly-colored rectangle. Outputs feed the
+ * engine: plot dimensions cap the Eden footprint, north drives the sun-path.
+ *
+ * On mount and on discrete plot changes (a sample plot), the rectangle draws
+ * itself in (stroke-dashoffset); during an active drag it updates immediately.
+ * Reduced motion is handled by the app-wide media query that neutralises it.
  */
-import { useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useDesign } from '../state/store';
+import { DimensionLine, ExtensionLine, AccentMark, INK, InkProvider } from '../pages/engine/hairline';
 
 const PX_PER_M = 20;
 const W = 480;
@@ -31,13 +38,24 @@ export function PlotMapper() {
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<DragKind>(null);
 
+  // Re-key the rectangle to replay its draw-in on mount + discrete changes only.
+  const [drawTick, setDrawTick] = useState(0);
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return; // mount draw-in already plays via the initial key
+    }
+    if (!drag.current) setDrawTick((t) => t + 1);
+  }, [plot.widthM, plot.depthM]);
+
   const halfW = (plot.widthM * PX_PER_M) / 2;
   const halfD = (plot.depthM * PX_PER_M) / 2;
+  const perim = 4 * (halfW + halfD);
 
   const northRad = (plot.northDeg * Math.PI) / 180;
   const knobX = CX + RING_R * Math.sin(northRad);
   const knobY = CY - RING_R * Math.cos(northRad);
-  // Compass N label follows the arrow.
   const labelX = CX + (RING_R + 18) * Math.sin(northRad);
   const labelY = CY - (RING_R + 18) * Math.cos(northRad);
 
@@ -118,6 +136,16 @@ export function PlotMapper() {
   }
 
   const areaM2 = (plot.widthM * plot.depthM).toFixed(0);
+  const top = CY - halfD;
+  const bottom = CY + halfD;
+  const left = CX - halfW;
+  const right = CX + halfW;
+
+  const drawStyle: CSSProperties = {
+    ['--plot-perim' as string]: `${perim}`,
+    strokeDasharray: perim,
+    animation: 'plot-draw var(--dur-slow) var(--ease-out) both',
+  };
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -131,58 +159,73 @@ export function PlotMapper() {
         {/* Compass ring */}
         <circle cx={CX} cy={CY} r={RING_R} fill="none" stroke="#DED8CB" strokeWidth={1.5} strokeDasharray="3 6" />
 
-        {/* Plot rectangle */}
+        {/* Plot rectangle: near-neutral fill, ink boundary, drawn in on change */}
         <rect
-          x={CX - halfW}
-          y={CY - halfD}
+          key={drawTick}
+          x={left}
+          y={top}
           width={halfW * 2}
           height={halfD * 2}
-          rx={4}
-          fill="rgba(122,139,60,0.14)"
-          stroke="#7A8B3C"
-          strokeWidth={2}
+          rx={3}
+          fill="rgba(23,22,15,0.03)"
+          stroke="#17160F"
+          strokeWidth={1.75}
+          style={drawStyle}
         />
 
-        {/* Grid ticks inside the plot (1m) for scale feel */}
+        {/* Interior 1m grid (secondary linework) */}
         <GridTicks halfW={halfW} halfD={halfD} />
 
+        {/* Hairline dimensioning, reusing the Engine page primitives */}
+        <InkProvider value={INK.inkBlack}>
+          <ExtensionLine x={left} y={top} length={22} angle={-90} />
+          <ExtensionLine x={right} y={top} length={22} angle={-90} />
+          <DimensionLine
+            x1={left}
+            y1={top - 20}
+            x2={right}
+            y2={top - 20}
+            label={`${plot.widthM.toFixed(1)}M`}
+            fontSize={13}
+            tick={5}
+            labelOffset={-12}
+          />
+          <ExtensionLine x={right} y={top} length={24} angle={0} />
+          <ExtensionLine x={right} y={bottom} length={24} angle={0} />
+          <DimensionLine
+            x1={right + 22}
+            y1={top}
+            x2={right + 22}
+            y2={bottom}
+            label={`${plot.depthM.toFixed(1)}M`}
+            fontSize={13}
+            tick={5}
+            labelOffset={-16}
+          />
+        </InkProvider>
+
         {/* Edge handles — draggable AND keyboard-focusable (arrows nudge 0.5 m) */}
-        <EdgeHandle x={CX - halfW} y={CY} cursor="ew-resize" onDown={start('w-left')} onMove={onMove} onUp={end}
+        <EdgeHandle x={left} y={CY} cursor="ew-resize" onDown={start('w-left')} onMove={onMove} onUp={end}
           onKey={nudge('w-left')} label="plot width, left edge" value={plot.widthM} min={MIN_W} max={MAX_W} unit="metres" />
-        <EdgeHandle x={CX + halfW} y={CY} cursor="ew-resize" onDown={start('w-right')} onMove={onMove} onUp={end}
+        <EdgeHandle x={right} y={CY} cursor="ew-resize" onDown={start('w-right')} onMove={onMove} onUp={end}
           onKey={nudge('w-right')} label="plot width, right edge" value={plot.widthM} min={MIN_W} max={MAX_W} unit="metres" />
-        <EdgeHandle x={CX} y={CY - halfD} cursor="ns-resize" onDown={start('d-top')} onMove={onMove} onUp={end}
+        <EdgeHandle x={CX} y={top} cursor="ns-resize" onDown={start('d-top')} onMove={onMove} onUp={end}
           onKey={nudge('d-top')} label="plot depth, top edge" value={plot.depthM} min={MIN_D} max={MAX_D} unit="metres" />
-        <EdgeHandle x={CX} y={CY + halfD} cursor="ns-resize" onDown={start('d-bottom')} onMove={onMove} onUp={end}
+        <EdgeHandle x={CX} y={bottom} cursor="ns-resize" onDown={start('d-bottom')} onMove={onMove} onUp={end}
           onKey={nudge('d-bottom')} label="plot depth, bottom edge" value={plot.depthM} min={MIN_D} max={MAX_D} unit="metres" />
 
-        {/* Live dimension labels */}
-        <text x={CX} y={CY - halfD - 12} textAnchor="middle" className="fill-inkSoft" fontSize={14} fontWeight={600}>
-          {plot.widthM.toFixed(1)} m
-        </text>
-        <text
-          x={CX + halfW + 14}
-          y={CY}
-          textAnchor="start"
-          dominantBaseline="middle"
-          className="fill-inkSoft"
-          fontSize={14}
-          fontWeight={600}
-        >
-          {plot.depthM.toFixed(1)} m
-        </text>
-
-        {/* North arrow + draggable knob */}
-        <line x1={CX} y1={CY} x2={knobX} y2={knobY} stroke="#E06A4E" strokeWidth={2} />
-        <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" className="fill-bloom" fontSize={13} fontWeight={700}>
+        {/* North: line + draggable knob, the one accent-olive highlight */}
+        <line x1={CX} y1={CY} x2={knobX} y2={knobY} stroke="#ACC13A" strokeWidth={2} />
+        <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize={13} fontWeight={700} fill="#17160F">
           N
         </text>
+        <AccentMark cx={knobX} cy={knobY} r={7} />
         <circle
           cx={knobX}
           cy={knobY}
           r={11}
-          fill="#E06A4E"
-          stroke="#F6F4EE"
+          fill="#ACC13A"
+          stroke="#FBF9F3"
           strokeWidth={3}
           style={{ cursor: 'grab' }}
           onPointerDown={start('north')}
@@ -197,7 +240,7 @@ export function PlotMapper() {
           aria-valuetext={`${plot.northDeg} degrees`}
           onKeyDown={nudge('north')}
         />
-        <circle cx={CX} cy={CY} r={3} fill="#57514A" />
+        <circle cx={CX} cy={CY} r={3} fill="#17160F" />
       </svg>
 
       <div className="flex items-center gap-6 text-sm">
@@ -213,8 +256,8 @@ export function PlotMapper() {
 function Readout({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-center">
-      <div className="font-display text-lg font-semibold text-ink tabular-nums">{value}</div>
-      <div className="text-[11px] uppercase tracking-wider text-inkFaint">{label}</div>
+      <div className="font-mono text-base font-semibold text-inkBlack tabular-nums">{value}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">{label}</div>
     </div>
   );
 }
@@ -262,7 +305,7 @@ function EdgeHandle({
       onKeyDown={onKey}
     >
       <circle cx={x} cy={y} r={14} fill="transparent" />
-      <circle cx={x} cy={y} r={7} fill="#F6F4EE" stroke="#5E6E2B" strokeWidth={2.5} />
+      <circle cx={x} cy={y} r={7} fill="#FBF9F3" stroke="#17160F" strokeWidth={2.5} />
     </g>
   );
 }
@@ -270,12 +313,12 @@ function EdgeHandle({
 function GridTicks({ halfW, halfD }: { halfW: number; halfD: number }) {
   const lines: React.ReactNode[] = [];
   for (let px = PX_PER_M; px < halfW; px += PX_PER_M) {
-    lines.push(<line key={`vx${px}`} x1={CX + px} y1={CY - halfD} x2={CX + px} y2={CY + halfD} stroke="#7A8B3C" strokeOpacity={0.12} />);
-    lines.push(<line key={`vx-${px}`} x1={CX - px} y1={CY - halfD} x2={CX - px} y2={CY + halfD} stroke="#7A8B3C" strokeOpacity={0.12} />);
+    lines.push(<line key={`vx${px}`} x1={CX + px} y1={CY - halfD} x2={CX + px} y2={CY + halfD} stroke="#17160F" strokeOpacity={0.1} />);
+    lines.push(<line key={`vx-${px}`} x1={CX - px} y1={CY - halfD} x2={CX - px} y2={CY + halfD} stroke="#17160F" strokeOpacity={0.1} />);
   }
   for (let px = PX_PER_M; px < halfD; px += PX_PER_M) {
-    lines.push(<line key={`hy${px}`} x1={CX - halfW} y1={CY + px} x2={CX + halfW} y2={CY + px} stroke="#7A8B3C" strokeOpacity={0.12} />);
-    lines.push(<line key={`hy-${px}`} x1={CX - halfW} y1={CY - px} x2={CX + halfW} y2={CY - px} stroke="#7A8B3C" strokeOpacity={0.12} />);
+    lines.push(<line key={`hy${px}`} x1={CX - halfW} y1={CY + px} x2={CX + halfW} y2={CY + px} stroke="#17160F" strokeOpacity={0.1} />);
+    lines.push(<line key={`hy-${px}`} x1={CX - halfW} y1={CY - px} x2={CX + halfW} y2={CY - px} stroke="#17160F" strokeOpacity={0.1} />);
   }
   return <g>{lines}</g>;
 }

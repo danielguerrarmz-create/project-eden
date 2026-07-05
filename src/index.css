@@ -2,11 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared motion vocabulary (configurator + engine page). Every duration below is
+   auto-neutralised by the prefers-reduced-motion block further down. */
+:root {
+  --dur-instant: 120ms;
+  --dur-fast: 200ms;
+  --dur: 350ms; /* matches EngineSection's entrance fade */
+  --dur-slow: 700ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+/* Step entrance: the entering step fades in + rises 8px, matching the engine
+   page's section fade so the two surfaces share one motion language. */
+@keyframes step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.step-enter {
+  animation: step-enter var(--dur) var(--ease-out) both;
+}
+
+/* Plot mapper: the rectangle draws itself edge by edge (stroke-dashoffset). */
+@keyframes plot-draw {
+  from {
+    stroke-dashoffset: var(--plot-perim);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 body {
