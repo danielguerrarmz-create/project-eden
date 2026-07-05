@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/source-serif-4": "^5.2.9",
+    "@fontsource/bodoni-moda": "^5.2.7",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
     "react": "^18.3.1",

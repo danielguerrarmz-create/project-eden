@@ -17,13 +17,39 @@ export default {
         bloom: '#E06A4E',
         bark: '#9c8466',
         amber: '#B8842A',
+
+        // Eden documentation layer (Generative Engine page + LP materials only).
+        // Additive: never used inside the warm-paper configurator. See
+        // docs/DESIGN-DIRECTION.md §5. Field colors are full-bleed section
+        // grounds, used one at a time; accent-olive is the single chroma accent.
+        fieldBlue: '#C3DEF2',
+        fieldChartreuse: '#D8F27E',
+        fieldYellow: '#F0CE1B',
+        inkNavy: '#232C5E',
+        inkBlack: '#17160F',
+        accentOlive: '#ACC13A',
+        paperVellum: '#FBF9F3',
       },
       fontFamily: {
-        // Eccentric organic display for titles + the big price.
+        // Eccentric organic display for titles + the big price (configurator).
         display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
         // Clean neutral sans for all UI.
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+        // Editorial display serif for the Eden documentation layer (Freight Big
+        // Pro when licensed, self-hosted Source Serif 4 as the free fallback).
+        serifDisplay: [
+          '"Freight Big Pro"',
+          '"Source Serif 4 Variable"',
+          '"Source Serif 4"',
+          'Fraunces',
+          'Georgia',
+          'serif',
+        ],
+        // High-contrast serif for the single hero / pull-quote moment per page.
+        quote: ['"Bodoni Moda"', '"Freight Big Pro"', '"Source Serif 4 Variable"', 'Georgia', 'serif'],
+        // Technical mono now leads with IBM Plex Mono (drafting character) for
+        // dimensions/annotations; benefits both layers (DESIGN-DIRECTION.md §3).
+        mono: ['"IBM Plex Mono"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       keyframes: {
         'grow-in': {

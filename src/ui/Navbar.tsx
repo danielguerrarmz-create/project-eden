@@ -5,6 +5,7 @@
  */
 import { useDesign } from '../state/store';
 import { ProgressMarker } from './ProgressMarker';
+import { routes } from '../routing';
 
 export function Navbar() {
   const reset = useDesign((s) => s.reset);
@@ -26,15 +27,23 @@ export function Navbar() {
           <ProgressMarker />
         </div>
 
-        {/* Quiet reset */}
-        <button
-          onClick={reset}
-          className={`shrink-0 text-xs font-medium text-inkFaint hover:text-ink transition ${
-            step === 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          start over
-        </button>
+        {/* Quiet nav: a link into the engine explainer, then reset. */}
+        <div className="flex shrink-0 items-center gap-3">
+          <a
+            href={routes.engine}
+            className="text-xs font-medium text-inkFaint transition hover:text-ink"
+          >
+            the engine
+          </a>
+          <button
+            onClick={reset}
+            className={`text-xs font-medium text-inkFaint transition hover:text-ink ${
+              step === 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            start over
+          </button>
+        </div>
       </div>
     </div>
   );
