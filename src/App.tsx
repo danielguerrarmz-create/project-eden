@@ -17,8 +17,8 @@ export default function App() {
   const step = useDesign((s) => s.step);
 
   return (
-    <div className="relative min-h-screen w-full bg-paper text-ink">
-      {/* Quiet botanical tendril motif at the page edge */}
+    <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
+      {/* Quiet tendril motif at the page edge, a faint neutral line drawing */}
       <Tendril />
 
       <Navbar />
@@ -36,22 +36,22 @@ export default function App() {
 function Tendril() {
   return (
     <svg
-      className="pointer-events-none fixed bottom-0 left-0 z-0 h-[60vh] w-40 opacity-40"
+      className="pointer-events-none fixed bottom-0 left-0 z-0 h-[60vh] w-40 opacity-[0.14]"
       viewBox="0 0 120 400"
       fill="none"
       aria-hidden
     >
       <path
         d="M20 400 C 20 320, 60 300, 50 240 S 10 180, 40 130 S 80 90, 55 40"
-        stroke="#7A8B3C"
+        stroke="#17160F"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
-      <path d="M50 240 C 70 235, 82 248, 78 262" stroke="#7A8B3C" strokeWidth="1.3" strokeLinecap="round" />
-      <path d="M40 130 C 22 126, 12 138, 16 152" stroke="#7A8B3C" strokeWidth="1.3" strokeLinecap="round" />
-      <circle cx="55" cy="40" r="3" fill="#E06A4E" />
-      <ellipse cx="78" cy="262" rx="6" ry="3" fill="#8ea060" transform="rotate(30 78 262)" />
-      <ellipse cx="16" cy="152" rx="6" ry="3" fill="#8ea060" transform="rotate(-30 16 152)" />
+      <path d="M50 240 C 70 235, 82 248, 78 262" stroke="#17160F" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M40 130 C 22 126, 12 138, 16 152" stroke="#17160F" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="55" cy="40" r="3" fill="#17160F" />
+      <ellipse cx="78" cy="262" rx="6" ry="3" fill="#17160F" transform="rotate(30 78 262)" />
+      <ellipse cx="16" cy="152" rx="6" ry="3" fill="#17160F" transform="rotate(-30 16 152)" />
     </svg>
   );
 }

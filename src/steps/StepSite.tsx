@@ -1,7 +1,8 @@
 /**
  * StepSite.tsx — Step 1. "Where's your garden?"
  * An honest address stub (or a sample plot), then the top-down plot mapper. The
- * mapped rectangle + north feed the engine's footprint cap and sun-path.
+ * mapped rectangle + north feed the engine's footprint cap and sun-path. This is
+ * where the plot and sun enter the pipeline.
  */
 import { useState } from 'react';
 import { useDesign, type Plot } from '../state/store';
@@ -9,9 +10,9 @@ import { PlotMapper } from '../ui/PlotMapper';
 import { CtaLink } from '../ui/CtaLink';
 
 const SAMPLES: { name: string; plot: Partial<Plot> }[] = [
-  { name: 'town courtyard', plot: { widthM: 6, depthM: 5, northDeg: 20, address: '14 Alder Mews, Bristol' } },
-  { name: 'suburban lawn', plot: { widthM: 9, depthM: 7, northDeg: 0, address: '3 Hazel Close, Reading' } },
-  { name: 'walled garden', plot: { widthM: 12, depthM: 9, northDeg: 300, address: 'The Old Rectory, Devon' } },
+  { name: 'Town courtyard', plot: { widthM: 6, depthM: 5, northDeg: 20, address: '14 Alder Mews, Bristol' } },
+  { name: 'Suburban lawn', plot: { widthM: 9, depthM: 7, northDeg: 0, address: '3 Hazel Close, Reading' } },
+  { name: 'Walled garden', plot: { widthM: 12, depthM: 9, northDeg: 300, address: 'The Old Rectory, Devon' } },
 ];
 
 export function StepSite() {
@@ -25,38 +26,41 @@ export function StepSite() {
       <div className="grid gap-10 md:grid-cols-2 md:items-center">
         {/* Left: intent + address */}
         <div className="max-w-md">
-          <p className="mb-3 text-sm font-medium uppercase tracking-widest text-moss">step one · site</p>
-          <h1 className="font-display text-5xl font-semibold lowercase leading-[0.95] text-ink sm:text-6xl">
-            where's your
-            <br />
-            garden?
+          <div className="mb-3 flex items-center gap-2">
+            <SiteGlyph />
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/70">
+              step one · site
+            </p>
+          </div>
+          <h1 className="font-quote text-[clamp(2.5rem,5.5vw,4.5rem)] font-bold leading-[0.98] tracking-[-0.02em] text-inkBlack">
+            Where's <em className="italic">your</em> garden?
           </h1>
-          <p className="mt-5 text-[15px] leading-relaxed text-inkSoft">
-            Start from your place. Map the patch of ground your Eden will live on, then we design
-            a pollinator pavilion that fits it and faces the sun.
+          <p className="mt-5 text-[15px] leading-relaxed text-inkBlack/70">
+            Map the patch of ground your Eden will live on. We'll design a pollinator pavilion that
+            fits it and faces the sun.
           </p>
 
           <div className="mt-7">
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-inkFaint">
-              address <span className="normal-case text-inkFaint/70">(demo stub, no lookup)</span>
+            <label className="mb-2 block font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
+              address <span className="normal-case">(demo stub, no lookup)</span>
             </label>
             <div className="flex gap-2">
               <input
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
                 placeholder="type a street, or pick a sample below"
-                className="flex-1 rounded-full border border-line bg-white/60 px-4 py-2.5 text-sm text-ink placeholder:text-inkFaint/70 focus:border-moss focus:outline-none"
+                className="flex-1 rounded-full border border-line bg-white/60 px-4 py-2.5 text-sm text-inkBlack placeholder:text-inkBlack/45 focus:border-accentOlive focus:outline-none"
               />
               <button
                 onClick={() => typed.trim() && setPlot({ address: typed.trim() })}
-                className="rounded-full border border-line px-4 py-2.5 text-sm font-medium text-inkSoft hover:border-moss hover:text-ink transition"
+                className="rounded-full border border-line px-4 py-2.5 text-sm font-medium text-inkBlack/85 transition hover:border-inkBlack/40"
               >
                 set
               </button>
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-medium uppercase tracking-wider text-inkFaint">
+              <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
                 or use a sample plot
               </div>
               <div className="flex flex-wrap gap-2">
@@ -67,7 +71,7 @@ export function StepSite() {
                       setPlot(s.plot);
                       setTyped(s.plot.address ?? '');
                     }}
-                    className="rounded-full border border-line bg-white/50 px-3.5 py-1.5 text-sm text-inkSoft hover:border-moss hover:text-ink transition"
+                    className="flex h-10 items-center rounded-full border border-line bg-paperVellum px-4 text-sm text-inkBlack/85 transition hover:border-inkBlack/40"
                   >
                     {s.name}
                   </button>
@@ -76,25 +80,35 @@ export function StepSite() {
             </div>
 
             {address && (
-              <p className="mt-4 text-sm text-mossDeep">
-                mapping <span className="font-medium">{address}</span>
+              <p className="mt-4 text-sm text-inkBlack/70">
+                mapping <span className="font-medium text-inkBlack">{address}</span>
               </p>
             )}
           </div>
         </div>
 
         {/* Right: the mapper */}
-        <div className="rounded-3xl border border-line bg-white/40 p-6 shadow-[0_20px_60px_-40px_rgba(30,27,23,0.5)]">
-          <div className="mb-3 text-center text-xs font-medium uppercase tracking-wider text-inkFaint">
-            drag the edges to size · drag the coral dot to orient
+        <div className="rounded-3xl border border-line bg-white/40 p-6 shadow-[0_20px_60px_-40px_rgba(23,22,15,0.5)]">
+          <div className="mb-3 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+            drag the edges to size · drag the marker to set north
           </div>
           <PlotMapper />
         </div>
       </div>
 
-      <div className="mt-10 flex justify-center md:justify-end">
+      <div className="sticky bottom-4 z-20 mt-10 flex justify-center md:justify-end">
         <CtaLink label="design your Eden" onClick={() => setStep(2)} />
       </div>
     </div>
+  );
+}
+
+/** A tiny plot-with-north glyph, the D1 site-envelope grammar at icon scale. */
+function SiteGlyph() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="#17160F" aria-hidden>
+      <rect x={2.5} y={4.5} width={11} height={8} strokeWidth={1} />
+      <path d="M8 4.5 L8 1.6 M6.9 2.7 L8 1.3 L9.1 2.7" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

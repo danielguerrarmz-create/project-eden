@@ -27,17 +27,22 @@ export function segmentMatrix(
   return scratch.matrix.clone();
 }
 
-/** Heat colour ramp: 0 (cool sparse) -> 1 (hot dense). Green -> amber -> red. */
+const HEAT_SPARSE = new THREE.Color('#17160F'); // inkBlack, near-invisible sparse cells
+const HEAT_DENSE = new THREE.Color('#ACC13A'); // accentOlive, the one "look here" hue
+
+/** Density ramp: sparse (inkBlack) -> dense (accentOlive). One accent hue, no glow. */
 export function heatColor(t: number): THREE.Color {
-  const c = new THREE.Color();
-  // hue 130° (green) down to 0° (red) as density rises.
-  c.setHSL((130 - 130 * Math.min(1, Math.max(0, t))) / 360, 0.7, 0.5);
-  return c;
+  return HEAT_SPARSE.clone().lerp(HEAT_DENSE, Math.min(1, Math.max(0, t)));
 }
 
-/** Foliage green varying slightly with density for a less flat canopy. */
+/**
+ * Foliage in the accentOlive hue family but as a MATERIAL, not flat UI paint:
+ * richer and darker than the chip color, with organic variation by density.
+ * hue 66..80°, sat 0.45..0.60, lightness 0.30..0.45 (denser = deeper).
+ */
 export function leafColor(t: number): THREE.Color {
   const c = new THREE.Color();
-  c.setHSL((95 + 25 * t) / 360, 0.55, 0.28 + 0.12 * (1 - t));
+  const tt = Math.min(1, Math.max(0, t));
+  c.setHSL((80 - 14 * tt) / 360, 0.45 + 0.15 * tt, 0.45 - 0.15 * tt);
   return c;
 }

@@ -33,45 +33,69 @@ export function GardenContext() {
     return new THREE.EdgesGeometry(g);
   }, [plot.widthM, plot.depthM]);
 
+  // Interior 1m drawing-sheet grid (secondary linework). WebGL line width isn't
+  // reliably controllable, so primary-vs-secondary weight is expressed as opacity:
+  // full-opacity boundary (outline) above, 0.10 interior grid here.
+  const grid = useMemo(() => {
+    const w = plot.widthM;
+    const d = plot.depthM;
+    const y = 0.006;
+    const pts: number[] = [];
+    for (let x = Math.ceil(-w / 2 + 1e-3); x <= Math.floor(w / 2 - 1e-3); x++) {
+      pts.push(x, y, -d / 2, x, y, d / 2);
+    }
+    for (let z = Math.ceil(-d / 2 + 1e-3); z <= Math.floor(d / 2 - 1e-3); z++) {
+      pts.push(-w / 2, y, z, w / 2, y, z);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    return g;
+  }, [plot.widthM, plot.depthM]);
+
   const northRad = (plot.northDeg * Math.PI) / 180;
   const markerDist = Math.max(plot.widthM, plot.depthM) / 2 + 0.7;
 
   return (
     <group>
-      {/* Soft surrounding ground (paper-sand) */}
+      {/* Soft surrounding ground, cooled toward the vellum family */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
         <circleGeometry args={[26, 48]} />
-        <meshStandardMaterial color="#e7e1d1" roughness={1} />
+        <meshStandardMaterial color="#EFEBDD" roughness={1} />
       </mesh>
 
-      {/* The mapped plot: a muted lawn rectangle, width x depth */}
+      {/* The mapped plot: a near-neutral drawing sheet, a whisper of ink over the ground */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[plot.widthM, plot.depthM]} />
-        <meshStandardMaterial color="#8ea060" roughness={1} />
+        <meshStandardMaterial color="#17160F" transparent opacity={0.03} roughness={1} />
       </mesh>
+      {/* Secondary linework: interior 1m grid */}
+      <lineSegments geometry={grid}>
+        <lineBasicMaterial color="#17160F" transparent opacity={0.1} />
+      </lineSegments>
+      {/* Primary linework: the plot boundary */}
       <lineSegments geometry={outline} position={[0, 0.006, 0]}>
-        <lineBasicMaterial color="#5E6E2B" />
+        <lineBasicMaterial color="#17160F" />
       </lineSegments>
 
       {/* Gravel apron under the Eden */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} receiveShadow>
         <circleGeometry args={[geo.footprintRadiusM + 0.45, 40]} />
-        <meshStandardMaterial color="#d9d0b8" roughness={1} />
+        <meshStandardMaterial color="#E5DFC9" roughness={1} />
       </mesh>
 
-      {/* Planting beds at the base — where the sacrificial armature is rooted */}
+      {/* Planting beds at the base, a soil material that recedes into the ink family */}
       {beds.map((p, i) => (
         <mesh key={i} position={[p[0], 0.014, p[2]]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.3, 16]} />
-          <meshStandardMaterial color="#5b4632" roughness={1} />
+          <meshStandardMaterial color="#2A2419" roughness={1} />
         </mesh>
       ))}
 
-      {/* North marker: a coral arrow on the ground, rotated to the set orientation */}
+      {/* North marker: the one functional highlight, accent olive, rotated to orientation */}
       <group rotation={[0, -northRad, 0]}>
         <mesh position={[0, 0.02, -markerDist]} rotation={[-Math.PI / 2, 0, 0]}>
           <coneGeometry args={[0.28, 0.6, 3]} />
-          <meshStandardMaterial color="#E06A4E" roughness={0.6} />
+          <meshStandardMaterial color="#ACC13A" roughness={0.6} />
         </mesh>
       </group>
     </group>

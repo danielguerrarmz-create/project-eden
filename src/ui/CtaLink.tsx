@@ -1,7 +1,9 @@
 /**
- * CtaLink.tsx — the Cedar-style forward action: a confident text label with an
- * arrow that slides on hover. Two weights: 'solid' (the primary advance, an ink
- * pill) and 'ghost' (a quiet underline link). No blue anywhere; accent is moss.
+ * CtaLink.tsx — the forward action: a confident text label with an arrow that
+ * slides on hover. Two weights: 'solid' (the primary advance, an ink pill) and
+ * 'ghost' (a quiet underline link). The one accent is olive, used as a hover
+ * ring/underline only, never as a fill swap (a fill change would read as the
+ * "recommended" pill signal, the wrong message for a plain forward action).
  */
 interface Props {
   label: string;
@@ -19,10 +21,10 @@ export function CtaLink({ label, onClick, variant = 'solid', back = false, disab
         type={type}
         onClick={onClick}
         disabled={disabled}
-        className="group inline-flex items-center gap-2 text-sm font-medium text-inkSoft hover:text-ink disabled:opacity-40 transition"
+        className="group inline-flex items-center gap-2 text-sm font-medium text-inkBlack/70 hover:text-inkBlack disabled:opacity-40 transition"
       >
         {back && <span className="transition-transform group-hover:-translate-x-1">&larr;</span>}
-        <span className="border-b border-transparent group-hover:border-ink/40 pb-0.5">{label}</span>
+        <span className="border-b border-transparent group-hover:border-accentOlive/60 pb-0.5">{label}</span>
         {!back && <span className="transition-transform group-hover:translate-x-1">&rarr;</span>}
       </button>
     );
@@ -33,7 +35,7 @@ export function CtaLink({ label, onClick, variant = 'solid', back = false, disab
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="group inline-flex items-center gap-2.5 rounded-full bg-ink px-6 py-3 text-[15px] font-medium text-paper hover:bg-mossDeep disabled:opacity-40 disabled:hover:bg-ink transition-colors shadow-sm"
+      className="group inline-flex items-center gap-2.5 rounded-full bg-inkBlack px-6 py-3 text-[15px] font-medium text-paperVellum ring-2 ring-transparent hover:ring-accentOlive/60 disabled:opacity-40 disabled:hover:ring-transparent transition shadow-sm"
     >
       <span>{label}</span>
       <span className="transition-transform group-hover:translate-x-1">&rarr;</span>

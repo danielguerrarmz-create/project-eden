@@ -1,10 +1,12 @@
 /**
- * Navbar.tsx — the floating translucent pill (Cedar's structure, our identity).
- * Wordmark left, a slim 3-step progress marker centre, a quiet "start over"
- * right. Nothing else. It floats over whatever stage the current step shows.
+ * Navbar.tsx — the floating translucent pill. Wordmark left, a slim 3-step
+ * progress marker centre, quiet mono nav links right (the engine, start over).
+ * Its chrome matches the Engine page header exactly so the two surfaces read as
+ * one continuous system.
  */
 import { useDesign } from '../state/store';
 import { ProgressMarker } from './ProgressMarker';
+import { SproutGlyph } from './SproutGlyph';
 import { routes } from '../routing';
 
 export function Navbar() {
@@ -13,12 +15,12 @@ export function Navbar() {
 
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-30 w-[min(920px,calc(100vw-1.5rem))]">
-      <div className="flex items-center justify-between gap-4 rounded-full border border-line/80 bg-paper/80 px-5 py-2.5 shadow-[0_6px_24px_-12px_rgba(30,27,23,0.35)] backdrop-blur-md">
+      <div className="flex items-center justify-between gap-4 rounded-full border border-line bg-paperVellum/85 px-5 py-2.5 shadow-[0_6px_24px_-12px_rgba(23,22,15,0.35)] backdrop-blur-md">
         {/* Wordmark */}
         <div className="flex items-center gap-2 shrink-0">
-          <Sprout />
-          <span className="font-display text-[19px] font-semibold lowercase tracking-tight text-ink">
-            living eden
+          <SproutGlyph size={20} />
+          <span className="font-serifDisplay text-[19px] font-semibold tracking-tight text-inkBlack">
+            Living Eden
           </span>
         </div>
 
@@ -31,13 +33,13 @@ export function Navbar() {
         <div className="flex shrink-0 items-center gap-3">
           <a
             href={routes.engine}
-            className="text-xs font-medium text-inkFaint transition hover:text-ink"
+            className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/70 transition hover:text-inkBlack"
           >
             the engine
           </a>
           <button
             onClick={reset}
-            className={`text-xs font-medium text-inkFaint transition hover:text-ink ${
+            className={`font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/70 transition hover:text-inkBlack ${
               step === 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
           >
@@ -46,22 +48,5 @@ export function Navbar() {
         </div>
       </div>
     </div>
-  );
-}
-
-function Sprout() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path d="M12 21V11" stroke="#5E6E2B" strokeWidth="1.8" strokeLinecap="round" />
-      <path
-        d="M12 12C12 8.5 9 6.5 5.5 6.5C5.5 10 8 12 12 12Z"
-        fill="#7A8B3C"
-      />
-      <path
-        d="M12 10.5C12 7.5 14.6 5 18 5C18 8.2 15.5 10.5 12 10.5Z"
-        fill="#8ea060"
-      />
-      <circle cx="12" cy="21" r="1.1" fill="#E06A4E" />
-    </svg>
   );
 }

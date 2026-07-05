@@ -8,6 +8,7 @@
  * if the CSS layer itself is what broke.
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { SproutGlyph } from './SproutGlyph';
 
 interface Props {
   children: ReactNode;
@@ -39,26 +40,26 @@ export class ErrorBoundary extends Component<Props, State> {
           minHeight: '100vh',
           display: 'grid',
           placeItems: 'center',
-          background: '#F6F4EE',
-          color: '#1E1B17',
+          background: '#FBF9F3',
+          color: '#17160F',
           fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
           padding: '2rem',
         }}
       >
         <div style={{ maxWidth: 420, textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }} aria-hidden>
-            🌱
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }} aria-hidden>
+            <SproutGlyph size={40} />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>
-            something snapped a twig
+            Something snapped a twig
           </h1>
-          <p style={{ fontSize: 14, lineHeight: 1.6, color: '#57514A', margin: '0 0 6px' }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: 'rgba(23,22,15,0.7)', margin: '0 0 6px' }}>
             The demo hit an unexpected error. Reloading usually fixes it.
           </p>
           <p
             style={{
               fontSize: 12,
-              color: '#8B857B',
+              color: 'rgba(23,22,15,0.45)',
               fontFamily: 'ui-monospace, monospace',
               margin: '0 0 20px',
               wordBreak: 'break-word',
@@ -71,8 +72,8 @@ export class ErrorBoundary extends Component<Props, State> {
             style={{
               borderRadius: 999,
               border: 'none',
-              background: '#1E1B17',
-              color: '#F6F4EE',
+              background: '#17160F',
+              color: '#FBF9F3',
               padding: '10px 24px',
               fontSize: 14,
               fontWeight: 500,

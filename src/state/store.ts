@@ -102,6 +102,11 @@ interface DesignState {
   outputs: EngineOutputs;
   overlays: Record<OverlayKey, boolean>;
 
+  // Has the user actively chosen this control yet? Drives the "recommended"
+  // pill hint, which shows only on the untouched default option.
+  sizeTouched: boolean;
+  speciesTouched: boolean;
+
   reserveEmail: string;
   reserved: boolean;
 
@@ -141,6 +146,9 @@ export const useDesign = create<DesignState>((set, get) => {
     // Step-driven: heatmap shows the species re-weighting; growth is the star of step 3.
     overlays: { sunPath: false, strutHeatmap: true, waterFlow: false, growth: false },
 
+    sizeTouched: false,
+    speciesTouched: false,
+
     reserveEmail: '',
     reserved: false,
 
@@ -158,11 +166,11 @@ export const useDesign = create<DesignState>((set, get) => {
       set({ plot, ...recompute({ plot }) });
     },
 
-    setSizePreset: (sizePreset) => set({ sizePreset, ...recompute({ sizePreset }) }),
+    setSizePreset: (sizePreset) => set({ sizePreset, sizeTouched: true, ...recompute({ sizePreset }) }),
 
     setOpenness: (openness01) => set({ openness01, ...recompute({ openness01 }) }),
 
-    setSpecies: (id) => set(recompute({ speciesId: id })),
+    setSpecies: (id) => set({ speciesTouched: true, ...recompute({ speciesId: id }) }),
 
     setYear: (year) => set(recompute({ year })),
 
@@ -193,6 +201,8 @@ export const useDesign = create<DesignState>((set, get) => {
         params: initialParams,
         outputs: runEngine(initialParams),
         overlays: { sunPath: false, strutHeatmap: true, waterFlow: false, growth: false },
+        sizeTouched: false,
+        speciesTouched: false,
         reserved: false,
         reserveEmail: '',
       }),

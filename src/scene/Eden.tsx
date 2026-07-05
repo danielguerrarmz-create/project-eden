@@ -42,9 +42,9 @@ export function Eden() {
       castShadow
       receiveShadow
     >
-      {/* Unit cylinder (r=0.03, h=1) — scaled per member by the instance matrix. */}
-      <cylinderGeometry args={[0.03, 0.03, 1, 6]} />
-      <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
+      {/* Unit cylinder (r=0.024, h=1), scaled per member by the instance matrix. */}
+      <cylinderGeometry args={[0.024, 0.024, 1, 6]} />
+      <meshStandardMaterial color="#17160F" roughness={0.62} metalness={0} />
     </instancedMesh>
   );
 }

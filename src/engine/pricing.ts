@@ -43,12 +43,12 @@ export function priceDesign(
     {
       label: `${components.totalCount} timber components`,
       valueGBP: r(componentsGBP),
-      note: 'PLACEHOLDER rate — TODO: wire real fab quote',
+      note: 'Placeholder rate, not yet a confirmed fabrication quote',
     },
     { label: `Cutting & finishing (${components.totalLengthM} m)`, valueGBP: r(cuttingGBP) },
     { label: 'Install (base + per member)', valueGBP: r(installGBP) },
-    { label: `Planting — ${plantCount}× ${species.common}`, valueGBP: r(plantingGBP) },
-    { label: 'Garden-designer channel fee (12%)', valueGBP: r(designerFeeGBP), note: 'mandatory — counted as COGS' },
+    { label: `Planting: ${plantCount}× ${species.common}`, valueGBP: r(plantingGBP) },
+    { label: 'Garden-designer channel fee (12%)', valueGBP: r(designerFeeGBP), note: 'mandatory, counted as cost of goods' },
     { label: 'VAT (20%)', valueGBP: r(vatGBP) },
   ];
 

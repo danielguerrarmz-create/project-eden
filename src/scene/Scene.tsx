@@ -13,6 +13,7 @@ import { OrbitControls, ContactShadows } from '@react-three/drei';
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { webglSupported } from '../ui/webgl';
+import { SproutGlyph } from '../ui/SproutGlyph';
 import { Eden } from './Eden';
 import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
@@ -31,18 +32,19 @@ export function Scene() {
       camera={{ position: [7, 4.6, 8], fov: 42 }}
       className="!absolute inset-0"
     >
-      <color attach="background" args={['#F6F4EE']} />
-      <fog attach="fog" args={['#F6F4EE', 20, 46]} />
+      <color attach="background" args={['#FBF9F3']} />
+      <fog attach="fog" args={['#FBF9F3', 20, 46]} />
 
-      <ambientLight intensity={0.85} />
+      {/* Even "studio" light: a technical drawing is shown in flat light, not golden hour. */}
+      <ambientLight intensity={0.95} />
       <directionalLight
         position={[6, 10, 5]}
-        intensity={1.35}
+        intensity={1.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0002}
       />
-      <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
+      <hemisphereLight args={['#FBF9F3', '#E4E0D2', 0.6]} />
 
       <GardenContext />
       <Eden />
@@ -71,11 +73,11 @@ function NoWebGL() {
   return (
     <div className="absolute inset-0 grid place-items-center p-6" role="status">
       <div className="max-w-sm text-center">
-        <div className="mb-2 text-3xl" aria-hidden>
-          🌿
+        <div className="mb-3 flex justify-center" aria-hidden>
+          <SproutGlyph />
         </div>
-        <p className="text-sm font-medium text-ink">this browser can't render the 3D stage</p>
-        <p className="mt-1 text-[13px] leading-relaxed text-inkSoft">
+        <p className="text-sm font-medium text-inkBlack">This browser can't render the 3D stage.</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-inkBlack/70">
           The Eden preview needs WebGL. Try a current Chrome, Edge, Firefox or Safari, or
           another device. All the numbers on this page still update live.
         </p>
