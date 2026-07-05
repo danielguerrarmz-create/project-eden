@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, open: true },
+  // Dedicated dev port. strictPort: fail loudly instead of drifting onto a
+  // neighbour's port (5173 portfolio, 5188 LSSC, 8787 Axon also run locally).
+  server: { port: 5333, strictPort: true, open: true },
   build: {
     // The three.js stack is inherently ~1 MB minified; it is split into its own
     // cached chunk below, so don't warn about it on every build.

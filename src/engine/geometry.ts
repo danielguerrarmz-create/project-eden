@@ -131,6 +131,29 @@ function dist(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+/** One point on an elevation section: in-plan radius (m) + height (m). */
+export interface ProfileSample {
+  radius: number;
+  y: number;
+}
+
+/**
+ * The real elevation silhouette of the canopy along a radial section at a
+ * compass bearing, sampled edge (v=0) to crown (v=1) from the SAME surface
+ * function the members are built on. The section at the aperture bearing sits
+ * higher than its opposite, so a drawing that samples both bearings shows the
+ * true lift asymmetry. Pure; used by the documentation-layer diagrams so they
+ * draw live engine geometry, never a freehand dome.
+ */
+export function canopyProfile(params: DesignParams, bearingDeg: number, samples = 24): ProfileSample[] {
+  const u = ((((bearingDeg % 360) + 360) % 360) / 360) % 1;
+  return Array.from({ length: samples }, (_, i) => {
+    const v = i / (samples - 1);
+    const { point } = surfacePoint(params, u, v);
+    return { radius: Math.hypot(point[0], point[2]), y: point[1] };
+  });
+}
+
 export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   const params = clampParams(rawParams);
   const { a: planAM, b: planBM } = planDims(params.footprintM2);
