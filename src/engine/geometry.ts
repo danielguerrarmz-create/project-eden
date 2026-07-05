@@ -46,7 +46,7 @@ export function clampParams(p: DesignParams): DesignParams {
 }
 
 /** Dome rib profile at height parameter t (0 = ground, 1 = oculus). */
-function ribProfile(t: number, R: number, H: number): { radius: number; y: number } {
+export function ribProfile(t: number, R: number, H: number): { radius: number; y: number } {
   // radius sweeps from R at the base to a small open oculus at the top.
   const radius = R * (1 - 0.82 * Math.pow(t, 1.7));
   // y rises fast then flattens into a dome shoulder.

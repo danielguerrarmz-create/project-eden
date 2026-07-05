@@ -14,9 +14,9 @@ import { GROWTH } from '../data/config';
 import type { GrowthState, Species, Year } from './types';
 
 const LABELS: Record<Year, string> = {
-  0: 'Year 0 — just planted',
-  1: 'Year 1 — establishing',
-  3: 'Year 3 — grown in',
+  0: 'Year 0, just planted',
+  1: 'Year 1, establishing',
+  3: 'Year 3, grown in',
 };
 
 export function computeGrowth(species: Species, year: Year): GrowthState {

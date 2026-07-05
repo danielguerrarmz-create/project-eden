@@ -28,7 +28,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.28, // twiners want closely-spaced verticals to wrap
     sunNeed: 'partial',
     pollinatorValue: 0.95,
-    floweringMonths: 'Jun–Sep',
+    floweringMonths: 'Jun to Sep',
     evergreen: false,
     note: 'Night-scented; moths + long-tongued bees. Twining stems need vertical wires/battens to spiral around.',
   },
@@ -42,7 +42,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.16, // petiole-clasping wants a fine MESH to grab
     sunNeed: 'full',
     pollinatorValue: 0.6,
-    floweringMonths: 'Apr–May',
+    floweringMonths: 'Apr to May',
     evergreen: false,
     note: 'Vigorous spring blossom. Leaf-stalks clasp thin members, so it wants a fine two-way mesh, not big posts.',
   },
@@ -56,7 +56,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.30,
     sunNeed: 'partial',
     pollinatorValue: 0.7,
-    floweringMonths: 'Jul–Aug',
+    floweringMonths: 'Jul to Aug',
     evergreen: true,
     note: 'Evergreen, intensely fragrant. Slower, tidy twiner — year-round green skin, best on a sheltered warm face.',
   },
@@ -70,7 +70,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.55, // scramblers ride HORIZONTAL rails and are tied in
     sunNeed: 'full',
     pollinatorValue: 0.55,
-    floweringMonths: 'Jun–Sep (repeat)',
+    floweringMonths: 'Jun to Sep (repeat)',
     evergreen: false,
     note: 'No self-clinging — canes are tied to horizontal rails. Repeat-flowering, disease-tough. Wants wide horizontal supports.',
   },
@@ -84,7 +84,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.12, // tendrils want the finest mesh of all
     sunNeed: 'full',
     pollinatorValue: 0.5,
-    floweringMonths: 'Jun–Aug',
+    floweringMonths: 'Jun to Aug',
     evergreen: false,
     note: 'Annual; fastest to clothe a mesh in year one but resets each spring. True tendrils need the finest netting.',
   },
@@ -98,7 +98,7 @@ export const SPECIES: Species[] = [
     supportSpacingM: 0.9, // self-clinging: needs almost no support, near-solid skin
     sunNeed: 'shade',
     pollinatorValue: 0.85, // late-season nectar lifeline (Sep–Nov)
-    floweringMonths: 'Sep–Nov',
+    floweringMonths: 'Sep to Nov',
     evergreen: true,
     note: 'Self-clinging aerial roots — barely needs struts, forms a dense evergreen skin. Vital late-season nectar. Kept OFF the load path on the armature so roots never touch structural timber.',
   },

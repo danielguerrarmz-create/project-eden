@@ -46,25 +46,25 @@ function habitProfile(species: Species): {
       return {
         base: 0.55,
         orientation: 'vertical',
-        strategy: `${species.common} twines — the engine spaces CLOSE VERTICAL battens for stems to spiral up.`,
+        strategy: `${species.common} twines. The engine spaces CLOSE VERTICAL battens for stems to spiral up.`,
       };
     case 'tendril':
       return {
         base: 0.7,
         orientation: 'mesh',
-        strategy: `${species.common} climbs by tendrils — the engine lays a FINE TWO-WAY MESH for them to grab.`,
+        strategy: `${species.common} climbs by tendrils. The engine lays a FINE TWO-WAY MESH for them to grab.`,
       };
     case 'scrambler':
       return {
         base: 0.4,
         orientation: 'horizontal',
-        strategy: `${species.common} scrambles — the engine adds WIDE HORIZONTAL RAILS to tie the canes to.`,
+        strategy: `${species.common} scrambles. The engine adds WIDE HORIZONTAL RAILS to tie the canes to.`,
       };
     case 'clinging':
       return {
         base: 0.9,
         orientation: 'mesh',
-        strategy: `${species.common} self-clings — the engine presents a NEAR-SOLID skin (min struts) and keeps roots off the structure.`,
+        strategy: `${species.common} self-clings. The engine presents a NEAR-SOLID skin (min struts) and keeps roots off the structure.`,
       };
   }
 }
