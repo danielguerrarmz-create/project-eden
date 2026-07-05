@@ -107,15 +107,18 @@ export function EnginePage() {
           time you come back to it.
         </p>
         <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-          The engine then rolls that arc into eight compass sectors and finds which one gets the most
-          daylight. That single number, the sunniest sector, is what the next section uses to decide
-          where the structure needs the densest support.
+          The engine then rolls that arc into eight compass sectors and finds which sector
+          accumulates the most sun over the whole day, weighted by how high the sun sits at each
+          hour, not just which way faces the sun at solar noon. On a long summer day that is often an
+          eastern or western face rather than due south, since a face catches many hours of climbing
+          or falling sun where south only catches the brief overhead peak. That most-sun-hours sector
+          is what the next section uses to decide where the structure needs the densest support.
         </p>
 
         <div className="mx-auto mt-12 max-w-[460px]">
           <SunPathDiagram outputs={outputs} />
           <AnnotationStrip>
-            peak altitude {sunPath.peakAltitudeDeg.toFixed(0)}° · sunniest face{' '}
+            peak altitude {sunPath.peakAltitudeDeg.toFixed(0)}° · most sun-hours:{' '}
             {strutField.sunwardSector}
           </AnnotationStrip>
         </div>

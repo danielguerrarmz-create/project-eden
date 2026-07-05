@@ -113,14 +113,16 @@ No diagram in this section. Keep it text only, generous whitespace, so the page 
 
 > Given a latitude and the day of year, the engine computes the sun's altitude and compass bearing hour by hour, using the same solar position astronomy an architect would use by hand: a declination angle for the date, an hour angle for the time, and standard trigonometry to resolve altitude and azimuth. It is deterministic. The same site, the same date, always gives the same arc, which is why the same Eden looks right in the render every time you come back to it.
 >
-> The engine then rolls that arc into eight compass sectors and finds which one gets the most daylight. That single number, the sunniest sector, is what the next section uses to decide where the structure needs the densest support.
+> The engine then rolls that arc into eight compass sectors and finds which one accumulates the most sun over the whole day, weighted by how high the sun sits at each hour, not just which way faces the sun at solar noon. On a long summer day that is often an eastern or western face rather than due south, since a face catches many hours of climbing or falling sun where south only catches the brief overhead peak. That sector is what the next section uses to decide where the structure needs the densest support.
+
+**Build note (added after implementation review):** at the default site, this resolves to east, not south, since morning and afternoon sun-hours at this latitude on the sampled day genuinely outweigh the single solar-noon sample in the south sector. This is a correct, honest output of the rule-of-thumb roll-up, not a bug, and the copy above is written to explain it rather than let it read as an error. Label the diagram annotation `MOST SUN-HOURS: {sectorName}`, not `SUNNIEST FACE`, so it does not imply "faces the sun at noon."
 
 **D2: Sun path arc.**
 
 - Composition: a semicircular arc (the sky dome, simplified to the sun's path from sunrise to sunset) drawn above a horizon line, with the actual sampled points from `computeSunPath()` (hours 4 through 20, altitude in degrees) plotted as small ticks along the arc, one path connecting them.
 - Solar noon marked as an `AccentMark` (the one `accentOlive` highlight in this diagram) at the peak altitude point, with a `DimensionLine`-style vertical from the horizon up to that point, labeled with the live `peakAltitudeDeg` value (worked example at the default site: latitude 51.5°N, day of year 172, is approximately 62 degrees at solar noon; render the real computed number, do not hardcode 62).
 - Below the arc, an 8-segment compass ring (N at top, matching `SECTOR_NAMES` order) with each sector's fill opacity driven by its `exposureBySector` value (0 to 1, mapped to 8 to 40 percent `inkNavy` fill), and the sunniest sector additionally outlined in `accentOlive`.
-- Mono annotation: `PEAK ALTITUDE {value}° · SUNNIEST FACE {sectorName}`, both live.
+- Mono annotation: `PEAK ALTITUDE {value}° · MOST SUN-HOURS {sectorName}`, both live.
 - Ink: `inkNavy` (blue ground). Secondary ticks at 60 to 70 percent opacity per the direction doc's rule for de-emphasized lines.
 
 ## 6. Section 4: The strut field (`bg-fieldYellow`)
