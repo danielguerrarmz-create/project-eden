@@ -43,7 +43,7 @@ export interface Member {
   v: number;
 }
 
-export interface FollyGeometry {
+export interface EdenGeometry {
   params: DesignParams; // the CLAMPED params actually used
   members: Member[];
   ribCount: number;
@@ -113,7 +113,7 @@ export interface SunSample {
   hour: number;
   altitudeDeg: number; // above horizon; <0 = below (skipped for lighting)
   azimuthDeg: number; // 0 = north, 90 = east, 180 = south, 270 = west
-  direction: Vec3; // unit vector FROM the folly TOWARD the sun
+  direction: Vec3; // unit vector FROM the Eden TOWARD the sun
 }
 
 export interface SunPath {
@@ -166,7 +166,7 @@ export interface GrowthState {
 
 /** The full recomputed bundle the store hands to the scene + UI. */
 export interface EngineOutputs {
-  geometry: FollyGeometry;
+  geometry: EdenGeometry;
   components: ComponentList;
   price: PriceBreakdown;
   species: Species;

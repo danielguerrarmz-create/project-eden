@@ -38,7 +38,7 @@ function sunSampleAt(hour: number, latDeg: number, declDeg: number): SunSample {
   const altDeg = altitude * RAD;
   const azDeg = azimuth * RAD;
 
-  // Unit vector FROM folly TOWARD the sun. Scene convention: +Z = north, +X = east.
+  // Unit vector FROM Eden TOWARD the sun. Scene convention: +Z = north, +X = east.
   const ca = Math.cos(altitude);
   const direction: Vec3 = [
     ca * Math.sin(azimuth), // east component (+X)

@@ -3,7 +3,7 @@
  *
  * A resizable rectangle the user drags by its edge handles to set width x depth
  * in metres (live readout), plus a rotatable north marker on a compass ring that
- * sets orientation. Outputs feed the engine: plot dimensions cap the folly
+ * sets orientation. Outputs feed the engine: plot dimensions cap the Eden
  * footprint, north drives the sun-path. Pure SVG + pointer events, no deps.
  */
 import { useRef } from 'react';

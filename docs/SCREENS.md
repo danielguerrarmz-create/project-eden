@@ -8,9 +8,9 @@ single take.
 
 ```
 STEP 1 · SITE                          STEP 2 · DESIGN                 STEP 3 · GROW
-where's your garden?                   design the folly                watch it grow
+where's your garden?                   design your Eden                watch it grow
 ┌───────────────┐  ┌──────────────┐    ┌───────────────────────┐       ┌─────────────────┐
-│ address (stub)│  │ PLOT MAPPER  │    │   [ 3D FOLLY on plot ]│       │ [ folly + plot ]│
+│ address (stub)│  │ PLOT MAPPER  │    │    [ 3D EDEN on plot ]│       │ [ eden + plot ] │
 │ sample plots  │  │ drag edges → │    │                       │       │ year 0 / 1 / 3  │
 │               │  │ width×depth  │    │ 1 size  2 openness    │       │ big price       │
 │               │  │ coral dot →  │    │ 3 planting (species)  │       │ ecology · reserve│
@@ -22,7 +22,7 @@ where's your garden?                   design the folly                watch it 
 
 1. **Site.** Pick a sample plot or type an address (stub). Drag the plot edges to size it,
    drag the coral dot to orient it. Width, depth, area, and orientation read out live.
-2. **Design.** Choose a Size preset, an Openness, and a Planting species. The folly renders
+2. **Design.** Choose a Size preset, an Openness, and a Planting species. The Eden renders
    fitted to the mapped plot. Changing species visibly re-weights the strut field: twiner gets
    close verticals, tendril gets a fine mesh, scrambler gets horizontal rails, self-clinger
    gets a near-solid skin. Everything stays buildable because the controls are clamped to a
@@ -35,7 +35,7 @@ where's your garden?                   design the folly                watch it 
 
 | Element | Status | Where |
 |---|---|---|
-| Form parametrics (folly generator) | **REAL** — parametric, envelope-clamped | `engine/geometry.ts` |
+| Form parametrics (Eden generator) | **REAL** — parametric, envelope-clamped | `engine/geometry.ts` |
 | Envelope clamping = structural validity | **REAL mechanism, STUBBED bounds** — bounds stand in for a stamped joint library; **no live FEA** | `data/config.ts` `ENVELOPE`, `geometry.clampParams` |
 | Component decomposition + count | **REAL** — members → tidy cut-list | `engine/components.ts` |
 | Price = count × rate + install + planting + channel fee + VAT | **REAL formula** | `engine/pricing.ts` |

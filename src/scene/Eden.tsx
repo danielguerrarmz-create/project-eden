@@ -1,5 +1,5 @@
 /**
- * Folly.tsx — the dry structure.
+ * Eden.tsx — the dry structure.
  *
  * Renders the engine's structural members as timber cylinders (one instanced
  * mesh, one draw call). This is the LOAD PATH and it is deliberately plain
@@ -17,7 +17,7 @@ import { segmentMatrix } from './util';
 
 const scratch = new THREE.Object3D();
 
-export function Folly() {
+export function Eden() {
   const members = useDesign((s) => s.outputs.geometry.members);
   const meshRef = useRef<THREE.InstancedMesh>(null);
 

@@ -1,5 +1,5 @@
 /**
- * geometry.ts — the parametric folly generator.
+ * geometry.ts — the parametric Eden generator.
  *
  * Produces ONE non-occupied typology: a pollinator-pavilion dome / bower — a
  * partial rotunda of timber ribs and rings you stand under, never inside a
@@ -20,7 +20,7 @@
  * keyed off the (u,v) coords, keeping the structure dry (stress-test §12).
  */
 import { ENVELOPE, FABRICATION } from '../data/config';
-import type { DesignParams, FollyGeometry, Member, Vec3 } from './types';
+import type { DesignParams, EdenGeometry, Member, Vec3 } from './types';
 
 const DEG = Math.PI / 180;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
@@ -84,7 +84,7 @@ function dist(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-export function generateGeometry(rawParams: DesignParams): FollyGeometry {
+export function generateGeometry(rawParams: DesignParams): EdenGeometry {
   const params = clampParams(rawParams);
   const { enclosurePct, heightM: H, footprintRadiusM: R, latticeDensity: d } = params;
 

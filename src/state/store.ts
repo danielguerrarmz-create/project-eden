@@ -10,7 +10,7 @@
  * opening + site orientation) so the engine keeps running exactly as before.
  *
  * Honesty note: footprint is CLAMPED to the plot (min(width,depth)/2 minus a
- * setback), so a folly can never be bigger than the site it was mapped onto.
+ * setback), so an Eden can never be bigger than the site it was mapped onto.
  */
 import { create } from 'zustand';
 import { ENVELOPE } from '../data/config';
@@ -40,7 +40,7 @@ export const SIZE_PRESETS: Record<
   grand: { label: 'Grand', radiusM: 3.1, heightM: 3.5, blurb: 'a gathering pavilion' },
 };
 
-const SETBACK_M = 0.6; // keep the folly off the plot boundary
+const SETBACK_M = 0.6; // keep the Eden off the plot boundary
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 

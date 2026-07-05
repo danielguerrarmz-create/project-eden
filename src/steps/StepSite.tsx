@@ -32,7 +32,7 @@ export function StepSite() {
             garden?
           </h1>
           <p className="mt-5 text-[15px] leading-relaxed text-inkSoft">
-            Start from your place. Map the patch of ground the folly will live on, then we design
+            Start from your place. Map the patch of ground your Eden will live on, then we design
             a pollinator pavilion that fits it and faces the sun.
           </p>
 
@@ -93,7 +93,7 @@ export function StepSite() {
       </div>
 
       <div className="mt-10 flex justify-center md:justify-end">
-        <CtaLink label="design the folly" onClick={() => setStep(2)} />
+        <CtaLink label="design your Eden" onClick={() => setStep(2)} />
       </div>
     </div>
   );

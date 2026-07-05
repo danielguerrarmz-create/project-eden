@@ -17,7 +17,7 @@ export function Navbar() {
         <div className="flex items-center gap-2 shrink-0">
           <Sprout />
           <span className="font-display text-[19px] font-semibold lowercase tracking-tight text-ink">
-            living folly
+            living eden
           </span>
         </div>
 

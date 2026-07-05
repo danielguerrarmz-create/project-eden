@@ -1,9 +1,9 @@
 /**
- * GardenContext.tsx — the mapped plot the folly sits on.
+ * GardenContext.tsx — the mapped plot the Eden sits on.
  *
  * v2: the ground is the rectangle the user drew in Step 1 (width x depth in
- * metres), centred on the folly, with a compass north marker rotated to the
- * orientation they set. The folly is clamped to fit inside it, so you can see it
+ * metres), centred on the Eden, with a compass north marker rotated to the
+ * orientation they set. The Eden is clamped to fit inside it, so you can see it
  * belongs to the site. Planting beds ring the built base where the climbers root.
  */
 import { useMemo } from 'react';
@@ -53,7 +53,7 @@ export function GardenContext() {
         <lineBasicMaterial color="#5E6E2B" />
       </lineSegments>
 
-      {/* Gravel apron under the folly */}
+      {/* Gravel apron under the Eden */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} receiveShadow>
         <circleGeometry args={[geo.footprintRadiusM + 0.45, 40]} />
         <meshStandardMaterial color="#d9d0b8" roughness={1} />

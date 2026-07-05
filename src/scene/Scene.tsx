@@ -2,7 +2,7 @@
  * Scene.tsx — the react-three-fiber canvas.
  *
  * v2 surface: a clean, bright, gallery stage on warm paper (not the old dark
- * room). Composes the mapped plot, the dry timber folly, and the two overlays
+ * room). Composes the mapped plot, the dry timber Eden, and the two overlays
  * the guided flow actually uses: the strut-density heatmap (proves the species
  * re-weights the field, step 2) and the animated growth layer (step 3). The
  * sun-path / water overlays stay in the tree but are never toggled on in the
@@ -13,7 +13,7 @@ import { OrbitControls, ContactShadows } from '@react-three/drei';
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { webglSupported } from '../ui/webgl';
-import { Folly } from './Folly';
+import { Eden } from './Eden';
 import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
 import { GrowthOverlay } from './overlays/GrowthOverlay';
@@ -45,7 +45,7 @@ export function Scene() {
       <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
 
       <GardenContext />
-      <Folly />
+      <Eden />
 
       {overlays.strutHeatmap && <StrutHeatmap />}
       {overlays.growth && <GrowthOverlay />}
@@ -76,7 +76,7 @@ function NoWebGL() {
         </div>
         <p className="text-sm font-medium text-ink">this browser can't render the 3D stage</p>
         <p className="mt-1 text-[13px] leading-relaxed text-inkSoft">
-          The folly preview needs WebGL. Try a current Chrome, Edge, Firefox or Safari, or
+          The Eden preview needs WebGL. Try a current Chrome, Edge, Firefox or Safari, or
           another device. All the numbers on this page still update live.
         </p>
       </div>

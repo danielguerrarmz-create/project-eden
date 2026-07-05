@@ -1,4 +1,4 @@
-# Living Folly
+# Living Eden
 
 A generative design demo for **living garden architecture**: organic timber pavilions whose
 lattice is a designed armature for climbing plants. You shape a pollinator pavilion, the
@@ -27,12 +27,12 @@ npm run typecheck  # types only
 
 ## The flow (three steps, built to be filmed in one take)
 
-1. **Site.** Map the patch of ground the folly will live on: drag the plot edges to set width
+1. **Site.** Map the patch of ground your Eden will live on: drag the plot edges to set width
    and depth in metres, drag the coral dot to orient it to the sun.
 2. **Design.** Three choices only: Size (Intimate / Standard / Grand), Openness, and Planting.
    Pick a climbing species and the strut field visibly re-weights for how that plant climbs
    (twiner gets close verticals, tendril gets a fine mesh, scrambler gets horizontal rails,
-   self-clinger gets a near-solid skin). The folly renders fitted to your mapped plot.
+   self-clinger gets a near-solid skin). The Eden renders fitted to your mapped plot.
 3. **Grow.** Toggle year 0 / 1 / 3 and the foliage animates in, ecology metrics climb, and the
    price and cut list resolve. Reserve with an email (stored locally in this demo).
 
@@ -40,7 +40,7 @@ npm run typecheck  # types only
 
 - `src/engine/` — pure, typed functions. **The core.** `runEngine(params)` runs the whole
   pipeline; the store calls it on every change. Testable in a plain node repl.
-- `src/scene/` — react-three-fiber canvas: the dry timber folly, the mapped garden plot, and
+- `src/scene/` — react-three-fiber canvas: the dry timber Eden, the mapped garden plot, and
   the growth overlay.
 - `src/steps/` — the three-step guided flow (`StepSite`, `StepDesign`, `StepPreview`).
 - `src/ui/` — the plot mapper, navbar, progress marker, controls, readout, reserve CTA.

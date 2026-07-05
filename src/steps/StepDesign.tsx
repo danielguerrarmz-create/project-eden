@@ -1,7 +1,7 @@
 /**
- * StepDesign.tsx — Step 2. "Design the folly."
+ * StepDesign.tsx — Step 2. "Design your Eden."
  * The whole v1 wall of 8 sliders collapses to THREE choices: Size (3 presets),
- * Openness (one slider), Planting (curated species). The folly renders live on
+ * Openness (one slider), Planting (curated species). The Eden renders live on
  * its mapped plot; changing the species visibly re-weights the strut heatmap.
  */
 import { useDesign, SIZE_PRESETS, plotRadiusCapM, type SizePreset } from '../state/store';
@@ -32,7 +32,7 @@ export function StepDesign() {
       <div className="mb-4">
         <p className="mb-1 text-sm font-medium uppercase tracking-widest text-moss">step two · design</p>
         <h1 className="font-display text-4xl font-semibold lowercase leading-none text-ink sm:text-5xl">
-          design the folly
+          design your Eden
         </h1>
       </div>
 

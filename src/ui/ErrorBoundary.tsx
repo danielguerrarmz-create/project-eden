@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // eslint-disable-next-line no-console
-    console.error('[living folly] render error', error, info.componentStack);
+    console.error('[living eden] render error', error, info.componentStack);
   }
 
   render() {

@@ -1,6 +1,6 @@
 /**
  * StepPreview.tsx — Step 3. "Watch it grow." + commission.
- * The folly on its plot, an animated Year 0/1/3 growth toggle (the signature
+ * The Eden on its plot, an animated Year 0/1/3 growth toggle (the signature
  * moment), ONE big price with the honest placeholder note, ecology at a glance,
  * the reserve gate, and two quiet disclosures (how it's priced, cut list).
  */
@@ -140,7 +140,7 @@ export function StepPreview() {
           {/* Reserve */}
           <div className="rounded-3xl border border-line bg-white/50 p-6">
             <div className="mb-3 font-display text-xl font-semibold lowercase text-ink">
-              reserve this folly
+              reserve this Eden
             </div>
             <ReserveCTA />
           </div>

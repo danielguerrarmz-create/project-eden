@@ -46,7 +46,7 @@ export function ReserveCTA() {
         type="submit"
         className="w-full rounded-full bg-ink px-4 py-3 text-sm font-medium text-paper transition-colors hover:bg-mossDeep"
       >
-        Reserve this folly · {gbp(price)}
+        Reserve this Eden · {gbp(price)}
       </button>
       <p className="text-center text-[11px] text-inkFaint">
         Reserves a slot for a site visit. No payment taken.
