@@ -25,10 +25,9 @@ export function computeGrowth(species: Species, year: Year): GrowthState {
   if (year === 0) {
     coverageFraction = GROWTH.year0CoverageFraction;
   } else {
-    // Metres of growth achieved / a characteristic lattice height (~3m of arch).
+    // Metres of growth achieved / the characteristic bed-to-crown climb.
     // Saturating curve so year 3 is nearly full but never a guaranteed 100%.
-    const characteristicLengthM = 3.2;
-    const reach = (species.growthRateMPerYr * year) / characteristicLengthM;
+    const reach = (species.growthRateMPerYr * year) / GROWTH.characteristicLengthM;
     coverageFraction = GROWTH.maxCoverageFraction * (1 - Math.exp(-reach));
   }
 

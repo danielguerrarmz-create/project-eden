@@ -15,6 +15,7 @@ export function segmentMatrix(
   start: Vec3,
   end: Vec3,
   scratch: THREE.Object3D,
+  radiusScale = 1,
 ): THREE.Matrix4 {
   const s = new THREE.Vector3(...start);
   const e = new THREE.Vector3(...end);
@@ -22,7 +23,7 @@ export function segmentMatrix(
   const len = dir.length() || 1e-6;
   scratch.position.copy(s).add(e).multiplyScalar(0.5);
   scratch.quaternion.setFromUnitVectors(UP, dir.clone().normalize());
-  scratch.scale.set(1, len, 1);
+  scratch.scale.set(radiusScale, len, radiusScale);
   scratch.updateMatrix();
   return scratch.matrix.clone();
 }

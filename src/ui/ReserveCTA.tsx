@@ -12,7 +12,7 @@ export function ReserveCTA() {
   const reserved = useDesign((s) => s.reserved);
   const setEmail = useDesign((s) => s.setReserveEmail);
   const submit = useDesign((s) => s.submitReserve);
-  const price = useDesign((s) => s.outputs.price.incVatGBP);
+  const price = useDesign((s) => s.outputs.price.fixedTotalGBP);
 
   if (reserved) {
     return (
@@ -46,7 +46,7 @@ export function ReserveCTA() {
         type="submit"
         className="w-full rounded-full bg-ink px-4 py-3 text-sm font-medium text-paper transition-colors hover:bg-mossDeep"
       >
-        Reserve this folly · {gbp(price)}
+        Reserve this design · {gbp(price)} fixed
       </button>
       <p className="text-center text-[11px] text-inkFaint">
         Reserves a slot for a site visit. No payment taken.

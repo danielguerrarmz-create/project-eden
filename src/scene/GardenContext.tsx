@@ -1,40 +1,30 @@
 /**
- * GardenContext.tsx — the mapped plot the folly sits on.
+ * GardenContext.tsx — the ground the pavilion sits on.
  *
- * v2: the ground is the rectangle the user drew in Step 1 (width x depth in
- * metres), centred on the folly, with a compass north marker rotated to the
- * orientation they set. The folly is clamped to fit inside it, so you can see it
- * belongs to the site. Planting beds ring the built base where the climbers root.
+ * One quiet environment (demo-spec §3 polish pass): a soft paper-sand ground,
+ * a lawn disc, a gravel apron under the canopy, planting beds at each FOOT
+ * (where the climbers root — the sacrificial armature starts here), and a
+ * coral north marker so the aperture bearing reads on camera.
  */
 import { useMemo } from 'react';
-import * as THREE from 'three';
 import { useDesign } from '../state/store';
+
+const DEG = Math.PI / 180;
 
 export function GardenContext() {
   const geo = useDesign((s) => s.outputs.geometry);
-  const plot = useDesign((s) => s.plot);
 
-  const beds = useMemo(() => {
-    const R = geo.footprintRadiusM;
-    const arc = (geo.params.enclosurePct / 100) * Math.PI * 2;
-    const centre = ((geo.params.openingOrientationDeg + 180) * Math.PI) / 180;
-    const n = 10;
-    const pts: [number, number, number][] = [];
-    for (let i = 0; i < n; i++) {
-      const a = centre - arc / 2 + (arc * i) / (n - 1);
-      pts.push([R * Math.sin(a), 0.02, R * Math.cos(a)]);
-    }
-    return pts;
-  }, [geo]);
+  // A planting bed just outside the eave at each foot bearing.
+  const beds = useMemo(
+    () =>
+      geo.footBearingsDeg.map((deg) => {
+        const t = deg * DEG;
+        return [(geo.planA + 0.35) * Math.sin(t), 0.014, (geo.planB + 0.35) * Math.cos(t)] as const;
+      }),
+    [geo.footBearingsDeg, geo.planA, geo.planB],
+  );
 
-  const outline = useMemo(() => {
-    const g = new THREE.PlaneGeometry(plot.widthM, plot.depthM);
-    g.rotateX(-Math.PI / 2);
-    return new THREE.EdgesGeometry(g);
-  }, [plot.widthM, plot.depthM]);
-
-  const northRad = (plot.northDeg * Math.PI) / 180;
-  const markerDist = Math.max(plot.widthM, plot.depthM) / 2 + 0.7;
+  const lawnRadius = Math.max(geo.planA, geo.planB) + 2.6;
 
   return (
     <group>
@@ -44,36 +34,36 @@ export function GardenContext() {
         <meshStandardMaterial color="#e7e1d1" roughness={1} />
       </mesh>
 
-      {/* The mapped plot: a muted lawn rectangle, width x depth */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[plot.widthM, plot.depthM]} />
+      {/* Lawn the pavilion belongs to */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[lawnRadius, 48]} />
         <meshStandardMaterial color="#8ea060" roughness={1} />
       </mesh>
-      <lineSegments geometry={outline} position={[0, 0.006, 0]}>
-        <lineBasicMaterial color="#5E6E2B" />
-      </lineSegments>
 
-      {/* Gravel apron under the folly */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} receiveShadow>
-        <circleGeometry args={[geo.footprintRadiusM + 0.45, 40]} />
+      {/* Gravel apron under the canopy, matched to the plan ellipse */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.008, 0]}
+        scale={[geo.planA + 0.45, geo.planB + 0.45, 1]}
+        receiveShadow
+      >
+        <circleGeometry args={[1, 48]} />
         <meshStandardMaterial color="#d9d0b8" roughness={1} />
       </mesh>
 
-      {/* Planting beds at the base — where the sacrificial armature is rooted */}
+      {/* Planting beds at the feet — where the sacrificial armature is rooted */}
       {beds.map((p, i) => (
-        <mesh key={i} position={[p[0], 0.014, p[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.3, 16]} />
+        <mesh key={i} position={[p[0], p[1], p[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.34, 16]} />
           <meshStandardMaterial color="#5b4632" roughness={1} />
         </mesh>
       ))}
 
-      {/* North marker: a coral arrow on the ground, rotated to the set orientation */}
-      <group rotation={[0, -northRad, 0]}>
-        <mesh position={[0, 0.02, -markerDist]} rotation={[-Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[0.28, 0.6, 3]} />
-          <meshStandardMaterial color="#E06A4E" roughness={0.6} />
-        </mesh>
-      </group>
+      {/* North marker: a small coral arrow on the ground at +Z (scene north). */}
+      <mesh position={[0, 0.02, lawnRadius + 1.3]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.18, 0.42, 3]} />
+        <meshStandardMaterial color="#E06A4E" roughness={0.6} />
+      </mesh>
     </group>
   );
 }

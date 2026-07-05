@@ -1,12 +1,10 @@
 /**
  * Scene.tsx — the react-three-fiber canvas.
  *
- * v2 surface: a clean, bright, gallery stage on warm paper (not the old dark
- * room). Composes the mapped plot, the dry timber folly, and the two overlays
- * the guided flow actually uses: the strut-density heatmap (proves the species
- * re-weights the field, step 2) and the animated growth layer (step 3). The
- * sun-path / water overlays stay in the tree but are never toggled on in the
- * flow (water used a blue line; the no-blue rule keeps it off screen).
+ * A clean, bright, gallery stage on warm paper. Composes the garden ground,
+ * the dry timber canopy, and the two overlays the studio uses: the
+ * strut-density heatmap (proves the species re-weights the armature) and the
+ * animated growth layer (the year 0/1/3 beat).
  */
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
@@ -28,7 +26,7 @@ export function Scene() {
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [7, 4.6, 8], fov: 42 }}
+      camera={{ position: [6.4, 3.4, 7.2], fov: 42 }}
       className="!absolute inset-0"
     >
       <color attach="background" args={['#F6F4EE']} />
@@ -54,7 +52,7 @@ export function Scene() {
 
       <OrbitControls
         makeDefault
-        target={[0, 1.3, 0]}
+        target={[0, 1.15, 0]}
         minDistance={4}
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}

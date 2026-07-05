@@ -11,10 +11,10 @@
  * PURE.
  */
 import { ECOLOGY } from '../data/config';
-import type { EcologyMetrics, FollyGeometry, GrowthState, Species } from './types';
+import type { CanopyGeometry, EcologyMetrics, GrowthState, Species } from './types';
 
 export function computeEcology(
-  geometry: FollyGeometry,
+  geometry: CanopyGeometry,
   species: Species,
   growth: GrowthState,
 ): EcologyMetrics {

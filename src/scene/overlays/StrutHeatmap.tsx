@@ -19,7 +19,9 @@ export function StrutHeatmap() {
     <group>
       {cells.map((cell, i) => {
         const c = heatColor(cell.density01);
-        const r = 0.05 + 0.11 * cell.density01;
+        // Small nodes so the timber stays legible; taper toward the crown where
+        // the (u,v) cells converge, or they'd pile into a pom-pom up top.
+        const r = (0.028 + 0.055 * cell.density01) * (0.45 + 0.55 * (1 - cell.v));
         // Nudge nodes slightly outward from the centre so they sit on the skin.
         const [x, y, z] = cell.position;
         const outward = 1.04;
@@ -29,7 +31,7 @@ export function StrutHeatmap() {
             <meshStandardMaterial
               color={c}
               emissive={c}
-              emissiveIntensity={0.45}
+              emissiveIntensity={0.3}
               roughness={0.5}
             />
           </mesh>

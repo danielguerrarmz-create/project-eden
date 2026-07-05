@@ -8,12 +8,14 @@
  * software load-bearing rather than decorative).
  *
  * Honest labelling (stress-test §5): this is PLANTING-INFORMED PARAMETRICS — a
- * rule-based field, not black-box optimisation. Two real inputs drive it:
+ * rule-based field, not black-box optimisation. Three real inputs drive it:
  *   1. the species' CLIMBING HABIT -> what support pattern it physically needs
  *      (twiners want close verticals; tendrils/petiole-clingers want a fine
  *       mesh; scramblers want horizontal rails to be tied to; self-clingers
  *       want almost nothing / a near-solid skin).
- *   2. the SUN-PATH -> the sunward face is densified because that is where the
+ *   2. the species' STEM LOAD -> heavy climbers (wisteria) up-gauge the
+ *      armature: "wisteria needs heavier struts" (demo-spec §2.4).
+ *   3. the SUN-PATH -> the sunward face is densified because that is where the
  *      plant grows most vigorously and flowers hardest, so it needs the most
  *      support there.
  *
@@ -80,12 +82,14 @@ export function computeStrutField(
   species: Species,
   sunPath: SunPath,
 ): StrutField {
-  const { base, orientation, strategy } = habitProfile(species);
+  const { base, orientation, strategy: habitStrategy } = habitProfile(species);
+  const strategy =
+    species.stemLoad01 > 0.75
+      ? `${habitStrategy} Mature stem load is high — the armature is UP-GAUGED, heavier members over more of them.`
+      : habitStrategy;
   const spacingComponent = spacingDensity(species.supportSpacingM);
 
-  // Grid resolution follows the lattice-density slider a little, so the field
-  // reads finer on denser structures.
-  const nU: number = 12;
+  const nU: number = 16;
   const nV: number = 7;
 
   const cells: StrutCell[] = [];
@@ -106,15 +110,19 @@ export function computeStrutField(
 
       // Sun bias: this facet's compass sector -> its daylight exposure (0..1).
       const sectorExposure = exposure[sectorForDeg(bearingDeg)] ?? 0;
-      const sunBias = 0.35 * sectorExposure;
+      const sunBias = 0.3 * sectorExposure;
+
+      // Stem-load bias: heavy climbers load the armature everywhere, most of
+      // all low down where the mature trunk hangs.
+      const loadBias = 0.22 * species.stemLoad01 * (1 - 0.4 * v);
 
       // Growth-height bias: twiners/scramblers need most support low-mid where
       // stems load the frame; clingers even top-out. Small, keeps the field
       // legible rather than flat.
-      const heightBias = 0.12 * (1 - Math.abs(v - 0.45) * 2);
+      const heightBias = 0.1 * (1 - Math.abs(v - 0.45) * 2);
 
       const density01 = clamp01(
-        0.45 * base + 0.4 * spacingComponent + sunBias + heightBias,
+        0.35 * base + 0.3 * spacingComponent + sunBias + loadBias + heightBias,
       );
       densitySum += density01;
 

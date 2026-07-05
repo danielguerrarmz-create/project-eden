@@ -8,11 +8,11 @@
  *
  * PURE. No pricing, no geometry maths — just decomposition + tally.
  */
-import { FABRICATION } from '../data/config';
-import type { ComponentList, CutItem, FollyGeometry } from './types';
+import { GRAMMAR } from '../data/config';
+import type { CanopyGeometry, ComponentList, CutItem } from './types';
 
-export function decomposeComponents(geometry: FollyGeometry): ComponentList {
-  const bucket = FABRICATION.cutListRoundingM;
+export function decomposeComponents(geometry: CanopyGeometry): ComponentList {
+  const bucket = GRAMMAR.cutListRoundingM;
   const key = (lengthM: number, type: CutItem['type']) =>
     `${type}:${(Math.round(lengthM / bucket) * bucket).toFixed(2)}`;
 
