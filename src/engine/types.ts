@@ -14,34 +14,71 @@ export type { Year };
 export type Vec3 = readonly [number, number, number];
 
 /**
- * The four user parameters (demo-spec §2.1 — no more), plus the living-layer
- * choices. All are clamped to the grammar-derived bounds before use.
+ * The two v1 joint systems (FABRICATION.md §2–§3).
+ * TODO(roadmap): 'timberJoinery' — 5-axis all-timber milled connections
+ * (BUGA-style). The node graph below is exactly what it will consume; add the
+ * literal here + a joints.ts branch when an industrial joinery partner lands.
+ */
+export type JointSystem = 'hub' | 'lamella';
+
+/** How the pavilion meets the ground (FABRICATION.md §5). Both on ground screws. */
+export type FootStrategy = 'legs' | 'sweep';
+
+/**
+ * The four form parameters (demo-spec §2.1), the two construction choices,
+ * plus the living-layer choices. All clamped to grammar bounds before use.
  */
 export interface DesignParams {
   /** Footprint area of the canopy plan, m² (12–18). */
   footprintM2: number;
   /** Rise: crown height above ground, m (1.9–2.5, PD-capped). */
   riseM: number;
-  /** Lattice density as node-to-node strut spacing, m (0.25–0.5). */
+  /** Structural bay: node-to-node spacing of the diagrid, m (system-capped). */
   strutSpacingM: number;
   /** Where the canopy opens/lifts — compass bearing, deg (0=N, 90=E). */
   apertureDeg: number;
+
+  /** Which joint family the kit is fabricated for. */
+  jointSystem: JointSystem;
+  /** How the structure meets the lawn. */
+  footStrategy: FootStrategy;
 
   speciesId: string;
   year: Year;
 }
 
 /**
- * A single flat, cuttable component. Curved runs are discretised into these.
- * 'lattice' = diagrid strut, 'eave' = edge-beam blank segment, 'foot' = the
- * grounded leg sweep members.
+ * A NODE of the structural graph — where members meet and a connector lives.
+ * This is what makes the model manufacturable: every joint is an explicit,
+ * addressable thing (hub / lamella bolt / ground shoe), not a coincidence of
+ * member endpoints.
+ */
+export interface CanopyNode {
+  id: string;
+  position: Vec3;
+  /** 'ground' nodes sit EXACTLY at y=0 on a ground screw. 'splice' nodes are
+   *  valence-2 mid-bay beam splices (fish plate, no hub) — inserted where a
+   *  single eave facet would outgrow the sheet (steep sweep drops). */
+  kind: 'crown' | 'interior' | 'eave' | 'ground' | 'splice';
+  /** Members arriving here — the connector's valence and angles derive from these. */
+  memberIds: string[];
+}
+
+/**
+ * One straight centreline SEGMENT between two nodes. Segments are the render
+ * + analysis unit; the PURCHASABLE unit is the Piece a segment belongs to (a
+ * two-bay lamella is 2 segments, an eave blank is several).
  */
 export interface Member {
   id: string;
-  type: 'lattice' | 'eave' | 'foot';
+  type: 'lattice' | 'lamella' | 'eave' | 'crown' | 'foot' | 'leg';
   start: Vec3;
   end: Vec3;
   lengthM: number;
+  nodeStartId: string;
+  nodeEndId: string;
+  /** The physical piece this segment is part of. */
+  pieceId: string;
   /**
    * Parametric coords used ONLY by overlays (heatmap / growth), never by the
    * load path. u = around the plan (0..1 from north, clockwise), v = up the
@@ -51,6 +88,22 @@ export interface Member {
    */
   u: number;
   v: number;
+}
+
+/**
+ * A PIECE: one physical thing a fabricator cuts and a courier ships.
+ * 'strut'/'leg' come off linear stock (docking saw); 'lamella' and the
+ * blanks are CNC-profiled from LVL sheet (curved, so cut not bent).
+ */
+export interface Piece {
+  id: string;
+  kind: 'strut' | 'lamella' | 'eaveBlank' | 'crownBlank' | 'leg';
+  memberIds: string[];
+  /** Developed length along the piece's segments, m. */
+  lengthM: number;
+  stock: 'linear' | 'sheet';
+  /** Nested width on sheet (sheet pieces) — the piece's structural depth. */
+  depthM: number;
 }
 
 /** One reason-carrying bound for one slider (the grammar surfaced). */
@@ -76,8 +129,15 @@ export interface GrammarBounds {
 
 export interface CanopyGeometry {
   params: DesignParams; // the CLAMPED params actually used
+  /** The structural graph: explicit nodes... */
+  nodes: CanopyNode[];
+  /** ...straight segments between them... */
   members: Member[];
-  /** Feet the canopy sweeps down to. 3 or 4 — chosen by the grammar. */
+  /** ...grouped into the physical pieces a fabricator cuts. */
+  pieces: Piece[];
+  /** Ground screws this design needs (one per leg / grounded node). */
+  groundScrewCount: number;
+  /** Feet the canopy stands on. 3 or 4 — chosen by the grammar. */
   feetCount: number;
   footBearingsDeg: number[];
   /** Diagrid resolution actually generated. */
@@ -94,19 +154,37 @@ export interface CanopyGeometry {
   surfaceAreaM2: number;
   /** Horizontal roof projection (m²) that catches rain. */
   roofAreaM2: number;
-  /** Longest single component (m) — checked against the sheet rule. */
+  /** Longest single piece (m) — every piece is also checked against its own
+   *  stock rule (sheet cut limit / linear handling cap) at generation. */
   maxComponentLengthM: number;
 }
 
-/** One line in the cut-list: "N pieces of length L". */
+/** One line in the cut-list: "N pieces of kind K at length L". */
 export interface CutItem {
   lengthM: number;
-  type: Member['type'];
+  kind: Piece['kind'];
+  stock: Piece['stock'];
+  /** Nested width for sheet pieces (their structural depth). */
+  depthM: number;
   count: number;
 }
 
+/** One hardware line: connectors, fasteners, screws, armature. */
+export interface HardwareItem {
+  /** Rate key into PRICING.hardwareGBP. */
+  id: string;
+  label: string;
+  qty: number;
+  /** Unit for display; default 'pcs' (armature wire is metres). */
+  unit?: string;
+}
+
 export interface ComponentList {
+  /** Timber piece schedule, grouped by kind + rounded length. */
   items: CutItem[];
+  /** Connectors + fasteners + foundations + armature — the other half of the kit. */
+  hardware: HardwareItem[];
+  /** Timber pieces total (what a courier ships, not segment count). */
   totalCount: number;
   totalLengthM: number;
 }
@@ -117,7 +195,7 @@ export interface NestedPart {
   y: number; // m from sheet top
   lengthM: number;
   widthM: number;
-  type: Member['type'];
+  kind: Piece['kind'];
 }
 
 export interface NestedSheet {
@@ -131,6 +209,15 @@ export interface NestingResult {
   sheetLengthM: number;
   sheetWidthM: number;
   totalParts: number;
+  /** Linear-stock plan for docking-saw pieces (hub struts, legs): how many
+   *  standard stock lengths the unique cut lengths pack into. */
+  stockPlan: {
+    stockLengthM: number;
+    lengthsNeeded: number;
+    pieceCount: number;
+    /** Fraction of purchased linear stock actually in pieces. */
+    utilisation: number;
+  };
 }
 
 /**

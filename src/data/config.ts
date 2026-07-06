@@ -20,22 +20,33 @@
  * is the invention; these numbers are its current authored bounds.
  */
 export const GRAMMAR = {
-  /** CNC sheet stock the components are cut from (standard 2.4 × 1.2 m). */
+  /** CNC sheet stock the curved pieces are cut from (standard 2.4 × 1.2 m). */
   sheet: { lengthM: 2.4, widthM: 1.2 },
-  /** Longest single blank we cut — sheet length minus clamping margin. */
+  /** Longest SHEET piece we cut — sheet length minus clamping margin. */
   maxComponentLengthM: 2.35,
+  /** Longest LINEAR piece in the kit — courier/handling cap, not the saw
+   *  (docking stock is 4.8 m; nothing ships longer than this). */
+  maxLinearPieceM: 3.0,
   /** Saw kerf + handling gap between nested parts on a sheet. */
   nestingKerfM: 0.012,
-  /** Nominal timber cross-section (mm) of a strut blank as nested on sheet. */
-  memberSectionMm: { width: 60, depth: 90 },
   /** Cut lengths round to this bucket so components collapse into a tidy cut-list. */
   cutListRoundingM: 0.05,
 
-  /** Below this node-to-node spacing the joint hardware overlaps — cuttability. */
-  minStrutSpacingM: 0.25,
-  /** Above this unsupported span the flat-piece approximation of the curved
-   *  surface exceeds cutting tolerance (max curvature per component). */
-  maxStrutSpacingM: 0.5,
+  /**
+   * Structural bay bounds (node-to-node spacing) — FABRICATION.md §1–§3.
+   * Below the min, connector hardware (hub fins / lamella bolt edge
+   * distances) physically overlaps at acute diamond angles.
+   */
+  minStrutSpacingM: 0.45,
+  /** Hub system cap: above this the unsupported armature span between
+   *  struts exceeds the flat-piece curvature tolerance. */
+  maxStrutSpacingM: 1.05,
+  /**
+   * Lamella system cap: a lamella spans TWO bays through its node, and the
+   * whole curved piece must still fit the CNC sheet cut limit. Grammar
+   * surfaces this the moment the user switches joint system.
+   */
+  maxLamellaSpacingM: 0.6,
 
   /** Permitted-development height cap — no planning application needed. HARD. */
   pdHeightCapM: 2.5,
@@ -60,6 +71,9 @@ export const GRAMMAR = {
   /** Plan proportion of the canopy ellipse (major/minor). Fixed, not a slider. */
   planAspect: 1.25,
 
+  /** Crown oculus radius as a fraction of the plan — the diagrid starts here. */
+  crownFraction: 0.22,
+
   /**
    * Eave beam blanks are curved pieces cut from sheet stock, spliced only at
    * feet and at one midpoint between feet (2 blanks per inter-foot span). The
@@ -72,14 +86,60 @@ export const GRAMMAR = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// STOCK — the standardized material palette (FABRICATION.md §0–§4).
+// ONE section per role; lengths vary freely because CNC makes that free.
+// ---------------------------------------------------------------------------
+export const STOCK = {
+  /** Hub-system struts + legs: planed C24 spruce/larch, UC3 treated. */
+  strut: { widthMm: 45, depthMm: 70, grade: 'C24', stockLengthM: 4.8 },
+  /** Lamella pieces: CNC-profiled from 45 mm spruce LVL sheet (curved, so cut not bent). */
+  lamella: { thicknessMm: 45, depthMm: 120 },
+  /** Eave + crown blanks: 45 mm LVL, cut to their true plan curve. */
+  blank: { thicknessMm: 45, depthMm: 180 },
+} as const;
+
+// ---------------------------------------------------------------------------
+// JOINTS — the two v1 joint systems (FABRICATION.md §2–§3).
+// TODO(roadmap): third system 'timberJoinery' — 5-axis all-timber milled
+// connections (BUGA-style, no visible steel). The node-graph representation
+// the geometry now emits is exactly what it will consume. FABRICATION.md §9.
+// ---------------------------------------------------------------------------
+export const JOINTS = {
+  hub: {
+    /** S355 laser-cut fin thickness (mm); strut end slot = fin + galv allowance. */
+    finThicknessMm: 6,
+    slotMm: { width: 7, depth: 105 },
+    /** M12×70 8.8 HDG through-bolts per strut end into the fin. */
+    boltsPerStrutEnd: 2,
+    boltSpec: 'M12×70 8.8 HDG + dome nut',
+  },
+  lamella: {
+    /** One through-bolt per node: continuous lamella mid-hole + two butting ends. */
+    boltsPerNode: 1,
+    boltSpec: 'M12×180 8.8 HDG + 50 mm washers',
+  },
+} as const;
+
+// ---------------------------------------------------------------------------
+// FOUNDATION — both foot strategies land on ground screws; no concrete.
+// ---------------------------------------------------------------------------
+export const FOUNDATION = {
+  /** TODO: confirm screw spec per ground survey (FABRICATION.md §5). */
+  groundScrewSpec: 'Ø76 × 865 mm HDG ground screw',
+} as const;
+
+// ---------------------------------------------------------------------------
 // ENVELOPE — slider ranges + defaults (bounds justified by GRAMMAR rules;
 // the live per-design bounds come from engine/grammar.ts deriveBounds()).
 // ---------------------------------------------------------------------------
 export const ENVELOPE = {
   footprintM2: { min: GRAMMAR.minFootprintM2, max: GRAMMAR.maxFootprintM2, default: 15 },
   riseM: { min: GRAMMAR.minHeadroomM, max: GRAMMAR.pdHeightCapM, default: 2.3 },
-  strutSpacingM: { min: GRAMMAR.minStrutSpacingM, max: GRAMMAR.maxStrutSpacingM, default: 0.35 },
+  strutSpacingM: { min: GRAMMAR.minStrutSpacingM, max: GRAMMAR.maxStrutSpacingM, default: 0.55 },
   apertureDeg: { min: 0, max: 359, default: 90 }, // 90 = opens east, toward morning light
+  /** Joint system + foot strategy defaults (FABRICATION.md §2–§5). */
+  jointSystem: 'hub',
+  footStrategy: 'legs',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -99,25 +159,48 @@ export const SITE = {
 // ---------------------------------------------------------------------------
 export const PRICING = {
   /**
-   * TODO: wire real fab quote (Clay, Day 4–6).
-   * This £/component rate is the single load-bearing placeholder in the whole
-   * demo. It is a guess until a CNC-timber fab shop returns an itemised quote
-   * against the demo's ACTUAL cut geometry. Until then the price MOVES
-   * correctly; it is not yet TRUE.
+   * TODO: wire real fab quotes (Clay, Day 4–6). Every unit rate below is a
+   * PLACEHOLDER until a fabricator returns an itemised quote against the
+   * demo's ACTUAL cut geometry + hardware schedule. Until then the price
+   * MOVES correctly (it is built from the real BOM); it is not yet TRUE.
    */
-  ratePerComponentGBP: 42,
 
-  /** TODO: wire real fab quote — per-metre cutting/finishing of timber stock. */
-  cutCostPerMetreGBP: 9,
+  /** £/m — 45×70 planed C24, UC3 treated, delivered (hub struts + legs). */
+  timberPerMetreGBP: 7,
+  /** £/sheet — 45 mm spruce LVL 2.4 × 1.2 m (lamellas, eave + crown blanks). */
+  lvlSheetGBP: 215,
+  /** £/sheet — CNC profiling one full sheet (lamellas / blanks). */
+  sheetCncGBP: 65,
+  /** £/piece — docking-saw end program on a linear piece (2 ends: dock+slot+drill). */
+  dockingPerPieceGBP: 5,
+
+  /** Steel + fixings unit rates, keyed by the hardware ids joints.ts emits. */
+  hardwareGBP: {
+    /** Welded + HDG steel node hub (per fin averaged in). */
+    hub: 32,
+    /** Ground-shoe hub: hub + 200×200×8 base plate (sweep touchdowns). */
+    hubGroundShoe: 48,
+    /** Leg-head T-plate, 6 mm HDG. */
+    legHeadPlate: 26,
+    /** Adjustable HDG post shoe (leg bases). */
+    postShoe: 19,
+    /** Bent-plate ground shoe for lamella sweep touchdowns. */
+    plateGroundShoe: 24,
+    /** M12 bolt set (bolt + nut + washers), either system. */
+    boltSet: 1.4,
+    /** 4 mm HDG fish-plate pair + M10 sets (blank splices, lamella system). */
+    fishPlate: 9,
+    /** Ø76 × 865 ground screw, supplied AND driven (no concrete). */
+    groundScrew: 175,
+    /** Living armature: 6 mm stainless wire + eye screws, per metre run. */
+    armatureWirePerM: 3.2,
+  } as Record<string, number>,
 
   /** TODO: confirm with installer — fixed mobilisation (crew, delivery). */
   installBaseGBP: 3800,
 
-  /** TODO: confirm with installer — marginal install labour per member. */
+  /** TODO: confirm with installer — marginal install labour per timber piece. */
   installPerComponentGBP: 6.5,
-
-  /** TODO: confirm — ground screws + base prep allowance per foot. */
-  groundworkPerFootGBP: 420,
 
   /** TODO: confirm with horticultural partner — supply + plant one climber. */
   plantingPerPlantGBP: 55,

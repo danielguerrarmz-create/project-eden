@@ -21,13 +21,16 @@ import { computeStrutField } from './strutOptimizer';
 import { computeSunPath } from './sunpath';
 import type { BuildPlan, CanopyGeometry, ComponentList, DesignParams, EngineOutputs } from './types';
 
-/** Assembly step count for the spec sheet: feet, eave blanks, then ring-by-ring
- *  diagrid lifts, then planting + tie-in. Derived from the component model. */
+/** Assembly step count for the spec sheet (FABRICATION.md §7): ground screws,
+ *  eave blanks, ring-by-ring lifts, legs if any, planting + armature tie-in.
+ *  Derived from the component model. */
 function planBuild(geometry: CanopyGeometry, components: ComponentList, plantCount: number): BuildPlan {
+  const legSteps = geometry.params.footStrategy === 'legs' ? geometry.feetCount : 0;
   const assemblySteps =
-    geometry.feetCount + // set each foot
-    geometry.feetCount * 2 + // splice the eave blanks between them
+    geometry.groundScrewCount + // drive each ground screw
+    geometry.feetCount * 2 + // splice the eave blanks between feet
     geometry.ringCount + // lift the diagrid ring by ring
+    legSteps + // stand each leg
     2; // plant + tie in the armature
   const leadTimeWeeks = Math.round(
     LEAD_TIME.baseWeeks + (components.totalCount / 100) * LEAD_TIME.weeksPerHundredComponents,
@@ -38,19 +41,21 @@ function planBuild(geometry: CanopyGeometry, components: ComponentList, plantCou
 export function runEngine(params: DesignParams): EngineOutputs {
   const bounds = deriveBounds(params);
   const geometry = generateGeometry(params);
-  const components = decomposeComponents(geometry);
-  const nesting = nestComponents(components);
   const species = getSpecies(params.speciesId);
 
   const sunPath = computeSunPath(SITE.latitudeDeg);
   const strutField = computeStrutField(geometry.params, species, sunPath);
+  // Components AFTER the strut field: the armature allowance (wire at the
+  // species' recommended spacing) is a real BOM line now.
+  const components = decomposeComponents(geometry, strutField);
+  const nesting = nestComponents(components);
   const growth = computeGrowth(species, geometry.params.year);
   const ecology = computeEcology(geometry, species, growth);
 
   // Eave perimeter -> how many climbers get planted -> planting allowance.
   const perimeterM = ellipsePerimeterM(geometry.planA, geometry.planB);
   const plantCount = plantCountFor(perimeterM);
-  const price = priceDesign(geometry, components, species, plantCount);
+  const price = priceDesign(components, nesting, species, plantCount);
   const buildPlan = planBuild(geometry, components, plantCount);
 
   return {
