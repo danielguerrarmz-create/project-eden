@@ -27,13 +27,15 @@
  * The living layer never enters this file — plants attach later to a
  * sacrificial armature keyed off (u,v) coords, keeping the structure dry.
  */
-import { GRAMMAR, JOINTS, STOCK } from '../data/config';
+import { GRAMMAR, STOCK } from '../data/config';
 import {
   clampParams,
   ellipsePerimeterM,
   feetCountFor,
   planDims,
 } from './grammar';
+import { resolveJointCuts } from './jointGeometry';
+import { vCross, vDot, vNorm, vSub } from './vec';
 import type {
   CanopyGeometry,
   CanopyNode,
@@ -119,19 +121,6 @@ function canopyPoint(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
   // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
   return [ctx.a * r * Math.sin(thetaRad), y, ctx.b * r * Math.cos(thetaRad)];
 }
-
-// --- small vector helpers (local; the engine stays three.js-free) ---
-const vSub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const vCross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const vDot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const vNorm = (a: Vec3): Vec3 => {
-  const l = Math.hypot(a[0], a[1], a[2]) || 1e-9;
-  return [a[0] / l, a[1] / l, a[2] / l];
-};
 
 /** Outward (upward) unit surface normal at (r, θ), by central differences. */
 function surfaceNormal(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
@@ -252,7 +241,7 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   });
 
   const addMember = (
-    m: Omit<Member, 'lengthM' | 'normal' | 'startTrimM' | 'endTrimM'>,
+    m: Omit<Member, 'lengthM' | 'normal' | 'endCuts' | 'startTrimM' | 'endTrimM'>,
     from: CanopyNode,
     to: CanopyNode,
   ): Member => {
@@ -270,6 +259,12 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       ...m,
       lengthM: dist(from.position, to.position),
       normal,
+      // Placeholder square cuts — the joint-resolution pass (below) assigns
+      // every end its real plane per FABRICATION.md §1a.
+      endCuts: {
+        start: { point: from.position, normal: [-axis[0], -axis[1], -axis[2]], kind: 'square' },
+        end: { point: to.position, normal: axis, kind: 'square' },
+      },
       startTrimM: 0,
       endTrimM: 0,
     };
@@ -279,13 +274,13 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
     return member;
   };
 
-  /** Physical cut length: developed length minus the milled-end trims. */
+  /** Physical cut length is filled AFTER joint resolution (planes → trims). */
   const addPiece = (kind: Piece['kind'], id: string, segs: Member[], stock: Piece['stock'], depthM: number) => {
     pieces.push({
       id,
       kind,
       memberIds: segs.map((s) => s.id),
-      lengthM: segs.reduce((sum, s) => sum + s.lengthM - s.startTrimM - s.endTrimM, 0),
+      lengthM: 0,
       stock,
       depthM,
     });
@@ -305,15 +300,6 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   // -------------------------------------------------------------------------
   const lamellaContinuesAt = (ring: number, family: 'a' | 'b'): boolean =>
     lamella && ring > 0 && ring < ringCount && (family === 'a' ? ring % 2 === 0 : ring % 2 === 1);
-
-  const nodeKind = new Map(nodes.map((n) => [n.id, n.kind]));
-  /** Milled-end trim where a diagrid piece terminates at a node. */
-  const trimAt = (nodeId: string): number => {
-    if (!lamella) return JOINTS.hub.strutStandoffM; // struts stop at the hub core
-    return nodeKind.get(nodeId) === 'interior'
-      ? JOINTS.lamella.buttTrimM // stops at the continuous piece's side face
-      : JOINTS.lamella.blankFaceTrimM; // stops at the ring blank's inner face
-  };
 
   for (const family of ['a', 'b'] as const) {
     const dj = family === 'a' ? 1 : -1;
@@ -352,11 +338,6 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
           const groups =
             runLengthM > GRAMMAR.maxComponentLengthM ? run.map((s) => [s]) : [run];
           for (const group of groups) {
-            // Milled ends: the piece's terminal members stop short of their
-            // node centres; through-nodes (middle of a two-bay lamella) keep
-            // trim 0. These trims flow into the PHYSICAL cut length.
-            group[0].startTrimM = trimAt(group[0].nodeStartId);
-            group[group.length - 1].endTrimM = trimAt(group[group.length - 1].nodeEndId);
             const startRing = i + 1 - run.length + run.indexOf(group[0]);
             const pieceId = `${lamella ? 'lam' : 'strut'}-${family}-${j0}-${startRing}`;
             group.forEach((s) => (s.pieceId = pieceId));
@@ -482,6 +463,21 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
 
   ringPieces(0, 'crown', 'crownBlank', 'crown', []);
   ringPieces(ringCount, 'eave', 'eaveBlank', 'eave', uniqueEaveBoundaries);
+
+  // ---------------------------------------------------------------------------
+  // JOINT RESOLUTION (FABRICATION.md §1a) — assign every member end its ONE
+  // planar cut (mitres, skew butts, blank faces, computed hub standoffs),
+  // derive the trims from the planes, then fill the PHYSICAL cut lengths the
+  // BOM prices. The scene draws the same clipped solids.
+  // ---------------------------------------------------------------------------
+  resolveJointCuts(nodes, members, params.jointSystem);
+  const memberById = new Map(members.map((m) => [m.id, m]));
+  for (const piece of pieces) {
+    piece.lengthM = piece.memberIds.reduce((sum, id) => {
+      const m = memberById.get(id)!;
+      return sum + m.lengthM - m.startTrimM - m.endTrimM;
+    }, 0);
+  }
 
   const groundScrewCount = nodes.filter((n) => n.kind === 'ground').length;
 

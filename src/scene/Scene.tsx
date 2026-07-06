@@ -16,6 +16,13 @@ import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
 import { GrowthOverlay } from './overlays/GrowthOverlay';
 
+/**
+ * ?inspect — joint-inspection mode (dev/review affordance): hides the soft
+ * overlays and frees the camera so the joinery can be examined close up.
+ * Read once at load; the app already treats the URL as load-time state.
+ */
+const INSPECT = new URLSearchParams(window.location.search).has('inspect');
+
 export function Scene() {
   const overlays = useDesign((s) => s.overlays);
   const reducedMotion = useReducedMotion();
@@ -45,19 +52,19 @@ export function Scene() {
       <GardenContext />
       <Folly />
 
-      {overlays.strutHeatmap && <StrutHeatmap />}
-      {overlays.growth && <GrowthOverlay />}
+      {overlays.strutHeatmap && !INSPECT && <StrutHeatmap />}
+      {overlays.growth && !INSPECT && <GrowthOverlay />}
 
       <ContactShadows position={[0, 0.015, 0]} opacity={0.28} scale={18} blur={2.6} far={7} color="#5a5443" />
 
       <OrbitControls
         makeDefault
         target={[0, 1.15, 0]}
-        minDistance={4}
+        minDistance={INSPECT ? 0.3 : 4}
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}
         enablePan={false}
-        autoRotate={!reducedMotion}
+        autoRotate={!reducedMotion && !INSPECT}
         autoRotateSpeed={0.35}
       />
     </Canvas>

@@ -67,6 +67,29 @@ export interface CanopyNode {
 }
 
 /**
+ * One PLANAR end cut (FABRICATION.md §1a): the plane a member's physical end
+ * is cut on. Every member end is exactly one planar cut — that is what a
+ * docking saw (square) or the CNC profile (skew) can make, and it is the ONLY
+ * end geometry that exists in v1. The member's solid is its section prism
+ * clipped by its two end planes; the cut schedule derives lengths from the
+ * same planes.
+ */
+export interface EndCut {
+  /** A point on the cut plane (world). */
+  point: Vec3;
+  /** OUTWARD unit plane normal — points out of the timber. */
+  normal: Vec3;
+  /** Which joint rule produced this plane (diagnostic + tests):
+   *  'standoff'  — hub strut square cut clearing the connector envelope
+   *  'butt'      — lamella skew cut on the continuous piece's side face
+   *  'blankFace' — lamella skew cut on the ring blank's inner face
+   *  'mitre'     — bisector plane where two segments of one piece meet
+   *  'splice'    — square cut with a joint gap under fish plates
+   *  'square'    — plain square cut (default / degenerate fallback) */
+  kind: 'standoff' | 'butt' | 'blankFace' | 'mitre' | 'splice' | 'square';
+}
+
+/**
  * One straight centreline SEGMENT between two nodes. Segments are the render
  * + analysis unit; the PURCHASABLE unit is the Piece a segment belongs to (a
  * two-bay lamella is 2 segments, an eave blank is several).
@@ -90,11 +113,14 @@ export interface Member {
    */
   normal: Vec3;
   /**
-   * MILLED-END reality: how far the physical timber stops short of the node
-   * centre at each end. Hub system: the hub-core standoff (struts never touch
-   * each other, they touch steel). Lamella: a butting end stops at the
-   * continuous piece's side face; ends at the rings stop at the blank face.
-   * Zero at a piece's own through-nodes.
+   * MILLED-END reality (FABRICATION.md §1a): the planar cut each physical end
+   * is made on, resolved per node by the joint rules. The solid the scene
+   * draws and the length the BOM prices both derive from these planes.
+   */
+  endCuts: { start: EndCut; end: EndCut };
+  /**
+   * DERIVED: centreline distance from each node to that end's cut plane
+   * (0 at a mitred through-node). Subtracted into the piece's cut length.
    */
   startTrimM: number;
   endTrimM: number;

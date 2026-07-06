@@ -109,31 +109,49 @@ export const JOINTS = {
     /** S355 laser-cut fin thickness (mm); strut end slot = fin + galv allowance. */
     finThicknessMm: 6,
     slotMm: { width: 7, depth: 105 },
+    /** Fin plate the strut slots onto: 60 mm tall (inside the 70 mm depth). */
+    finHeightMm: 60,
     /** M12×70 8.8 HDG through-bolts per strut end into the fin. */
     boltsPerStrutEnd: 2,
     boltSpec: 'M12×70 8.8 HDG + dome nut',
-    /** Hub core disc diameter (mm) — sets the strut end standoff. */
+    /** Bolt hole centres from the strut end face (mm) — FABRICATION.md §2. */
+    boltInsetsMm: [40, 85],
+    boltDiaMm: 12,
+    /** Hub core drum diameter / height (mm). The core claims a cylindrical
+     *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior core,
+     *  ring flange assembly, ground shoe alike) — timber stays out of it. */
     coreDiaMm: 140,
+    coreHeightMm: 80,
     /**
-     * MILLED-END TRIM: every strut's physical end stops this far short of the
-     * node centre (hub core radius). Struts never touch each other — they
-     * touch steel. This is subtracted into the CUT length, not just drawn.
+     * MILLED-END STANDOFF (FABRICATION.md §1a): every strut end is a square
+     * cut at a COMPUTED standoff — the smallest length where the whole end
+     * face clears the connector envelope by `envelopeClearanceMm`, whatever
+     * the approach angle. This is the FLOOR (the core radius); the computed
+     * value is typically 75–85 mm and is subtracted into the CUT length.
      */
     strutStandoffM: 0.07,
+    /** Timber-to-steel clearance at the envelope (mm). */
+    envelopeClearanceMm: 10,
+    /** At ring nodes the strut end also clears the blank's inner face (mm). */
+    blankFaceClearanceMm: 5,
   },
   lamella: {
     /** One through-bolt per node: continuous lamella mid-hole + two butting ends. */
     boltsPerNode: 1,
     boltSpec: 'M12×180 8.8 HDG + 50 mm washers',
+    boltDiaMm: 12,
     /**
-     * MILLED-END TRIM: a butting lamella end stops at the continuous piece's
-     * side face — half its 45 mm thickness plus a 2 mm assembly gap.
+     * MILLED-END GEOMETRY (FABRICATION.md §1a): a butting end is a SKEW cut
+     * on the continuous piece's side-face plane — half its thickness plus
+     * this assembly gap from the node centre. Ends at the rings are skew cuts
+     * on the blank's inner-face plane (half the blank depth + the same gap).
+     * The trims are DERIVED from those planes, not constants.
      */
-    buttTrimM: 0.0245,
-    /** A lamella end at the crown/eave ring stops at the blank's inner face
-     *  (half the 180 mm blank depth). */
-    blankFaceTrimM: 0.09,
+    assemblyGapMm: 2,
   },
+  /** Mid-bay splice + split-weave nodes: square cuts leaving this total
+   *  joint gap under the fish plates (half each side). */
+  spliceGapM: 0.003,
 } as const;
 
 // ---------------------------------------------------------------------------

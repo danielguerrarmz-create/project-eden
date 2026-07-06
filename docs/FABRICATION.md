@@ -49,6 +49,39 @@ that is the CNC sheet profile. Timber end operations stay commodity.
   separate sacrificial layer (§6) — exactly the decoupling the engine already
   claims.
 
+## 1a. The joint-geometry model — one planar cut per member end
+
+How members come together at a node is not decoration; it is the model. The
+rule that makes it representable AND fabricable:
+
+> **Every member is its rectangular section extruded along its centreline and
+> terminated by exactly two PLANAR cuts.** A docking saw makes a square
+> plane; the CNC sheet profile makes a skew plane. No other end geometry
+> exists in v1. (Slots and holes are subtractions *inside* the solid — they
+> never change the silhouette.)
+
+The engine carries each end's cut plane (point + outward normal) explicitly.
+The 3D solid is the section prism clipped by its two planes; the cut schedule
+derives lengths from the same planes. Trims are therefore **computed**
+(centreline-to-plane distances), never constants.
+
+The full catalogue of end conditions — every member end in either system is
+exactly one of these:
+
+| End condition | Where it occurs | The cut plane |
+|---|---|---|
+| **square standoff** | hub-system strut ends, every node kind | ⊥ member axis, at the smallest standoff where every corner of the end face clears the node's **connector envelope** (Ø140 cylinder about the node normal) by ≥ 10 mm — and, at ring nodes, clears the blank's inner face by ≥ 5 mm. Floor = core radius (70 mm). The end program stays identical; only length varies. |
+| **skew butt** | lamella ends at woven interior nodes | the continuous lamella's **side face**: offset half its 45 mm thickness + 2 mm assembly gap from the node centre, along its width direction. Cut as part of the CNC profile. |
+| **blank-face butt** | lamella ends at crown / eave / ground ring nodes | the blank's **inner face**: 90 mm from the ring centreline + 2 mm gap. |
+| **mitre** | wherever two segments of the SAME piece pass through a node (a two-bay lamella's through-node, blank facet-to-facet) and blank piece ends at ring nodes | the **bisector plane** of the two segment axes, through the node centre. Both sides cut on one plane → the faceted representation of a curved piece closes with zero gap or overlap. |
+| **splice gap** | valence-2 mid-bay splice nodes; split-weave lamella nodes | ⊥ member axis, 1.5 mm short of the node (3 mm total joint gap); fish plates carry across. |
+
+Why the hub standoff must be computed, not fixed: members meet the node at
+varying angles to the node normal, so a fixed 70 mm standoff lets one corner
+of a square-cut end face clip into the steel core. Solving the corner-
+clearance condition per end (typically 75–85 mm) keeps timber off steel at
+every approach angle while the milling program stays one program.
+
 ## 2. Joint system A — "hub": steel node hubs + straight struts
 
 The flagship detail. Contemporary-gridshell standard (knife-plate node).
@@ -74,11 +107,14 @@ fixture angles. Variants:
 
 **Fasteners** — M12 × 70 grade 8.8 HDG bolts + dome nuts, 2 per strut end.
 
-**Milled-end geometry**: a strut's PHYSICAL length is the node-to-node
-centreline distance minus the hub-core standoff (70 mm) at each end — struts
-never touch each other, they touch steel. The model carries these trims on
-every member end and the cut schedule prices the trimmed length; the 3D view
-draws exactly that.
+**Milled-end geometry** (§1a): every strut end is a square cut at a
+**computed standoff** — the smallest length at which the whole end face
+clears the node's Ø140 connector envelope by 10 mm (floor: the 70 mm core
+radius). Struts never touch each other and never touch the core; they hang on
+the fins. The standoff is subtracted into the physical cut length, the cut
+schedule prices it, and the 3D view draws exactly that solid. At ring nodes
+the connector is the flange variant (plates gripping the blank + fins), so
+the strut end additionally clears the blank's inner face.
 
 **Why it's legit**: struts carry axial force into fins in double shear; the
 free-edge canopy sees real wind uplift and the bolted fin takes tension as
@@ -103,10 +139,15 @@ camber — you **cut** that, you don't bend it. So lamellas are CNC-profiled,
 pipeline as the eave blanks. End ops are part of the same CNC profile: skew
 butt cut + slotted Ø13 end hole (tolerance take-up), Ø13 mid hole.
 
-**Milled-end geometry**: a butting lamella end stops at the continuous
-piece's side face — half its 45 mm thickness plus a 2 mm assembly gap; ends
-at the crown/eave rings stop at the blank's inner face (half the 180 mm
-depth). Trims are carried per member end and subtracted into the cut length.
+**Milled-end geometry** (§1a): a butting lamella end is a **skew cut ON the
+continuous piece's side-face plane** — half its 45 mm thickness plus a 2 mm
+assembly gap from the node centre, along the continuous piece's width
+direction. The cut is NOT square to the butting piece's own axis; it is part
+of the CNC profile, which is why it costs nothing extra. Ends at the
+crown/eave rings are skew cuts on the blank's inner-face plane (90 mm + 2 mm
+gap). A two-bay piece's through-node is a mitre in the faceted model (the
+real piece is continuous and curved there). All trims derive from the planes
+and flow into the cut length.
 
 **Bounds consequence**: a two-bay piece must fit the 2.35 m sheet cut limit →
 the lamella system caps bay spacing lower (~0.8 m) than the hub system. The
@@ -124,6 +165,12 @@ grammar surfaces this when the user switches system.
   flat-piece tolerance the grammar already enforces. Splices: at eave hubs
   (system A) or bolted fish plates 4 mm HDG + 4 × M10 (system B); mid-bay
   splices are fish plates in both systems.
+- **Blank end geometry** (§1a): facet-to-facet inside a blank AND blank-to-
+  blank at a ring node are **mitres** — both segments cut on the shared
+  bisector plane, so the ring closes with no corner gap or overlap (the real
+  piece is CNC-cut smooth to its plan curve; the mitred facets are its exact
+  faceted representation). Mid-bay splice nodes are square cuts with a 3 mm
+  joint gap under the fish plates.
 - **Crown ring**: same LVL, 2–4 curved segments around the oculus.
 
 ## 5. Meeting the ground — the sweep roots itself

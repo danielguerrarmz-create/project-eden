@@ -1,7 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { generateGeometry, canopyProfile } from './geometry';
-import { GRAMMAR, ENVELOPE, JOINTS } from '../data/config';
-import type { DesignParams, JointSystem, Vec3 } from './types';
+import { memberPrism, sectionFor } from './jointGeometry';
+import { GRAMMAR, ENVELOPE, JOINTS, STOCK } from '../data/config';
+import type { DesignParams, JointSystem, Member, Vec3 } from './types';
+
+const vSub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vDot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const vLen = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
+
+/** The prism corners belonging to one end's cut face. */
+const endFace = (verts: Vec3[], end: 'start' | 'end') =>
+  end === 'start' ? verts.slice(0, 4) : verts.slice(4, 8);
+
+const prismOf = (m: Member, jointSystem: JointSystem) => {
+  const { widthM, depthM } = sectionFor(m.type, jointSystem);
+  return memberPrism(m, widthM, depthM);
+};
 
 const base: DesignParams = {
   footprintM2: 15,
@@ -138,54 +152,151 @@ describe('generateGeometry: section frames — solid timber, not piping', () => 
   });
 });
 
-describe('generateGeometry: milled-end trims — physical cut lengths', () => {
-  it('hub system: every strut stops at the hub core, and its cut length prices the trim', () => {
+describe('generateGeometry: joint geometry — one planar cut per member end (§1a)', () => {
+  it('every member is a valid solid: unit outward cut normals, positive edge lengths, cut faces ON their planes', () => {
+    sweep((p) => {
+      const g = generateGeometry(p);
+      for (const m of g.members) {
+        const axis = vSub(m.end, m.start).map((x) => x / m.lengthM) as unknown as Vec3;
+        // Outward normals: out of the timber at each end.
+        expect(vLen(m.endCuts.start.normal)).toBeCloseTo(1, 6);
+        expect(vLen(m.endCuts.end.normal)).toBeCloseTo(1, 6);
+        expect(vDot(m.endCuts.start.normal, axis)).toBeLessThanOrEqual(1e-9);
+        expect(vDot(m.endCuts.end.normal, axis)).toBeGreaterThanOrEqual(-1e-9);
+        // The clipped prism never inverts: all four long edges run forward.
+        const verts = prismOf(m, p.jointSystem);
+        for (let k = 0; k < 4; k++) {
+          expect(vDot(vSub(verts[k + 4], verts[k]), axis), `${m.id} edge ${k}`).toBeGreaterThan(
+            1e-3,
+          );
+        }
+        // Cut-face corners lie exactly on their planes.
+        for (const end of ['start', 'end'] as const) {
+          const cut = m.endCuts[end];
+          for (const v of endFace(verts, end)) {
+            expect(Math.abs(vDot(vSub(v, cut.point), cut.normal))).toBeLessThan(1e-6);
+          }
+        }
+      }
+    });
+  });
+
+  it('hub system: struts are square-cut at a COMPUTED standoff — every end-face corner clears the connector envelope', () => {
     const g = generateGeometry({ ...base, jointSystem: 'hub' });
     const memberById = new Map(g.members.map((m) => [m.id, m]));
+    const nodeById = new Map(g.nodes.map((n) => [n.id, n]));
+    const envelopeR =
+      JOINTS.hub.coreDiaMm / 2000 + JOINTS.hub.envelopeClearanceMm / 1000;
     const struts = g.pieces.filter((pc) => pc.kind === 'strut');
     expect(struts.length).toBeGreaterThan(0);
     for (const piece of struts) {
       const m = memberById.get(piece.memberIds[0])!;
-      expect(m.startTrimM).toBe(JOINTS.hub.strutStandoffM);
-      expect(m.endTrimM).toBe(JOINTS.hub.strutStandoffM);
-      expect(piece.lengthM).toBeCloseTo(m.lengthM - 2 * JOINTS.hub.strutStandoffM, 9);
+      // Standoff floor = the core radius; the computed value prices the cut.
+      expect(m.startTrimM).toBeGreaterThanOrEqual(JOINTS.hub.strutStandoffM - 1e-9);
+      expect(m.endTrimM).toBeGreaterThanOrEqual(JOINTS.hub.strutStandoffM - 1e-9);
+      expect(m.endCuts.start.kind).toBe('standoff');
+      expect(m.endCuts.end.kind).toBe('standoff');
+      expect(piece.lengthM).toBeCloseTo(m.lengthM - m.startTrimM - m.endTrimM, 9);
       expect(piece.lengthM).toBeGreaterThan(0.1); // still a millable piece
+      // Timber never touches steel: every corner of the square end face sits
+      // ≥ envelope radius from the node's normal axis.
+      const verts = prismOf(m, 'hub');
+      for (const end of ['start', 'end'] as const) {
+        const node = nodeById.get(end === 'start' ? m.nodeStartId : m.nodeEndId)!;
+        for (const v of endFace(verts, end)) {
+          const rel = vSub(v, node.position);
+          const axial = vDot(rel, node.normal);
+          const radial = vLen(vSub(rel, [
+            node.normal[0] * axial,
+            node.normal[1] * axial,
+            node.normal[2] * axial,
+          ]));
+          expect(radial, `${m.id} @ ${node.id}`).toBeGreaterThanOrEqual(envelopeR - 1e-6);
+        }
+      }
     }
   });
 
-  it('lamella system: butting ends trim at side faces, through-nodes stay untrimmed', () => {
+  it('lamella system: butting ends are skew-cut ON the continuous side face; through-nodes mitre with zero trim', () => {
     const g = generateGeometry({ ...base, jointSystem: 'lamella' });
     const memberById = new Map(g.members.map((m) => [m.id, m]));
-    const nodeKind = new Map(g.nodes.map((n) => [n.id, n.kind]));
+    const nodeById = new Map(g.nodes.map((n) => [n.id, n]));
+    const buttOffsetM =
+      STOCK.lamella.thicknessMm / 2000 + JOINTS.lamella.assemblyGapMm / 1000;
+    const blankFaceOffsetM =
+      STOCK.blank.depthMm / 2000 + JOINTS.lamella.assemblyGapMm / 1000;
+    let butts = 0;
+    let blankFaces = 0;
+    for (const m of g.members.filter((mm) => mm.type === 'lamella' || mm.type === 'foot')) {
+      for (const end of ['start', 'end'] as const) {
+        const cut = m.endCuts[end];
+        const node = nodeById.get(end === 'start' ? m.nodeStartId : m.nodeEndId)!;
+        const planeDist = Math.abs(vDot(vSub(cut.point, node.position), cut.normal));
+        if (cut.kind === 'butt') {
+          butts++;
+          // The plane IS the continuous piece's side face: half thickness + gap.
+          expect(planeDist).toBeCloseTo(buttOffsetM, 6);
+        }
+        if (cut.kind === 'blankFace') {
+          blankFaces++;
+          // The plane IS the ring blank's inner face: half depth + gap.
+          expect(planeDist).toBeCloseTo(blankFaceOffsetM, 6);
+        }
+      }
+    }
+    expect(butts).toBeGreaterThan(0); // the weave exists
+    expect(blankFaces).toBeGreaterThan(0); // the rings receive the lamellas
+    // Two-bay through-nodes: both segments cut on the shared bisector plane.
     for (const piece of g.pieces.filter((pc) => pc.kind === 'lamella')) {
       const segs = piece.memberIds.map((id) => memberById.get(id)!);
-      const first = segs[0];
-      const last = segs[segs.length - 1];
-      const expectedTrim = (nodeId: string) =>
-        nodeKind.get(nodeId) === 'interior'
-          ? JOINTS.lamella.buttTrimM
-          : JOINTS.lamella.blankFaceTrimM;
-      expect(first.startTrimM).toBe(expectedTrim(first.nodeStartId));
-      expect(last.endTrimM).toBe(expectedTrim(last.nodeEndId));
       if (segs.length === 2) {
-        // The through-node in the middle of a two-bay lamella is NOT trimmed.
-        expect(segs[0].endTrimM).toBe(0);
-        expect(segs[1].startTrimM).toBe(0);
+        expect(segs[0].endCuts.end.kind).toBe('mitre');
+        expect(segs[1].endCuts.start.kind).toBe('mitre');
+        expect(segs[0].endTrimM).toBeCloseTo(0, 9);
+        expect(segs[1].startTrimM).toBeCloseTo(0, 9);
       }
       const developed = segs.reduce((s, m) => s + m.lengthM, 0);
       expect(piece.lengthM).toBeCloseTo(
-        developed - first.startTrimM - last.endTrimM,
+        developed - segs[0].startTrimM - segs[segs.length - 1].endTrimM,
         9,
       );
     }
   });
 
-  it('blanks are continuous through their nodes (no trims)', () => {
+  it('blanks close the ring: adjacent facets share one mitre plane at every ring node; splices keep the joint gap', () => {
     sweep((p) => {
       const g = generateGeometry(p);
-      for (const m of g.members.filter((mm) => mm.type === 'eave' || mm.type === 'crown')) {
-        expect(m.startTrimM).toBe(0);
-        expect(m.endTrimM).toBe(0);
+      const memberById = new Map(g.members.map((m) => [m.id, m]));
+      for (const node of g.nodes) {
+        const ringEnds = node.memberIds
+          .map((id) => memberById.get(id)!)
+          .filter((m) => m.type === 'eave' || m.type === 'crown')
+          .map((m) => ({
+            m,
+            end: (m.nodeStartId === node.id ? 'start' : 'end') as 'start' | 'end',
+          }));
+        if (node.kind === 'splice') {
+          // Mid-bay splice: square cuts, half the fish-plate joint gap each.
+          for (const { m, end } of ringEnds) {
+            expect(m.endCuts[end].kind).toBe('splice');
+            expect(end === 'start' ? m.startTrimM : m.endTrimM).toBeCloseTo(
+              JOINTS.spliceGapM / 2,
+              9,
+            );
+          }
+          continue;
+        }
+        if (ringEnds.length !== 2) continue;
+        // Both facets cut on the SAME plane through the node (opposed
+        // normals) — the faceted ring closes with no corner gap or overlap.
+        const [a, b] = ringEnds;
+        const ca = a.m.endCuts[a.end];
+        const cb = b.m.endCuts[b.end];
+        expect(ca.kind).toBe('mitre');
+        expect(cb.kind).toBe('mitre');
+        expect(vDot(ca.normal, cb.normal)).toBeCloseTo(-1, 6);
+        expect(Math.abs(vDot(vSub(node.position, ca.point), ca.normal))).toBeLessThan(1e-9);
+        expect(Math.abs(vDot(vSub(node.position, cb.point), cb.normal))).toBeLessThan(1e-9);
       }
     });
   });
