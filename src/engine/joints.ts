@@ -20,7 +20,6 @@ import type { CanopyGeometry, HardwareItem } from './types';
 
 export function computeHardware(g: CanopyGeometry): HardwareItem[] {
   const lamella = g.params.jointSystem === 'lamella';
-  const legs = g.params.footStrategy === 'legs';
 
   const nodeCount = (kind: string) => g.nodes.filter((n) => n.kind === kind).length;
   const pieceCount = (kind: string) => g.pieces.filter((p) => p.kind === kind).length;
@@ -28,9 +27,8 @@ export function computeHardware(g: CanopyGeometry): HardwareItem[] {
   const crownN = nodeCount('crown');
   const interiorN = nodeCount('interior');
   const eaveN = nodeCount('eave');
-  const groundN = nodeCount('ground');
+  const groundN = nodeCount('ground'); // the rooted touchdowns, one screw each
   const spliceN = nodeCount('splice'); // mid-bay beam splices: fish plate, no hub
-  const legCount = legs ? g.feetCount : 0;
   // Every ring node (crown + eave, grounded or not) fixes a blank: 2 bolts each.
   const ringNodeN = 2 * g.spokeCount;
 
@@ -38,27 +36,24 @@ export function computeHardware(g: CanopyGeometry): HardwareItem[] {
 
   if (!lamella) {
     // HUB SYSTEM — one welded steel hub per canopy node; struts slot onto
-    // fins with 2 bolts per end (JOINTS.hub).
-    const canopyHubs = crownN + interiorN + eaveN; // grid ground nodes handled below; leg bases get post shoes
+    // fins with 2 bolts per end (JOINTS.hub). Grounded nodes get the
+    // ground-shoe variant (hub + base plate) over their screw.
     items.push({
       id: 'hub',
       label: 'steel node hubs — S355 6 mm laser-cut fins, welded, HDG (each unique, angles from this design)',
-      qty: canopyHubs,
+      qty: crownN + interiorN + eaveN,
     });
-    if (!legs && groundN > 0) {
-      items.push({
-        id: 'hubGroundShoe',
-        label: 'ground-shoe hubs — node hub + 200×200×8 base plate (sweep touchdowns)',
-        qty: groundN,
-      });
-    }
+    items.push({
+      id: 'hubGroundShoe',
+      label: 'ground-shoe hubs — node hub + 200×200×8 base plate (rooted touchdowns)',
+      qty: groundN,
+    });
     const strutEndBolts = pieceCount('strut') * 2 * JOINTS.hub.boltsPerStrutEnd;
     const blankBolts = ringNodeN * 2;
-    const legBolts = legCount * 4;
     items.push({
       id: 'boltSet',
       label: `bolt sets — ${JOINTS.hub.boltSpec}`,
-      qty: strutEndBolts + blankBolts + legBolts,
+      qty: strutEndBolts + blankBolts,
     });
     if (spliceN > 0) {
       items.push({
@@ -70,18 +65,15 @@ export function computeHardware(g: CanopyGeometry): HardwareItem[] {
   } else {
     // LAMELLA SYSTEM — one through-bolt per interior node (the Zollinger
     // joint), one per ring node fixing lamella ends to the blanks, fish
-    // plates at blank splices.
-    const nodeBolts = interiorN * JOINTS.lamella.boltsPerNode;
-    const edgeBolts = ringNodeN;
-    const legBolts = legCount * 4;
+    // plates at blank splices; grounded nodes get bent-plate shoes.
     items.push({
       id: 'boltSet',
       label: `bolt sets — ${JOINTS.lamella.boltSpec}`,
-      qty: nodeBolts + edgeBolts + legBolts,
+      qty: interiorN * JOINTS.lamella.boltsPerNode + ringNodeN,
     });
-    // Where the sheet cut limit forced a lamella down to single bays (foot
-    // sweep zone), no piece runs continuous through the node — that joint
-    // needs a fish-plate splice instead of the plain single bolt.
+    // Where the sheet cut limit forced a lamella down to single bays (the
+    // rooted foot zone), no piece runs continuous through the node — that
+    // joint needs a fish-plate splice instead of the plain single bolt.
     const pieceOf = new Map(g.members.map((m) => [m.id, m.pieceId]));
     const typeOf = new Map(g.members.map((m) => [m.id, m.type]));
     let splitWeaveNodes = 0;
@@ -99,24 +91,11 @@ export function computeHardware(g: CanopyGeometry): HardwareItem[] {
       label: 'splice fish-plate pairs — 4 mm HDG + M10 sets (blank + mid-bay splices, split-weave nodes)',
       qty: pieceCount('eaveBlank') + pieceCount('crownBlank') + splitWeaveNodes + spliceN,
     });
-    if (!legs && groundN > 0) {
-      items.push({
-        id: 'plateGroundShoe',
-        label: 'bent-plate ground shoes (sweep touchdowns)',
-        qty: groundN,
-      });
-    }
-  }
-
-  if (legs) {
-    items.push(
-      {
-        id: 'legHeadPlate',
-        label: 'leg-head T-plates — 6 mm HDG (paired posts sandwich the plate)',
-        qty: legCount,
-      },
-      { id: 'postShoe', label: 'adjustable HDG post shoes (leg bases)', qty: legCount },
-    );
+    items.push({
+      id: 'plateGroundShoe',
+      label: 'bent-plate ground shoes (rooted touchdowns)',
+      qty: groundN,
+    });
   }
 
   items.push({

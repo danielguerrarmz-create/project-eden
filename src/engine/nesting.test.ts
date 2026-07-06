@@ -9,7 +9,6 @@ const base: DesignParams = {
   strutSpacingM: 0.55,
   apertureDeg: 90,
   jointSystem: 'hub',
-  footStrategy: 'legs',
   speciesId: 'clematis',
   year: 0,
 };
@@ -49,8 +48,8 @@ describe('nesting: sheet pieces shelf-packed, linear pieces bin-packed into stoc
     expect(hub.nesting.stockPlan.utilisation).toBeGreaterThan(0);
     expect(hub.nesting.stockPlan.utilisation).toBeLessThanOrEqual(1);
 
-    // Lamella + sweep: every piece (lamellas, blanks) comes off sheet stock.
-    const lam = runEngine({ ...base, jointSystem: 'lamella', footStrategy: 'sweep' });
+    // Lamella: every piece (lamellas, blanks) comes off sheet stock.
+    const lam = runEngine({ ...base, jointSystem: 'lamella' });
     expect(lam.nesting.stockPlan.pieceCount).toBe(0);
     expect(lam.nesting.stockPlan.lengthsNeeded).toBe(0);
     expect(lam.nesting.sheets.length).toBeGreaterThan(0);

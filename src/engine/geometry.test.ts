@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateGeometry, canopyProfile } from './geometry';
-import { GRAMMAR, ENVELOPE } from '../data/config';
-import type { DesignParams, FootStrategy, JointSystem } from './types';
+import { GRAMMAR, ENVELOPE, JOINTS } from '../data/config';
+import type { DesignParams, JointSystem, Vec3 } from './types';
 
 const base: DesignParams = {
   footprintM2: 15,
@@ -9,32 +9,20 @@ const base: DesignParams = {
   strutSpacingM: 0.55,
   apertureDeg: 90,
   jointSystem: 'hub',
-  footStrategy: 'legs',
   speciesId: 'clematis',
   year: 0,
 };
 
 const SYSTEMS: JointSystem[] = ['hub', 'lamella'];
-const FEET: FootStrategy[] = ['legs', 'sweep'];
 
-/** Sweep a representative grid of designs × ALL system/feet combinations. */
+/** Sweep a representative grid of designs × both joint systems. */
 function sweep(fn: (p: DesignParams) => void) {
   for (let f = ENVELOPE.footprintM2.min; f <= ENVELOPE.footprintM2.max; f += 1.5) {
     for (const r of [1.9, 2.2, 2.5]) {
       for (const s of [0.45, 0.6, 1.05]) {
         for (const ap of [0, 90, 210]) {
           for (const jointSystem of SYSTEMS) {
-            for (const footStrategy of FEET) {
-              fn({
-                ...base,
-                footprintM2: f,
-                riseM: r,
-                strutSpacingM: s,
-                apertureDeg: ap,
-                jointSystem,
-                footStrategy,
-              });
-            }
+            fn({ ...base, footprintM2: f, riseM: r, strutSpacingM: s, apertureDeg: ap, jointSystem });
           }
         }
       }
@@ -43,7 +31,7 @@ function sweep(fn: (p: DesignParams) => void) {
 }
 
 describe('generateGeometry: structural invariants across the whole range', () => {
-  it('always reaches the ground exactly (no member dips below, some node at y=0)', () => {
+  it('always roots exactly (no member dips below ground, the foot nodes sit at y=0)', () => {
     sweep((p) => {
       const g = generateGeometry(p);
       for (const m of g.members) {
@@ -120,6 +108,89 @@ describe('generateGeometry: the node graph is a real, closed component model', (
   });
 });
 
+describe('generateGeometry: section frames — solid timber, not piping', () => {
+  const len = (v: Vec3) => Math.hypot(v[0], v[1], v[2]);
+
+  it('every node carries a unit, upward surface normal', () => {
+    sweep((p) => {
+      const g = generateGeometry(p);
+      for (const n of g.nodes) {
+        expect(len(n.normal)).toBeCloseTo(1, 6);
+        expect(n.normal[1]).toBeGreaterThan(0); // outward = upward on a cap
+      }
+    });
+  });
+
+  it('every member frame is unit and perpendicular to the member axis', () => {
+    sweep((p) => {
+      const g = generateGeometry(p);
+      for (const m of g.members) {
+        expect(len(m.normal)).toBeCloseTo(1, 6);
+        const axis: Vec3 = [
+          (m.end[0] - m.start[0]) / m.lengthM,
+          (m.end[1] - m.start[1]) / m.lengthM,
+          (m.end[2] - m.start[2]) / m.lengthM,
+        ];
+        const dot = axis[0] * m.normal[0] + axis[1] * m.normal[1] + axis[2] * m.normal[2];
+        expect(Math.abs(dot)).toBeLessThan(1e-6);
+      }
+    });
+  });
+});
+
+describe('generateGeometry: milled-end trims — physical cut lengths', () => {
+  it('hub system: every strut stops at the hub core, and its cut length prices the trim', () => {
+    const g = generateGeometry({ ...base, jointSystem: 'hub' });
+    const memberById = new Map(g.members.map((m) => [m.id, m]));
+    const struts = g.pieces.filter((pc) => pc.kind === 'strut');
+    expect(struts.length).toBeGreaterThan(0);
+    for (const piece of struts) {
+      const m = memberById.get(piece.memberIds[0])!;
+      expect(m.startTrimM).toBe(JOINTS.hub.strutStandoffM);
+      expect(m.endTrimM).toBe(JOINTS.hub.strutStandoffM);
+      expect(piece.lengthM).toBeCloseTo(m.lengthM - 2 * JOINTS.hub.strutStandoffM, 9);
+      expect(piece.lengthM).toBeGreaterThan(0.1); // still a millable piece
+    }
+  });
+
+  it('lamella system: butting ends trim at side faces, through-nodes stay untrimmed', () => {
+    const g = generateGeometry({ ...base, jointSystem: 'lamella' });
+    const memberById = new Map(g.members.map((m) => [m.id, m]));
+    const nodeKind = new Map(g.nodes.map((n) => [n.id, n.kind]));
+    for (const piece of g.pieces.filter((pc) => pc.kind === 'lamella')) {
+      const segs = piece.memberIds.map((id) => memberById.get(id)!);
+      const first = segs[0];
+      const last = segs[segs.length - 1];
+      const expectedTrim = (nodeId: string) =>
+        nodeKind.get(nodeId) === 'interior'
+          ? JOINTS.lamella.buttTrimM
+          : JOINTS.lamella.blankFaceTrimM;
+      expect(first.startTrimM).toBe(expectedTrim(first.nodeStartId));
+      expect(last.endTrimM).toBe(expectedTrim(last.nodeEndId));
+      if (segs.length === 2) {
+        // The through-node in the middle of a two-bay lamella is NOT trimmed.
+        expect(segs[0].endTrimM).toBe(0);
+        expect(segs[1].startTrimM).toBe(0);
+      }
+      const developed = segs.reduce((s, m) => s + m.lengthM, 0);
+      expect(piece.lengthM).toBeCloseTo(
+        developed - first.startTrimM - last.endTrimM,
+        9,
+      );
+    }
+  });
+
+  it('blanks are continuous through their nodes (no trims)', () => {
+    sweep((p) => {
+      const g = generateGeometry(p);
+      for (const m of g.members.filter((mm) => mm.type === 'eave' || mm.type === 'crown')) {
+        expect(m.startTrimM).toBe(0);
+        expect(m.endTrimM).toBe(0);
+      }
+    });
+  });
+});
+
 describe('generateGeometry: joint systems', () => {
   it('hub system: every diagrid piece is a single straight strut', () => {
     const g = generateGeometry({ ...base, jointSystem: 'hub' });
@@ -129,45 +200,36 @@ describe('generateGeometry: joint systems', () => {
     }
   });
 
-  it('lamella system: at every interior node exactly ONE piece runs continuous (the Zollinger weave)', () => {
-    for (const footStrategy of FEET) {
-      const g = generateGeometry({ ...base, jointSystem: 'lamella', strutSpacingM: 0.55, footStrategy });
-      const interior = g.nodes.filter((n) => n.kind === 'interior');
-      expect(interior.length).toBeGreaterThan(0);
-      const memberPiece = new Map(g.members.map((m) => [m.id, m.pieceId]));
-      const memberType = new Map(g.members.map((m) => [m.id, m.type]));
-      const pieceById = new Map(g.pieces.map((pc) => [pc.id, pc]));
-      let woven = 0;
-      for (const n of interior) {
-        const diagrid = n.memberIds.filter((id) => {
-          const t = memberType.get(id);
-          return t === 'lamella' || t === 'foot';
-        });
-        expect(diagrid).toHaveLength(4); // two families through every interior node
-        const counts = new Map<string, number>();
-        for (const id of diagrid) {
-          const pid = memberPiece.get(id)!;
-          counts.set(pid, (counts.get(pid) ?? 0) + 1);
-        }
-        if (counts.size === 3) {
-          // The weave: one lamella passes through, two butt into it.
-          expect([...counts.values()].filter((c) => c === 2)).toHaveLength(1);
-          woven++;
-        } else {
-          // Sheet cut limit degraded this node (foot sweep zone) — allowed,
-          // but ONLY as documented: NO piece runs continuous here (four
-          // distinct pieces butt), and joints.ts splices it with a fish
-          // plate. The over-long family was split into single-bay pieces.
-          expect(counts.size).toBe(4);
-          const singleBay = [...counts.keys()].filter(
-            (pid) => pieceById.get(pid)!.memberIds.length === 1,
-          );
-          expect(singleBay.length).toBeGreaterThanOrEqual(2);
-        }
+  it('lamella system: the Zollinger weave holds at interior nodes (degrading only as documented)', () => {
+    const g = generateGeometry({ ...base, jointSystem: 'lamella' });
+    const interior = g.nodes.filter((n) => n.kind === 'interior');
+    expect(interior.length).toBeGreaterThan(0);
+    const memberPiece = new Map(g.members.map((m) => [m.id, m.pieceId]));
+    const memberType = new Map(g.members.map((m) => [m.id, m.type]));
+    let woven = 0;
+    for (const n of interior) {
+      const diagrid = n.memberIds.filter((id) => {
+        const t = memberType.get(id);
+        return t === 'lamella' || t === 'foot';
+      });
+      expect(diagrid).toHaveLength(4); // two families through every interior node
+      const counts = new Map<string, number>();
+      for (const id of diagrid) {
+        const pid = memberPiece.get(id)!;
+        counts.set(pid, (counts.get(pid) ?? 0) + 1);
       }
-      expect(woven).toBeGreaterThan(interior.length * 0.6); // the weave is the norm, not the exception
-      if (footStrategy === 'legs') expect(woven).toBe(interior.length); // no sweep distortion → fully woven
+      if (counts.size === 3) {
+        // The weave: one lamella passes through, two butt into it.
+        expect([...counts.values()].filter((c) => c === 2)).toHaveLength(1);
+        woven++;
+      } else {
+        // Sheet cut limit degraded this node (rooted foot zone) — allowed,
+        // but ONLY as documented: no piece runs continuous here; joints.ts
+        // splices it with a fish plate.
+        expect(counts.size).toBe(4);
+      }
     }
+    expect(woven).toBeGreaterThan(interior.length * 0.6); // the weave is the norm
   });
 
   it('lamella pieces are cut from sheet; their spacing is capped tighter by the grammar', () => {
@@ -177,41 +239,6 @@ describe('generateGeometry: joint systems', () => {
       expect(piece.stock).toBe('sheet');
       expect(piece.memberIds.length).toBeLessThanOrEqual(2);
     }
-  });
-});
-
-describe('generateGeometry: foot strategies', () => {
-  it('legs: one leg piece per foot, dropping from an eave node to a ground node at y=0', () => {
-    sweep((p) => {
-      if (p.footStrategy !== 'legs') return;
-      const g = generateGeometry(p);
-      const legPieces = g.pieces.filter((pc) => pc.kind === 'leg');
-      expect(legPieces).toHaveLength(g.feetCount);
-      expect(g.groundScrewCount).toBe(g.feetCount);
-      const byId = new Map(g.nodes.map((n) => [n.id, n]));
-      for (const m of g.members.filter((mm) => mm.type === 'leg')) {
-        expect(byId.get(m.nodeStartId)!.kind).toBe('eave');
-        expect(byId.get(m.nodeEndId)!.kind).toBe('ground');
-        expect(m.end[1]).toBe(0);
-      }
-    });
-  });
-
-  it('legs: the canopy surface itself stays clear of the lawn (no sweep morph)', () => {
-    const g = generateGeometry({ ...base, footStrategy: 'legs' });
-    const canopyNodes = g.nodes.filter((n) => n.kind !== 'ground');
-    for (const n of canopyNodes) expect(n.position[1]).toBeGreaterThan(0.5);
-  });
-
-  it('sweep: the lattice itself touches down on grid ground nodes, no leg pieces', () => {
-    sweep((p) => {
-      if (p.footStrategy !== 'sweep') return;
-      const g = generateGeometry(p);
-      expect(g.pieces.filter((pc) => pc.kind === 'leg')).toHaveLength(0);
-      const grounded = g.nodes.filter((n) => n.kind === 'ground');
-      expect(grounded.length).toBeGreaterThanOrEqual(g.feetCount);
-      for (const n of grounded) expect(n.id.startsWith('n-')).toBe(true); // grid nodes, not appended ones
-    });
   });
 });
 

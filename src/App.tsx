@@ -161,16 +161,14 @@ function ControlRail() {
 // ---------------------------------------------------------------------------
 function ConstructionPicker() {
   const jointSystem = useDesign((s) => s.params.jointSystem);
-  const footStrategy = useDesign((s) => s.params.footStrategy);
   const setJointSystem = useDesign((s) => s.setJointSystem);
-  const setFootStrategy = useDesign((s) => s.setFootStrategy);
 
   return (
     <div className="rounded-3xl border border-line bg-white/50 p-5">
       <h2 className="mb-1 font-display text-xl font-semibold lowercase text-ink">build it</h2>
       <p className="mb-3 text-[11px] leading-snug text-inkFaint">
-        two ways to joint the lattice, two ways to meet the lawn — the cut files and hardware
-        schedule follow your choice
+        two ways to joint the lattice — the cut files and hardware schedule follow your choice.
+        the canopy always sweeps to the lawn and roots on driven ground screws
       </p>
       <Segmented
         label="joints"
@@ -181,17 +179,6 @@ function ConstructionPicker() {
           { value: 'lamella', title: 'lamella', hint: 'all-timber weave, one bolt per node' },
         ]}
       />
-      <div className="mt-2.5">
-        <Segmented
-          label="feet"
-          value={footStrategy}
-          onChange={(v) => setFootStrategy(v as 'legs' | 'sweep')}
-          options={[
-            { value: 'legs', title: 'legs', hint: 'eave ring on posts + ground screws' },
-            { value: 'sweep', title: 'sweep', hint: 'the lattice itself curves to ground' },
-          ]}
-        />
-      </div>
     </div>
   );
 }

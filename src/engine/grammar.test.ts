@@ -17,7 +17,6 @@ const base: DesignParams = {
   strutSpacingM: 0.55,
   apertureDeg: 90,
   jointSystem: 'hub',
-  footStrategy: 'legs',
   speciesId: 'clematis',
   year: 0,
 };

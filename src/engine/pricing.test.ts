@@ -9,7 +9,6 @@ const base: DesignParams = {
   strutSpacingM: 0.55,
   apertureDeg: 90,
   jointSystem: 'hub',
-  footStrategy: 'legs',
   speciesId: 'clematis',
   year: 0,
 };
@@ -37,14 +36,12 @@ describe('pricing: a fixed figure built from the real BOM', () => {
 
   it('every hardware id the joints stage emits has a price in config', () => {
     for (const jointSystem of ['hub', 'lamella'] as const) {
-      for (const footStrategy of ['legs', 'sweep'] as const) {
-        const { components } = runEngine({ ...base, jointSystem, footStrategy });
-        for (const h of components.hardware) {
-          expect(
-            PRICING.hardwareGBP[h.id],
-            `missing rate for hardware id "${h.id}"`,
-          ).toBeGreaterThan(0);
-        }
+      const { components } = runEngine({ ...base, jointSystem });
+      for (const h of components.hardware) {
+        expect(
+          PRICING.hardwareGBP[h.id],
+          `missing rate for hardware id "${h.id}"`,
+        ).toBeGreaterThan(0);
       }
     }
   });
@@ -55,12 +52,10 @@ describe('pricing: a fixed figure built from the real BOM', () => {
     expect(big).toBeGreaterThan(small);
   });
 
-  it('prices all four construction combinations to a positive fixed figure', () => {
+  it('prices both joint systems to a positive fixed figure', () => {
     for (const jointSystem of ['hub', 'lamella'] as const) {
-      for (const footStrategy of ['legs', 'sweep'] as const) {
-        const { price: p } = runEngine({ ...base, jointSystem, footStrategy });
-        expect(p.fixedTotalGBP).toBeGreaterThan(0);
-      }
+      const { price: p } = runEngine({ ...base, jointSystem });
+      expect(p.fixedTotalGBP).toBeGreaterThan(0);
     }
   });
 });

@@ -14,7 +14,7 @@ import { create } from 'zustand';
 import { ENVELOPE, GROWTH } from '../data/config';
 import { runEngine } from '../engine';
 import { DEFAULT_SPECIES_ID, SPECIES_BY_ID } from '../engine/species';
-import type { DesignParams, EngineOutputs, FootStrategy, JointSystem } from '../engine/types';
+import type { DesignParams, EngineOutputs, JointSystem } from '../engine/types';
 import type { Year } from '../data/config';
 
 export type OverlayKey = 'strutHeatmap' | 'growth';
@@ -28,7 +28,6 @@ const defaultParams: DesignParams = {
   strutSpacingM: ENVELOPE.strutSpacingM.default,
   apertureDeg: ENVELOPE.apertureDeg.default,
   jointSystem: ENVELOPE.jointSystem,
-  footStrategy: ENVELOPE.footStrategy,
   speciesId: DEFAULT_SPECIES_ID,
   year: 0,
 };
@@ -52,7 +51,6 @@ export function paramsFromURL(): DesignParams {
     strutSpacingM: num(q.get('s')) ?? defaultParams.strutSpacingM,
     apertureDeg: num(q.get('ap')) ?? defaultParams.apertureDeg,
     jointSystem: q.get('j') === 'lamella' ? 'lamella' : q.get('j') === 'hub' ? 'hub' : defaultParams.jointSystem,
-    footStrategy: q.get('f') === 'sweep' ? 'sweep' : q.get('f') === 'legs' ? 'legs' : defaultParams.footStrategy,
     speciesId: q.get('sp') && SPECIES_BY_ID[q.get('sp')!] ? q.get('sp')! : defaultParams.speciesId,
     year: (GROWTH.years as readonly number[]).includes(year ?? -1) ? (year as Year) : 0,
   };
@@ -65,7 +63,6 @@ function urlFor(params: DesignParams): string {
     s: params.strutSpacingM.toFixed(2),
     ap: String(Math.round(params.apertureDeg)),
     j: params.jointSystem,
-    f: params.footStrategy,
     sp: params.speciesId,
     y: String(params.year),
   });
@@ -99,7 +96,6 @@ interface DesignState {
 
   setParam: (key: SliderKey, value: number) => void;
   setJointSystem: (system: JointSystem) => void;
-  setFootStrategy: (strategy: FootStrategy) => void;
   setSpecies: (id: string) => void;
   setYear: (year: Year) => void;
   setOverlay: (key: OverlayKey, on: boolean) => void;
@@ -134,8 +130,6 @@ export const useDesign = create<DesignState>((set, get) => {
     setParam: (key, value) => set(recompute({ [key]: value })),
 
     setJointSystem: (jointSystem) => set(recompute({ jointSystem })),
-
-    setFootStrategy: (footStrategy) => set(recompute({ footStrategy })),
 
     setSpecies: (id) => set(recompute({ speciesId: id })),
 

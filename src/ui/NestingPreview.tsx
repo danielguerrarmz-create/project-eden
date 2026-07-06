@@ -4,7 +4,7 @@
  * The credibility kicker on the spec sheet: the actual CURVED pieces of THIS
  * design (lamellas, eave + crown blanks) shelf-nested onto 2.4 × 1.2 m LVL
  * sheet stock, drawn to scale as SVG — plus the linear-stock line for the
- * docking-saw pieces (hub struts, legs), which honestly do NOT come from
+ * docking-saw pieces (hub struts), which honestly do NOT come from
  * sheets. Rectangles-on-sheets photographs like the real pipeline because it
  * is the real pipeline, one abstraction earlier.
  */
@@ -17,7 +17,6 @@ const PART_FILL: Record<Piece['kind'], string> = {
   lamella: '#a98e68',
   eaveBlank: '#8a7355',
   crownBlank: '#75603f',
-  leg: '#5b4632',
 };
 
 const MAX_SHEETS_SHOWN = 6;
@@ -82,7 +81,6 @@ export function NestingPreview() {
         <LegendSwatch color={PART_FILL.lamella} label="lamellas" />
         <LegendSwatch color={PART_FILL.eaveBlank} label="eave blanks" />
         <LegendSwatch color={PART_FILL.crownBlank} label="crown blanks" />
-        <LegendSwatch color={PART_FILL.leg} label="leg cheeks" />
         <span>
           sheet stock: {nesting.sheetLengthM} × {nesting.sheetWidthM} m · {STOCK.blank.thicknessMm} mm LVL
         </span>

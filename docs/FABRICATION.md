@@ -70,9 +70,15 @@ fixture angles. Variants:
 - interior hub (valence 4)
 - crown hub (2 diagonals + 2 ring-segment flanges)
 - eave hub (2 diagonals + paired vertical flanges gripping the eave blank)
-- ground shoe hub (fins + 200 × 200 × 8 base plate, 4 × Ø13) — sweep feet & leg bases
+- ground shoe hub (fins + 200 × 200 × 8 base plate, 4 × Ø13) — the rooted feet
 
 **Fasteners** — M12 × 70 grade 8.8 HDG bolts + dome nuts, 2 per strut end.
+
+**Milled-end geometry**: a strut's PHYSICAL length is the node-to-node
+centreline distance minus the hub-core standoff (70 mm) at each end — struts
+never touch each other, they touch steel. The model carries these trims on
+every member end and the cut schedule prices the trimmed length; the 3D view
+draws exactly that.
 
 **Why it's legit**: struts carry axial force into fins in double shear; the
 free-edge canopy sees real wind uplift and the bolted fin takes tension as
@@ -97,6 +103,11 @@ camber — you **cut** that, you don't bend it. So lamellas are CNC-profiled,
 pipeline as the eave blanks. End ops are part of the same CNC profile: skew
 butt cut + slotted Ø13 end hole (tolerance take-up), Ø13 mid hole.
 
+**Milled-end geometry**: a butting lamella end stops at the continuous
+piece's side face — half its 45 mm thickness plus a 2 mm assembly gap; ends
+at the crown/eave rings stop at the blank's inner face (half the 180 mm
+depth). Trims are carried per member end and subtracted into the cut length.
+
 **Bounds consequence**: a two-bay piece must fit the 2.35 m sheet cut limit →
 the lamella system caps bay spacing lower (~0.8 m) than the hub system. The
 grammar surfaces this when the user switches system.
@@ -115,24 +126,20 @@ grammar surfaces this when the user switches system.
   splices are fish plates in both systems.
 - **Crown ring**: same LVL, 2–4 curved segments around the oculus.
 
-## 5. Meeting the ground — two strategies, user-selectable
+## 5. Meeting the ground — the sweep roots itself
 
-Both foundation types are **Ø 76 × 865 mm ground screws** — no concrete,
-reversible, installed with a hand impact driver. **[TBC: screw spec per
+There is ONE way this pavilion meets the lawn, and it IS the typology: the
+lattice sweeps down and **roots at its feet**. The swept bays are ordinary
+lattice/lamella pieces; the grid node at each grammar-chosen foot bearing
+(3–4) lands EXACTLY at y = 0 on a ground-shoe connector over a driven
+**Ø 76 × 865 mm ground screw** — no concrete, reversible, installed with a
+hand impact driver. One screw per grounded node. **[TBC: screw spec per
 ground survey]**
 
-- **`legs`** (default): the diagrid terminates at the eave ring everywhere.
-  At each grammar-chosen foot bearing (3–4), a leg drops from an eave node to
-  a ground screw: paired 45 × 70 posts (A) / paired 45 mm LVL cheeks (B)
-  sandwiching a 6 mm T-plate at the head, adjustable HDG post shoe at the
-  base. One screw per leg.
-- **`sweep`**: the lattice itself curves to the lawn (the more dramatic
-  form). The swept bays are ordinary lattice/lamella pieces; the grid node at
-  each foot bearing lands EXACTLY at y = 0 on a ground-shoe connector, one
-  screw per grounded node. In the lamella system, a two-bay piece that the
-  plunging sweep bays would stretch past the sheet limit degrades to
-  single-bay pieces, and that node is spliced with a fish plate instead of
-  the plain single bolt — the hardware schedule counts both honestly.
+In the lamella system, a two-bay piece that the plunging sweep bays would
+stretch past the sheet limit degrades to single-bay pieces, and that node is
+spliced with a fish plate instead of the plain single bolt — the hardware
+schedule counts both honestly.
 
 ## 6. The living armature (species layer)
 
@@ -145,9 +152,9 @@ enters the load path. (This is what the 0.25–0.5 m spacing always was.)
 
 Hub system: set ground screws → assemble crown ring + ring 1 flat on
 trestles → work outward ring by ring, bolts snug not torqued → hang eave
-blanks → stand legs / tilt onto ground shoes → torque all → rig armature
-wires → plant. Lamella system: same outside-in, one bolt per node, temporary
-centre prop until the eave closes.
+blanks → tilt the swept feet onto their ground shoes → torque all → rig
+armature wires → plant. Lamella system: same outside-in, one bolt per node,
+temporary centre prop until the eave closes.
 
 Piece labelling: every piece engraved/inked with its member id (`lat-3-14-a`),
 every hub with its node id. The cut files ARE the instructions.
@@ -159,7 +166,7 @@ every hub with its node id. The cut files ARE the instructions.
 | Docking saw length/end cut | ±1.0 mm |
 | CNC sheet profile | ±0.5 mm |
 | Hub weld fixture | ±1.5 mm (slotted end holes absorb accumulation) |
-| Ground screw plan position | ±30 mm (shoe slots + leg-head adjustability absorb it) |
+| Ground screw plan position | ±30 mm (slotted shoe plates absorb it) |
 
 ## 9. Roadmap — bookmarked, not built
 

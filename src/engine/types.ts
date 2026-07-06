@@ -21,12 +21,13 @@ export type Vec3 = readonly [number, number, number];
  */
 export type JointSystem = 'hub' | 'lamella';
 
-/** How the pavilion meets the ground (FABRICATION.md §5). Both on ground screws. */
-export type FootStrategy = 'legs' | 'sweep';
-
 /**
- * The four form parameters (demo-spec §2.1), the two construction choices,
- * plus the living-layer choices. All clamped to grammar bounds before use.
+ * The four form parameters (demo-spec §2.1), the joint-system choice, plus
+ * the living-layer choices. All clamped to grammar bounds before use.
+ *
+ * There is ONE way the pavilion meets the ground (FABRICATION.md §5): the
+ * lattice sweeps to the lawn and roots there — each grounded node lands on a
+ * shoe over a driven ground screw. Not a parameter; it IS the typology.
  */
 export interface DesignParams {
   /** Footprint area of the canopy plan, m² (12–18). */
@@ -40,8 +41,6 @@ export interface DesignParams {
 
   /** Which joint family the kit is fabricated for. */
   jointSystem: JointSystem;
-  /** How the structure meets the lawn. */
-  footStrategy: FootStrategy;
 
   speciesId: string;
   year: Year;
@@ -56,6 +55,9 @@ export interface DesignParams {
 export interface CanopyNode {
   id: string;
   position: Vec3;
+  /** Outward (upward) unit surface normal — the connector's axis: the hub
+   *  core and every member's section depth align to this. */
+  normal: Vec3;
   /** 'ground' nodes sit EXACTLY at y=0 on a ground screw. 'splice' nodes are
    *  valence-2 mid-bay beam splices (fish plate, no hub) — inserted where a
    *  single eave facet would outgrow the sheet (steep sweep drops). */
@@ -71,14 +73,31 @@ export interface CanopyNode {
  */
 export interface Member {
   id: string;
-  type: 'lattice' | 'lamella' | 'eave' | 'crown' | 'foot' | 'leg';
+  type: 'lattice' | 'lamella' | 'eave' | 'crown' | 'foot';
+  /** Node-to-node centreline endpoints (the joint graph truth). */
   start: Vec3;
   end: Vec3;
+  /** Node-to-node centreline length. Physical cut length subtracts the trims. */
   lengthM: number;
   nodeStartId: string;
   nodeEndId: string;
   /** The physical piece this segment is part of. */
   pieceId: string;
+  /**
+   * Unit section-depth direction: the local surface normal orthogonalized
+   * against the member axis. Timber stands on edge along this — the 3D view
+   * and (later) the milling schedule both derive the section frame from it.
+   */
+  normal: Vec3;
+  /**
+   * MILLED-END reality: how far the physical timber stops short of the node
+   * centre at each end. Hub system: the hub-core standoff (struts never touch
+   * each other, they touch steel). Lamella: a butting end stops at the
+   * continuous piece's side face; ends at the rings stop at the blank face.
+   * Zero at a piece's own through-nodes.
+   */
+  startTrimM: number;
+  endTrimM: number;
   /**
    * Parametric coords used ONLY by overlays (heatmap / growth), never by the
    * load path. u = around the plan (0..1 from north, clockwise), v = up the
@@ -92,14 +111,15 @@ export interface Member {
 
 /**
  * A PIECE: one physical thing a fabricator cuts and a courier ships.
- * 'strut'/'leg' come off linear stock (docking saw); 'lamella' and the
- * blanks are CNC-profiled from LVL sheet (curved, so cut not bent).
+ * 'strut' comes off linear stock (docking saw); 'lamella' and the blanks
+ * are CNC-profiled from LVL sheet (curved, so cut not bent).
  */
 export interface Piece {
   id: string;
-  kind: 'strut' | 'lamella' | 'eaveBlank' | 'crownBlank' | 'leg';
+  kind: 'strut' | 'lamella' | 'eaveBlank' | 'crownBlank';
   memberIds: string[];
-  /** Developed length along the piece's segments, m. */
+  /** PHYSICAL cut length, m: developed length along the piece's segments
+   *  minus the milled-end trims. This is what the saw/CNC cuts. */
   lengthM: number;
   stock: 'linear' | 'sheet';
   /** Nested width on sheet (sheet pieces) — the piece's structural depth. */
@@ -135,7 +155,7 @@ export interface CanopyGeometry {
   members: Member[];
   /** ...grouped into the physical pieces a fabricator cuts. */
   pieces: Piece[];
-  /** Ground screws this design needs (one per leg / grounded node). */
+  /** Ground screws this design needs (one per rooted/grounded node). */
   groundScrewCount: number;
   /** Feet the canopy stands on. 3 or 4 — chosen by the grammar. */
   feetCount: number;
@@ -209,7 +229,7 @@ export interface NestingResult {
   sheetLengthM: number;
   sheetWidthM: number;
   totalParts: number;
-  /** Linear-stock plan for docking-saw pieces (hub struts, legs): how many
+  /** Linear-stock plan for docking-saw pieces (hub struts): how many
    *  standard stock lengths the unique cut lengths pack into. */
   stockPlan: {
     stockLengthM: number;

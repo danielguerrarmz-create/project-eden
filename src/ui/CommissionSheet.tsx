@@ -31,9 +31,9 @@ export function CommissionSheet() {
 
   if (!open) return null;
 
-  const designCode = `${WORDMARK.toUpperCase()}-${geometry.params.jointSystem === 'hub' ? 'H' : 'L'}${
-    geometry.params.footStrategy === 'legs' ? 'L' : 'S'
-  }-${geometry.footprintM2.toFixed(0)}-${Math.round(geometry.riseM * 100)}-${Math.round(
+  const designCode = `${WORDMARK.toUpperCase()}-${geometry.params.jointSystem === 'hub' ? 'H' : 'L'}-${geometry.footprintM2.toFixed(
+    0,
+  )}-${Math.round(geometry.riseM * 100)}-${Math.round(
     geometry.params.strutSpacingM * 1000,
   )}-${Math.round(geometry.params.apertureDeg)}`;
 
@@ -86,12 +86,10 @@ export function CommissionSheet() {
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Fact
             label="construction"
-            value={`${geometry.params.jointSystem === 'hub' ? 'steel hubs' : 'lamella'} · ${
-              geometry.params.footStrategy
-            }`}
+            value={geometry.params.jointSystem === 'hub' ? 'steel hubs' : 'lamella weave'}
           />
           <Fact label="timber pieces" value={`${components.totalCount}`} />
-          <Fact label="joints" value={`${geometry.nodes.length - (geometry.params.footStrategy === 'legs' ? geometry.feetCount : 0)} nodes`} />
+          <Fact label="joints" value={`${geometry.nodes.length} nodes`} />
           <Fact label="CNC sheets" value={`${nesting.sheets.length}`} />
           <Fact label="ground screws" value={`${geometry.groundScrewCount}`} />
           <Fact label="assembly steps" value={`${buildPlan.assemblySteps}`} />

@@ -22,15 +22,13 @@ import { computeSunPath } from './sunpath';
 import type { BuildPlan, CanopyGeometry, ComponentList, DesignParams, EngineOutputs } from './types';
 
 /** Assembly step count for the spec sheet (FABRICATION.md §7): ground screws,
- *  eave blanks, ring-by-ring lifts, legs if any, planting + armature tie-in.
+ *  eave blanks, ring-by-ring lifts, planting + armature tie-in.
  *  Derived from the component model. */
 function planBuild(geometry: CanopyGeometry, components: ComponentList, plantCount: number): BuildPlan {
-  const legSteps = geometry.params.footStrategy === 'legs' ? geometry.feetCount : 0;
   const assemblySteps =
     geometry.groundScrewCount + // drive each ground screw
     geometry.feetCount * 2 + // splice the eave blanks between feet
     geometry.ringCount + // lift the diagrid ring by ring
-    legSteps + // stand each leg
     2; // plant + tie in the armature
   const leadTimeWeeks = Math.round(
     LEAD_TIME.baseWeeks + (components.totalCount / 100) * LEAD_TIME.weeksPerHundredComponents,

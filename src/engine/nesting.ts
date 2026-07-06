@@ -7,7 +7,7 @@
  *   better than shelves — this is deliberately conservative, so the sheet
  *   count on the spec sheet errs high rather than flattering the quote.
  *
- *   LINEAR pieces (hub-system struts, legs) are NOT sheet parts — they come
+ *   LINEAR pieces (hub-system struts) are NOT sheet parts — they come
  *   off standard lengths of planed C24 on a docking saw. They get a
  *   first-fit-decreasing bin pack into stock lengths so the BOM can say how
  *   many lengths to order, honestly including offcut waste.

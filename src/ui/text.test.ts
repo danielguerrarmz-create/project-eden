@@ -13,7 +13,6 @@ const base: DesignParams = {
   strutSpacingM: 0.55,
   apertureDeg: 90,
   jointSystem: 'hub',
-  footStrategy: 'legs',
   speciesId: 'lonicera',
   year: 0,
 };

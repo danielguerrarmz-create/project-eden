@@ -2,11 +2,15 @@
  * geometry.ts — the parametric canopy generator.
  *
  * ONE typology (demo-spec §1): an open garden pavilion — a curved timber
- * gridshell canopy. Four form parameters shape it (footprint, rise, bay
- * spacing, aperture) plus two CONSTRUCTION choices the kit is fabricated for:
- * the joint system ('hub' steel nodes / 'lamella' Zollinger weave) and the
- * foot strategy ('legs' on ground screws / the lattice 'sweep'ing to ground).
+ * gridshell canopy that SWEEPS to the lawn and roots at its feet on driven
+ * ground screws. Four form parameters shape it (footprint, rise, bay
+ * spacing, aperture) plus one CONSTRUCTION choice the kit is fabricated for:
+ * the joint system ('hub' steel nodes / 'lamella' Zollinger weave).
  * Physical details: docs/FABRICATION.md — code follows that file.
+ *
+ * Members carry a full SECTION FRAME (axis + surface normal) and MILLED-END
+ * TRIMS, so what renders and what the BOM prices is solid oriented timber
+ * with real cut lengths — never centreline "piping".
  *
  * STRUCTURAL VALIDITY IS GUARANTEED BY THE GRAMMAR, NOT BY FEA.
  * clampParams() (engine/grammar.ts) forces every parameter inside bounds that
@@ -23,7 +27,7 @@
  * The living layer never enters this file — plants attach later to a
  * sacrificial armature keyed off (u,v) coords, keeping the structure dry.
  */
-import { GRAMMAR, STOCK } from '../data/config';
+import { GRAMMAR, JOINTS, STOCK } from '../data/config';
 import {
   clampParams,
   ellipsePerimeterM,
@@ -66,8 +70,6 @@ interface SurfaceCtx {
   eaveBaseM: number;
   apertureRad: number;
   footAnglesRad: number[];
-  /** Only the 'sweep' foot strategy pulls the surface itself to the lawn. */
-  sweep: boolean;
 }
 
 function surfaceCtx(p: DesignParams, snapToSpokes?: number): SurfaceCtx {
@@ -86,15 +88,7 @@ function surfaceCtx(p: DesignParams, snapToSpokes?: number): SurfaceCtx {
     const spokeStep = TWO_PI / snapToSpokes;
     return Math.round(raw / spokeStep) * spokeStep;
   });
-  return {
-    a,
-    b,
-    H,
-    eaveBaseM: 0.62 * H,
-    apertureRad,
-    footAnglesRad,
-    sweep: p.footStrategy === 'sweep',
-  };
+  return { a, b, H, eaveBaseM: 0.62 * H, apertureRad, footAnglesRad };
 }
 
 /** Free-edge (eave) height at bearing θ: lifts toward the aperture. */
@@ -119,10 +113,37 @@ function footPull(ctx: SurfaceCtx, thetaRad: number): number {
 function canopyPoint(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
   const E = eaveHeightM(ctx, thetaRad);
   let y = E + (ctx.H - E) * capProfile(r);
-  // 'sweep' feet: near the edge, the surface itself sweeps down to the ground.
-  if (ctx.sweep) y *= 1 - footPull(ctx, thetaRad) * Math.pow(r, 5);
+  // The ONE typology: near the edge, the surface sweeps down and roots at
+  // the feet (FABRICATION.md §5).
+  y *= 1 - footPull(ctx, thetaRad) * Math.pow(r, 5);
   // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
   return [ctx.a * r * Math.sin(thetaRad), y, ctx.b * r * Math.cos(thetaRad)];
+}
+
+// --- small vector helpers (local; the engine stays three.js-free) ---
+const vSub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vCross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const vDot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const vNorm = (a: Vec3): Vec3 => {
+  const l = Math.hypot(a[0], a[1], a[2]) || 1e-9;
+  return [a[0] / l, a[1] / l, a[2] / l];
+};
+
+/** Outward (upward) unit surface normal at (r, θ), by central differences. */
+function surfaceNormal(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
+  const e = 1e-4;
+  const tR = vSub(
+    canopyPoint(ctx, Math.min(1, r + e), thetaRad),
+    canopyPoint(ctx, Math.max(1e-6, r - e), thetaRad),
+  );
+  const tT = vSub(canopyPoint(ctx, r, thetaRad + e), canopyPoint(ctx, r, thetaRad - e));
+  let n = vCross(tT, tR);
+  if (n[1] < 0) n = [-n[0], -n[1], -n[2]];
+  return vNorm(n);
 }
 
 /**
@@ -207,12 +228,13 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
     const ring: CanopyNode[] = [];
     for (let j = 0; j < spokeCount; j++) {
       const pos = canopyPoint(ctx, rAt(i), thetaAt(j));
-      // 'sweep' touchdown: the grid node at each foot bearing lands EXACTLY
-      // at y = 0 (footPull → 1 there) and becomes a ground-shoe node.
-      const grounded = ctx.sweep && i === ringCount && footPull(ctx, thetaAt(j)) >= 0.999;
+      // Touchdown: the grid node at each foot bearing lands EXACTLY at y = 0
+      // (footPull → 1 there) and roots on a ground-shoe + driven screw.
+      const grounded = i === ringCount && footPull(ctx, thetaAt(j)) >= 0.999;
       ring.push({
         id: `n-${i}-${j}`,
         position: grounded ? [pos[0], 0, pos[2]] : pos,
+        normal: surfaceNormal(ctx, rAt(i), thetaAt(j)),
         kind: grounded ? 'ground' : i === 0 ? 'crown' : i === ringCount ? 'eave' : 'interior',
         memberIds: [],
       });
@@ -229,28 +251,49 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
     v: 1 - i / ringCount,
   });
 
-  const addMember = (m: Omit<Member, 'lengthM'>, from: CanopyNode, to: CanopyNode): Member => {
-    const member: Member = { ...m, lengthM: dist(from.position, to.position) };
+  const addMember = (
+    m: Omit<Member, 'lengthM' | 'normal' | 'startTrimM' | 'endTrimM'>,
+    from: CanopyNode,
+    to: CanopyNode,
+  ): Member => {
+    // Section frame: mean of the end-node surface normals, orthogonalized
+    // against the member axis — the timber stands on edge along this.
+    const axis = vNorm(vSub(to.position, from.position));
+    const nSum: Vec3 = [
+      from.normal[0] + to.normal[0],
+      from.normal[1] + to.normal[1],
+      from.normal[2] + to.normal[2],
+    ];
+    const d = vDot(nSum, axis);
+    const normal = vNorm([nSum[0] - d * axis[0], nSum[1] - d * axis[1], nSum[2] - d * axis[2]]);
+    const member: Member = {
+      ...m,
+      lengthM: dist(from.position, to.position),
+      normal,
+      startTrimM: 0,
+      endTrimM: 0,
+    };
     members.push(member);
     from.memberIds.push(member.id);
     to.memberIds.push(member.id);
     return member;
   };
 
+  /** Physical cut length: developed length minus the milled-end trims. */
   const addPiece = (kind: Piece['kind'], id: string, segs: Member[], stock: Piece['stock'], depthM: number) => {
     pieces.push({
       id,
       kind,
       memberIds: segs.map((s) => s.id),
-      lengthM: segs.reduce((sum, s) => sum + s.lengthM, 0),
+      lengthM: segs.reduce((sum, s) => sum + s.lengthM - s.startTrimM - s.endTrimM, 0),
       stock,
       depthM,
     });
   };
 
-  /** In the sweep strategy, edge members inside a foot's pull are 'foot' parts. */
+  /** Edge members inside a foot's pull are 'foot' parts (the rooted sweep). */
   const sweptType = (i: number, jMid: number, fallback: Member['type']): Member['type'] =>
-    ctx.sweep && i >= ringCount - 2 && footPull(ctx, thetaAt(jMid)) > 0.45 ? 'foot' : fallback;
+    i >= ringCount - 2 && footPull(ctx, thetaAt(jMid)) > 0.45 ? 'foot' : fallback;
 
   // -------------------------------------------------------------------------
   // DIAGRID — two diagonal families, generated as chains so both joint
@@ -262,6 +305,15 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   // -------------------------------------------------------------------------
   const lamellaContinuesAt = (ring: number, family: 'a' | 'b'): boolean =>
     lamella && ring > 0 && ring < ringCount && (family === 'a' ? ring % 2 === 0 : ring % 2 === 1);
+
+  const nodeKind = new Map(nodes.map((n) => [n.id, n.kind]));
+  /** Milled-end trim where a diagrid piece terminates at a node. */
+  const trimAt = (nodeId: string): number => {
+    if (!lamella) return JOINTS.hub.strutStandoffM; // struts stop at the hub core
+    return nodeKind.get(nodeId) === 'interior'
+      ? JOINTS.lamella.buttTrimM // stops at the continuous piece's side face
+      : JOINTS.lamella.blankFaceTrimM; // stops at the ring blank's inner face
+  };
 
   for (const family of ['a', 'b'] as const) {
     const dj = family === 'a' ? 1 : -1;
@@ -300,6 +352,11 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
           const groups =
             runLengthM > GRAMMAR.maxComponentLengthM ? run.map((s) => [s]) : [run];
           for (const group of groups) {
+            // Milled ends: the piece's terminal members stop short of their
+            // node centres; through-nodes (middle of a two-bay lamella) keep
+            // trim 0. These trims flow into the PHYSICAL cut length.
+            group[0].startTrimM = trimAt(group[0].nodeStartId);
+            group[group.length - 1].endTrimM = trimAt(group[group.length - 1].nodeEndId);
             const startRing = i + 1 - run.length + run.indexOf(group[0]);
             const pieceId = `${lamella ? 'lam' : 'strut'}-${family}-${j0}-${startRing}`;
             group.forEach((s) => (s.pieceId = pieceId));
@@ -344,7 +401,17 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
           (from.position[1] + to.position[1]) / 2,
           (from.position[2] + to.position[2]) / 2,
         ];
-        const splice: CanopyNode = { id: `${idPrefix}-sp-${j}`, position: mid, kind: 'splice', memberIds: [] };
+        const splice: CanopyNode = {
+          id: `${idPrefix}-sp-${j}`,
+          position: mid,
+          normal: vNorm([
+            from.normal[0] + to.normal[0],
+            from.normal[1] + to.normal[1],
+            from.normal[2] + to.normal[2],
+          ]),
+          kind: 'splice',
+          memberIds: [],
+        };
         nodes.push(splice);
         bySpoke.push([
           addMember(
@@ -415,42 +482,6 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
 
   ringPieces(0, 'crown', 'crownBlank', 'crown', []);
   ringPieces(ringCount, 'eave', 'eaveBlank', 'eave', uniqueEaveBoundaries);
-
-  // -------------------------------------------------------------------------
-  // LEGS — 'legs' strategy: a leg drops from the eave node at each foot
-  // bearing straight to a ground node at y = 0 (post shoe on a ground screw).
-  // -------------------------------------------------------------------------
-  if (!ctx.sweep) {
-    footSpokes.forEach((jf, f) => {
-      const eaveNode = grid[ringCount][jf];
-      const [x, , z] = eaveNode.position;
-      const groundNode: CanopyNode = {
-        id: `gnd-${f}`,
-        position: [x, 0, z],
-        kind: 'ground',
-        memberIds: [],
-      };
-      nodes.push(groundNode);
-      const leg = addMember(
-        {
-          id: `leg-${f}`,
-          type: 'leg',
-          start: eaveNode.position,
-          end: groundNode.position,
-          nodeStartId: eaveNode.id,
-          nodeEndId: groundNode.id,
-          pieceId: `leg-${f}`,
-          u: jf / spokeCount,
-          v: 0,
-        },
-        eaveNode,
-        groundNode,
-      );
-      // Paired posts (hub: 2× 45×70 C24; lamella: 2× 45 mm LVL cheeks) around
-      // a T-plate — modelled as ONE piece, priced as the pair.
-      addPiece('leg', `leg-${f}`, [leg], lamella ? 'sheet' : 'linear', lamella ? LAMELLA_DEPTH_M : STRUT_DEPTH_M);
-    });
-  }
 
   const groundScrewCount = nodes.filter((n) => n.kind === 'ground').length;
 

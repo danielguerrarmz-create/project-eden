@@ -90,7 +90,7 @@ export const GRAMMAR = {
 // ONE section per role; lengths vary freely because CNC makes that free.
 // ---------------------------------------------------------------------------
 export const STOCK = {
-  /** Hub-system struts + legs: planed C24 spruce/larch, UC3 treated. */
+  /** Hub-system struts: planed C24 spruce/larch, UC3 treated. */
   strut: { widthMm: 45, depthMm: 70, grade: 'C24', stockLengthM: 4.8 },
   /** Lamella pieces: CNC-profiled from 45 mm spruce LVL sheet (curved, so cut not bent). */
   lamella: { thicknessMm: 45, depthMm: 120 },
@@ -112,11 +112,27 @@ export const JOINTS = {
     /** M12×70 8.8 HDG through-bolts per strut end into the fin. */
     boltsPerStrutEnd: 2,
     boltSpec: 'M12×70 8.8 HDG + dome nut',
+    /** Hub core disc diameter (mm) — sets the strut end standoff. */
+    coreDiaMm: 140,
+    /**
+     * MILLED-END TRIM: every strut's physical end stops this far short of the
+     * node centre (hub core radius). Struts never touch each other — they
+     * touch steel. This is subtracted into the CUT length, not just drawn.
+     */
+    strutStandoffM: 0.07,
   },
   lamella: {
     /** One through-bolt per node: continuous lamella mid-hole + two butting ends. */
     boltsPerNode: 1,
     boltSpec: 'M12×180 8.8 HDG + 50 mm washers',
+    /**
+     * MILLED-END TRIM: a butting lamella end stops at the continuous piece's
+     * side face — half its 45 mm thickness plus a 2 mm assembly gap.
+     */
+    buttTrimM: 0.0245,
+    /** A lamella end at the crown/eave ring stops at the blank's inner face
+     *  (half the 180 mm blank depth). */
+    blankFaceTrimM: 0.09,
   },
 } as const;
 
@@ -137,9 +153,8 @@ export const ENVELOPE = {
   riseM: { min: GRAMMAR.minHeadroomM, max: GRAMMAR.pdHeightCapM, default: 2.3 },
   strutSpacingM: { min: GRAMMAR.minStrutSpacingM, max: GRAMMAR.maxStrutSpacingM, default: 0.55 },
   apertureDeg: { min: 0, max: 359, default: 90 }, // 90 = opens east, toward morning light
-  /** Joint system + foot strategy defaults (FABRICATION.md §2–§5). */
+  /** Default joint system (FABRICATION.md §2–§3). */
   jointSystem: 'hub',
-  footStrategy: 'legs',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -165,7 +180,7 @@ export const PRICING = {
    * MOVES correctly (it is built from the real BOM); it is not yet TRUE.
    */
 
-  /** £/m — 45×70 planed C24, UC3 treated, delivered (hub struts + legs). */
+  /** £/m — 45×70 planed C24, UC3 treated, delivered (hub struts). */
   timberPerMetreGBP: 7,
   /** £/sheet — 45 mm spruce LVL 2.4 × 1.2 m (lamellas, eave + crown blanks). */
   lvlSheetGBP: 215,
@@ -178,13 +193,9 @@ export const PRICING = {
   hardwareGBP: {
     /** Welded + HDG steel node hub (per fin averaged in). */
     hub: 32,
-    /** Ground-shoe hub: hub + 200×200×8 base plate (sweep touchdowns). */
+    /** Ground-shoe hub: hub + 200×200×8 base plate (the rooted touchdowns). */
     hubGroundShoe: 48,
-    /** Leg-head T-plate, 6 mm HDG. */
-    legHeadPlate: 26,
-    /** Adjustable HDG post shoe (leg bases). */
-    postShoe: 19,
-    /** Bent-plate ground shoe for lamella sweep touchdowns. */
+    /** Bent-plate ground shoe for lamella touchdowns. */
     plateGroundShoe: 24,
     /** M12 bolt set (bolt + nut + washers), either system. */
     boltSet: 1.4,
