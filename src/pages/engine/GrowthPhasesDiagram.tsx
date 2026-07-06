@@ -11,6 +11,7 @@ import { computeEcology } from '../../engine/ecology';
 import { computeGrowth } from '../../engine/growth';
 import type { EngineOutputs, GrowthState } from '../../engine/types';
 import type { Year } from '../../data/config';
+import { deDash } from '../../ui/text';
 import { AccentMark, DiagramSvg, LeaderCallout, useInk } from './hairline';
 
 const YEARS: Year[] = [0, 1, 3];
@@ -65,7 +66,7 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
   const apexY = baseY - crown.y * scale;
 
   return (
-    <DiagramSvg viewBox="0 0 70 92" label={growth.label}>
+    <DiagramSvg viewBox="0 0 70 92" label={deDash(growth.label)}>
       {/* Ground line */}
       <line x1={cx - edgeR * scale} y1={baseY} x2={cx + edgeR * scale} y2={baseY} stroke={ink} strokeWidth={0.5} opacity={0.65} />
       {/* Real canopy silhouette */}
@@ -81,7 +82,7 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
           <LeaderCallout
             from={[apexX, apexY + 5]}
             to={[cx + edgeR * scale + 4, apexY]}
-            label={outputs.ecology.floweringMonths.toUpperCase()}
+            label={deDash(outputs.ecology.floweringMonths).toUpperCase()}
           />
         </>
       )}
@@ -103,7 +104,7 @@ export function GrowthPhasesDiagram({ outputs }: { outputs: EngineOutputs }) {
                 <GrowthPanel outputs={outputs} year={year} />
               </div>
               <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.1em] opacity-85">
-                {g.label}
+                {deDash(g.label)}
               </figcaption>
             </figure>
           );

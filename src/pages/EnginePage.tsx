@@ -6,25 +6,22 @@
  * illustration. The studio is never touched: this is the documentation layer
  * (field color + editorial serif + hairline linework), opened via hash route,
  * reading the same default design a first-time visitor sees (the store
- * initializes its outputs eagerly). The product name comes from the WORDMARK
- * constant, so this page never hard-codes a name the Day-3 call has not locked.
+ * initializes its outputs eagerly). Brand chrome reads the company wordmark
+ * (WORDMARK = "Bower"); the thing you shape is the product (PRODUCT = "Eden").
  */
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
-import { WORDMARK } from '../data/config';
+import { deDash } from '../ui/text';
+import { ENGINE_NAME, PRODUCT } from '../data/config';
 import { routes } from '../routing';
+import { BowerMark } from '../ui/BowerMark';
 import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
 import { PipelineSchematic } from './engine/PipelineSchematic';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
 import { SunPathDiagram } from './engine/SunPathDiagram';
 import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
 import { GrowthPhasesDiagram } from './engine/GrowthPhasesDiagram';
-
-const H1 = 'font-quote font-bold leading-[0.98] tracking-[-0.02em] text-[clamp(2.75rem,6vw,5.5rem)]';
-const H2 = 'font-serifDisplay font-semibold leading-[1.04] tracking-[-0.01em] text-[clamp(1.75rem,3.5vw,3rem)]';
-const BODY = 'mt-6 max-w-[60ch] text-[17px] leading-relaxed opacity-90';
-
-const NAME = WORDMARK.charAt(0).toUpperCase() + WORDMARK.slice(1);
+import { H1, H2, BODY } from './typeScale';
 
 export function EnginePage() {
   const reduced = useReducedMotion();
@@ -35,11 +32,14 @@ export function EnginePage() {
     <div className="min-h-screen w-full bg-fieldBlue">
       {/* Quiet header: mono wordmark + a real anchor back to the tool. */}
       <header className="flex items-center justify-between bg-fieldBlue px-6 pt-6 text-inkNavy sm:px-10">
-        <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-80">
-          {WORDMARK} · the engine
-        </span>
+        <div className="flex items-center gap-2 opacity-80">
+          <BowerMark />
+          <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-70">
+            · {ENGINE_NAME}
+          </span>
+        </div>
         <a
-          href={routes.configurator}
+          href={routes.studio}
           className="font-mono text-[11px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
         >
           back to the studio
@@ -97,7 +97,7 @@ export function EnginePage() {
             spacing {geometry.params.strutSpacingM.toFixed(2)} m · {geometry.feetCount} feet · rings{' '}
             {geometry.ringCount} · spokes {geometry.spokeCount}
           </AnnotationStrip>
-          {bounds.notes[0] && <AnnotationStrip>grammar: {bounds.notes[0]}</AnnotationStrip>}
+          {bounds.notes[0] && <AnnotationStrip>grammar: {deDash(bounds.notes[0])}</AnnotationStrip>}
         </div>
       </EngineSection>
 
@@ -207,10 +207,10 @@ export function EnginePage() {
         </p>
 
         <a
-          href={routes.configurator}
+          href={routes.studio}
           className="mt-12 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
         >
-          Shape your own {NAME} →
+          Shape your own {PRODUCT} →
         </a>
       </EngineSection>
     </div>

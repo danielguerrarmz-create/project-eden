@@ -46,7 +46,11 @@ export function SiteEnvelopeDiagram({ outputs }: { outputs: EngineOutputs }) {
   const edgeR = Math.max(front[0].radius, back[0].radius);
 
   return (
-    <DiagramSvg viewBox="0 0 190 200" label="Plan and section of the generated canopy: elliptical plan, feet, aperture and rise">
+    <DiagramSvg viewBox="-14 0 220 200" label="Plan and section of the generated canopy: elliptical plan, feet, aperture and rise">
+      {/* Horizontal padding on the viewBox (drawing content still lives in 0..190):
+          the aperture LeaderCallout label extends past the drawing on whichever side
+          the aperture opens, so the frame is widened to contain "APERTURE" at any
+          bearing rather than clipping it (was "APERTU" at some widths). */}
       {/* Plan: ellipse */}
       <ellipse cx={cx} cy={cy} rx={aU} ry={bU} fill={ink} fillOpacity={0.05} stroke={ink} strokeWidth={0.75} />
       <circle cx={cx} cy={cy} r={0.9} fill={ink} />

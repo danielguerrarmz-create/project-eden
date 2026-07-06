@@ -8,6 +8,7 @@
 import { computeStrutField } from '../../engine/strutOptimizer';
 import { getSpecies } from '../../engine/species';
 import type { EngineOutputs, StrutCell } from '../../engine/types';
+import { deDash } from '../../ui/text';
 import { AccentMark, DiagramSvg, useInk } from './hairline';
 
 // One representative species per habit (the catalogue has one scrambler + one clinger).
@@ -68,7 +69,7 @@ export function StrutFieldDiagram({ outputs }: { outputs: EngineOutputs }) {
               <Panel outputs={outputs} speciesId={id} />
             </div>
             <figcaption className="mt-3 font-mono text-[10px] uppercase leading-snug tracking-[0.08em] opacity-85">
-              {field.habitStrategy}
+              {deDash(field.habitStrategy)}
             </figcaption>
             <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.12em] opacity-60">
               recommended spacing {field.recommendedSpacingM.toFixed(2)}m

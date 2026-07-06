@@ -23,10 +23,13 @@ export function EngineSection({
   ground,
   reduced,
   children,
+  id,
 }: {
   ground: Ground;
   reduced: boolean;
   children: ReactNode;
+  /** Optional anchor id on the section root (e.g. the splash's #register). */
+  id?: string;
 }) {
   const g = GROUND[ground];
   const ref = useRef<HTMLElement>(null);
@@ -61,6 +64,7 @@ export function EngineSection({
   return (
     <section
       ref={ref}
+      id={id}
       className={`w-full ${g.bg} ${g.text}`}
       style={{
         opacity: shown ? 1 : 0,

@@ -1,10 +1,11 @@
 /**
  * routing.ts — a deliberately tiny hash router (no dependency).
  *
- * Only two destinations exist: the configurator (any route) and the Engine
- * explainer at `#/engine`. We subscribe to `hashchange` via useSyncExternalStore
- * so back/forward and manual URL edits all work, then normalize the hash to a
- * clean path (`#/engine` -> `/engine`, empty -> `/`).
+ * Three destinations: the splash landing at `#/` (the new home), the studio
+ * (the configurator) at `#/studio`, and the Engine explainer at `#/engine`. We
+ * subscribe to `hashchange` via useSyncExternalStore so back/forward and manual
+ * URL edits all work, then normalize the hash to a clean path (`#/engine` ->
+ * `/engine`, empty -> `/`).
  */
 import { useSyncExternalStore } from 'react';
 
@@ -26,6 +27,7 @@ export function useRoute(): string {
 
 /** Hash hrefs, so links stay real anchors (openable in new tab, no JS needed). */
 export const routes = {
-  configurator: '#/',
+  home: '#/',
+  studio: '#/studio',
   engine: '#/engine',
 } as const;

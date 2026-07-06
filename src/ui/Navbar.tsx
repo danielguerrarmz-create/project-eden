@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { WORDMARK } from '../data/config';
 import { useDesign, shareURL } from '../state/store';
+import { Sprout } from './Sprout';
 
 export function Navbar() {
   const reset = useDesign((s) => s.reset);
@@ -48,16 +49,5 @@ export function Navbar() {
         </div>
       </div>
     </div>
-  );
-}
-
-function Sprout() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path d="M12 21V11" stroke="#5E6E2B" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M12 12C12 8.5 9 6.5 5.5 6.5C5.5 10 8 12 12 12Z" fill="#7A8B3C" />
-      <path d="M12 10.5C12 7.5 14.6 5 18 5C18 8.2 15.5 10.5 12 10.5Z" fill="#8ea060" />
-      <circle cx="12" cy="21" r="1.1" fill="#E06A4E" />
-    </svg>
   );
 }
