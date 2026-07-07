@@ -11,7 +11,7 @@
  * never on the structural timber (stress-test §12). Visual approximation, not a
  * biological warranty.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDesign } from '../../state/store';
@@ -26,7 +26,21 @@ interface Leaf {
   phase: number; // idle-sway phase
 }
 
-export function GrowthOverlay({ coverageOverride }: { coverageOverride?: number } = {}) {
+export function GrowthOverlay({
+  coverageOverride,
+  progressRef,
+  coverageRange,
+}: {
+  coverageOverride?: number;
+  /** When set (the hero), coverage is a positional function of scroll progress,
+   *  not a time-eased animation. Under frameloop="demand" the studio's dt-easing
+   *  advances only on invalidated frames, so a paused scroll would freeze growth
+   *  mid-ease and couple its speed to scroll velocity; reading progress directly
+   *  keeps growth exactly at the position the scroll last reached. */
+  progressRef?: MutableRefObject<number>;
+  /** Progress range [start, end] that maps to coverage [0, coverageOverride]. */
+  coverageRange?: [number, number];
+} = {}) {
   const cells = useDesign((s) => s.outputs.strutField.cells);
   const storeCoverage = useDesign((s) => s.outputs.growth.coverageFraction);
   // The hero render fixes a lush coverage regardless of the studio's year; the
@@ -59,7 +73,13 @@ export function GrowthOverlay({ coverageOverride }: { coverageOverride?: number 
   useFrame((state, dt) => {
     // Ease the visible coverage toward the target growth stage.
     // Reduced motion: SNAP to the stage instead of animating, and hold still.
-    if (reducedMotion) {
+    if (progressRef && coverageRange) {
+      // Positional (hero): coverage is a smoothstep of scroll progress across the
+      // range, so it tracks the scroll and holds when the scroll pauses.
+      const [pa, pb] = coverageRange;
+      const g = THREE.MathUtils.clamp((progressRef.current - pa) / (pb - pa), 0, 1);
+      current.current = g * g * (3 - 2 * g) * targetCoverage;
+    } else if (reducedMotion) {
       current.current = targetCoverage;
     } else {
       current.current += (targetCoverage - current.current) * Math.min(1, dt * 3.2);

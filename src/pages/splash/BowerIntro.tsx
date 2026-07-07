@@ -29,7 +29,8 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 const WORD = WORDMARK.toLowerCase(); // "bower"
 const LETTERS = WORD.split('');
 
-/** Deterministic per-letter entrance offsets (px + rotate deg). */
+/** Deterministic per-letter entrance offsets. Only `y` is consumed now (the
+ *  letters rise into a line); `x`/`r` are kept as the original scatter record. */
 const OFFSETS = [
   { x: -30, y: -58, r: -5 },
   { x: 24, y: -64, r: 4 },
@@ -49,15 +50,18 @@ const LOGO = {
   liftVh: 0.14, // how far above center the lockup logo floats (fraction of vh)
   enterRotate: -14, // gentle rotate-in
   enterDur: 0.9, // fade / scale / rotate in
-  settleDur: 1.35, // travel-beat settle to the hero plan position
+  settleDur: 1.25, // travel-beat settle to the hero plan position (ends 1150 -> 2400)
 } as const;
 
 /** The big wordmark drops this fraction of vh below center so the logo clears above it. */
 const NAME_DROP_VH = 0.12;
 
-/** Timeline (ms): assemble at 0, hold, travel at 1600, fade at 2900, unmount at 3800.
- *  Deliberately slow: a big wordmark that takes its time in and out. */
-const T = { travel: 1600, fade: 2900, done: 3800 } as const;
+/** Timeline (ms): assemble at 0, travel at 1150, fade at 2500, unmount at 3000.
+ *  Letters finish assembling ~1.0s, so travel lands a ~150ms considered beat later.
+ *  The logo settle (1150 -> 2400) completes 100ms before the backdrop fade starts,
+ *  so the logo is fully still before the veil lifts; the 0.5s backdrop fade then
+ *  completes exactly at done (2500 + 500 = 3000). */
+const T = { travel: 1150, fade: 2500, done: 3000 } as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. Unit-tested. */
 export function shouldPlayIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
@@ -86,7 +90,15 @@ export function BowerIntro() {
     } catch {
       /* private mode: treat as not played */
     }
-    if (shouldPlayIntro(prefersReduced, played)) setActive(true);
+    if (shouldPlayIntro(prefersReduced, played)) {
+      // Pin the scroll to the top while the one-time intro plays so its centered
+      // logo hands off to the hero's plan view cleanly; a reload mid-page would
+      // otherwise restore scroll and settle the logo over a mid-scrub hero.
+      // Restored to 'auto' when the intro unmounts (T.done cleanup below).
+      window.history.scrollRestoration = 'manual';
+      window.scrollTo(0, 0);
+      setActive(true);
+    }
   }, [prefersReduced]);
 
   // Measure the nav wordmark (after fonts settle), re-measure on resize.
@@ -115,6 +127,8 @@ export function BowerIntro() {
       } catch {
         /* ignore */
       }
+      // The one-time intro is over: resume normal back/forward scroll restoration.
+      if (typeof window !== 'undefined') window.history.scrollRestoration = 'auto';
       setActive(false);
     }, T.done);
     return () => {
@@ -150,7 +164,7 @@ export function BowerIntro() {
         className="absolute inset-0 bg-paperVellum"
         initial={{ opacity: 1 }}
         animate={{ opacity: phase === 'fade' ? 0 : 1 }}
-        transition={{ duration: 0.9, ease: 'easeOut' }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
       />
 
       {/* The LOGO. Same container + mark sizing as HeroReveal's OculusPlate, so once
@@ -186,17 +200,14 @@ export function BowerIntro() {
         }
       >
         {LETTERS.map((ch, i) => (
+          // Opacity + y only. The blur(4px)->0 and x/rotate were the main repaint
+          // cost (five animated CSS filters at once); dropping them keeps the
+          // "type setting into a line" read with zero per-frame blur repaints.
           <motion.span
             key={i}
             className="inline-block"
-            initial={{
-              opacity: 0,
-              x: OFFSETS[i].x,
-              y: OFFSETS[i].y,
-              rotate: OFFSETS[i].r,
-              filter: 'blur(4px)',
-            }}
-            animate={{ opacity: 1, x: 0, y: 0, rotate: 0, filter: 'blur(0px)' }}
+            initial={{ opacity: 0, y: OFFSETS[i].y }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.72, ease: EASE_LETTER, delay: 0.07 * i }}
           >
             {ch}

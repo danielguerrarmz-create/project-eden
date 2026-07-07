@@ -41,16 +41,19 @@ describe('HERO_THRESHOLDS are ordered and in range', () => {
       HERO_THRESHOLDS.TILT,
       HERO_THRESHOLDS.RESOLVE,
       HERO_THRESHOLDS.COPY_IN,
+      HERO_THRESHOLDS.STATS_IN,
     ];
     for (const [a, b] of ranges) {
       expect(a).toBeGreaterThanOrEqual(0);
       expect(b).toBeLessThanOrEqual(1);
       expect(a).toBeLessThan(b);
     }
-    // Choreography order: canvas in -> tilt -> resolve -> copy in.
+    // Choreography order: canvas in -> tilt -> resolve -> copy in (at the end of the
+    // scrub, over the finished render), with the stats strip arriving alongside it.
     expect(HERO_THRESHOLDS.CANVAS_IN[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.TILT[0]);
     expect(HERO_THRESHOLDS.TILT[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.RESOLVE[0]);
     expect(HERO_THRESHOLDS.RESOLVE[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.COPY_IN[0]);
+    expect(HERO_THRESHOLDS.COPY_IN[0]).toBeLessThanOrEqual(HERO_THRESHOLDS.STATS_IN[0]);
   });
 });
 

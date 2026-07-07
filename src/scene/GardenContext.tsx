@@ -5,13 +5,17 @@
  * a lawn disc, a gravel apron under the canopy, planting beds at each FOOT
  * (where the climbers root — the sacrificial armature starts here), and a
  * coral north marker so the aperture bearing reads on camera.
+ *
+ * The north marker is wayfinding for the STUDIO's aperture-bearing slider; it is
+ * meaningless in the passive hero render, so `showNorthMarker` (default true)
+ * lets HeroScene opt out of it.
  */
 import { useMemo } from 'react';
 import { useDesign } from '../state/store';
 
 const DEG = Math.PI / 180;
 
-export function GardenContext() {
+export function GardenContext({ showNorthMarker = true }: { showNorthMarker?: boolean } = {}) {
   const geo = useDesign((s) => s.outputs.geometry);
 
   // A planting bed just outside the eave at each foot bearing.
@@ -59,11 +63,14 @@ export function GardenContext() {
         </mesh>
       ))}
 
-      {/* North marker: a small coral arrow on the ground at +Z (scene north). */}
-      <mesh position={[0, 0.02, lawnRadius + 1.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.18, 0.42, 3]} />
-        <meshStandardMaterial color="#E06A4E" roughness={0.6} />
-      </mesh>
+      {/* North marker: a small coral arrow on the ground at +Z (scene north).
+          Studio-only wayfinding; the hero render passes showNorthMarker={false}. */}
+      {showNorthMarker && (
+        <mesh position={[0, 0.02, lawnRadius + 1.3]} rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.18, 0.42, 3]} />
+          <meshStandardMaterial color="#E06A4E" roughness={0.6} />
+        </mesh>
+      )}
     </group>
   );
 }

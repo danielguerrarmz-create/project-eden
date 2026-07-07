@@ -13,30 +13,31 @@
  * Copy note: no em/en dashes anywhere in this page's hand-authored copy. The one
  * engine-generated string shown (floweringMonths) is passed through deDash, the
  * same sanitiser the studio uses, since that string can carry a range dash.
- * No margin, certification, or insurer claim anywhere; Biodiversity Net Gain in
- * section 4 is framed as market context, never as a certification the product carries.
+ * No margin, certification, or insurer claim anywhere.
+ *
+ * The engine explainer is condensed here into one section (The Engine, anchored
+ * #how-it-works): pipeline mechanics + a honesty coda. The full six-section
+ * walkthrough (sun path, growth phases) lives at the standalone /engine route.
  */
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { deDash } from '../ui/text';
-import { CTA_PRIMARY_EVALUATOR } from '../data/config';
+import { routes } from '../routing';
 import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
+import { PipelineSchematic } from './engine/PipelineSchematic';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
 import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
 import { HeroReveal } from './splash/HeroReveal';
 import { BowerIntro } from './splash/BowerIntro';
 import { SeasonalBecomingDiagram } from './splash/SeasonalBecomingDiagram';
-import { HowItWorks } from './splash/HowItWorks';
 import { RegisterInterest } from './splash/RegisterInterest';
-import { ritualSteps, ritualCompact, STAYS_THE_SAME, PD_FACT } from './splash/copy';
+import { ritualSteps, STAYS_THE_SAME, PD_FACT } from './splash/copy';
 import { H2, BODY } from './typeScale';
-
-const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 
 export function SplashPage() {
   const reduced = useReducedMotion();
   const outputs = useDesign((s) => s.outputs);
-  const { geometry, ecology, price, components, buildPlan } = outputs;
+  const { geometry, ecology, components, buildPlan, bounds } = outputs;
 
   return (
     <div className="min-h-screen w-full">
@@ -54,14 +55,9 @@ export function SplashPage() {
           A structure that keeps <em className="italic">becoming</em>.
         </h2>
         <p className={BODY}>
-          Every Eden is planted the day it is built. It arrives quiet: a bare lattice and a young
-          climber at its feet. Then it starts to change, and it does not stop. Each season it holds
-          more leaf, more flower, more shade than the one before. There is no finished photograph,
-          only the next one.
-        </p>
-        <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-          You are not buying an object placed on a lawn. You are commissioning a place that keeps
-          arriving, growing more alive and more beautiful with every season it stands.
+          Every Eden is planted the day it is built. It arrives quiet, a bare lattice and a young
+          climber at its feet. Each season after, it holds more leaf, more flower, more shade than
+          the season before.
         </p>
 
         <div className="mt-12">
@@ -69,34 +65,61 @@ export function SplashPage() {
         </div>
       </EngineSection>
 
-      {/* 3 — CATALOG CERTAINTY, COMMISSION SINGULARITY (vellum) + D reuse */}
-      <EngineSection ground="vellum" reduced={reduced}>
-        <Eyebrow>Why it is technology, not joinery</Eyebrow>
+      {/* 3 — THE ENGINE (vellum, #how-it-works): the condensed engine explainer.
+          Merges the old catalog-certainty pitch with HowItWorks secs 1, 2 and 6:
+          pipeline mechanics + one envelope diagram + a honesty coda. The full
+          six-section walkthrough (sun path, growth phases) lives at /engine. */}
+      <EngineSection ground="vellum" reduced={reduced} id="how-it-works">
+        <Eyebrow>What the engine actually does</Eyebrow>
         <h2 className={`mt-4 ${H2}`}>
-          Shape it like clay. It <em className="italic">prices</em> itself as you do.
+          Not a catalogue of shapes. A grammar that computes <em className="italic">one</em>.
         </h2>
         <p className={BODY}>
-          Every Eden comes out of a small, honest engine, not a catalogue of ten shapes. Footprint,
-          rise, the spacing of the lattice, the direction it opens: four things you can shape, and
-          every shape you reach is something a fabricator can actually cut. The form cannot leave
-          what its own fabrication grammar allows, which is what makes it buildable at every position
-          of every slider, not just the one in the brochure.
+          Four things you shape, footprint, rise, lattice spacing, and the direction it opens, pass
+          through a fabrication grammar before they reach the geometry: a set of stated cutting rules
+          that recomputes each control's limits for the design in front of you. A small footprint
+          pulls the rise cap down, because a flatter crown keeps every component inside the cutter's
+          tolerance. Widen the footprint far enough and the engine adds a fourth foot, because an
+          edge blank would otherwise run longer than a CNC sheet. What the grammar allows then runs
+          through the same functions every time: geometry, cut list, nesting, sun path, ecology.
+          Given the same choices, the engine produces the same pavilion, every time.
         </p>
-        <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-          That constraint is what makes the price real, not a fixed range with a footnote. Move a
-          control and the price recalculates from the same cut list a fabricator would quote from,
-          live, in front of you. Complex, organic form was never expensive because of material. It
-          was expensive because of uncertainty. Remove the uncertainty, and a shape this alive
-          becomes something you can simply commission.
-        </p>
+
+        <div className="mx-auto mt-12 max-w-[640px]">
+          <PipelineSchematic />
+        </div>
 
         <div className="mx-auto mt-12 max-w-[520px]">
           <SiteEnvelopeDiagram outputs={outputs} />
           <AnnotationStrip>
             footprint {geometry.footprintM2.toFixed(1)} m² · rise {geometry.riseM.toFixed(2)} m ·
-            fixed price {gbp(price.fixedTotalGBP)}
+            spacing {geometry.params.strutSpacingM.toFixed(2)} m · {geometry.feetCount} feet · rings{' '}
+            {geometry.ringCount} · spokes {geometry.spokeCount}
           </AnnotationStrip>
+          {bounds.notes[0] && <AnnotationStrip>grammar: {deDash(bounds.notes[0])}</AnnotationStrip>}
         </div>
+
+        {/* Honesty coda, hairline-divided beneath the diagrams (folds HowItWorks sec 6). */}
+        <div className="mt-12 border-t border-inkBlack/15 pt-8">
+          <Eyebrow>What is real and what is a rule of thumb</Eyebrow>
+          <p className="mt-6 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
+            Structural validity here means inside a designed family, not an engineer's sign-off on
+            every shape. Every control is clamped to the grammar before the geometry is built, which
+            is what guarantees a buildable structure. The honest limit: widening that family still
+            takes a chartered engineer, one sign-off at a time. The ecology figures are rule-of-thumb
+            formulas, not a certified survey, and move honestly with the design. The price
+            recalculates correctly from the same cut list a fabricator would quote from; the
+            per-component rate itself is still a placeholder until a fabrication shop returns a real
+            quote.
+          </p>
+        </div>
+
+        <a
+          href={routes.engine}
+          className="mt-10 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+        >
+          See the full engine walkthrough →
+        </a>
       </EngineSection>
 
       {/* 3b — THE COMMISSION RITUAL (field-blue). Process shown expanded here, then
@@ -141,10 +164,10 @@ export function SplashPage() {
           poured slab, so the soil beneath it stays alive.
         </p>
         <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-          The UK made Biodiversity Net Gain a legal requirement for new development in 2024: adding
-          habitat to a site is moving from a nice idea to something that is measured. An Eden is
-          built to sit on the right side of that line, honestly, without pretending to be an
-          ecological survey.
+          The support pattern is computed for how the chosen plant physically climbs: twining stems
+          want close verticals, tendrils want a fine mesh, self-clinging roots want almost nothing,
+          layered against where the sun falls hardest on the structure. Change the species and the
+          fine support pattern changes with it. The load-bearing frame itself never does.
         </p>
 
         <div className="mt-12">
@@ -169,36 +192,19 @@ export function SplashPage() {
         </dl>
       </EngineSection>
 
-      {/* HOW IT WORKS — the generative-engine explainer, folded in as an in-page
-          band (anchor #how-it-works) between the Eden pitch above and the
-          commission / register close below. Six live field-color EngineSections,
-          formerly the #/engine page; opens on field-blue so it reads as its own
-          movement in the scroll. */}
-      <HowItWorks outputs={outputs} reduced={reduced} />
-
-      {/* 5 — CLOSE (vellum), repeats the two CTAs + the one register form */}
+      {/* 6 — CLOSE (vellum), one purpose: register email. The commission-ritual
+          restatement and the repeated #how-it-works CTA are gone (each was shown
+          twice); the engine section above is the single reasoning destination. */}
       <EngineSection ground="vellum" reduced={reduced} id="register">
         <Eyebrow>Start here</Eyebrow>
         <h2 className={`mt-4 ${H2}`}>
           Two ways to <em className="italic">begin</em>.
         </h2>
         <p className={BODY}>
-          If you want the proof first, the how it works section above walks through exactly what is
-          real and what is a rule of thumb, with every diagram computed live. If you would rather
-          just put your name down, that takes ten seconds.
+          If you want to see the reasoning first, the engine section above lays out exactly what is
+          computed and what is a rule of thumb. If you would rather put your name down, that takes
+          ten seconds.
         </p>
-
-        {/* The commission ritual, restated compact (process shown twice). */}
-        <p className="mt-8 max-w-[70ch] font-mono text-[11px] leading-relaxed tracking-[0.06em] opacity-60">
-          {ritualCompact(components.totalCount)}
-        </p>
-
-        <a
-          href="#how-it-works"
-          className="mt-10 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
-        >
-          {CTA_PRIMARY_EVALUATOR} →
-        </a>
 
         <RegisterInterest />
       </EngineSection>

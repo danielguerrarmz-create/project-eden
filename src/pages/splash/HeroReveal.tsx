@@ -1,13 +1,19 @@
 /**
  * HeroReveal.tsx — the cinematic, scroll-scrubbed home hero (replaces the static
- * hero visual). A tall wrapper pins a full-viewport stage; scroll progress p (0..1)
- * across the wrapper drives a 2D -> 3D -> render choreography:
+ * hero visual). A tall wrapper pins a FULL-BLEED stage (absolute inset-0 layers);
+ * scroll progress p (0..1) across the wrapper drives a 2D -> 3D -> render
+ * choreography over the whole viewport:
  *
- *   p 0.00 -> 0.12  the flat Oculus SVG mark, large and centered (the intro's handoff)
- *   p 0.12 -> 0.25  cross-fade: Oculus SVG out, the R3F canvas in (pavilion top-down)
- *   p 0.25 -> 0.60  the camera tilts top-down -> oblique; the plan becomes a gridshell
- *   p 0.60 -> 0.90  the render resolves: ink wireframe -> solid timber + plants grow in
- *   p 0.90 -> 1.00  the hero copy + CTAs fade / rise in over the finished render
+ *   p 0.00 -> 0.08  the flat Oculus SVG mark, large and centered (the intro's handoff)
+ *   p 0.08 -> 0.20  cross-fade: Oculus SVG out, the R3F canvas in (pavilion top-down)
+ *   p 0.20 -> 0.50  the camera tilts top-down -> oblique; the plan becomes a gridshell
+ *   p 0.50 -> 0.76  the render resolves: ink wireframe -> solid timber + plants grow in
+ *   p 0.80 -> 0.94  the hero copy + CTAs fade / rise in over the finished render, with
+ *                   the live stats strip arriving alongside them (the scroll's payoff)
+ *
+ * Daniel override: p=0 shows ONLY the centered Oculus mark, full-bleed, no copy. The
+ * reveal itself is the pitch, so the copy is scroll-gated to the end of the scrub and
+ * then dwells over the finished render before the hero unpins.
  *
  * Fallbacks:
  *   - reduced motion    -> the FINAL state, static, no pinning ('staticRender').
@@ -20,27 +26,35 @@ import { useScroll } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
 import { CTA_PRIMARY_EVALUATOR } from '../../data/config';
 import { routes } from '../../routing';
+import { useDesign } from '../../state/store';
 import { BowerMark } from '../../ui/BowerMark';
 import { OculusMark } from '../../ui/OculusMark';
 import { webglSupported } from '../../ui/webgl';
+import { AnnotationStrip } from '../engine/EngineSection';
 import { H1 } from '../typeScale';
+
+const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 
 const HeroScene = lazy(() => import('./HeroScene'));
 
 /** Scroll-progress thresholds. Exposed as named constants for visual tuning. */
 export const HERO_THRESHOLDS = {
   /** Total scroll length of the pinned hero, in viewport heights. */
-  WRAPPER_VH: 280,
+  WRAPPER_VH: 210,
   /** Oculus SVG fades OUT over this p-range. */
-  OCULUS_OUT: [0.12, 0.25] as [number, number],
+  OCULUS_OUT: [0.08, 0.2] as [number, number],
   /** The R3F canvas fades IN over this p-range. */
-  CANVAS_IN: [0.12, 0.25] as [number, number],
+  CANVAS_IN: [0.08, 0.2] as [number, number],
   /** Camera tilts top-down -> oblique over this range (also lives in HeroScene). */
-  TILT: [0.25, 0.6] as [number, number],
+  TILT: [0.2, 0.5] as [number, number],
   /** Wireframe -> solid + plants resolve over this range (also in HeroScene). */
-  RESOLVE: [0.6, 0.9] as [number, number],
-  /** The hero copy fades / rises in over this range. */
-  COPY_IN: [0.9, 1.0] as [number, number],
+  RESOLVE: [0.5, 0.76] as [number, number],
+  /** The hero copy + CTAs fade / rise in at the END of the scrub, over the finished
+   *  render (Daniel override: p=0 shows only the mark, the reveal itself is the pitch).
+   *  Landing at 0.94 leaves ~0.06 of the 210vh wrapper as pinned dwell before unpinning. */
+  COPY_IN: [0.8, 0.94] as [number, number],
+  /** The reward stats strip arrives WITH the copy (a beat into the copy reveal). */
+  STATS_IN: [0.82, 0.94] as [number, number],
 } as const;
 
 export type HeroMode = 'poster' | 'staticRender' | 'scrub';
@@ -157,14 +171,20 @@ function StaticRenderHero() {
   );
 }
 
-/** The full pinned, scroll-scrubbed choreography. */
+/** The full pinned, scroll-scrubbed choreography (full-bleed visual, copy reveals at end). */
 function ScrubHero() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef(0);
   const oculusRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
   const invalidateRef = useRef<(() => void) | null>(null);
+
+  // The stats strip reuses the live default outputs already on the page (same
+  // pattern as SplashPage): no new copy string, no new data.
+  const geometry = useDesign((s) => s.outputs.geometry);
+  const price = useDesign((s) => s.outputs.price);
 
   const { scrollYProgress } = useScroll({
     target: wrapRef,
@@ -173,12 +193,13 @@ function ScrubHero() {
 
   // Drive every scroll-linked layer imperatively off one signal. Framer motion-value
   // style bindings proved unreliable for these overlays (opacity would stick), so the
-  // canvas fade-in, the Oculus fade-out, and the copy reveal are all set here.
+  // canvas fade-in, the Oculus fade-out, and the copy + stats reveal are all set here.
   useEffect(() => {
     const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
     const [oa, ob] = HERO_THRESHOLDS.OCULUS_OUT;
     const [na, nb] = HERO_THRESHOLDS.CANVAS_IN;
     const [ca, cb] = HERO_THRESHOLDS.COPY_IN;
+    const [sa, sb] = HERO_THRESHOLDS.STATS_IN;
     const apply = (v: number) => {
       progressRef.current = v;
       if (canvasRef.current) canvasRef.current.style.opacity = String(clamp01((v - na) / (nb - na)));
@@ -192,6 +213,11 @@ function ScrubHero() {
         copyRef.current.style.opacity = String(t);
         copyRef.current.style.transform = `translateY(${(1 - t) * 24}px)`;
       }
+      if (statsRef.current) {
+        const t = clamp01((v - sa) / (sb - sa));
+        statsRef.current.style.opacity = String(t);
+        statsRef.current.style.transform = `translateY(${(1 - t) * 8}px)`;
+      }
       // Request one 3D frame per scroll change (canvas runs frameloop="demand").
       invalidateRef.current?.();
     };
@@ -203,15 +229,15 @@ function ScrubHero() {
   return (
     <div ref={wrapRef} className="relative w-full" style={{ height: `${HERO_THRESHOLDS.WRAPPER_VH}vh` }}>
       <div className="sticky top-0 h-screen w-full overflow-hidden bg-paperVellum text-inkBlack">
-        {/* Canvas layer, fades in as the mark fades out (opacity set imperatively above). */}
+        {/* Canvas layer, full-bleed, fades in as the mark fades out (opacity set imperatively). */}
         <div ref={canvasRef} className="absolute inset-0" style={{ opacity: 0 }}>
           <Suspense fallback={null}>
             <HeroScene progressRef={progressRef} invalidateRef={invalidateRef} />
           </Suspense>
         </div>
 
-        {/* Flat Oculus mark (front), the p=0 state handed off from the intro. Opacity +
-            scale are driven imperatively in the scroll effect above. */}
+        {/* Flat Oculus mark (front), full-bleed, the p=0 state handed off from the intro.
+            Opacity + scale are driven imperatively in the scroll effect above. */}
         <div
           ref={oculusRef}
           className="pointer-events-none absolute inset-0"
@@ -225,15 +251,29 @@ function ScrubHero() {
           <Header />
         </div>
 
-        {/* Hero copy, fades / rises in over the finished render (bottom-left overlay).
-            Opacity + translate driven imperatively in the scroll effect above. */}
+        {/* Hero copy, bottom-left gradient overlay over the full-bleed render. Scroll-
+            gated: hidden at p=0 (the reveal is the pitch) and faded / risen in near the
+            end of the scrub (COPY_IN), driven imperatively in the scroll effect above. */}
         <div
           ref={copyRef}
           className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-r from-paperVellum via-paperVellum/45 to-transparent"
-          style={{ opacity: 0, willChange: 'opacity, transform' }}
+          style={{ opacity: 0, transform: 'translateY(24px)', willChange: 'opacity, transform' }}
         >
           <div className="mx-auto max-w-[1120px] px-6 pb-16 pt-24 md:px-10">
             <HeroCopy />
+
+            {/* Reward stats strip: arrives with the copy (STATS_IN), inside the copy
+                overlay. Live numbers already on the page, worded as "priced live". */}
+            <div
+              ref={statsRef}
+              className="mt-8"
+              style={{ opacity: 0, transform: 'translateY(8px)', willChange: 'opacity, transform' }}
+            >
+              <AnnotationStrip>
+                footprint {geometry.footprintM2.toFixed(1)} m² · rise {geometry.riseM.toFixed(2)} m ·
+                this shape, priced live: {gbp(price.fixedTotalGBP)}
+              </AnnotationStrip>
+            </div>
           </div>
         </div>
       </div>

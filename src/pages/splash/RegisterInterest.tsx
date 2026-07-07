@@ -39,7 +39,10 @@ export function RegisterInterest() {
           register interest
         </span>
         <input
+          id="register-email"
+          name="email"
           type="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}

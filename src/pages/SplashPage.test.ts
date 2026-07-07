@@ -13,9 +13,9 @@ describe('SplashPage', () => {
     expect(html).toContain('Commission a');
     expect(html).toContain('register interest');
     expect(html).toContain('See how the engine works');
-    // live number from the hero annotation strip (fixed price)
-    expect(html).toMatch(/fixed price £[\d,]+/);
-    // svg diagrams present (hero + envelope + strut small multiples + becoming)
+    // live number from the Engine section's envelope annotation strip
+    expect(html).toMatch(/footprint [\d.]+ m²/);
+    // svg diagrams present (hero + becoming + pipeline + envelope + strut)
     expect((html.match(/<svg/g) || []).length).toBeGreaterThan(5);
   });
 
@@ -46,13 +46,19 @@ describe('SplashPage', () => {
     expect(html).not.toContain('(the pavilion)');
   });
 
-  it('folds the engine explainer in as the #how-it-works band', () => {
-    // The former #/engine page now lives inside the home as one anchored band.
+  it('carries a condensed engine section anchored #how-it-works', () => {
+    // The home carries only the condensed engine section: pipeline mechanics + a
+    // honesty coda. The full six-section walkthrough lives at the /engine route.
     expect(html).toContain('id="how-it-works"');
-    expect(html).toContain('The generative engine');
-    expect(html).toContain('not chosen from a catalogue');
-    // its studio CTA (was the engine page close) renders in the band
-    expect(html).toContain('Shape your own Eden');
+    expect(html).toContain('What the engine actually does');
+    expect(html).toContain('A grammar that computes');
+    expect(html).toContain('What is real and what is a rule of thumb');
+    // the deep-link out to the full walkthrough (the restored /engine route)
+    expect(html).toContain('See the full engine walkthrough');
+    expect(html).toContain('#/engine');
+    // the sun-path / growth-phases detail is NOT on the home page anymore
+    expect(html).not.toContain('Solar geometry');
+    expect(html).not.toContain('Shape your own Eden');
   });
 
   it('teaches the commission ritual with live production figures', () => {

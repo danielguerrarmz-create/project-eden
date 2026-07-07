@@ -25,11 +25,11 @@ import { segmentMatrix } from '../../scene/util';
 
 /** Scene-internal p thresholds (kept in sync with HeroReveal.HERO_THRESHOLDS). */
 export const SCENE_THRESHOLDS = {
-  TILT_START: 0.25,
-  TILT_END: 0.6,
-  RESOLVE_START: 0.6,
-  RESOLVE_END: 0.9,
-  PLANT_START: 0.62,
+  TILT_START: 0.2,
+  TILT_END: 0.5,
+  RESOLVE_START: 0.5,
+  RESOLVE_END: 0.76,
+  PLANT_START: 0.56,
 } as const;
 
 /** Camera keyframes: straight top-down -> oblique gallery angle (Scene's default). */
@@ -127,7 +127,13 @@ function HeroPlants({ progressRef }: { progressRef: ProgressRef }) {
     if (!on && p >= SCENE_THRESHOLDS.PLANT_START) setOn(true);
     else if (on && p < SCENE_THRESHOLDS.PLANT_START - 0.04) setOn(false);
   });
-  return on ? <GrowthOverlay coverageOverride={HERO_COVERAGE} /> : null;
+  return on ? (
+    <GrowthOverlay
+      coverageOverride={HERO_COVERAGE}
+      progressRef={progressRef}
+      coverageRange={[SCENE_THRESHOLDS.PLANT_START, SCENE_THRESHOLDS.RESOLVE_END]}
+    />
+  ) : null;
 }
 
 /** Exposes r3f's `invalidate` so the DOM scroll handler can request frames on demand. */
@@ -168,7 +174,7 @@ export default function HeroScene({ progressRef, invalidateRef }: HeroSceneProps
       <directionalLight position={[6, 10, 5]} intensity={1.55} />
       <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
 
-      <GardenContext />
+      <GardenContext showNorthMarker={false} />
       <HeroFolly progressRef={progressRef} />
       <HeroPlants progressRef={progressRef} />
 
