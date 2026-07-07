@@ -1,11 +1,16 @@
 /**
  * routing.ts — a deliberately tiny hash router (no dependency).
  *
- * Three destinations: the splash landing at `#/` (the new home), the studio
- * (the configurator) at `#/studio`, and the Engine explainer at `#/engine`. We
- * subscribe to `hashchange` via useSyncExternalStore so back/forward and manual
- * URL edits all work, then normalize the hash to a clean path (`#/engine` ->
- * `/engine`, empty -> `/`).
+ * Bower is one company with one product, Eden, so the company home IS the Eden
+ * splash. Two destinations: that combined landing at `#/` (which now folds the
+ * engine explainer in as an in-page `#how-it-works` band), and the studio (the
+ * configurator) at `#/studio`. We subscribe to `hashchange` via
+ * useSyncExternalStore so back/forward and manual URL edits all work, then
+ * normalize the hash to a clean path (`#/studio` -> `/studio`, empty -> `/`).
+ *
+ * Note: an in-page anchor like `#how-it-works` normalizes to the path
+ * `/how-it-works`, which is not a known route, so Root falls through to the home
+ * splash and the browser scrolls to the matching element id. That is intentional.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -29,5 +34,4 @@ export function useRoute(): string {
 export const routes = {
   home: '#/',
   studio: '#/studio',
-  engine: '#/engine',
 } as const;

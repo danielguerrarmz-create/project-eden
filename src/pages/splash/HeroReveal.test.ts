@@ -1,0 +1,72 @@
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import { describe, it, expect } from 'vitest';
+import { HeroReveal, heroMode, HERO_THRESHOLDS } from './HeroReveal';
+import { runEngine } from '../../engine';
+import { ENVELOPE } from '../../data/config';
+import type { DesignParams } from '../../engine/types';
+
+const defaults: DesignParams = {
+  footprintM2: ENVELOPE.footprintM2.default,
+  riseM: ENVELOPE.riseM.default,
+  strutSpacingM: ENVELOPE.strutSpacingM.default,
+  apertureDeg: ENVELOPE.apertureDeg.default,
+  speciesId: 'lonicera',
+  year: 0,
+};
+
+describe('heroMode (fallback decision)', () => {
+  it('server (no window) -> poster (no canvas, copy present)', () => {
+    expect(heroMode({ isBrowser: false, webgl: true, reduced: false })).toBe('poster');
+  });
+
+  it('no WebGL -> poster', () => {
+    expect(heroMode({ isBrowser: true, webgl: false, reduced: false })).toBe('poster');
+  });
+
+  it('reduced motion + WebGL -> final render, static (no scrub)', () => {
+    expect(heroMode({ isBrowser: true, webgl: true, reduced: true })).toBe('staticRender');
+  });
+
+  it('browser + WebGL + motion allowed -> the scrubbed hero (no poster flash)', () => {
+    expect(heroMode({ isBrowser: true, webgl: true, reduced: false })).toBe('scrub');
+  });
+});
+
+describe('HERO_THRESHOLDS are ordered and in range', () => {
+  it('each stage runs forward and the beats do not regress', () => {
+    const ranges = [
+      HERO_THRESHOLDS.OCULUS_OUT,
+      HERO_THRESHOLDS.CANVAS_IN,
+      HERO_THRESHOLDS.TILT,
+      HERO_THRESHOLDS.RESOLVE,
+      HERO_THRESHOLDS.COPY_IN,
+    ];
+    for (const [a, b] of ranges) {
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThanOrEqual(1);
+      expect(a).toBeLessThan(b);
+    }
+    // Choreography order: canvas in -> tilt -> resolve -> copy in.
+    expect(HERO_THRESHOLDS.CANVAS_IN[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.TILT[0]);
+    expect(HERO_THRESHOLDS.TILT[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.RESOLVE[0]);
+    expect(HERO_THRESHOLDS.RESOLVE[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.COPY_IN[0]);
+  });
+});
+
+describe('HeroReveal SSR (poster fallback = final state visible)', () => {
+  const outputs = runEngine(defaults);
+  const html = renderToString(createElement(HeroReveal, { outputs, reduced: false }));
+
+  it('renders the poster hero with the copy visible and no canvas', () => {
+    expect(html).toContain('Commission a');
+    expect(html).toContain('living'); // the one italic word
+    expect(html).toContain('See how the engine works');
+    expect(html).toContain('how it works');
+    expect(html).toContain('the studio');
+    // the flat Oculus mark stands in for the render (poster): real <circle> mark
+    expect((html.match(/<circle/g) || []).length).toBeGreaterThanOrEqual(8);
+    // no em/en dashes in the hero copy (house rule)
+    expect(html).not.toMatch(/[—–]/);
+  });
+});

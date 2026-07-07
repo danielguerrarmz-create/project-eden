@@ -1,57 +1,44 @@
 /**
- * EnginePage.tsx — the generative-engine explainer (#/engine).
+ * HowItWorks.tsx — the generative-engine explainer, folded into the home page as
+ * one in-page band (anchor id="how-it-works"). This is the former #/engine page's
+ * body, verbatim in substance: the same six field-color EngineSections, each
+ * rendering live engine output (never illustration), in the same documentation
+ * layer language (field color + editorial serif + navy hairline linework).
  *
- * Six full-bleed field-color sections that explain, honestly, what the engine in
- * src/engine actually computes. Every diagram renders live engine output, not
- * illustration. The studio is never touched: this is the documentation layer
- * (field color + editorial serif + hairline linework), opened via hash route,
- * reading the same default design a first-time visitor sees (the store
- * initializes its outputs eagerly). Brand chrome reads the company wordmark
- * (WORDMARK = "Bower"); the thing you shape is the product (PRODUCT = "Eden").
+ * The difference from the old standalone page is only chrome: no page header and
+ * no min-h-screen page wrapper, because this now lives inside the home scroll
+ * between the Eden pitch and the commission / register close. It reads the same
+ * live `outputs` the rest of the home reads (passed down from SplashPage), and it
+ * inherits the page's reduced-motion + hairline (InkProvider) conventions through
+ * EngineSection exactly as before.
+ *
+ * The first band keeps the field-blue ground, so the explainer opens as a
+ * visually distinct movement within the home scroll. Copy is unchanged; the one
+ * engine-generated string shown (bounds.notes[0]) is still passed through deDash.
  */
-import { useDesign } from '../state/store';
-import { useReducedMotion } from '../ui/useReducedMotion';
-import { deDash } from '../ui/text';
-import { ENGINE_NAME, PRODUCT } from '../data/config';
-import { routes } from '../routing';
-import { BowerMark } from '../ui/BowerMark';
-import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
-import { PipelineSchematic } from './engine/PipelineSchematic';
-import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
-import { SunPathDiagram } from './engine/SunPathDiagram';
-import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
-import { GrowthPhasesDiagram } from './engine/GrowthPhasesDiagram';
-import { H1, H2, BODY } from './typeScale';
+import type { EngineOutputs } from '../../engine/types';
+import { deDash } from '../../ui/text';
+import { PRODUCT } from '../../data/config';
+import { routes } from '../../routing';
+import { AnnotationStrip, Eyebrow, EngineSection } from '../engine/EngineSection';
+import { PipelineSchematic } from '../engine/PipelineSchematic';
+import { SiteEnvelopeDiagram } from '../engine/SiteEnvelopeDiagram';
+import { SunPathDiagram } from '../engine/SunPathDiagram';
+import { StrutFieldDiagram } from '../engine/StrutFieldDiagram';
+import { GrowthPhasesDiagram } from '../engine/GrowthPhasesDiagram';
+import { H1, H2, BODY } from '../typeScale';
 
-export function EnginePage() {
-  const reduced = useReducedMotion();
-  const outputs = useDesign((s) => s.outputs);
+export function HowItWorks({ outputs, reduced }: { outputs: EngineOutputs; reduced: boolean }) {
   const { geometry, sunPath, strutField, bounds } = outputs;
 
   return (
-    <div className="min-h-screen w-full bg-fieldBlue">
-      {/* Quiet header: mono wordmark + a real anchor back to the tool. */}
-      <header className="flex items-center justify-between bg-fieldBlue px-6 pt-6 text-inkNavy sm:px-10">
-        <div className="flex items-center gap-2 opacity-80">
-          <BowerMark />
-          <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-70">
-            · {ENGINE_NAME}
-          </span>
-        </div>
-        <a
-          href={routes.studio}
-          className="font-mono text-[11px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
-        >
-          back to the studio
-        </a>
-      </header>
-
-      {/* 1 — HERO (field-blue, the one Bodoni moment) */}
-      <EngineSection ground="blue" reduced={reduced}>
+    <>
+      {/* 1 — HERO (field-blue, the anchored open of the explainer band) */}
+      <EngineSection ground="blue" reduced={reduced} id="how-it-works">
         <Eyebrow>The generative engine</Eyebrow>
-        <h1 className={`mt-4 ${H1}`}>
+        <h2 className={`mt-4 ${H1}`}>
           Every pavilion is <em className="italic">computed</em>, not chosen from a catalogue.
-        </h1>
+        </h2>
         <p className="mt-8 max-w-[60ch] text-[18px] leading-relaxed opacity-90">
           Every form on this site comes out of a small pipeline of plain functions. Four shaping
           parameters, a species, and the sun go in. A structure you could actually cut, on feet that
@@ -213,6 +200,6 @@ export function EnginePage() {
           Shape your own {PRODUCT} →
         </a>
       </EngineSection>
-    </div>
+    </>
   );
 }

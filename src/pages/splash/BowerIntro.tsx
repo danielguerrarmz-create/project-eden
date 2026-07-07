@@ -1,0 +1,208 @@
+/**
+ * BowerIntro.tsx — the "bower" intro (Archipedia Preloader mechanic, 1:1).
+ *
+ * On first load per tab a centered brand lockup loads in together: the Oculus mark
+ * (logo) fades / scales / rotates in while the five letters of the "bower" wordmark
+ * set themselves into a line below it (deterministic offsets, "type set into a
+ * line, not confetti"). They resolve and hold. Then the lockup hands off:
+ *   - the WORDMARK flies to the top-left nav wordmark and fades into the real nav
+ *     lockup (font metrics match the `[data-wordmark]` span so at scale 1 they land
+ *     on top of it);
+ *   - the LOGO settles to dead-center at the hero's plan size, i.e. exactly where
+ *     HeroReveal's `OculusPlate` big centered Oculus sits at scroll p=0 (same
+ *     `absolute inset-0 grid place-items-center` + `w-[min(340px,60vmin)]`), so when
+ *     the backdrop clears the intro's logo and the hero's logo are pixel-coincident
+ *     and scroll simply takes over into the 2D -> 3D transition.
+ *
+ * We re-measure the nav wordmark after `document.fonts.ready` and on resize. Runs
+ * ONCE per tab (sessionStorage). Reduced-motion or already-played -> renders null
+ * (no intro). SSR-safe: no window on the server means it never activates.
+ */
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { WORDMARK } from '../../data/config';
+import { OculusMark } from '../../ui/OculusMark';
+
+/** Layout effect on the client, plain effect on the server (no SSR warning). */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+const WORD = WORDMARK.toLowerCase(); // "bower"
+const LETTERS = WORD.split('');
+
+/** Deterministic per-letter entrance offsets (px + rotate deg). */
+const OFFSETS = [
+  { x: -30, y: -58, r: -5 },
+  { x: 24, y: -64, r: 4 },
+  { x: -16, y: -56, r: 3 },
+  { x: 36, y: -50, r: -4 },
+  { x: -40, y: -62, r: 5 },
+] as const;
+
+const SESSION_KEY = 'bower.intro.played';
+const EASE_LETTER = [0.16, 1, 0.3, 1] as const;
+const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
+
+/** The logo lockup: sits above the wordmark, then settles to the hero plan (scale 1,
+ *  y 0). Tuned to match the slow/large register; adjust freely. */
+const LOGO = {
+  lockupScale: 0.52, // logo size while paired with the big wordmark
+  liftVh: 0.14, // how far above center the lockup logo floats (fraction of vh)
+  enterRotate: -14, // gentle rotate-in
+  enterDur: 0.9, // fade / scale / rotate in
+  settleDur: 1.35, // travel-beat settle to the hero plan position
+} as const;
+
+/** The big wordmark drops this fraction of vh below center so the logo clears above it. */
+const NAME_DROP_VH = 0.12;
+
+/** Timeline (ms): assemble at 0, hold, travel at 1600, fade at 2900, unmount at 3800.
+ *  Deliberately slow: a big wordmark that takes its time in and out. */
+const T = { travel: 1600, fade: 2900, done: 3800 } as const;
+
+/** Pure guard: only play on a fresh, non-reduced-motion tab. Unit-tested. */
+export function shouldPlayIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
+  return !prefersReduced && !alreadyPlayed;
+}
+
+interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function BowerIntro() {
+  const prefersReduced = useReducedMotion() ?? false;
+  const [active, setActive] = useState(false);
+  const [phase, setPhase] = useState<'assemble' | 'travel' | 'fade'>('assemble');
+  const [target, setTarget] = useState<Rect | null>(null);
+
+  // Decide once, client-side only.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let played = false;
+    try {
+      played = !!sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      /* private mode: treat as not played */
+    }
+    if (shouldPlayIntro(prefersReduced, played)) setActive(true);
+  }, [prefersReduced]);
+
+  // Measure the nav wordmark (after fonts settle), re-measure on resize.
+  useIsomorphicLayoutEffect(() => {
+    if (!active || typeof document === 'undefined') return;
+    const measure = () => {
+      const el = document.querySelector('[data-wordmark]') as HTMLElement | null;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setTarget({ left: r.left, top: r.top, width: r.width, height: r.height });
+    };
+    measure();
+    document.fonts?.ready.then(measure).catch(() => {});
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [active]);
+
+  // Timeline.
+  useEffect(() => {
+    if (!active) return;
+    const t1 = setTimeout(() => setPhase('travel'), T.travel);
+    const t2 = setTimeout(() => setPhase('fade'), T.fade);
+    const t3 = setTimeout(() => {
+      try {
+        sessionStorage.setItem(SESSION_KEY, '1');
+      } catch {
+        /* ignore */
+      }
+      setActive(false);
+    }, T.done);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [active]);
+
+  if (!active) return null;
+
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const w = target?.width ?? 60;
+  const h = target?.height ?? 16;
+
+  // Centered-big state: the word spans ~90vw, clamped to 3.2–8x the nav size (large),
+  // dropped below center so the logo lockup clears above it.
+  const bigScale = Math.min(8, Math.max(3.2, (0.9 * vw) / w));
+  const bigX = vw / 2 - (w * bigScale) / 2;
+  const bigY = vh / 2 - (h * bigScale) / 2 + NAME_DROP_VH * vh;
+
+  const traveled = phase !== 'assemble' && !!target;
+  const settled = phase !== 'assemble'; // the logo drops to the hero plan on the same beat
+  const wordAnim = traveled
+    ? { x: target!.left, y: target!.top, scale: 1, opacity: phase === 'fade' ? 0 : 1 }
+    : { x: bigX, y: bigY, scale: bigScale, opacity: 1 };
+
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-[100]">
+      {/* Backdrop clears on the fade beat. */}
+      <motion.div
+        className="absolute inset-0 bg-paperVellum"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: phase === 'fade' ? 0 : 1 }}
+        transition={{ duration: 0.9, ease: 'easeOut' }}
+      />
+
+      {/* The LOGO. Same container + mark sizing as HeroReveal's OculusPlate, so once
+          it settles (scale 1, y 0) it is pixel-coincident with the hero's plan view.
+          It does NOT fade on the fade beat: it becomes the hero plan and the backdrop
+          simply clears from behind it. */}
+      <div className="absolute inset-0 grid place-items-center">
+        <motion.div
+          className="w-[min(340px,60vmin)] text-inkBlack"
+          initial={{ opacity: 0, scale: LOGO.lockupScale * 0.9, rotate: LOGO.enterRotate, y: -LOGO.liftVh * vh }}
+          animate={
+            settled
+              ? { opacity: 1, scale: 1, rotate: 0, y: 0 }
+              : { opacity: 1, scale: LOGO.lockupScale, rotate: 0, y: -LOGO.liftVh * vh }
+          }
+          transition={{ duration: settled ? LOGO.settleDur : LOGO.enterDur, ease: EASE_TRAVEL }}
+        >
+          <OculusMark size={360} className="h-auto w-full" />
+        </motion.div>
+      </div>
+
+      {/* The word: assembles in place (below the logo), then travels to the nav
+          wordmark. Font metrics match the nav lockup so at scale 1 they land on it. */}
+      <motion.div
+        className="absolute left-0 top-0 flex font-mono lowercase text-inkBlack"
+        style={{ transformOrigin: 'top left', fontSize: '11px', letterSpacing: '0.14em', lineHeight: 1 }}
+        initial={{ x: bigX, y: bigY, scale: bigScale, opacity: 1 }}
+        animate={wordAnim}
+        transition={
+          traveled
+            ? { duration: 1.35, ease: EASE_TRAVEL, opacity: { duration: 0.85, ease: 'easeOut' } }
+            : { duration: 0 }
+        }
+      >
+        {LETTERS.map((ch, i) => (
+          <motion.span
+            key={i}
+            className="inline-block"
+            initial={{
+              opacity: 0,
+              x: OFFSETS[i].x,
+              y: OFFSETS[i].y,
+              rotate: OFFSETS[i].r,
+              filter: 'blur(4px)',
+            }}
+            animate={{ opacity: 1, x: 0, y: 0, rotate: 0, filter: 'blur(0px)' }}
+            transition={{ duration: 0.72, ease: EASE_LETTER, delay: 0.07 * i }}
+          >
+            {ch}
+          </motion.span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}

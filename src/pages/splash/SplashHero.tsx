@@ -12,7 +12,7 @@
  * studio, Eden is what it builds for you (confirmed 2026-07-05).
  */
 import { useEffect, useRef, useState } from 'react';
-import { ENGINE_NAME, PRODUCT, CTA_PRIMARY_EVALUATOR } from '../../data/config';
+import { CTA_PRIMARY_EVALUATOR } from '../../data/config';
 import type { EngineOutputs } from '../../engine/types';
 import { routes } from '../../routing';
 import { BowerMark } from '../../ui/BowerMark';
@@ -75,11 +75,8 @@ export function SplashHero({ outputs, reduced }: { outputs: EngineOutputs; reduc
             </span>
           </div>
           <nav className="flex items-center gap-4">
-            <a href={routes.home} className={navLink}>
-              {PRODUCT} (the pavilion)
-            </a>
-            <a href={routes.engine} className={navLink}>
-              {ENGINE_NAME}
+            <a href="#how-it-works" className={navLink}>
+              how it works
             </a>
             <a href={routes.studio} className={navLink}>
               the studio
@@ -93,7 +90,7 @@ export function SplashHero({ outputs, reduced }: { outputs: EngineOutputs; reduc
             {/* Text zone */}
             <div className="max-w-[46ch]">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] opacity-70" style={{ letterSpacing: '0.2em' }}>
-                Living architecture for the garden
+                Bower · living architecture for the garden
               </p>
               <h1 className={`mt-5 ${H1}`}>
                 Commission a <em className="italic">living</em> Eden.
@@ -106,7 +103,7 @@ export function SplashHero({ outputs, reduced }: { outputs: EngineOutputs; reduc
 
               <div className="mt-10 flex flex-col gap-5 sm:flex-row sm:items-center">
                 <a
-                  href={routes.engine}
+                  href="#how-it-works"
                   className="inline-flex items-center justify-center bg-inkNavy px-6 py-3 font-mono text-[12px] uppercase tracking-[0.14em] text-fieldBlue transition hover:bg-inkNavy/90 focus-visible:bg-inkNavy/90"
                 >
                   {CTA_PRIMARY_EVALUATOR} →

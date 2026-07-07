@@ -26,9 +26,12 @@ interface Leaf {
   phase: number; // idle-sway phase
 }
 
-export function GrowthOverlay() {
+export function GrowthOverlay({ coverageOverride }: { coverageOverride?: number } = {}) {
   const cells = useDesign((s) => s.outputs.strutField.cells);
-  const targetCoverage = useDesign((s) => s.outputs.growth.coverageFraction);
+  const storeCoverage = useDesign((s) => s.outputs.growth.coverageFraction);
+  // The hero render fixes a lush coverage regardless of the studio's year; the
+  // studio passes nothing and keeps its live, year-driven coverage.
+  const targetCoverage = coverageOverride ?? storeCoverage;
   const reducedMotion = useReducedMotion();
 
   const leaves = useMemo<Leaf[]>(

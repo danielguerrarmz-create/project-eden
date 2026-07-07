@@ -2,7 +2,6 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import { SplashPage } from './SplashPage';
-import { EnginePage } from './EnginePage';
 
 /** Strip the <!-- --> markers React SSR injects between text and expressions. */
 const clean = (html: string) => html.replace(/<!-- -->/g, '');
@@ -20,12 +19,17 @@ describe('SplashPage', () => {
     expect((html.match(/<svg/g) || []).length).toBeGreaterThan(5);
   });
 
-  it('honors the durationless constraint (no year label leaks)', () => {
-    expect(html).not.toContain('Year 0');
-    expect(html).not.toContain('just planted');
-    expect(html).toContain('just placed');
-    expect(html).toContain('always becoming, never finished');
-    expect(html.toLowerCase()).not.toMatch(/year (one|two|three|3|1|0)/);
+  it('honors the durationless constraint in the marketing pitch (no year label leaks)', () => {
+    // The durationless rule governs the MARKETING pitch (the becoming diagram must
+    // not promise a timeline), not the honest engine explainer, which deliberately
+    // says "year three is a projection, and the page says so". So we assert against
+    // the pitch portion of the page: everything above the #how-it-works band.
+    const pitch = html.split('id="how-it-works"')[0];
+    expect(pitch).not.toContain('Year 0');
+    expect(pitch).not.toContain('just planted');
+    expect(pitch).toContain('just placed');
+    expect(pitch).toContain('always becoming, never finished');
+    expect(pitch.toLowerCase()).not.toMatch(/year (one|two|three|3|1|0)/);
   });
 
   it('uses the Eden product name and the Bower brand coherently', () => {
@@ -33,10 +37,22 @@ describe('SplashPage', () => {
     expect(html).toContain('Bower'); // the company wordmark (hero header)
   });
 
-  it('teaches the noun stack in the header chrome', () => {
-    expect(html).toContain('(the pavilion)');
-    expect(html).toContain('the engine');
+  it('teaches the two-surface noun stack in the header chrome', () => {
+    // The site collapsed from three surfaces to two: the engine explainer is now
+    // an in-page band, so the nav teaches "how it works" (an anchor) and "the
+    // studio" (the tool), with no separate "the engine" route link.
+    expect(html).toContain('how it works');
     expect(html).toContain('the studio');
+    expect(html).not.toContain('(the pavilion)');
+  });
+
+  it('folds the engine explainer in as the #how-it-works band', () => {
+    // The former #/engine page now lives inside the home as one anchored band.
+    expect(html).toContain('id="how-it-works"');
+    expect(html).toContain('The generative engine');
+    expect(html).toContain('not chosen from a catalogue');
+    // its studio CTA (was the engine page close) renders in the band
+    expect(html).toContain('Shape your own Eden');
   });
 
   it('teaches the commission ritual with live production figures', () => {
@@ -56,15 +72,9 @@ describe('SplashPage', () => {
 
 describe('house dash rule (no em/en dashes in rendered copy)', () => {
   it('renders no em/en dashes anywhere in the splash output', () => {
+    // This now also covers the folded-in engine explainer copy, since the whole
+    // home (pitch + how-it-works band + close) renders from this one tree.
     const html = clean(renderToString(createElement(SplashPage)));
     expect(html).not.toMatch(/[—–]/);
-  });
-
-  it('renders no em/en dashes anywhere in the engine output', () => {
-    const html = clean(renderToString(createElement(EnginePage)));
-    expect(html).not.toMatch(/[—–]/);
-    // the product CTA reads Eden, the brand chrome reads Bower
-    expect(html).toContain('Shape your own Eden');
-    expect(html).toContain('Bower');
   });
 });

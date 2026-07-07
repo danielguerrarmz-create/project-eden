@@ -19,13 +19,14 @@
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { deDash } from '../ui/text';
-import { routes } from '../routing';
 import { CTA_PRIMARY_EVALUATOR } from '../data/config';
 import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
 import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
-import { SplashHero } from './splash/SplashHero';
+import { HeroReveal } from './splash/HeroReveal';
+import { BowerIntro } from './splash/BowerIntro';
 import { SeasonalBecomingDiagram } from './splash/SeasonalBecomingDiagram';
+import { HowItWorks } from './splash/HowItWorks';
 import { RegisterInterest } from './splash/RegisterInterest';
 import { ritualSteps, ritualCompact, STAYS_THE_SAME, PD_FACT } from './splash/copy';
 import { H2, BODY } from './typeScale';
@@ -39,8 +40,12 @@ export function SplashPage() {
 
   return (
     <div className="min-h-screen w-full">
-      {/* 1 — HERO (field-blue, the one Bodoni moment) */}
-      <SplashHero outputs={outputs} reduced={reduced} />
+      {/* The "bower" intro: assembles center-screen, flies to the nav wordmark.
+          Runs once per tab; reduced-motion / already-played render nothing. */}
+      <BowerIntro />
+
+      {/* 1 — HERO: the scroll-scrubbed 2D Oculus -> 3D gridshell -> render reveal */}
+      <HeroReveal outputs={outputs} reduced={reduced} />
 
       {/* 2 — ALWAYS BECOMING, the emotional core (field-chartreuse) + D2 */}
       <EngineSection ground="chartreuse" reduced={reduced}>
@@ -164,6 +169,13 @@ export function SplashPage() {
         </dl>
       </EngineSection>
 
+      {/* HOW IT WORKS — the generative-engine explainer, folded in as an in-page
+          band (anchor #how-it-works) between the Eden pitch above and the
+          commission / register close below. Six live field-color EngineSections,
+          formerly the #/engine page; opens on field-blue so it reads as its own
+          movement in the scroll. */}
+      <HowItWorks outputs={outputs} reduced={reduced} />
+
       {/* 5 — CLOSE (vellum), repeats the two CTAs + the one register form */}
       <EngineSection ground="vellum" reduced={reduced} id="register">
         <Eyebrow>Start here</Eyebrow>
@@ -171,9 +183,9 @@ export function SplashPage() {
           Two ways to <em className="italic">begin</em>.
         </h2>
         <p className={BODY}>
-          If you want the proof first, the engine page walks through exactly what is real and what is
-          a rule of thumb, with every diagram computed live. If you would rather just put your name
-          down, that takes ten seconds.
+          If you want the proof first, the how it works section above walks through exactly what is
+          real and what is a rule of thumb, with every diagram computed live. If you would rather
+          just put your name down, that takes ten seconds.
         </p>
 
         {/* The commission ritual, restated compact (process shown twice). */}
@@ -182,7 +194,7 @@ export function SplashPage() {
         </p>
 
         <a
-          href={routes.engine}
+          href="#how-it-works"
           className="mt-10 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
         >
           {CTA_PRIMARY_EVALUATOR} →
@@ -190,6 +202,16 @@ export function SplashPage() {
 
         <RegisterInterest />
       </EngineSection>
+
+      {/* Company monument: Bower is the company, Eden its one product. One quiet,
+          viewport-wide lowercase wordmark closes the page. */}
+      <footer className="w-full overflow-hidden bg-paperVellum px-6 pb-16 md:px-10">
+        <div className="mx-auto max-w-[880px] border-t border-inkBlack/15 pt-8">
+          <p className="whitespace-nowrap font-serifDisplay font-semibold lowercase leading-none tracking-[-0.03em] text-inkBlack text-[clamp(4rem,20vw,14rem)]">
+            bower
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
