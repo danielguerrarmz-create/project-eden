@@ -127,14 +127,18 @@ export function BowerIntro() {
       } catch {
         /* ignore */
       }
-      // The one-time intro is over: resume normal back/forward scroll restoration.
-      if (typeof window !== 'undefined') window.history.scrollRestoration = 'auto';
       setActive(false);
     }, T.done);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      // Resume normal back/forward scroll restoration whenever the intro leaves:
+      // on normal completion (active -> false via t3) AND on early unmount /
+      // navigation mid-intro, so scrollRestoration is never left stuck on 'manual'.
+      if (typeof window !== 'undefined' && window.history.scrollRestoration === 'manual') {
+        window.history.scrollRestoration = 'auto';
+      }
     };
   }, [active]);
 
