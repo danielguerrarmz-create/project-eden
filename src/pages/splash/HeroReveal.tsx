@@ -23,7 +23,11 @@ import type { EngineOutputs } from '../../engine/types';
 import { OculusMark } from '../../ui/OculusMark';
 import { webglSupported } from '../../ui/webgl';
 import { SESSION_KEY, INTRO_DONE_EVENT } from './BowerIntro';
-import { HERO_STILL, isCaptureMode } from './heroStill';
+import { HERO_STILL, isCaptureMode, captureRecord } from './heroStill';
+
+/** Only cross-fade to the beauty still once a REAL render replaces the placeholder;
+ *  while it's a placeholder the reveal ends cleanly on the three.js geometry. */
+const STILL_ENABLED = !HERO_STILL.placeholder;
 
 const HeroScene = lazy(() => import('./HeroScene'));
 
@@ -129,7 +133,9 @@ function StaticRenderHero() {
           <HeroScene progressRef={finalRef} />
         </Suspense>
       </div>
-      <img src={HERO_STILL.src} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+      {STILL_ENABLED && (
+        <img src={HERO_STILL.src} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+      )}
       <CopyBand>
         <HeroCopy />
       </CopyBand>
@@ -175,10 +181,11 @@ function AutoHero() {
         edenRef.current.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
         edenRef.current.style.opacity = String(0.4 + 0.6 * t);
       }
-      // Cross-fade the beauty still in over the resolved render. Suppressed in capture
-      // mode so the endpoint screenshot is pure three.js geometry (the structure lock).
+      // Cross-fade the beauty still in over the resolved render. Off in capture mode and
+      // while the still is a placeholder, so the reveal ends on the three.js geometry.
       if (stillRef.current) {
-        stillRef.current.style.opacity = capture ? '0' : String(clamp01((p - sa) / (sb - sa)));
+        stillRef.current.style.opacity =
+          capture || !STILL_ENABLED ? '0' : String(clamp01((p - sa) / (sb - sa)));
       }
       invalidateRef.current?.();
     };
@@ -200,6 +207,69 @@ function AutoHero() {
     };
 
     apply(0); // first paint: big centered Oculus, canvas + copy hidden (intro handoff)
+
+    if (capture && captureRecord()) {
+      // Record mode: play the reveal once and capture the WebGL canvas (geometry only, no
+      // DOM chrome) to a clean .webm, holding a beat at each end. This is the input for a
+      // Higgsfield video-to-video restyle (keeps our geometry + motion, re-skins the look).
+      // The canvas is lazy-loaded, so wait until it (and the render-on-demand hook) exist.
+      let raf = 0;
+      let start = 0;
+      let rec: MediaRecorder | null = null;
+      let cancelled = false;
+
+      const beginRecord = (
+        canvas: HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream },
+      ) => {
+        const stream = canvas.captureStream(30);
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : 'video/webm';
+        rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
+        const chunks: Blob[] = [];
+        rec.ondataavailable = (e) => {
+          if (e.data.size) chunks.push(e.data);
+        };
+        rec.onstop = () => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+          a.download = 'hero-animation.webm';
+          a.click();
+        };
+        const HOLD_START = 500;
+        const HOLD_END = 900;
+        const total = HOLD_START + HERO_THRESHOLDS.REVEAL_MS + HOLD_END;
+        rec.start();
+        const step = (now: number) => {
+          if (!start) start = now;
+          const elapsed = now - start;
+          apply(easeInOutCubic(clamp01((elapsed - HOLD_START) / HERO_THRESHOLDS.REVEAL_MS)));
+          if (elapsed < total) raf = requestAnimationFrame(step);
+          else if (rec && rec.state !== 'inactive') rec.stop();
+        };
+        raf = requestAnimationFrame(step);
+      };
+
+      const waitForReady = () => {
+        if (cancelled) return;
+        const canvas = document.querySelector('canvas') as
+          | (HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream })
+          | null;
+        // Ready = the lazy canvas is mounted AND the render-on-demand hook is live.
+        if (canvas?.captureStream && invalidateRef.current && typeof MediaRecorder !== 'undefined') {
+          beginRecord(canvas as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream });
+        } else {
+          raf = requestAnimationFrame(waitForReady);
+        }
+      };
+      waitForReady();
+
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(raf);
+        if (rec && rec.state !== 'inactive') rec.stop();
+      };
+    }
 
     if (capture) {
       // Capture mode: freeze at the endpoint (progress = 1) for the Phase-A screenshot,
@@ -245,14 +315,17 @@ function AutoHero() {
       </div>
 
       {/* Beauty still: cross-fades in over the resolved three.js render at the end of the
-          reveal (Phase C). Placeholder image until the structure-locked Fuser render lands. */}
-      <div
-        ref={stillRef}
-        className="pointer-events-none absolute inset-0"
-        style={{ opacity: 0, willChange: 'opacity' }}
-      >
-        <img src={HERO_STILL.src} alt="" className="h-full w-full object-cover" />
-      </div>
+          reveal (Phase C). Only rendered once a REAL render replaces the placeholder, so
+          today the reveal ends cleanly on the three.js geometry. */}
+      {STILL_ENABLED && (
+        <div
+          ref={stillRef}
+          className="pointer-events-none absolute inset-0"
+          style={{ opacity: 0, willChange: 'opacity' }}
+        >
+          <img src={HERO_STILL.src} alt="" className="h-full w-full object-cover" />
+        </div>
+      )}
 
       {/* Copy band: hidden until the reveal's end, then fades / rises in at the bottom.
           The reveal styles live on the band itself (a transformed wrapper would become

@@ -5,3 +5,6 @@ dist-ssr
 .vite
 .DS_Store
 *.tsbuildinfo
+
+# agent worktrees (isolated, own git)
+.claude/worktrees/

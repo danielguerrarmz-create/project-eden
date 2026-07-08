@@ -53,3 +53,16 @@ export function captureGrown(): boolean {
     return false;
   }
 }
+
+/** Record mode: `?capture=1&record=1` plays the reveal once and captures the WebGL canvas
+ *  (geometry only, no DOM chrome) to a clean .webm via MediaRecorder — the input for a
+ *  Higgsfield video-to-video restyle, which keeps our exact geometry + motion and only
+ *  re-skins the look. */
+export function captureRecord(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return isCaptureMode() && new URLSearchParams(window.location.search).has('record');
+  } catch {
+    return false;
+  }
+}
