@@ -38,4 +38,6 @@ export const routes = {
   about: '#/about',
   /** Direct-manipulation shaping prototype (draggable cage, no sliders). */
   shape: '#/shape',
+  /** Form-finding spike: sculpt a control lattice, relax onto a buildable gridshell. */
+  sculpt: '#/sculpt',
 } as const;
