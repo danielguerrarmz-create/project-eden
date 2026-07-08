@@ -41,7 +41,8 @@ describe('HERO_THRESHOLDS are ordered and in range', () => {
       HERO_THRESHOLDS.TILT,
       HERO_THRESHOLDS.RESOLVE,
       HERO_THRESHOLDS.COPY_IN,
-      HERO_THRESHOLDS.STATS_IN,
+      HERO_THRESHOLDS.EDEN_IN,
+      HERO_THRESHOLDS.STILL_IN,
     ];
     for (const [a, b] of ranges) {
       expect(a).toBeGreaterThanOrEqual(0);
@@ -49,11 +50,13 @@ describe('HERO_THRESHOLDS are ordered and in range', () => {
       expect(a).toBeLessThan(b);
     }
     // Choreography order: canvas in -> tilt -> resolve -> copy in (at the end of the
-    // scrub, over the finished render), with the stats strip arriving alongside it.
+    // reveal, over the finished render), with the cursive Eden writing on a beat later,
+    // and the beauty still cross-fading in once the render has resolved.
     expect(HERO_THRESHOLDS.CANVAS_IN[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.TILT[0]);
     expect(HERO_THRESHOLDS.TILT[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.RESOLVE[0]);
     expect(HERO_THRESHOLDS.RESOLVE[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.COPY_IN[0]);
-    expect(HERO_THRESHOLDS.COPY_IN[0]).toBeLessThanOrEqual(HERO_THRESHOLDS.STATS_IN[0]);
+    expect(HERO_THRESHOLDS.COPY_IN[0]).toBeLessThanOrEqual(HERO_THRESHOLDS.EDEN_IN[0]);
+    expect(HERO_THRESHOLDS.RESOLVE[1]).toBeLessThanOrEqual(HERO_THRESHOLDS.STILL_IN[0]);
   });
 });
 
@@ -61,12 +64,19 @@ describe('HeroReveal SSR (poster fallback = final state visible)', () => {
   const outputs = runEngine(defaults);
   const html = renderToString(createElement(HeroReveal, { outputs, reduced: false }));
 
-  it('renders the poster hero with the copy visible and no canvas', () => {
-    expect(html).toContain('Commission a');
-    expect(html).toContain('living'); // the one italic word
-    expect(html).toContain('See how the engine works');
-    expect(html).toContain('how it works');
-    expect(html).toContain('the studio');
+  it('renders the poster hero with the outcome copy visible and no canvas', () => {
+    // New stripped hero: a 7-word outcome headline with the cursive product word
+    // "Eden", plus a single mission line. No eyebrow, no CTAs, no stats strip.
+    expect(html).toContain('Grow a living');
+    expect(html).toContain('Eden');
+    expect(html).toContain('in your garden');
+    expect(html).toContain('Rewilding gardens through architecture anyone can build');
+    // The nav moved to the global fixed SplashHeader, so it is NOT in the hero SSR.
+    expect(html).not.toContain('the studio');
+    // The removed CTAs / stats must not reappear.
+    expect(html).not.toContain('Register interest');
+    expect(html).not.toContain('See how the engine works');
+    expect(html).not.toContain('priced live');
     // the flat Oculus mark stands in for the render (poster): real <circle> mark
     expect((html.match(/<circle/g) || []).length).toBeGreaterThanOrEqual(8);
     // no em/en dashes in the hero copy (house rule)

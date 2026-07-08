@@ -12,11 +12,23 @@
 import { WORDMARK } from '../data/config';
 import { OculusMark } from './OculusMark';
 
-export function BowerMark({ className = '' }: { className?: string }) {
+export function BowerMark({
+  className = '',
+  markSize = 16,
+  nameClass = 'font-mono text-[11px] lowercase tracking-[0.14em]',
+}: {
+  className?: string;
+  /** Oculus glyph size in px. */
+  markSize?: number;
+  /** Class string for the wordmark text (the intro re-measures `[data-wordmark]`). */
+  nameClass?: string;
+}) {
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <OculusMark size={16} />
-      <span data-wordmark className="font-mono text-[11px] lowercase tracking-[0.14em]">{WORDMARK}</span>
+      <OculusMark size={markSize} />
+      <span data-wordmark className={nameClass}>
+        {WORDMARK}
+      </span>
     </span>
   );
 }

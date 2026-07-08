@@ -16,11 +16,13 @@
 import App from './App';
 import { EnginePage } from './pages/engine/EnginePage';
 import { SplashPage } from './pages/SplashPage';
+import { AboutPage } from './pages/AboutPage';
 import { useRoute } from './routing';
 
 export function Root() {
   const route = useRoute();
   if (route === '/studio') return <App />;
   if (route === '/engine') return <EnginePage />;
+  if (route === '/about') return <AboutPage />;
   return <SplashPage />;
 }

@@ -19,7 +19,7 @@
  * (no intro). SSR-safe: no window on the server means it never activates.
  */
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { WORDMARK } from '../../data/config';
 import { OculusMark } from '../../ui/OculusMark';
 
@@ -39,7 +39,10 @@ const OFFSETS = [
   { x: -40, y: -62, r: 5 },
 ] as const;
 
-const SESSION_KEY = 'bower.intro.played';
+export const SESSION_KEY = 'bower.intro.played';
+/** Fired on window when the intro finishes (or is skipped), so the hero can start
+ *  its timed logo->structure reveal only once the veil has lifted. */
+export const INTRO_DONE_EVENT = 'bower:intro-done';
 const EASE_LETTER = [0.16, 1, 0.3, 1] as const;
 const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
 
@@ -56,12 +59,12 @@ const LOGO = {
 /** The big wordmark drops this fraction of vh below center so the logo clears above it. */
 const NAME_DROP_VH = 0.12;
 
-/** Timeline (ms): assemble at 0, travel at 1150, fade at 2500, unmount at 3000.
- *  Letters finish assembling ~1.0s, so travel lands a ~150ms considered beat later.
- *  The logo settle (1150 -> 2400) completes 100ms before the backdrop fade starts,
- *  so the logo is fully still before the veil lifts; the 0.5s backdrop fade then
- *  completes exactly at done (2500 + 500 = 3000). */
-const T = { travel: 1150, fade: 2500, done: 3000 } as const;
+/** Timeline (ms): assemble at 0, travel at 1900, fade at 3300, unmount at 3800.
+ *  (Trimmed 0.5s from the previous 4.3s cut.) Letters finish assembling ~1.15s, so
+ *  the full "bower" lockup HOLDS still ~0.75s before it flies to the nav. The logo
+ *  settle (1900 -> 3150) completes 150ms before the backdrop fade starts; the 0.5s
+ *  backdrop fade then completes exactly at done (3300 + 500 = 3800). */
+const T = { travel: 1900, fade: 3300, done: 3800 } as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. Unit-tested. */
 export function shouldPlayIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
@@ -76,30 +79,30 @@ interface Rect {
 }
 
 export function BowerIntro() {
-  const prefersReduced = useReducedMotion() ?? false;
-  const [active, setActive] = useState(false);
-  const [phase, setPhase] = useState<'assemble' | 'travel' | 'fade'>('assemble');
-  const [target, setTarget] = useState<Rect | null>(null);
-
-  // Decide once, client-side only.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  // Decide SYNCHRONOUSLY on the first render (client only) so the veil is painted on
+  // the very first frame — no gap where the full page flashes before the intro mounts.
+  const [active, setActive] = useState(() => {
+    if (typeof window === 'undefined') return false;
     let played = false;
     try {
       played = !!sessionStorage.getItem(SESSION_KEY);
     } catch {
       /* private mode: treat as not played */
     }
-    if (shouldPlayIntro(prefersReduced, played)) {
-      // Pin the scroll to the top while the one-time intro plays so its centered
-      // logo hands off to the hero's plan view cleanly; a reload mid-page would
-      // otherwise restore scroll and settle the logo over a mid-scrub hero.
-      // Restored to 'auto' when the intro unmounts (T.done cleanup below).
-      window.history.scrollRestoration = 'manual';
-      window.scrollTo(0, 0);
-      setActive(true);
-    }
-  }, [prefersReduced]);
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+    return shouldPlayIntro(reduced, played);
+  });
+  const [phase, setPhase] = useState<'assemble' | 'travel' | 'fade'>('assemble');
+  const [target, setTarget] = useState<Rect | null>(null);
+
+  // Pin the scroll to the top while the one-time intro plays so its centered logo hands
+  // off to the hero's plan view cleanly; a reload mid-page would otherwise restore scroll
+  // and settle the logo over the wrong spot. Restored to 'auto' on unmount (cleanup below).
+  useEffect(() => {
+    if (!active || typeof window === 'undefined') return;
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+  }, [active]);
 
   // Measure the nav wordmark (after fonts settle), re-measure on resize.
   useIsomorphicLayoutEffect(() => {
@@ -127,6 +130,8 @@ export function BowerIntro() {
       } catch {
         /* ignore */
       }
+      // Tell the hero the veil has lifted, so its timed reveal can start now.
+      window.dispatchEvent(new Event(INTRO_DONE_EVENT));
       setActive(false);
     }, T.done);
     return () => {
@@ -193,8 +198,8 @@ export function BowerIntro() {
       {/* The word: assembles in place (below the logo), then travels to the nav
           wordmark. Font metrics match the nav lockup so at scale 1 they land on it. */}
       <motion.div
-        className="absolute left-0 top-0 flex font-mono lowercase text-inkBlack"
-        style={{ transformOrigin: 'top left', fontSize: '11px', letterSpacing: '0.14em', lineHeight: 1 }}
+        className="absolute left-0 top-0 flex font-mono font-semibold lowercase text-inkBlack"
+        style={{ transformOrigin: 'top left', fontSize: '17px', letterSpacing: '0.1em', lineHeight: 1 }}
         initial={{ x: bigX, y: bigY, scale: bigScale, opacity: 1 }}
         animate={wordAnim}
         transition={

@@ -22,6 +22,7 @@ import { useDesign } from '../../state/store';
 import { GardenContext } from '../../scene/GardenContext';
 import { GrowthOverlay } from '../../scene/overlays/GrowthOverlay';
 import { segmentMatrix } from '../../scene/util';
+import { isCaptureMode, captureView, captureGrown } from './heroStill';
 
 /** Scene-internal p thresholds (kept in sync with HeroReveal.HERO_THRESHOLDS). */
 export const SCENE_THRESHOLDS = {
@@ -54,11 +55,20 @@ function smoothstep(a: number, b: number, x: number): number {
 
 type ProgressRef = MutableRefObject<number>;
 
-/** Camera rig driven purely by scroll progress. */
+/** Straight overhead capture pose (tighter than CAM_TOP so the plan fills the frame). */
+const CAM_TOP_CAPTURE = new THREE.Vector3(0, 8.6, 0.001);
+
+/** Camera rig driven purely by progress. In capture mode with `view=top` it locks to a
+ *  centered overhead plan pose (the "computed" keyframe) instead of following the tilt. */
 function Rig({ progressRef }: { progressRef: ProgressRef }) {
   const cam = useThree((s) => s.camera);
   const tgt = useMemo(() => new THREE.Vector3(), []);
   useFrame(() => {
+    if (isCaptureMode() && captureView() === 'top') {
+      cam.position.copy(CAM_TOP_CAPTURE);
+      cam.lookAt(0, 0.6, 0);
+      return;
+    }
     const t = smoothstep(SCENE_THRESHOLDS.TILT_START, SCENE_THRESHOLDS.TILT_END, progressRef.current);
     cam.position.lerpVectors(CAM_TOP, CAM_OBLIQUE, t);
     tgt.lerpVectors(TGT_TOP, TGT_OBLIQUE, t);
@@ -118,18 +128,28 @@ function HeroFolly({ progressRef }: { progressRef: ProgressRef }) {
   );
 }
 
-/** Mounts the living layer once resolve passes PLANT_START; it then grows itself in. */
+/** Mounts the living layer once resolve passes PLANT_START; it then grows itself in.
+ *  Capture seeds override this: `view=top` renders BARE (clean lattice for the plan
+ *  keyframe); `grown=1` clothes it heavily (the "living" keyframe). */
 function HeroPlants({ progressRef }: { progressRef: ProgressRef }) {
+  const capture = isCaptureMode();
+  const bare = capture && captureView() === 'top';
+  const grown = capture && captureGrown();
   const [on, setOn] = useState(false);
   useFrame(() => {
+    if (bare) {
+      if (on) setOn(false);
+      return;
+    }
     const p = progressRef.current;
     // Hysteresis so scrubbing back up retracts the greenery cleanly.
-    if (!on && p >= SCENE_THRESHOLDS.PLANT_START) setOn(true);
-    else if (on && p < SCENE_THRESHOLDS.PLANT_START - 0.04) setOn(false);
+    if (!on && (grown || p >= SCENE_THRESHOLDS.PLANT_START)) setOn(true);
+    else if (on && !grown && p < SCENE_THRESHOLDS.PLANT_START - 0.04) setOn(false);
   });
+  if (bare) return null;
   return on ? (
     <GrowthOverlay
-      coverageOverride={HERO_COVERAGE}
+      coverageOverride={grown ? 0.9 : HERO_COVERAGE}
       progressRef={progressRef}
       coverageRange={[SCENE_THRESHOLDS.PLANT_START, SCENE_THRESHOLDS.RESOLVE_END]}
     />
@@ -150,6 +170,35 @@ function Invalidator({ invalidateRef }: { invalidateRef?: MutableRefObject<(() =
   return null;
 }
 
+/**
+ * Phase-A capture rig (dev only, `?capture=1`). Exposes `window.__captureHero()` which
+ * renders the current frame and downloads it as a PNG — the exact endpoint image that
+ * conditions the Fuser render so the cross-fade still lines up. Requires the Canvas's
+ * `preserveDrawingBuffer` (set below when in capture mode). Usage: open the home with
+ * `?capture=1`, wait for the scene to settle, then run `__captureHero()` in the console.
+ */
+function CaptureRig() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    if (!isCaptureMode()) return;
+    invalidate();
+    (window as unknown as { __captureHero?: () => void }).__captureHero = () => {
+      gl.render(scene, camera);
+      const a = document.createElement('a');
+      a.href = gl.domElement.toDataURL('image/png');
+      a.download = 'hero-endpoint.png';
+      a.click();
+    };
+    return () => {
+      delete (window as unknown as { __captureHero?: () => void }).__captureHero;
+    };
+  }, [gl, scene, camera, invalidate]);
+  return null;
+}
+
 type HeroSceneProps = {
   progressRef: ProgressRef;
   invalidateRef?: MutableRefObject<(() => void) | null>;
@@ -164,6 +213,9 @@ export default function HeroScene({ progressRef, invalidateRef }: HeroSceneProps
     <Canvas
       frameloop="demand"
       dpr={[1, 1.5]}
+      // preserveDrawingBuffer only in capture mode so __captureHero()'s toDataURL is not
+      // blank; off normally (it costs a little memory bandwidth per frame).
+      gl={{ preserveDrawingBuffer: isCaptureMode() }}
       camera={{ position: [0, 11.5, 0.001], fov: 42 }}
       className="!absolute inset-0"
     >
@@ -182,6 +234,7 @@ export default function HeroScene({ progressRef, invalidateRef }: HeroSceneProps
 
       <Rig progressRef={progressRef} />
       <Invalidator invalidateRef={invalidateRef} />
+      <CaptureRig />
     </Canvas>
   );
 }

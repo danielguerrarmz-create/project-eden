@@ -23,11 +23,12 @@ import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { deDash } from '../ui/text';
 import { routes } from '../routing';
-import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
+import { AnnotationStrip, EngineSection } from './engine/EngineSection';
 import { PipelineSchematic } from './engine/PipelineSchematic';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
 import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
 import { HeroReveal } from './splash/HeroReveal';
+import { SplashHeader } from './splash/SplashHeader';
 import { BowerIntro } from './splash/BowerIntro';
 import { SeasonalBecomingDiagram } from './splash/SeasonalBecomingDiagram';
 import { RegisterInterest } from './splash/RegisterInterest';
@@ -45,19 +46,21 @@ export function SplashPage() {
           Runs once per tab; reduced-motion / already-played render nothing. */}
       <BowerIntro />
 
+      {/* Global nav: fixed, frozen at the top for the whole scroll session. Holds the
+          single [data-wordmark] the intro hands the "bower" lockup onto. */}
+      <SplashHeader />
+
       {/* 1 — HERO: the scroll-scrubbed 2D Oculus -> 3D gridshell -> render reveal */}
       <HeroReveal outputs={outputs} reduced={reduced} />
 
       {/* 2 — ALWAYS BECOMING, the emotional core (field-chartreuse) + D2 */}
       <EngineSection ground="chartreuse" reduced={reduced}>
-        <Eyebrow>Always growing, never finished</Eyebrow>
-        <h2 className={`mt-4 ${H2}`}>
+        <h2 className={H2}>
           A structure that keeps <em className="italic">becoming</em>.
         </h2>
         <p className={BODY}>
-          Every Eden is planted the day it is built. It arrives quiet, a bare lattice and a young
-          climber at its feet. Each season after, it holds more leaf, more flower, more shade than
-          the season before.
+          Every Eden is planted the day it is built, a bare lattice and a young climber. Each season
+          after, it holds more leaf, more flower, more shade than the one before.
         </p>
 
         <div className="mt-12">
@@ -70,19 +73,13 @@ export function SplashPage() {
           pipeline mechanics + one envelope diagram + a honesty coda. The full
           six-section walkthrough (sun path, growth phases) lives at /engine. */}
       <EngineSection ground="vellum" reduced={reduced} id="how-it-works">
-        <Eyebrow>What the engine actually does</Eyebrow>
-        <h2 className={`mt-4 ${H2}`}>
+        <h2 className={H2}>
           Not a catalogue of shapes. A grammar that computes <em className="italic">one</em>.
         </h2>
         <p className={BODY}>
-          Four things you shape, footprint, rise, lattice spacing, and the direction it opens, pass
-          through a fabrication grammar before they reach the geometry: a set of stated cutting rules
-          that recomputes each control's limits for the design in front of you. A small footprint
-          pulls the rise cap down, because a flatter crown keeps every component inside the cutter's
-          tolerance. Widen the footprint far enough and the engine adds a fourth foot, because an
-          edge blank would otherwise run longer than a CNC sheet. What the grammar allows then runs
-          through the same functions every time: geometry, cut list, nesting, sun path, ecology.
-          Given the same choices, the engine produces the same pavilion, every time.
+          You shape four things: footprint, rise, lattice spacing, and the way it opens. A fabrication
+          grammar clamps them to what a cutter can actually make, then the same functions run every
+          time: geometry, cut list, nesting, sun path, ecology. Same choices, same pavilion.
         </p>
 
         <div className="mx-auto mt-12 max-w-[640px]">
@@ -101,16 +98,10 @@ export function SplashPage() {
 
         {/* Honesty coda, hairline-divided beneath the diagrams (folds HowItWorks sec 6). */}
         <div className="mt-12 border-t border-inkBlack/15 pt-8">
-          <Eyebrow>What is real and what is a rule of thumb</Eyebrow>
-          <p className="mt-6 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-            Structural validity here means inside a designed family, not an engineer's sign-off on
-            every shape. Every control is clamped to the grammar before the geometry is built, which
-            is what guarantees a buildable structure. The honest limit: widening that family still
-            takes a chartered engineer, one sign-off at a time. The ecology figures are rule-of-thumb
-            formulas, not a certified survey, and move honestly with the design. The price
-            recalculates correctly from the same cut list a fabricator would quote from; the
-            per-component rate itself is still a placeholder until a fabrication shop returns a real
-            quote.
+          <p className="max-w-[60ch] text-[17px] leading-relaxed opacity-90">
+            Every shape in the family is buildable; widening the family still takes a chartered
+            engineer. The ecology figures are honest rules of thumb, not a survey, and the price is
+            computed from the same cut list a fabricator would quote from.
           </p>
         </div>
 
@@ -126,8 +117,7 @@ export function SplashPage() {
           compact in the close. Live production figures from the same default outputs
           the commission sheet reads. */}
       <EngineSection ground="blue" reduced={reduced}>
-        <Eyebrow>The commission, start to finish</Eyebrow>
-        <h2 className={`mt-4 ${H2}`}>
+        <h2 className={H2}>
           What actually <em className="italic">happens</em> after you shape it.
         </h2>
         <p className={BODY}>You shape it, we cut it, you plant it. This is the whole of it.</p>
@@ -151,23 +141,13 @@ export function SplashPage() {
 
       {/* 4 — LIVING, NOT PLACED ON (field-yellow) + D reuse + ecology facts */}
       <EngineSection ground="yellow" reduced={reduced}>
-        <Eyebrow>Contributing to its garden, not just standing in it</Eyebrow>
-        <h2 className={`mt-4 ${H2}`}>
+        <h2 className={H2}>
           A structure with a <em className="italic">habitat</em> built in.
         </h2>
         <p className={BODY}>
-          The lattice is not just a frame, it is a living armature. Its density and orientation are
-          computed for the climbing habit of the species you choose, so the plant has exactly the
-          support it physically needs: twining stems close verticals to spiral around, tendrils a
-          fine mesh to grasp, self-clinging roots almost nothing at all. The roof does not shed water
-          to a drain, it channels it down to the beds it shelters. It stands on ground screws, not a
-          poured slab, so the soil beneath it stays alive.
-        </p>
-        <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-          The support pattern is computed for how the chosen plant physically climbs: twining stems
-          want close verticals, tendrils want a fine mesh, self-clinging roots want almost nothing,
-          layered against where the sun falls hardest on the structure. Change the species and the
-          fine support pattern changes with it. The load-bearing frame itself never does.
+          The lattice is a living armature: its density and orientation are computed for how your
+          chosen plant climbs, so it has exactly the support it needs. It stands on ground screws,
+          not a poured slab, so the soil beneath it stays alive.
         </p>
 
         <div className="mt-12">
@@ -196,14 +176,12 @@ export function SplashPage() {
           restatement and the repeated #how-it-works CTA are gone (each was shown
           twice); the engine section above is the single reasoning destination. */}
       <EngineSection ground="vellum" reduced={reduced} id="register">
-        <Eyebrow>Start here</Eyebrow>
-        <h2 className={`mt-4 ${H2}`}>
+        <h2 className={H2}>
           Two ways to <em className="italic">begin</em>.
         </h2>
         <p className={BODY}>
-          If you want to see the reasoning first, the engine section above lays out exactly what is
-          computed and what is a rule of thumb. If you would rather put your name down, that takes
-          ten seconds.
+          See the reasoning in the engine section above, or put your name down. That takes ten
+          seconds.
         </p>
 
         <RegisterInterest />

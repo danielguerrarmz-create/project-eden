@@ -10,9 +10,14 @@ describe('SplashPage', () => {
   const html = clean(renderToString(createElement(SplashPage)));
 
   it('renders live copy and diagrams without throwing', () => {
-    expect(html).toContain('Commission a');
+    // New stripped hero: outcome headline + mission line (the cursive "Eden" word).
+    expect(html).toContain('Grow a living');
+    expect(html).toContain('Rewilding gardens through architecture anyone can build');
+    // the register section's form label is still present lower on the page
     expect(html).toContain('register interest');
-    expect(html).toContain('See how the engine works');
+    // the hero's old CTAs / stats strip are gone
+    expect(html).not.toContain('See how the engine works');
+    expect(html).not.toContain('this shape, priced live');
     // live number from the Engine section's envelope annotation strip
     expect(html).toMatch(/footprint [\d.]+ m²/);
     // svg diagrams present (hero + becoming + pipeline + envelope + strut)
@@ -28,7 +33,7 @@ describe('SplashPage', () => {
     expect(pitch).not.toContain('Year 0');
     expect(pitch).not.toContain('just planted');
     expect(pitch).toContain('just placed');
-    expect(pitch).toContain('always becoming, never finished');
+    expect(pitch).toContain('A structure that keeps');
     expect(pitch.toLowerCase()).not.toMatch(/year (one|two|three|3|1|0)/);
   });
 
@@ -37,12 +42,14 @@ describe('SplashPage', () => {
     expect(html).toContain('Bower'); // the company wordmark (hero header)
   });
 
-  it('teaches the two-surface noun stack in the header chrome', () => {
-    // The site collapsed from three surfaces to two: the engine explainer is now
-    // an in-page band, so the nav teaches "how it works" (an anchor) and "the
-    // studio" (the tool), with no separate "the engine" route link.
+  it('carries the global nav: how it works, engine, about', () => {
+    // The fixed SplashHeader teaches "how it works" (an anchor), "engine" (the tool,
+    // renamed from "the studio"), and "about" (empty placeholder page).
     expect(html).toContain('how it works');
-    expect(html).toContain('the studio');
+    expect(html).toContain('about');
+    // "engine" nav label (renamed from "the studio"), pointing at the studio route
+    expect(html).toContain('>engine<');
+    expect(html).toContain('href="#/studio"');
     expect(html).not.toContain('(the pavilion)');
   });
 
@@ -50,9 +57,9 @@ describe('SplashPage', () => {
     // The home carries only the condensed engine section: pipeline mechanics + a
     // honesty coda. The full six-section walkthrough lives at the /engine route.
     expect(html).toContain('id="how-it-works"');
-    expect(html).toContain('What the engine actually does');
     expect(html).toContain('A grammar that computes');
-    expect(html).toContain('What is real and what is a rule of thumb');
+    // honesty coda (eyebrow removed in the simplification pass, prose kept)
+    expect(html).toContain('honest rules of thumb');
     // the deep-link out to the full walkthrough (the restored /engine route)
     expect(html).toContain('See the full engine walkthrough');
     expect(html).toContain('#/engine');

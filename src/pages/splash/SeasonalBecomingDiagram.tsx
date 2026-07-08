@@ -127,9 +127,6 @@ export function SeasonalBecomingDiagram({ outputs }: { outputs: EngineOutputs })
           </figure>
         ))}
       </div>
-      <p className="mt-6 font-mono text-[10px] lowercase tracking-[0.12em] opacity-70">
-        always becoming, never finished
-      </p>
     </div>
   );
 }

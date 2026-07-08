@@ -35,4 +35,5 @@ export const routes = {
   home: '#/',
   engine: '#/engine',
   studio: '#/studio',
+  about: '#/about',
 } as const;
