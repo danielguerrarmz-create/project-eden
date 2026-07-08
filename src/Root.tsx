@@ -17,6 +17,7 @@ import App from './App';
 import { EnginePage } from './pages/engine/EnginePage';
 import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
+import { ShapePage } from './pages/ShapePage';
 import { useRoute } from './routing';
 
 export function Root() {
@@ -24,5 +25,6 @@ export function Root() {
   if (route === '/studio') return <App />;
   if (route === '/engine') return <EnginePage />;
   if (route === '/about') return <AboutPage />;
+  if (route === '/shape') return <ShapePage />;
   return <SplashPage />;
 }

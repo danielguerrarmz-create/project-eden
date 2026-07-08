@@ -36,4 +36,6 @@ export const routes = {
   engine: '#/engine',
   studio: '#/studio',
   about: '#/about',
+  /** Direct-manipulation shaping prototype (draggable cage, no sliders). */
+  shape: '#/shape',
 } as const;

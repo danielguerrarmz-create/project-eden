@@ -20,10 +20,20 @@ describe('EnginePage (the restored /engine walkthrough)', () => {
     expect(html).toContain('Shape your own Eden');
   });
 
-  it('restores the page chrome (nav back to home and the studio)', () => {
-    expect(html).toContain('the generative engine');
-    expect(html).toContain('the studio');
-    expect(html).toContain('#/');
+  it('wears the shared splash chrome (one floating SplashHeader, one nav)', () => {
+    // The shared header, not the old bespoke one: wordmark tagline + splash nav.
+    expect(html).toContain('living architecture for the garden');
+    expect(html).toContain('how it works');
+    expect(html).toContain('about');
+    expect(html).toContain('#/'); // home link
+    expect(html).toContain('#/studio'); // the "engine" nav target
+    // The old bespoke header strings are gone.
+    expect(html).not.toContain('· the generative engine');
+  });
+
+  it('links to the direct-manipulation prototype', () => {
+    expect(html).toContain('#/shape');
+    expect(html).toContain('direct manipulation');
   });
 
   it('holds the house dash rule across the whole walkthrough', () => {

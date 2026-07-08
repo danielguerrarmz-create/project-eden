@@ -15,8 +15,14 @@ import { Folly } from './Folly';
 import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
 import { GrowthOverlay } from './overlays/GrowthOverlay';
+import { CageHandles } from './CageHandles';
 
-export function Scene() {
+/**
+ * `manipulate` turns the stage into the direct-manipulation cage: draggable
+ * handles reshape the pavilion (routed through the grammar), overlays are hidden
+ * for a clean cage view, and auto-rotate stops so shaping never fights the camera.
+ */
+export function Scene({ manipulate = false }: { manipulate?: boolean }) {
   const overlays = useDesign((s) => s.overlays);
   const reducedMotion = useReducedMotion();
 
@@ -45,8 +51,9 @@ export function Scene() {
       <GardenContext />
       <Folly />
 
-      {overlays.strutHeatmap && <StrutHeatmap />}
-      {overlays.growth && <GrowthOverlay />}
+      {!manipulate && overlays.strutHeatmap && <StrutHeatmap />}
+      {!manipulate && overlays.growth && <GrowthOverlay />}
+      {manipulate && <CageHandles />}
 
       <ContactShadows position={[0, 0.015, 0]} opacity={0.28} scale={18} blur={2.6} far={7} color="#5a5443" />
 
@@ -57,7 +64,7 @@ export function Scene() {
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}
         enablePan={false}
-        autoRotate={!reducedMotion}
+        autoRotate={!reducedMotion && !manipulate}
         autoRotateSpeed={0.35}
       />
     </Canvas>
