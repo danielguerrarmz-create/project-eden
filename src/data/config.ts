@@ -128,8 +128,11 @@ export const GRAMMAR = {
 export const STOCK = {
   /** Hub-system struts: planed C24 spruce/larch, UC3 treated. */
   strut: { widthMm: 45, depthMm: 70, grade: 'C24', stockLengthM: 4.8 },
-  /** Lamella pieces: CNC-profiled from 45 mm spruce LVL sheet (curved, so cut not bent). */
-  lamella: { thicknessMm: 45, depthMm: 120 },
+  /** Lamella pieces: CNC-profiled from 45 mm spruce LVL sheet (curved, so
+   *  cut not bent). Depth is MOMENT-SHAPED (FABRICATION.md §3): depthMm at
+   *  the node / mid-span, tapering to endDepthMm at the butt ends (floor:
+   *  the Ø13 end hole's 3d edge distances). */
+  lamella: { thicknessMm: 45, depthMm: 120, endDepthMm: 100 },
   /** Eave + crown blanks: 45 mm LVL, cut to their true plan curve. */
   blank: { thicknessMm: 45, depthMm: 180 },
 } as const;

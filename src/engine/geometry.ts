@@ -35,6 +35,7 @@ import {
   planDims,
 } from './grammar';
 import { flatPieceFit, resolveJointCuts, resolvePieceFrames } from './jointGeometry';
+import { buildPieceSolid } from './pieceSolid';
 import { vCross, vDot, vNorm, vSub } from './vec';
 import type {
   CanopyGeometry,
@@ -324,6 +325,13 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
               type,
               start: from.position,
               end: to.position,
+              // The TRUE surface point mid-bay — a curved piece's CNC
+              // profile passes through here, not along the chord.
+              arcMid: canopyPoint(
+                ctx,
+                (rAt(i) + rAt(i + 1)) / 2,
+                ((j0 + dj * (i + 0.5)) / spokeCount) * TWO_PI,
+              ),
               nodeStartId: from.id,
               nodeEndId: to.id,
               pieceId: '', // patched when the run closes
@@ -389,11 +397,8 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       const { u, v } = uv(ringIdx, j);
       const chordM = dist(from.position, to.position);
       if (chordM > GRAMMAR.maxComponentLengthM) {
-        const mid: Vec3 = [
-          (from.position[0] + to.position[0]) / 2,
-          (from.position[1] + to.position[1]) / 2,
-          (from.position[2] + to.position[2]) / 2,
-        ];
+        // The splice node sits ON the piece's true curve, not the chord.
+        const mid = canopyPoint(ctx, rAt(ringIdx), thetaAt(j) + spokeStep * 0.5);
         const splice: CanopyNode = {
           id: `${idPrefix}-sp-${j}`,
           position: mid,
@@ -408,12 +413,12 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
         nodes.push(splice);
         bySpoke.push([
           addMember(
-            { id: `${idPrefix}-${j}a`, type, start: from.position, end: mid, nodeStartId: from.id, nodeEndId: splice.id, pieceId: '', u, v },
+            { id: `${idPrefix}-${j}a`, type, start: from.position, end: mid, arcMid: canopyPoint(ctx, rAt(ringIdx), thetaAt(j) + spokeStep * 0.25), nodeStartId: from.id, nodeEndId: splice.id, pieceId: '', u, v },
             from,
             splice,
           ),
           addMember(
-            { id: `${idPrefix}-${j}b`, type, start: mid, end: to.position, nodeStartId: splice.id, nodeEndId: to.id, pieceId: '', u, v },
+            { id: `${idPrefix}-${j}b`, type, start: mid, end: to.position, arcMid: canopyPoint(ctx, rAt(ringIdx), thetaAt(j) + spokeStep * 0.75), nodeStartId: splice.id, nodeEndId: to.id, pieceId: '', u, v },
             splice,
             to,
           ),
@@ -421,7 +426,7 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       } else {
         bySpoke.push([
           addMember(
-            { id: `${idPrefix}-${j}`, type, start: from.position, end: to.position, nodeStartId: from.id, nodeEndId: to.id, pieceId: '', u, v },
+            { id: `${idPrefix}-${j}`, type, start: from.position, end: to.position, arcMid: canopyPoint(ctx, rAt(ringIdx), thetaAt(j) + spokeStep * 0.5), nodeStartId: from.id, nodeEndId: to.id, pieceId: '', u, v },
             from,
             to,
           ),
@@ -503,6 +508,23 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       const m = memberById.get(id)!;
       return sum + m.lengthM - m.startTrimM - m.endTrimM;
     }, 0);
+  }
+
+  // Each sheet piece's TRUE CNC curve (pieceSolid.ts): record its camber so
+  // the BOM nests the curved profile's real sheet width, not a rectangle.
+  // The profile's band (depth + camber) must fit the sheet — the deepest
+  // arcs live where the eave band plunges at a foot; shout if one ever
+  // outgrows the stock.
+  for (const piece of pieces) {
+    if (piece.stock !== 'sheet') continue;
+    const solid = buildPieceSolid(piece, piece.memberIds.map((id) => memberById.get(id)!));
+    piece.camberM = solid?.camberM ?? 0;
+    if (piece.depthM + piece.camberM > GRAMMAR.sheet.widthM - 0.05) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[grammar] ${piece.id} profile band ${(piece.depthM + piece.camberM).toFixed(2)} m exceeds the ${GRAMMAR.sheet.widthM} m sheet width`,
+      );
+    }
   }
 
   // HONEST ACCOUNTING (FABRICATION.md §2): a hub strut must be long enough

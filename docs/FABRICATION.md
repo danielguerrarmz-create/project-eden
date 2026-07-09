@@ -158,10 +158,22 @@ the continuous piece's mid-hole. Continuity alternates by ring parity, giving
 the classic woven diamond.
 
 Because the surface radius is ~3 m, a two-bay piece needs up to ~80 mm of
-camber — you **cut** that, you don't bend it. So lamellas are CNC-profiled,
-120 mm deep, from **45 mm spruce LVL sheet stock (2.4 × 1.2 m)** — same sheet
-pipeline as the eave blanks. End ops are part of the same CNC profile: skew
-butt cut + slotted Ø13 end hole (tolerance take-up), Ø13 mid hole.
+camber — you **cut** that, you don't bend it. So lamellas are CNC-profiled
+from **45 mm spruce LVL sheet stock (2.4 × 1.2 m)** — same sheet pipeline as
+the eave blanks. End ops are part of the same CNC profile: skew butt cut +
+slotted Ø13 end hole (tolerance take-up), Ø13 mid hole.
+
+**Every lamella is ITS OWN piece — the profile is the point.** The CNC cuts
+whatever 2D drawing is in the sheet plane, so the drawing is the true one:
+the top edge rides the shell (its camber follows THIS piece's location on
+the surface), and the depth is **moment-shaped** — 120 mm at the node where
+a two-bay piece takes its bolt and its peak bending, tapering to 100 mm at
+the butt ends (never below the Ø13 end-hole's 3d edge distances). No two
+lamellas share a profile unless the surface says so; uniqueness costs
+nothing because it lives entirely in the cut file. The model computes and
+carries each piece's developed curve and CAMBER — and the camber goes into
+the piece's nested width on the sheet, so the sheet count prices the true
+curved profile, not a wishful rectangle.
 
 **Honest caveat**: the classic Zollinger end hole sits closer to the piece's
 end than EC5's 7d loaded-end distance — the joint is compression-dominant
@@ -197,7 +209,10 @@ grammar surfaces this when the user switches system.
 
 ## 4. Eave beam + crown ring (both systems)
 
-- **Eave blanks**: 45 mm LVL, 180 mm deep, CNC-cut to their true plan curve;
+- **Eave blanks**: 45 mm LVL, 180 mm deep, CNC-cut to their true plan curve —
+  and modelled that way: each blank is a smooth arc in its own sheet plane
+  (the node polyline is only the joint graph), its camber carried into its
+  nested sheet width like every other sheet piece;
   2 blanks per inter-foot span (existing grammar rule — feet are added when a
   blank would outgrow the sheet), and an EXTRA splice is inserted the moment
   any blank would still exceed the sheet cut limit. Where a single bay's
