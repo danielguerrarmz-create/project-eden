@@ -140,15 +140,15 @@ export function Folly() {
     <>
       {c24Count > 0 && (
         <mesh geometry={c24Geo} castShadow receiveShadow>
-          {/* Planed C24 spruce/larch, UC3 treated. */}
-          <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
+          {/* Planed C24 spruce/larch, UC3 treated — pale honey, not muddy. */}
+          <meshStandardMaterial color="#b39672" roughness={0.72} metalness={0} />
         </mesh>
       )}
 
       {lvlCount > 0 && (
         <mesh geometry={lvlGeo} castShadow receiveShadow>
-          {/* Spruce LVL, CNC-profiled — paler than the sawn stock. */}
-          <meshStandardMaterial color="#c2ab84" roughness={0.75} metalness={0} />
+          {/* Spruce LVL, CNC-profiled — paler + yellower than sawn stock. */}
+          <meshStandardMaterial color="#d2bd94" roughness={0.68} metalness={0} />
         </mesh>
       )}
 
@@ -159,9 +159,10 @@ export function Folly() {
           args={[undefined, undefined, steel.boxes.length]}
           castShadow
         >
-          {/* Fins, clamp plates, base plates, fish plates — S355 HDG. */}
+          {/* Fins, clamp plates, base plates, fish plates — hot-dip galv:
+              light matte zinc grey, QUIET against the timber. */}
           <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="#878c93" roughness={0.45} metalness={0.7} />
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.45} />
         </instancedMesh>
       )}
 
@@ -172,9 +173,9 @@ export function Folly() {
           args={[undefined, undefined, steel.cylinders.length]}
           castShadow
         >
-          {/* Core drums + bolts (unit Ø1 × h1, scaled per instance). */}
-          <cylinderGeometry args={[0.5, 0.5, 1, 16]} />
-          <meshStandardMaterial color="#878c93" roughness={0.45} metalness={0.7} />
+          {/* Core discs + bolts (unit Ø1 × h1, scaled per instance). */}
+          <cylinderGeometry args={[0.5, 0.5, 1, 24]} />
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.45} />
         </instancedMesh>
       )}
     </>

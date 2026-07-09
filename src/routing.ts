@@ -1,8 +1,9 @@
 /**
  * routing.ts — a deliberately tiny hash router (no dependency).
  *
- * Only two destinations exist: the configurator (any route) and the Engine
- * explainer at `#/engine`. We subscribe to `hashchange` via useSyncExternalStore
+ * Three destinations exist: the configurator (any route), the Engine explainer
+ * at `#/engine`, and the company page at `#/company`. We subscribe to
+ * `hashchange` via useSyncExternalStore
  * so back/forward and manual URL edits all work, then normalize the hash to a
  * clean path (`#/engine` -> `/engine`, empty -> `/`).
  */
@@ -28,4 +29,5 @@ export function useRoute(): string {
 export const routes = {
   configurator: '#/',
   engine: '#/engine',
+  company: '#/company',
 } as const;

@@ -110,16 +110,17 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
       ringW = v3.norm(v3.cross(ringT, node.normal));
     }
 
-    // --- MID-BAY SPLICES (both systems): fish-plate pair on the blank faces.
+    // --- MID-BAY SPLICES (both systems): fish-plate strips on the blank
+    // faces — slim, centred, intentional.
     if (node.kind === 'splice') {
       if (ringT) {
         for (const s of [-1, 1]) {
           boxes.push(
             boxMat(
-              v3.add(P, v3.scale(node.normal, s * (BLANK_THICK_M / 2 + 0.004))),
-              ringT, 0.24,
-              ringW!, 0.12,
-              0.004,
+              v3.add(P, v3.scale(node.normal, s * (BLANK_THICK_M / 2 + 0.003))),
+              ringT, 0.2,
+              ringW!, 0.07,
+              0.005,
             ),
           );
         }
@@ -131,36 +132,58 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
       // ================= HUB SYSTEM =================
       // Connector body by node kind (FABRICATION.md §2 variants).
       if (node.kind === 'interior') {
+        // The spider node as specced: a thin laser-cut disc the fins weld
+        // to — NOT a drum. Reads as quiet hardware, which galvanized is.
         cylinders.push(
-          cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreHeightMm * MM),
+          cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreDiscMm * MM),
         );
       } else if (node.kind === 'ground') {
-        // Ground shoe (FABRICATION.md §5): 200×200×8 base plate over the
-        // driven screw + welded upstand rising past the splash plane — the
-        // strut fins spring from it, no timber at grade.
-        boxes.push(boxMat([P[0], 0.004, P[2]], [1, 0, 0], 0.2, [0, 1, 0], 0.008, 0.2));
+        // Ground shoe (FABRICATION.md §5): base plate over the driven screw
+        // + welded upstand rising past the splash plane, aligned to the
+        // members it receives — the strut fins spring from it.
+        boxes.push(boxMat([P[0], 0.004, P[2]], [1, 0, 0], 0.18, [0, 1, 0], 0.008, 0.18));
         const upH = FOUNDATION.splashClearM + 0.04;
-        const upDir: Vec3 = ringT ?? [1, 0, 0];
+        let upDir: Vec3 = ringT ?? [1, 0, 0];
+        if (strutEnds.length > 0) {
+          const mean = strutEnds.reduce<Vec3>(
+            (acc, e) => v3.add(acc, [e.u[0], 0, e.u[2]]),
+            [0, 0, 0],
+          );
+          if (v3.dot(mean, mean) > 1e-6) upDir = v3.norm(mean);
+        }
         boxes.push(boxMat([P[0], upH / 2, P[2]], upDir, 0.07, [0, 1, 0], upH, 0.008));
       } else if (ringT && ringW) {
-        // Crown/eave hub: paired flanges gripping the blank band.
+        // Crown/eave hub: paired flange strips gripping the blank band —
+        // sized to read as a clamp, not a slab.
         for (const s of [-1, 1]) {
           boxes.push(
             boxMat(
               v3.add(P, v3.scale(node.normal, s * (BLANK_THICK_M / 2 + 0.004))),
-              ringT, 0.12,
-              ringW, 0.12,
+              ringT, 0.08,
+              ringW, 0.14,
               0.006,
             ),
           );
         }
       }
 
-      // One fin per arriving strut: connector body → 105 mm into the slot.
-      // At ring nodes the fin starts at the blank's inner face (it welds to
-      // the flange assembly there), elsewhere inside the core drum.
+      // At a foot the eave band fixes to the shoe too: a vertical fin plate
+      // from the upstand into each band end (slot in the band's wide face).
+      if (node.kind === 'ground') {
+        for (const e of ringEnds) {
+          const finEnd = e.trim + 0.1;
+          if (finEnd > 0.04) {
+            const mid = v3.add(P, v3.scale(e.u, (0.03 + finEnd) / 2));
+            boxes.push(boxMat(mid, e.u, finEnd - 0.03, e.f.width, 0.12, 0.006));
+          }
+        }
+      }
+
+      // One fin per arriving strut, reaching the full slot. At ring nodes
+      // the fin emerges from the blank's inner face (it welds to the flange
+      // assembly inside); elsewhere it springs from the core disc / shoe.
       const slotM = JOINTS.hub.slotMm.depth * MM;
-      const finStart = node.kind === 'crown' || node.kind === 'eave' ? 0.075 : 0.04;
+      const finStart = node.kind === 'crown' || node.kind === 'eave' ? 0.088 : 0.04;
       for (const e of strutEnds) {
         const finEnd = e.trim + slotM;
         if (finEnd <= finStart + 0.01) continue;
@@ -197,8 +220,8 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
         for (const e of strutEnds) {
           for (const s of [-1, 1]) {
             const off = v3.scale(e.f.width, s * (LAMELLA_THICK_M / 2 + 0.003));
-            const mid = v3.add(v3.add(P, v3.scale(e.u, e.trim + 0.06)), off);
-            boxes.push(boxMat(mid, e.u, 0.16, e.f.depth, 0.1, 0.004));
+            const mid = v3.add(v3.add(P, v3.scale(e.u, e.trim + 0.055)), off);
+            boxes.push(boxMat(mid, e.u, 0.14, e.f.depth, 0.09, 0.004));
           }
         }
       }
