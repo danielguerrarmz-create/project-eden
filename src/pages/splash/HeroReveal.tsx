@@ -64,30 +64,79 @@ export function heroMode(o: { isBrowser: boolean; webgl: boolean; reduced: boole
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** The hero copy: one outcome headline (with the animated cursive "Eden") + one mission
- *  line, sized to sit as a slim bottom band so the structure keeps the frame. When
- *  `edenRef` is given, the cursive word is driven by the reveal; else it CSS-writes on. */
-function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | null> }) {
-  const driven = !!edenRef;
+/**
+ * The cursive "Eden" as a single connected stroke path (Track B, spec §3.2): one pen
+ * line that draws itself on via stroke-dashoffset, then a filled copy of the same path
+ * settles in UNDER it so the word firms from a drawn line into a solid wordmark. Using
+ * `pathLength={1}` normalises the dash to [0,1] so the reveal needs no getTotalLength()
+ * measurement and no flash before layout.
+ *
+ * INTERIM ASSET: this path is a hand-authored cursive tracing, structured as one
+ * swappable constant. Replace EDEN_PATH with Daniel's own hand-lettered "Eden" (or a
+ * clean Dancing-Script glyph extraction) for final signature fidelity — the draw-on
+ * mechanics below are asset-agnostic and won't change.
+ */
+const EDEN_PATH =
+  'M66,46 C54,30 30,30 26,48 C23,62 44,64 54,58 C42,66 40,70 48,72 C34,74 22,90 40,100 ' +
+  'C54,110 72,102 74,90 C80,80 88,72 92,62 C86,52 72,52 68,64 C65,76 80,80 90,70 ' +
+  'C96,54 104,38 108,24 C110,18 116,20 114,30 C110,52 106,76 108,90 C109,97 116,97 122,90 ' +
+  'C132,80 132,66 120,64 C110,62 104,74 112,84 C118,92 132,90 140,82 C146,78 148,68 146,62 ' +
+  'C158,54 172,58 172,74 C172,84 170,90 172,96 C178,84 184,70 194,64 C204,60 210,68 208,82 ' +
+  'C207,90 206,94 210,96';
+
+/**
+ * Renders the Eden wordmark. When `strokeRef`/`fillRef` are given the reveal drives them
+ * (stroke starts fully dashed-out, fill starts transparent); otherwise it renders the
+ * FINISHED state directly (full stroke + fill), which is what the poster and
+ * reduced-motion (StaticRender) heroes want — no animation where motion is unwelcome.
+ */
+function EdenWord({
+  strokeRef,
+  fillRef,
+  className = '',
+}: {
+  strokeRef?: MutableRefObject<SVGPathElement | null>;
+  fillRef?: MutableRefObject<SVGPathElement | null>;
+  className?: string;
+}) {
+  const driven = !!strokeRef;
+  return (
+    <svg viewBox="0 0 232 128" role="img" aria-label="Eden" className={`block h-auto text-inkBlack ${className}`}>
+      <path ref={fillRef} d={EDEN_PATH} fill="currentColor" stroke="none" style={driven ? { opacity: 0 } : undefined} />
+      <path
+        ref={strokeRef}
+        d={EDEN_PATH}
+        pathLength={1}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={driven ? { strokeDasharray: 1, strokeDashoffset: 1 } : undefined}
+      />
+    </svg>
+  );
+}
+
+/** The hero copy: one outcome headline (with the drawn cursive "Eden") + one mission
+ *  line, sized to sit as a slim bottom band so the structure keeps the frame. When the
+ *  Eden refs are given, the word is driven by the reveal; else it renders finished. */
+function HeroCopy({
+  edenStrokeRef,
+  edenFillRef,
+}: {
+  edenStrokeRef?: MutableRefObject<SVGPathElement | null>;
+  edenFillRef?: MutableRefObject<SVGPathElement | null>;
+}) {
   return (
     <div>
       <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-inkBlack">
         <span className="block">Grow a living</span>
-        {/* The product name is the hero's one display moment: a drastically larger
-            cursive word on its own line. Sized in em-free clamp() so it scales with the
-            viewport and stays inside max-w-[15ch] at every breakpoint (a 4-letter word
-            at 9rem is ~275px, well under the ~450px line box). leading-none + the small
-            negative margins tuck the sentence lines close without clipping the tall
-            Dancing-Script ascenders; pr keeps the final flourish off the clip edge. */}
-        <span
-          ref={edenRef}
-          className={`-my-[0.04em] block pr-[0.14em] font-handwrite text-[clamp(3.5rem,11vw,8rem)] font-semibold not-italic leading-[0.85] ${
-            driven ? '' : 'animate-write-on motion-reduce:animate-none'
-          }`}
-          style={driven ? { clipPath: 'inset(0 100% 0 0)', opacity: 0.4 } : undefined}
-        >
-          Eden
-        </span>
+        {/* The product name is the hero's one display moment: a drawn cursive word on
+            its own line, drastically larger than the sentence. Width in clamp() so it
+            scales with the viewport; the two plain lines stay hero-size so the semantic
+            <h1> still reads as one whole sentence (the SVG carries aria-label="Eden"). */}
+        <EdenWord strokeRef={edenStrokeRef} fillRef={edenFillRef} className="my-1 w-[clamp(11rem,30vw,21rem)]" />
         <span className="block">in your garden.</span>
       </h1>
       <p className="mt-4 max-w-[36ch] font-serifDisplay text-[17px] leading-snug text-inkBlack/70">
@@ -156,7 +205,8 @@ function AutoHero() {
   const copyRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLDivElement>(null);
-  const edenRef = useRef<HTMLSpanElement>(null);
+  const edenStrokeRef = useRef<SVGPathElement>(null);
+  const edenFillRef = useRef<SVGPathElement>(null);
   const invalidateRef = useRef<(() => void) | null>(null);
 
   // Drive every layer imperatively off one progress value: the canvas fade-in, the
@@ -182,10 +232,12 @@ function AutoHero() {
         copyRef.current.style.opacity = String(t);
         copyRef.current.style.transform = `translateY(${(1 - t) * 24}px)`;
       }
-      if (edenRef.current) {
+      if (edenStrokeRef.current) {
         const t = clamp01((p - ea) / (eb - ea));
-        edenRef.current.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
-        edenRef.current.style.opacity = String(0.4 + 0.6 * t);
+        // Draw the pen line on (dashoffset 1 -> 0), then firm the fill in under it over
+        // the last quarter of the window, so the word resolves line -> solid wordmark.
+        edenStrokeRef.current.style.strokeDashoffset = String(1 - t);
+        if (edenFillRef.current) edenFillRef.current.style.opacity = String(clamp01((t - 0.75) / 0.25));
       }
       // Cross-fade the beauty still in over the resolved render. Off in capture mode and
       // while the still is a placeholder, so the reveal ends on the three.js geometry.
@@ -338,11 +390,11 @@ function AutoHero() {
           the containing block and break the absolute `bottom-0`). */}
       <div
         ref={copyRef}
-        className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-28 md:px-10 md:pb-12"
+        className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12"
         style={{ opacity: 0, transform: 'translateY(24px)', willChange: 'opacity, transform' }}
       >
         <div className="mx-auto max-w-[1120px]">
-          <HeroCopy edenRef={edenRef} />
+          <HeroCopy edenStrokeRef={edenStrokeRef} edenFillRef={edenFillRef} />
         </div>
       </div>
     </section>
