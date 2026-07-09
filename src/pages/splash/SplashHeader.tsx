@@ -66,7 +66,7 @@ export function SplashHeader() {
         </span>
       </a>
       <LensFilter />
-      <nav className="nav-pill flex items-center gap-1 px-2 py-1">
+      <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
         <NavLink href="#how-it-works">how it works</NavLink>
         <NavLink href={routes.studio}>engine</NavLink>
         <NavLink href={routes.about}>about</NavLink>

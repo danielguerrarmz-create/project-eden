@@ -73,6 +73,11 @@ function Ring({ reduced }: { reduced: boolean }) {
   const y = useSpring(rawY, posCfg);
   const scale = useSpring(1, scaleCfg);
   const [visible, setVisible] = useState(false);
+  // Over the glass nav the blend-difference ring composites THROUGH the backdrop
+  // displacement filter and rasterises coarse. So over anything `[data-cursor-solid]`
+  // we drop the blend and become a crisp solid accent-olive ring instead — an
+  // intentional hover treatment that never touches the filter's low-res raster.
+  const [solid, setSolid] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -90,7 +95,10 @@ function Ring({ reduced }: { reduced: boolean }) {
     // binding, works for anything rendered later.
     const onOver = (e: PointerEvent) => {
       const t = e.target as Element | null;
-      scale.set(t && t.closest && t.closest(INTERACTIVE) ? HOVER_SCALE : 1);
+      const overGlass = !!(t && t.closest && t.closest('[data-cursor-solid]'));
+      setSolid(overGlass);
+      // Over glass: a modest ring (2.2x). Elsewhere: grow over interactive, else rest.
+      scale.set(overGlass ? 2.2 : t && t.closest && t.closest(INTERACTIVE) ? HOVER_SCALE : 1);
     };
     const onLeave = () => setVisible(false);
     const onEnter = () => setVisible(true);
@@ -111,8 +119,20 @@ function Ring({ reduced }: { reduced: boolean }) {
   return (
     <motion.div
       aria-hidden
-      className="pointer-events-none fixed left-0 top-0 z-[200] rounded-full bg-white mix-blend-difference"
-      style={{ width: SIZE, height: SIZE, x, y, scale, opacity: visible ? 1 : 0 }}
+      className="pointer-events-none fixed left-0 top-0 z-[200] rounded-full will-change-transform"
+      style={{
+        width: SIZE,
+        height: SIZE,
+        x,
+        y,
+        scale,
+        opacity: visible ? 1 : 0,
+        boxSizing: 'border-box',
+        // Solid crisp ring over glass; white blend-difference disc everywhere else.
+        backgroundColor: solid ? 'transparent' : '#fff',
+        border: solid ? '1.5px solid #ACC13A' : 'none',
+        mixBlendMode: solid ? 'normal' : 'difference',
+      }}
     />
   );
 }
