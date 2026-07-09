@@ -1,8 +1,56 @@
 # Manufacturing-engine integration onto form-finding-core
 
-Date: 2026-07-08
+Date: 2026-07-08 (integration) / 2026-07-09 (green-close-out)
 Branch: `integrate/manufacturing-engine` (cut from `form-finding-core`, LOCAL ONLY — not pushed)
 Author: Edward (claudio)
+
+## STATUS: GREEN (2026-07-09)
+
+`npm run typecheck` clean, `npm run test` 126/126 passing. Both collisions in the
+original report were resolved per Daniel's decisions (commit `bb5f89f`, on top of the
+integration commit `ac65646`):
+
+1. Min-spacing fork -> option (a): retuned form-finding to Clay's 0.45 m joint floor
+   (the solver bends to the manufacturable reality; Clay's GRAMMAR constant was NOT
+   reverted). See "Resolution" below.
+2. Fixed the 3 landing typecheck errors (hero reuses engine geometry).
+
+This branch is now the intended Clay hand-off: his engine + an up-to-date, green
+front-end. HOLD PUSH until Daniel confirms.
+
+## Resolution (2026-07-09)
+
+### form-finding retune (`src/engine/formFinding.ts`)
+- `DEFAULT_SHELL` re-tuned to a coarser, larger seed so every seed strut clears the
+  new 0.45 m floor: rings 6->4, spokes 18->14, a/b/rise 2.2/1.76/2.3 -> 3.1/2.5/3.0,
+  oculus 0.43->0.48. Shortest seed strut ~0.52 m, longest ~1.56 m (was min ~0.26 m).
+  `outOfSpec` back to 0; relaxation/grab tests pass by construction.
+- `buildBand` no longer inverts: when a rest is so short the x1.6 ceiling would fall
+  below the 0.45 floor, the band collapses to a single rigid length at `FAB_MIN_M`
+  rather than returning `lmax < lmin`.
+- `formFinding.test.ts` node-count expectation updated to `(4+1)*14`. All other
+  formFinding assertions derive from `FAB_MIN_M`/`FAB_MAX_M` and needed no change.
+
+### Studio density presets (`src/pages/SculptPage.tsx`) — a real design consequence
+The studio overrides `spokes/rings/oculus` per density preset, so the presets feed
+`buildGridshell` directly. At the 0.45 m floor the OLD presets went badly out of spec
+(default 56, fine 146, perf 1586 struts under the floor). Re-tuned the three buildable
+presets to a coarser buildable band (coarse/default/fine now top out ~90 nodes, not
+~170); `perf` still deliberately crosses the ceiling to visualise the break.
+
+IMPORTANT for Daniel/Sai: this is the physically-correct consequence of Clay's floor —
+**a fine mesh is not manufacturable when joints cannot sit closer than 0.45 m.** The
+studio's buildable density range is therefore genuinely coarser than the pre-fabrication
+spike, and the pavilion seed is larger (~6.2 m major axis vs 4.4 m). If a denser studio
+look is wanted, it needs a bigger pavilion or a different joint family — not a solver
+tweak. Flagging as a product call, not a bug.
+
+### Landing (`src/pages/splash/*`)
+- `HeroScene.tsx` GAUGE Record extended: `lamella: 1.3`, `crown: 1.7` (tracks real
+  section depths — strut 70 mm, lamella 120 mm, blank 180 mm).
+- `copy.test.ts` + `HeroReveal.test.ts` DesignParams literals carry the new required
+  `jointSystem`, read from `ENVELOPE.jointSystem` (matches their existing pattern of
+  sourcing defaults from ENVELOPE).
 
 ## What
 
