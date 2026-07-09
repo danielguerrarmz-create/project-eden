@@ -56,18 +56,23 @@ function LensFilter() {
 export function SplashHeader() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-4 pt-5 md:px-10">
-      <a href="#/" className="flex items-center gap-3 text-inkBlack" aria-label="Bower, home">
-        <BowerMark
-          markSize={26}
-          nameClass="font-mono text-[17px] font-semibold lowercase tracking-[0.1em]"
-        />
-        <span className="hidden font-mono text-[12px] uppercase leading-none tracking-[0.18em] text-inkBlack/65 sm:inline">
-          · living architecture for the garden
-        </span>
-      </a>
       <LensFilter />
+      {/* The logo rides in its own glass pill (matching the nav) so it stays distinct and
+          legible on any ground — the frosted capsule gives the dark ink a consistent
+          backing over the hero photo or the vellum pages, no colour-blend needed. */}
+      <a
+        href="#/"
+        aria-label="Bower, home"
+        data-cursor-solid
+        className="nav-pill flex items-center gap-2.5 px-4 py-2 text-inkBlack"
+      >
+        <BowerMark
+          markSize={30}
+          nameClass="font-mono text-[19px] font-semibold lowercase tracking-[0.1em]"
+        />
+      </a>
       <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
-        <NavLink href="#how-it-works">how it works</NavLink>
+        <NavLink href={routes.engine}>how it works</NavLink>
         <NavLink href={routes.studio}>engine</NavLink>
         <NavLink href={routes.about}>about</NavLink>
       </nav>

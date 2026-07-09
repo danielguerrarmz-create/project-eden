@@ -21,8 +21,7 @@ describe('EnginePage (the restored /engine walkthrough)', () => {
   });
 
   it('wears the shared splash chrome (one floating SplashHeader, one nav)', () => {
-    // The shared header, not the old bespoke one: wordmark tagline + splash nav.
-    expect(html).toContain('living architecture for the garden');
+    // The shared header, not the old bespoke one: wordmark + splash nav.
     expect(html).toContain('how it works');
     expect(html).toContain('about');
     expect(html).toContain('#/'); // home link

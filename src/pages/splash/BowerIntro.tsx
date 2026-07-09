@@ -199,7 +199,7 @@ export function BowerIntro() {
           wordmark. Font metrics match the nav lockup so at scale 1 they land on it. */}
       <motion.div
         className="absolute left-0 top-0 flex font-mono font-semibold lowercase text-inkBlack"
-        style={{ transformOrigin: 'top left', fontSize: '17px', letterSpacing: '0.1em', lineHeight: 1 }}
+        style={{ transformOrigin: 'top left', fontSize: '19px', letterSpacing: '0.1em', lineHeight: 1 }}
         initial={{ x: bigX, y: bigY, scale: bigScale, opacity: 1 }}
         animate={wordAnim}
         transition={

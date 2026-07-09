@@ -43,7 +43,8 @@ describe('SplashPage', () => {
   });
 
   it('carries the global nav: how it works, engine, about', () => {
-    // The fixed SplashHeader teaches "how it works" (an anchor), "engine" (the tool,
+    // The fixed SplashHeader teaches "how it works" (the /engine walkthrough page),
+    // "engine" (the tool,
     // renamed from "the studio"), and "about" (empty placeholder page).
     expect(html).toContain('how it works');
     expect(html).toContain('about');
