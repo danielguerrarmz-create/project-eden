@@ -71,18 +71,24 @@ function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | nu
   const driven = !!edenRef;
   return (
     <div>
-      <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.0] tracking-[-0.02em] text-inkBlack">
-        Grow a living{' '}
+      <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-inkBlack">
+        <span className="block">Grow a living</span>
+        {/* The product name is the hero's one display moment: a drastically larger
+            cursive word on its own line. Sized in em-free clamp() so it scales with the
+            viewport and stays inside max-w-[15ch] at every breakpoint (a 4-letter word
+            at 9rem is ~275px, well under the ~450px line box). leading-none + the small
+            negative margins tuck the sentence lines close without clipping the tall
+            Dancing-Script ascenders; pr keeps the final flourish off the clip edge. */}
         <span
           ref={edenRef}
-          className={`font-handwrite pr-[0.06em] text-[1.15em] font-semibold not-italic leading-[0.8] ${
+          className={`-my-[0.04em] block pr-[0.14em] font-handwrite text-[clamp(4rem,12vw,9rem)] font-semibold not-italic leading-none ${
             driven ? '' : 'animate-write-on'
           }`}
           style={driven ? { clipPath: 'inset(0 100% 0 0)', opacity: 0.4 } : undefined}
         >
           Eden
-        </span>{' '}
-        in your garden.
+        </span>
+        <span className="block">in your garden.</span>
       </h1>
       <p className="mt-4 max-w-[36ch] font-serifDisplay text-[17px] leading-snug text-inkBlack/70">
         Rewilding gardens through architecture anyone can build.
