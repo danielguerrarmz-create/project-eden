@@ -97,6 +97,28 @@ input[type='range'].botanical::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* Glass pill nav (SplashHeader): one frosted capsule housing the three links. The
+   frosted base (blur + saturate + a touch of brightness) is guaranteed on every
+   browser that supports backdrop-filter, so nav text always has a surface for
+   contrast over busy field grounds. The lens-refraction warp (SVG #lensWarp chained
+   into backdrop-filter) is layered on ONLY where the value parses, so Safari and other
+   browsers that drop an SVG filter ref get plain frosted glass, never a broken nav. */
+.nav-pill {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(23, 22, 15, 0.1); /* hairline off inkBlack, not a new color */
+  backdrop-filter: blur(14px) saturate(1.4) brightness(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4) brightness(1.08);
+  box-shadow:
+    0 1px 2px rgba(23, 22, 15, 0.06),
+    0 8px 24px rgba(23, 22, 15, 0.08);
+}
+@supports (backdrop-filter: blur(1px) url('#lensWarp')) {
+  .nav-pill {
+    backdrop-filter: blur(10px) saturate(1.4) brightness(1.08) url('#lensWarp');
+  }
+}
+
 /* AdaptiveCursor: while the blend-difference ring is live (fine pointer + motion
    allowed only), the native arrow is replaced by the ring. Scoped to a root class so
    it is fully removed on unmount / reduced-motion / touch — the native cursor always

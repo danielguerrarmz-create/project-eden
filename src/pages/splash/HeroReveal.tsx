@@ -81,8 +81,8 @@ function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | nu
             Dancing-Script ascenders; pr keeps the final flourish off the clip edge. */}
         <span
           ref={edenRef}
-          className={`-my-[0.04em] block pr-[0.14em] font-handwrite text-[clamp(4rem,12vw,9rem)] font-semibold not-italic leading-none ${
-            driven ? '' : 'animate-write-on'
+          className={`-my-[0.04em] block pr-[0.14em] font-handwrite text-[clamp(3.5rem,11vw,8rem)] font-semibold not-italic leading-[0.85] ${
+            driven ? '' : 'animate-write-on motion-reduce:animate-none'
           }`}
           style={driven ? { clipPath: 'inset(0 100% 0 0)', opacity: 0.4 } : undefined}
         >
@@ -101,7 +101,7 @@ function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | nu
  *  reads over the render while the structure keeps the upper frame. */
 function CopyBand({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-28 md:px-10 md:pb-12">
+    <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12">
       <div className="mx-auto max-w-[1120px]">{children}</div>
     </div>
   );

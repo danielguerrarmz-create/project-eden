@@ -17,15 +17,14 @@
  */
 import { useEffect, useRef, useState } from 'react';
 
-/** Anything the ring should grow over. Add `data-cursor="grow"` to opt something in. */
-const INTERACTIVE =
-  'a,button,[role="button"],input,textarea,select,label,summary,[data-cursor="grow"]';
+/** Anything the ring should grow over. Add `data-cursor-hover` to opt something in. */
+const INTERACTIVE = 'a,button,[role="button"],[data-cursor-hover]';
 
 export function AdaptiveCursor({
   /** Ring diameter in px at rest. */
-  size = 20,
-  /** Scale multiplier when hovering an interactive target. */
-  hoverScale = 1.9,
+  size = 14,
+  /** Scale multiplier when hovering an interactive target (14px * 3.14 ~= 44px). */
+  hoverScale = 3.14,
   /** Position follow factor per frame (0..1): higher = snappier, lower = more trail. */
   ease = 0.3,
 }: {
@@ -34,18 +33,28 @@ export function AdaptiveCursor({
   ease?: number;
 }) {
   const ringRef = useRef<HTMLDivElement>(null);
-  // Active only on a fine pointer with motion allowed; re-evaluated on media changes.
+  // Active on a real mouse only (fine pointer that can hover). Touch / coarse pointers
+  // (incl. hybrid laptops, correctly, since they have hover:hover) keep the native
+  // cursor. Reduced-motion does NOT disable it: the colour-invert is a static property;
+  // we only drop the spring lag (see reducedRef in the rAF loop below).
   const [active, setActive] = useState(false);
+  const reducedRef = useRef(false);
 
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
+    const hover = window.matchMedia('(hover: hover)');
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const decide = () => setActive(fine.matches && !reduced.matches);
+    const decide = () => {
+      reducedRef.current = reduced.matches;
+      setActive(fine.matches && hover.matches);
+    };
     decide();
     fine.addEventListener('change', decide);
+    hover.addEventListener('change', decide);
     reduced.addEventListener('change', decide);
     return () => {
       fine.removeEventListener('change', decide);
+      hover.removeEventListener('change', decide);
       reduced.removeEventListener('change', decide);
     };
   }, []);
@@ -95,10 +104,13 @@ export function AdaptiveCursor({
     };
 
     const tick = () => {
-      x += (tx - x) * ease;
-      y += (ty - y) * ease;
+      // Reduced motion: snap to the pointer (no spring lag) and jump scale instantly.
+      const follow = reducedRef.current ? 1 : ease;
+      const sFollow = reducedRef.current ? 1 : 0.2;
+      x += (tx - x) * follow;
+      y += (ty - y) * follow;
       const target = (hovering ? hoverScale : 1) * (pressed ? 0.82 : 1);
-      scale += (target - scale) * 0.2;
+      scale += (target - scale) * sFollow;
       el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(${scale})`;
       raf = requestAnimationFrame(tick);
     };
@@ -126,7 +138,7 @@ export function AdaptiveCursor({
     <div
       ref={ringRef}
       aria-hidden
-      className="pointer-events-none fixed left-0 top-0 z-[100] rounded-full bg-white opacity-0 mix-blend-difference will-change-transform"
+      className="pointer-events-none fixed left-0 top-0 z-[200] rounded-full bg-white opacity-0 mix-blend-difference will-change-transform"
       style={{ width: size, height: size, transition: 'opacity 200ms ease' }}
     />
   );

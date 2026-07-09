@@ -79,12 +79,14 @@ export function SplashPage() {
           six-section walkthrough (sun path, growth phases) lives at /engine. */}
       <EngineSection ground="vellum" reduced={reduced} id="how-it-works">
         <h2 className={H2}>
-          Not a catalogue of shapes. A grammar that computes <em className="italic">one</em>.
+          Instead of a catalogue of shapes to choose from, a grammar computes the{' '}
+          <em className="italic">one</em> that's yours.
         </h2>
         <p className={BODY}>
           You shape four things: footprint, rise, lattice spacing, and the way it opens. A fabrication
           grammar clamps them to what a cutter can actually make, then the same functions run every
-          time: geometry, cut list, nesting, sun path, ecology. Same choices, same pavilion.
+          time: geometry, cut list, nesting, sun path, ecology, so the same choices always mean the
+          same pavilion.
         </p>
 
         <div className="mx-auto mt-12 max-w-[640px]">
@@ -125,7 +127,7 @@ export function SplashPage() {
         <h2 className={H2}>
           What actually <em className="italic">happens</em> after you shape it.
         </h2>
-        <p className={BODY}>You shape it, we cut it, you plant it. This is the whole of it.</p>
+        <p className={BODY}>You shape it, we cut it, you plant it, and that's genuinely the whole of it.</p>
 
         <ol className="mt-10 max-w-[640px]">
           {ritualSteps(components.totalCount).map((step) => (
@@ -185,8 +187,8 @@ export function SplashPage() {
           Two ways to <em className="italic">begin</em>.
         </h2>
         <p className={BODY}>
-          See the reasoning in the engine section above, or put your name down. That takes ten
-          seconds.
+          See the reasoning in the engine section above, or just put your name down, which takes
+          about ten seconds.
         </p>
 
         <RegisterInterest />

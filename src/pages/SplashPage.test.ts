@@ -57,7 +57,7 @@ describe('SplashPage', () => {
     // The home carries only the condensed engine section: pipeline mechanics + a
     // honesty coda. The full six-section walkthrough lives at the /engine route.
     expect(html).toContain('id="how-it-works"');
-    expect(html).toContain('A grammar that computes');
+    expect(html).toContain('a grammar computes the');
     // honesty coda (eyebrow removed in the simplification pass, prose kept)
     expect(html).toContain('honest rules of thumb');
     // the deep-link out to the full walkthrough (the restored /engine route)

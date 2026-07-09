@@ -22,7 +22,7 @@ export function ritualSteps(componentCount: number): RitualStep[] {
   return [
     { n: '1', text: 'Shape it in the studio' },
     { n: '2', text: 'The price fixes itself as you do' },
-    { n: '3', text: `We cut, flat CNC-cut timber, ~${componentCount} components from the live cut list` },
+    { n: '3', text: `We CNC-cut ~${componentCount} flat timber components from the live cut list` },
     { n: '4', text: 'Days to raise, ground screws, no slab, no wet trades' },
     { n: '5', text: 'Plant, and let it start becoming.' },
   ];
