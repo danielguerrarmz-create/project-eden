@@ -18,7 +18,7 @@
  * (drums, bolts) — each matrix orients + scales a unit primitive.
  */
 import * as THREE from 'three';
-import { JOINTS, STOCK } from '../data/config';
+import { FOUNDATION, JOINTS, STOCK } from '../data/config';
 import { memberFrame } from '../engine/jointGeometry';
 import type { CanopyGeometry, Member, Vec3 } from '../engine/types';
 
@@ -135,8 +135,13 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
           cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreHeightMm * MM),
         );
       } else if (node.kind === 'ground') {
-        // Ground shoe: 200×200×8 base plate over the driven screw.
+        // Ground shoe (FABRICATION.md §5): 200×200×8 base plate over the
+        // driven screw + welded upstand rising past the splash plane — the
+        // strut fins spring from it, no timber at grade.
         boxes.push(boxMat([P[0], 0.004, P[2]], [1, 0, 0], 0.2, [0, 1, 0], 0.008, 0.2));
+        const upH = FOUNDATION.splashClearM + 0.04;
+        const upDir: Vec3 = ringT ?? [1, 0, 0];
+        boxes.push(boxMat([P[0], upH / 2, P[2]], upDir, 0.07, [0, 1, 0], upH, 0.008));
       } else if (ringT && ringW) {
         // Crown/eave hub: paired flanges gripping the blank band.
         for (const s of [-1, 1]) {
@@ -183,8 +188,19 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
     } else {
       // ================= LAMELLA SYSTEM =================
       if (node.kind === 'ground') {
-        // Bent-plate shoe: base plate over the screw.
+        // Bent-plate shoe (FABRICATION.md §5): base plate over the screw +
+        // upstand stirrup gripping each swept piece's side faces above the
+        // splash plane (side bolts — a foot bay is too short for end slots).
         boxes.push(boxMat([P[0], 0.003, P[2]], [1, 0, 0], 0.15, [0, 1, 0], 0.006, 0.15));
+        const upH = FOUNDATION.splashClearM + 0.02;
+        boxes.push(boxMat([P[0], upH / 2, P[2]], ringT ?? [1, 0, 0], 0.06, [0, 1, 0], upH, 0.006));
+        for (const e of strutEnds) {
+          for (const s of [-1, 1]) {
+            const off = v3.scale(e.f.width, s * (LAMELLA_THICK_M / 2 + 0.003));
+            const mid = v3.add(v3.add(P, v3.scale(e.u, e.trim + 0.06)), off);
+            boxes.push(boxMat(mid, e.u, 0.16, e.f.depth, 0.1, 0.004));
+          }
+        }
       }
       if (node.kind === 'interior') {
         const butt = strutEnds.find((e) => e.cut.kind === 'butt');

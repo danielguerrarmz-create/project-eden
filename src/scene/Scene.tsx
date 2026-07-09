@@ -19,9 +19,17 @@ import { GrowthOverlay } from './overlays/GrowthOverlay';
 /**
  * ?inspect — joint-inspection mode (dev/review affordance): hides the soft
  * overlays and frees the camera so the joinery can be examined close up.
+ * Optionally takes an orbit target: ?inspect=x,y,z (e.g. a foot position).
  * Read once at load; the app already treats the URL as load-time state.
  */
-const INSPECT = new URLSearchParams(window.location.search).has('inspect');
+const INSPECT_RAW = new URLSearchParams(window.location.search).get('inspect');
+const INSPECT = INSPECT_RAW !== null;
+const INSPECT_TARGET: [number, number, number] | null = (() => {
+  const parts = (INSPECT_RAW ?? '').split(',').map(Number);
+  return parts.length === 3 && parts.every((n) => Number.isFinite(n))
+    ? [parts[0], parts[1], parts[2]]
+    : null;
+})();
 
 export function Scene() {
   const overlays = useDesign((s) => s.overlays);
@@ -59,7 +67,7 @@ export function Scene() {
 
       <OrbitControls
         makeDefault
-        target={[0, 1.15, 0]}
+        target={INSPECT_TARGET ?? [0, 1.15, 0]}
         minDistance={INSPECT ? 0.3 : 4}
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}

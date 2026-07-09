@@ -27,14 +27,14 @@
  * The living layer never enters this file — plants attach later to a
  * sacrificial armature keyed off (u,v) coords, keeping the structure dry.
  */
-import { GRAMMAR, STOCK } from '../data/config';
+import { GRAMMAR, JOINTS, STOCK } from '../data/config';
 import {
   clampParams,
   ellipsePerimeterM,
   feetCountFor,
   planDims,
 } from './grammar';
-import { resolveJointCuts } from './jointGeometry';
+import { flatPieceFit, resolveJointCuts, resolvePieceFrames } from './jointGeometry';
 import { vCross, vDot, vNorm, vSub } from './vec';
 import type {
   CanopyGeometry,
@@ -193,7 +193,7 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
 
   // Diagrid resolution from the bay-spacing parameter: node-to-node spacing
   // along a diagonal ≈ strutSpacingM × the diamond diagonal factor.
-  const bayM = params.strutSpacingM * 1.35;
+  const bayM = params.strutSpacingM * GRAMMAR.diagonalFactor;
   const spokeCount = Math.max(12, 2 * Math.round(perimeterM / bayM / 2));
 
   const ctx = surfaceCtx(params, spokeCount);
@@ -201,9 +201,14 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   const feetCount = ctx.footAnglesRad.length;
   const meanR = (a + b) / 2;
   const radialRunM = Math.hypot(meanR, H) * 1.05;
-  const ringCount = Math.max(4, Math.round(radialRunM / bayM));
 
   const r0 = GRAMMAR.crownFraction; // crown oculus radius — diagrid starts here
+  // Rings span the oculus (r0) to the eave, NOT the full crown-to-eave run —
+  // divide only the run the rings actually occupy, or every bay lands ~25%
+  // denser than the stated spacing and the whole cut list runs short. Floor
+  // of 3: a small footprint at wide bays IS a 3-ring pavilion; forcing more
+  // rings than the spacing supports just shortens every strut.
+  const ringCount = Math.max(3, Math.round((radialRunM * (1 - r0)) / bayM));
   const rAt = (i: number) => r0 + (1 - r0) * (i / ringCount);
   const thetaAt = (j: number) => (j / spokeCount) * TWO_PI;
   const spokeStep = TWO_PI / spokeCount;
@@ -330,13 +335,20 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
           ),
         );
         if (!lamellaContinuesAt(i + 1, family)) {
-          // If a two-bay lamella would outgrow the sheet cut limit (it can in
-          // the foot-sweep zone, where bays plunge to ground), the weave
-          // degrades to single-bay pieces there and joints.ts counts a
-          // fish-plate splice at the node instead of a plain bolt.
+          // A two-bay lamella must fit the sheet AND live flat in ONE plane
+          // (FABRICATION.md §1a): over the cut limit OR leaning off the
+          // surface beyond the flat-piece tolerance (both happen in the
+          // foot-sweep zone), the weave degrades to single-bay pieces and
+          // joints.ts counts a fish-plate splice at the node instead of a
+          // plain bolt.
           const runLengthM = run.reduce((s, m) => s + m.lengthM, 0);
+          const unflat =
+            run.length > 1 &&
+            flatPieceFit(run, 'lamella').leanDeg > GRAMMAR.flatPiece.maxLamellaLeanDeg;
           const groups =
-            runLengthM > GRAMMAR.maxComponentLengthM ? run.map((s) => [s]) : [run];
+            runLengthM > GRAMMAR.maxComponentLengthM || unflat
+              ? run.map((s) => [s])
+              : [run];
           for (const group of groups) {
             const startRing = i + 1 - run.length + run.indexOf(group[0]);
             const pieceId = `${lamella ? 'lam' : 'strut'}-${family}-${j0}-${startRing}`;
@@ -418,8 +430,18 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
     }
 
     // Split the cyclic chord run into pieces: at declared splice boundaries
-    // (eave rule: feet + midspans), and ALWAYS the moment a blank would
-    // outgrow the sheet cut limit.
+    // (eave rule: feet + midspans), the moment a blank would outgrow the
+    // sheet cut limit, and the moment it would leave its ONE flat plane
+    // (FABRICATION.md §1a) — a flat piece cannot follow the eave's plunge
+    // beside a sweep foot, so the beam honestly splits into short facets
+    // there.
+    const flatOk = (segs: Member[]): boolean => {
+      if (segs.length < 2) return true;
+      const fit = flatPieceFit(segs, 'blank');
+      return (
+        fit.devM <= GRAMMAR.flatPiece.maxDevM && fit.leanDeg <= GRAMMAR.flatPiece.maxLeanDeg
+      );
+    };
     const startJ = boundaries.length ? boundaries[0] : 0;
     let run: Member[] = [];
     let runLen = 0;
@@ -438,7 +460,8 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       let firstInBay = true;
       for (const seg of bySpoke[j]) {
         const overCap = runLen + seg.lengthM > GRAMMAR.maxComponentLengthM;
-        if ((boundarySpoke && firstInBay) || overCap) close(); // no-op on an empty run
+        const unflat = run.length > 0 && !flatOk([...run, seg]);
+        if ((boundarySpoke && firstInBay) || overCap || unflat) close(); // no-op on an empty run
         run.push(seg);
         runLen += seg.lengthM;
         firstInBay = false;
@@ -465,11 +488,14 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   ringPieces(ringCount, 'eave', 'eaveBlank', 'eave', uniqueEaveBoundaries);
 
   // ---------------------------------------------------------------------------
-  // JOINT RESOLUTION (FABRICATION.md §1a) — assign every member end its ONE
-  // planar cut (mitres, skew butts, blank faces, computed hub standoffs),
-  // derive the trims from the planes, then fill the PHYSICAL cut lengths the
+  // JOINT RESOLUTION (FABRICATION.md §1a) — first orient every sheet piece's
+  // sections to its ONE flat plane (the run closers guaranteed the fit),
+  // then assign every member end its ONE planar cut (mitres, skew butts,
+  // blank faces, computed standoffs incl. splash + neighbour clearance),
+  // derive the trims from the planes, and fill the PHYSICAL cut lengths the
   // BOM prices. The scene draws the same clipped solids.
   // ---------------------------------------------------------------------------
+  resolvePieceFrames(members, pieces);
   resolveJointCuts(nodes, members, params.jointSystem);
   const memberById = new Map(members.map((m) => [m.id, m]));
   for (const piece of pieces) {
@@ -477,6 +503,42 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
       const m = memberById.get(id)!;
       return sum + m.lengthM - m.startTrimM - m.endTrimM;
     }, 0);
+  }
+
+  // HONEST ACCOUNTING (FABRICATION.md §2): a hub strut must be long enough
+  // to mill its fixings — two EC5-length end slots plus clear timber. On the
+  // current polar net the CROWN-adjacent bays can come up short (spokes
+  // crowd toward the oculus) — a known net-fairness issue (§9 roadmap).
+  // Counted and surfaced, never hidden; anything short OUTSIDE the crown
+  // zone is a generator bug and shouts.
+  let subMillableStrutCount = 0;
+  if (!lamella) {
+    const minMillableM =
+      (2 * JOINTS.hub.slotMm.depth + JOINTS.hub.slotClearanceMm) / 1000;
+    for (const piece of pieces) {
+      if (piece.kind !== 'strut' || piece.lengthM >= minMillableM - 1e-9) continue;
+      subMillableStrutCount++;
+      const m = memberById.get(piece.memberIds[0])!;
+      // Known debt lives where the current net misbehaves: the crown HALF
+      // (v → 1; spokes crowd), the FOOT-SWEEP influence zone (the sweep
+      // compresses the last bays and the splash standoff consumes them —
+      // §5 shoe detail TBC), and the net's few-percent bay-length variance
+      // (marginal shorts anywhere). A GROSSLY short strut outside the zones
+      // = generator bug: shout.
+      const theta = m.u * TWO_PI;
+      const nearFoot =
+        Math.max(
+          footPull(ctx, theta),
+          footPull(ctx, theta + spokeStep),
+          footPull(ctx, theta - spokeStep),
+        ) > 0.02;
+      if (m.v <= 0.4 && !nearFoot && piece.lengthM < minMillableM * 0.85) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[grammar] ${piece.id} at ${piece.lengthM.toFixed(2)} m cannot carry two ${JOINTS.hub.slotMm.depth} mm end slots (needs ${minMillableM.toFixed(2)} m) — OUTSIDE THE KNOWN net-debt zones`,
+        );
+      }
+    }
   }
 
   const groundScrewCount = nodes.filter((n) => n.kind === 'ground').length;
@@ -535,5 +597,6 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
     surfaceAreaM2: round(surfaceAreaM2, 0.1),
     roofAreaM2: round(params.footprintM2, 0.1),
     maxComponentLengthM: round(maxComponentLengthM, 0.01),
+    subMillableStrutCount,
   };
 }

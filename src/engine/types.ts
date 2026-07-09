@@ -150,6 +150,16 @@ export interface Piece {
   stock: 'linear' | 'sheet';
   /** Nested width on sheet (sheet pieces) — the piece's structural depth. */
   depthM: number;
+  /**
+   * SHEET pieces only — the flat-piece rule (FABRICATION.md §1a): the ONE
+   * plane this piece is cut from flat stock in. Every segment's section is
+   * oriented to this plane; the CNC profile lives in it.
+   */
+  plane?: { origin: Vec3; normal: Vec3 };
+  /** Max centreline deviation from the piece plane (m) — grammar-capped. */
+  flatDevM?: number;
+  /** Max section lean off the ideal surface normal (deg) — grammar-capped. */
+  leanDeg?: number;
 }
 
 /** One reason-carrying bound for one slider (the grammar surfaced). */
@@ -203,6 +213,13 @@ export interface CanopyGeometry {
   /** Longest single piece (m) — every piece is also checked against its own
    *  stock rule (sheet cut limit / linear handling cap) at generation. */
   maxComponentLengthM: number;
+  /**
+   * HONEST DEBT COUNTER (FABRICATION.md §2/§9): hub struts too short to
+   * carry two EC5-length end slots. Non-zero only in the crown zone, where
+   * the polar net crowds — the net re-parameterization roadmap item owns
+   * driving this to 0. Never hidden.
+   */
+  subMillableStrutCount: number;
 }
 
 /** One line in the cut-list: "N pieces of kind K at length L". */

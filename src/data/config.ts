@@ -71,8 +71,44 @@ export const GRAMMAR = {
   /** Plan proportion of the canopy ellipse (major/minor). Fixed, not a slider. */
   planAspect: 1.25,
 
+  /** Diagonal-to-bay factor of the diamond net: node-to-node length along a
+   *  diagonal ≈ bay spacing × this. Shared by grammar + geometry so the two
+   *  can never disagree about what a bay physically is. */
+  diagonalFactor: 1.35,
+
+  /** MEASURED bay-length undershoot of the polar net vs nominal spacing
+   *  across the mid-surface (the crown/foot zones are worse and carry their
+   *  own debt counter). The derived minimum spacing divides by (1 − this)
+   *  so the rule binds on real bays, not wishful nominal ones. Shrinks when
+   *  the net is re-parameterized (FABRICATION.md §9). */
+  netBayVarianceFrac: 0.15,
+
   /** Crown oculus radius as a fraction of the plan — the diagrid starts here. */
   crownFraction: 0.22,
+
+  /**
+   * THE FLAT-PIECE RULE (FABRICATION.md §1a): every sheet piece is cut from
+   * flat 45 mm LVL, so it owns ONE plane. A run splits the moment its
+   * centreline bows more than maxDevM out of that plane, or its section
+   * would lean more than maxLeanDeg off the ideal surface normal.
+   */
+  flatPiece: {
+    /** Max centreline deviation from the piece plane (m). [TBC: what the
+     *  slotted holes + weld-fixture tolerance absorb] */
+    maxDevM: 0.008,
+    /** Max section lean off the local surface normal (deg) — blanks. [TBC] */
+    maxLeanDeg: 15,
+    /**
+     * INTERIM lamella lean cap (deg) — an honest open issue, not a solved
+     * number (FABRICATION.md §3): on the current polar net a two-bay
+     * lamella's flat plane leans far off the shell near the crown (the
+     * diagonal chains curve hard in-plan where spokes converge). The piece
+     * IS still flat + cuttable + its joints close — but a strongly leaning
+     * lamella is structurally weak. Real fix: net re-parameterization (§9).
+     * [TBC: engineer's structural lean limit]
+     */
+    maxLamellaLeanDeg: 45,
+  },
 
   /**
    * Eave beam blanks are curved pieces cut from sheet stock, spliced only at
@@ -108,15 +144,22 @@ export const JOINTS = {
   hub: {
     /** S355 laser-cut fin thickness (mm); strut end slot = fin + galv allowance. */
     finThicknessMm: 6,
-    slotMm: { width: 7, depth: 105 },
+    slotMm: { width: 7, depth: 185 },
     /** Fin plate the strut slots onto: 60 mm tall (inside the 70 mm depth). */
     finHeightMm: 60,
     /** M12×70 8.8 HDG through-bolts per strut end into the fin. */
     boltsPerStrutEnd: 2,
     boltSpec: 'M12×70 8.8 HDG + dome nut',
-    /** Bolt hole centres from the strut end face (mm) — FABRICATION.md §2. */
-    boltInsetsMm: [40, 85],
+    /**
+     * Bolt hole centres from the strut end face (mm) — DERIVED, not chosen
+     * (FABRICATION.md §2): EC5 for M12 in timber wants ≥ 5d = 60 mm spacing
+     * along grain and ≥ max(7d, 80) = 84 mm loaded-end distance. The slot
+     * reaches 40 mm past the last hole. [TBC: engineer confirmation]
+     */
+    boltInsetsMm: [85, 145],
     boltDiaMm: 12,
+    /** Clear timber between the two end slots of one strut (mm). */
+    slotClearanceMm: 50,
     /** Hub core drum diameter / height (mm). The core claims a cylindrical
      *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior core,
      *  ring flange assembly, ground shoe alike) — timber stays out of it. */
@@ -132,6 +175,13 @@ export const JOINTS = {
     strutStandoffM: 0.07,
     /** Timber-to-steel clearance at the envelope (mm). */
     envelopeClearanceMm: 10,
+    /**
+     * Upper envelope of the COMPUTED standoff across the joint family —
+     * envelope exit + neighbour clearance at the shallowest eave crossing.
+     * Feeds the derived minimum bay spacing (grammar.ts hubMinSpacingM);
+     * the millability sweep test enforces that this allowance is honest.
+     */
+    standoffAllowanceM: 0.125,
     /** At ring nodes the strut end also clears the blank's inner face (mm). */
     blankFaceClearanceMm: 5,
   },
@@ -152,6 +202,10 @@ export const JOINTS = {
   /** Mid-bay splice + split-weave nodes: square cuts leaving this total
    *  joint gap under the fish plates (half each side). */
   spliceGapM: 0.003,
+  /** Timber-to-timber clearance between neighbouring members at a node (mm)
+   *  — the standoff solver keeps every end face this far off every other
+   *  member's face, whatever the node angle. */
+  memberClearanceMm: 10,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -160,6 +214,12 @@ export const JOINTS = {
 export const FOUNDATION = {
   /** TODO: confirm screw spec per ground survey (FABRICATION.md §5). */
   groundScrewSpec: 'Ø76 × 865 mm HDG ground screw',
+  /**
+   * THE SPLASH PLANE (FABRICATION.md §5): no timber below this height at a
+   * ground node — end grain stays out of the splash zone; the shoe's welded
+   * upstand bridges the gap. [TBC: clearance per exposure class]
+   */
+  splashClearM: 0.15,
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -30,9 +30,9 @@
  * PURE data-in data-out (mutates the members it is handed, as part of
  * generateGeometry's build). No three.js.
  */
-import { JOINTS, STOCK } from '../data/config';
-import type { CanopyNode, EndCut, JointSystem, Member, Vec3 } from './types';
-import { vAdd, vCross, vDot, vNorm, vPerp, vScale, vSub } from './vec';
+import { FOUNDATION, JOINTS, STOCK } from '../data/config';
+import type { CanopyNode, EndCut, JointSystem, Member, Piece, Vec3 } from './types';
+import { vAdd, vCross, vDot, vLen, vNorm, vPerp, vScale, vSub } from './vec';
 
 const MM = 1 / 1000;
 
@@ -63,6 +63,115 @@ export function memberFrame(m: Member): { axis: Vec3; depth: Vec3; width: Vec3 }
   const depth = m.normal;
   const width = vNorm(vCross(axis, depth));
   return { axis, depth, width };
+}
+
+// ---------------------------------------------------------------------------
+// THE FLAT-PIECE RULE (FABRICATION.md §1a): a sheet piece is cut from flat
+// stock, so it owns ONE plane. flatPieceFit measures how well a run of
+// segments can live in a single plane; the run closers split on it, and
+// resolvePieceFrames orients every section to the final piece's plane.
+// ---------------------------------------------------------------------------
+
+export interface FlatFit {
+  /** The sheet plane: for a lamella the section DEPTH lies IN it (normal =
+   *  the 45 mm thickness direction); for a blank the section depth (45 mm
+   *  thickness) IS along the normal. */
+  origin: Vec3;
+  normal: Vec3;
+  /** Max centreline-node deviation from the plane (m). */
+  devM: number;
+  /** Max section lean off the ideal surface normal (deg). */
+  leanDeg: number;
+}
+
+const DEG_PER_RAD = 180 / Math.PI;
+
+/**
+ * Fit the sheet plane of a segment run: the support plane through the run's
+ * endpoints and its most-offset node (exact for ≤3 nodes; a tight, simple
+ * bound for longer runs). Falls back to a zero-lean construction from the
+ * mean ideal normal when the centreline is straight.
+ */
+export function flatPieceFit(segs: Member[], mode: 'lamella' | 'blank'): FlatFit {
+  const points: Vec3[] = [segs[0].start, ...segs.map((s) => s.end)];
+  const p0 = points[0];
+  const chord = vSub(points[points.length - 1], p0);
+  const chordDir = vNorm(chord);
+  const meanIdeal = vNorm(
+    segs.reduce<Vec3>((acc, s) => vAdd(acc, s.normal), [0, 0, 0]),
+  );
+
+  // Most-offset interior node from the chord line.
+  let q: Vec3 | null = null;
+  let qDist = 1e-5; // below this the centreline is straight
+  for (let i = 1; i < points.length - 1; i++) {
+    const rel = vSub(points[i], p0);
+    const off = vLen(vPerp(rel, chordDir));
+    if (off > qDist) {
+      qDist = off;
+      q = points[i];
+    }
+  }
+
+  let normal: Vec3;
+  if (q) {
+    normal = vNorm(vCross(chord, vSub(q, p0)));
+  } else if (mode === 'blank') {
+    // Straight band: plane contains the chord, normal as close to the ideal
+    // thickness direction (the surface normal) as possible.
+    normal = vNorm(vPerp(meanIdeal, chordDir));
+  } else {
+    // Straight lamella: plane contains the chord AND the ideal depth.
+    normal = vNorm(vCross(chordDir, meanIdeal));
+  }
+
+  let devM = 0;
+  for (const p of points) {
+    devM = Math.max(devM, Math.abs(vDot(vSub(p, p0), normal)));
+  }
+
+  let leanDeg = 0;
+  for (const s of segs) {
+    const axis = vNorm(vSub(s.end, s.start));
+    // The section direction the flat piece FORCES, vs the surface ideal.
+    const forced =
+      mode === 'lamella'
+        ? vNorm(vCross(normal, axis)) // depth lies in the plane
+        : vNorm(vPerp(normal, axis)); // thickness along the plane normal
+    const cos = Math.min(1, Math.abs(vDot(forced, s.normal)));
+    leanDeg = Math.max(leanDeg, Math.acos(cos) * DEG_PER_RAD);
+  }
+
+  return { origin: p0, normal, devM, leanDeg };
+}
+
+/**
+ * Orient every sheet piece's sections to its ONE plane (the run closers have
+ * already guaranteed the fit is inside tolerance). After this pass a
+ * two-bay lamella's two segments share their thickness direction exactly —
+ * which is what makes their mitre close exactly. Runs BEFORE
+ * resolveJointCuts, which consumes the frames.
+ */
+export function resolvePieceFrames(members: Member[], pieces: Piece[]): void {
+  const byId = new Map(members.map((m) => [m.id, m]));
+  for (const piece of pieces) {
+    if (piece.stock !== 'sheet') continue;
+    const segs = piece.memberIds.map((id) => byId.get(id)!);
+    const mode = piece.kind === 'lamella' ? 'lamella' : 'blank';
+    const fit = flatPieceFit(segs, mode);
+    piece.plane = { origin: fit.origin, normal: fit.normal };
+    piece.flatDevM = fit.devM;
+    piece.leanDeg = fit.leanDeg;
+    for (const m of segs) {
+      const axis = vNorm(vSub(m.end, m.start));
+      let d =
+        mode === 'lamella'
+          ? vNorm(vCross(fit.normal, axis))
+          : vNorm(vPerp(fit.normal, axis));
+      if (vDot(d, m.normal) < 0) d = vScale(d, -1);
+      m.normal = d;
+    }
+  }
 }
 
 /** One member end as seen from the node it lands on. */
@@ -131,6 +240,23 @@ export function resolveJointCuts(
       continue;
     }
 
+    // --- GROUND NODES (FABRICATION.md §5): every timber end — swept lattice,
+    // lamella and eave band alike — is square-cut clear of the SPLASH PLANE;
+    // the shoe's welded upstand bridges the gap. No timber sits at grade.
+    if (node.kind === 'ground') {
+      const diagridEnds = ends.filter((e) => isDiagrid(e.m.type));
+      for (const e of ends) {
+        const neighbours = diagridEnds.filter((o) => o !== e).map((o) => o.u);
+        const t = standoffM(e, node, neighbours, null, lamella ? 0 : envelopeR, 0, true);
+        setCut(e, {
+          point: vAdd(P, vScale(e.u, t)),
+          normal: vScale(e.u, -1),
+          kind: 'standoff',
+        });
+      }
+      continue;
+    }
+
     const assigned = new Set<EndRef>();
 
     /** Cut both ends of a pair on their shared bisector plane. */
@@ -164,22 +290,32 @@ export function resolveJointCuts(
     const open = ends.filter((e) => !assigned.has(e) && isDiagrid(e.m.type));
     if (open.length === 0) continue;
 
-    // Ring frame at ring nodes: the blank band's averaged width direction —
-    // in-surface, ⊥ the ring tangent. Blank-face planes and strut clearances
-    // are both measured along it.
+    // Ring frame at ring nodes: the blank band's true face direction — the
+    // averaged in-plane width dir of the two facets (their piece planes are
+    // resolved by now). Blank-face planes and strut clearances measure
+    // along it.
     const ringMembers = ends.filter((e) => isRing(e.m.type));
     let ringWidthDir: Vec3 | null = null;
     if (ringMembers.length >= 2) {
-      // Travel direction around the ring: the two ring ends point away from
-      // the node in opposite senses, so flip one before averaging.
-      const t = vNorm(vSub(ringMembers[0].u, ringMembers[1].u));
-      ringWidthDir = vNorm(vCross(t, node.normal));
+      const w0 = memberFrame(ringMembers[0].m).width;
+      let w1 = memberFrame(ringMembers[1].m).width;
+      if (vDot(w0, w1) < 0) w1 = vScale(w1, -1);
+      ringWidthDir = vNorm(vAdd(w0, w1));
     }
 
     if (!lamella) {
       // --- HUB: square cut at the computed standoff (FABRICATION.md §2). ---
       for (const e of open) {
-        const t = hubStandoffM(e, node, ringWidthDir, envelopeR, blankHalfM + blankClearM);
+        const neighbours = open.filter((o) => o !== e).map((o) => o.u);
+        const t = standoffM(
+          e,
+          node,
+          neighbours,
+          ringWidthDir,
+          envelopeR,
+          blankHalfM + blankClearM,
+          false,
+        );
         setCut(e, {
           point: vAdd(P, vScale(e.u, t)),
           normal: vScale(e.u, -1),
@@ -275,19 +411,24 @@ function trimAlong(node: Vec3, u: Vec3, cut: EndCut): number {
 }
 
 /**
- * The computed hub standoff (FABRICATION.md §1a/§2): smallest square-cut
- * length where every corner of the end face clears the node's connector
- * envelope (radius already includes the clearance), and — at ring nodes —
- * sits clear of the blank's inner face. Floor: the core radius.
+ * The computed standoff (FABRICATION.md §1a): smallest square-cut length
+ * where the whole end face clears every constraint that lives at this node —
+ * the connector envelope (radius includes the clearance; 0 disables), every
+ * NEIGHBOURING member's face (timber never touches timber, whatever the node
+ * angle), the blank's inner face at ring nodes, and the SPLASH PLANE at
+ * ground nodes. Floor: the hub core radius.
  */
-function hubStandoffM(
+function standoffM(
   e: EndRef,
   node: CanopyNode,
+  neighbourDirs: Vec3[],
   ringWidthDir: Vec3 | null,
   envelopeR: number,
   blankFaceOffsetM: number,
+  splash: boolean,
 ): number {
-  const { widthM, depthM } = sectionFor(e.m.type, 'hub');
+  const system: JointSystem = envelopeR > 0 ? 'hub' : 'lamella';
+  const { widthM, depthM } = sectionFor(e.m.type, system);
   const frame = memberFrame(e.m);
   const corners: Vec3[] = [];
   for (const sw of [-0.5, 0.5]) {
@@ -302,7 +443,7 @@ function hubStandoffM(
   // in t whose larger root is the exit distance from the envelope cylinder.
   const uT = vPerp(e.u, node.normal);
   const a = vDot(uT, uT);
-  if (a > 1e-8) {
+  if (a > 1e-8 && envelopeR > 0) {
     for (const o of corners) {
       const oT = vPerp(o, node.normal);
       const b = 2 * vDot(uT, oT);
@@ -312,8 +453,23 @@ function hubStandoffM(
     }
   }
 
+  // Neighbours: my end-face centre keeps half-widths + clearance from every
+  // other member's centreline ray. dist(t·u, ray v) = t·sin δ while the
+  // closest point is ahead of the node, else simply t.
+  const clearM = widthM / 2 + JOINTS.memberClearanceMm * MM; // + their w/2 below
+  for (const v of neighbourDirs) {
+    const need = clearM + STOCK.strut.widthMm * MM * 0.5;
+    const cos = vDot(e.u, v);
+    if (cos <= 0) {
+      t = Math.max(t, need);
+    } else {
+      const sin = Math.sqrt(Math.max(1e-6, 1 - cos * cos));
+      t = Math.max(t, need / sin);
+    }
+  }
+
   // Ring nodes: the end face also clears the blank's inner face plane.
-  if (ringWidthDir) {
+  if (ringWidthDir && blankFaceOffsetM > 0) {
     const s = Math.sign(vDot(e.u, ringWidthDir)) || 1;
     const n = vScale(ringWidthDir, s);
     const un = vDot(e.u, n);
@@ -321,6 +477,19 @@ function hubStandoffM(
       for (const o of corners) {
         t = Math.max(t, (blankFaceOffsetM - vDot(o, n)) / un);
       }
+    }
+  }
+
+  // Ground nodes: no corner of the end face below the splash plane (§5).
+  if (splash) {
+    const uy = e.u[1];
+    if (uy > 0.02) {
+      for (const o of corners) {
+        t = Math.max(t, (FOUNDATION.splashClearM - node.position[1] - o[1]) / uy);
+      }
+    } else {
+      // Near-horizontal arrival at grade: conservative fallback.
+      t = Math.max(t, FOUNDATION.splashClearM + depthM);
     }
   }
 

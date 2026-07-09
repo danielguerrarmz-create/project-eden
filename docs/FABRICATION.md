@@ -70,7 +70,7 @@ exactly one of these:
 
 | End condition | Where it occurs | The cut plane |
 |---|---|---|
-| **square standoff** | hub-system strut ends, every node kind | ⊥ member axis, at the smallest standoff where every corner of the end face clears the node's **connector envelope** (Ø140 cylinder about the node normal) by ≥ 10 mm — and, at ring nodes, clears the blank's inner face by ≥ 5 mm. Floor = core radius (70 mm). The end program stays identical; only length varies. |
+| **square standoff** | hub-system strut ends, every node kind; ALL timber ends at ground nodes (both systems) | ⊥ member axis, at the smallest standoff where every corner of the end face clears the node's **connector envelope** (Ø140 cylinder about the node normal) by ≥ 10 mm, clears every NEIGHBOURING member's centreline by half-width + 10 mm (timber never touches timber, whatever the node angle), at ring nodes clears the blank's inner face by ≥ 5 mm, and at ground nodes clears the **splash plane** (§5). Floor = core radius (70 mm). The end program stays identical; only length varies. |
 | **skew butt** | lamella ends at woven interior nodes | the continuous lamella's **side face**: offset half its 45 mm thickness + 2 mm assembly gap from the node centre, along its width direction. Cut as part of the CNC profile. |
 | **blank-face butt** | lamella ends at crown / eave / ground ring nodes | the blank's **inner face**: 90 mm from the ring centreline + 2 mm gap. |
 | **mitre** | wherever two segments of the SAME piece pass through a node (a two-bay lamella's through-node, blank facet-to-facet) and blank piece ends at ring nodes | the **bisector plane** of the two segment axes, through the node centre. Both sides cut on one plane → the faceted representation of a curved piece closes with zero gap or overlap. |
@@ -82,6 +82,25 @@ of a square-cut end face clip into the steel core. Solving the corner-
 clearance condition per end (typically 75–85 mm) keeps timber off steel at
 every approach angle while the milling program stays one program.
 
+**The flat-piece rule.** Every SHEET piece (lamella, eave/crown blank) is cut
+from flat 45 mm LVL, so each piece owns **one plane** — its sheet plane — and
+its section is oriented to that plane for its whole length, not re-tilted
+per segment. Two computed checks gate every sheet piece, and a run SPLITS the
+moment either would fail (exactly like the length rule):
+
+- **planarity**: every centreline node of the piece lies within ±8 mm
+  **[TBC: what the slotted holes + fixture tolerance absorb]** of the piece's
+  plane — a flat piece cannot bow out of its own plane;
+- **lean**: the plane-derived section direction stays within 15° **[TBC]**
+  of the ideal surface normal at every node — beyond that the flat piece
+  visibly falls off the shell and the crossing joints misalign.
+
+Consequences the model now shows honestly: the steeply-plunging eave beside a
+sweep foot splits into short single-facet blanks (a flat piece cannot follow
+that curve), and a two-bay lamella whose kink plane leaves the surface
+degrades to single bays. Mitred segments of one piece close EXACTLY, because
+both sections live in the same sheet plane.
+
 ## 2. Joint system A — "hub": steel node hubs + straight struts
 
 The flagship detail. Contemporary-gridshell standard (knife-plate node).
@@ -91,11 +110,16 @@ from 4.8 m linear stock on a CNC docking saw. Every strut end gets the SAME
 program, only lengths differ:
 
 1. dock cut, square to the member axis (±1 mm)
-2. central slot 7 × 105 mm (takes a 6 mm fin + galv allowance)
-3. 2 × Ø13 holes at 40 / 85 mm from the end
+2. central slot 7 × 185 mm (takes a 6 mm fin + galv allowance)
+3. 2 × Ø13 holes at **85 / 145 mm** from the end — these are DERIVED, not
+   chosen: EC5 bolt rules for M12 in timber want ≥ 5d = 60 mm spacing along
+   grain and ≥ max(7d, 80) = 84 mm loaded-end distance. (The earlier
+   40/85 mm draft failed the end-distance rule — an engineer's first
+   redline.) **[TBC: chartered-engineer confirmation of the joint family]**
 
 **Hubs** — S355 steel, 6 mm laser-cut parts: core disc Ø 140 mm + one fin
-(60 × 100 mm, 2 × Ø13) per arriving member, welded in a parametric fixture so
+(60 mm deep, reaching the full 185 mm slot, 2 × Ø13) per arriving member,
+welded in a parametric fixture so
 each fin's azimuth/dihedral matches the member axes, then hot-dip galvanized.
 Every hub is geometrically unique; uniqueness lives entirely in 2D cut files +
 fixture angles. Variants:
@@ -138,6 +162,24 @@ camber — you **cut** that, you don't bend it. So lamellas are CNC-profiled,
 120 mm deep, from **45 mm spruce LVL sheet stock (2.4 × 1.2 m)** — same sheet
 pipeline as the eave blanks. End ops are part of the same CNC profile: skew
 butt cut + slotted Ø13 end hole (tolerance take-up), Ø13 mid hole.
+
+**Honest caveat**: the classic Zollinger end hole sits closer to the piece's
+end than EC5's 7d loaded-end distance — the joint is compression-dominant
+and clamped, which is how the historic roofs stand, but this is exactly the
+detail a chartered engineer must sign, not the model. **[TBC: engineer
+sign-off of the lamella node]**
+
+**OPEN ISSUE — net torsion vs flat lamellas.** Measured on the current polar
+net, a two-bay flat lamella's plane leans **38–70°** off the shell normal:
+the diagonal chains curve hard in-plan (spokes converge toward the crown),
+and a flat on-edge piece cannot follow both that plan curvature and the
+surface camber. Zollinger's historic domain is barrel vaults and nets
+designed for low geodesic torsion — not this net. The model now applies the
+flat-piece rule honestly: pieces beyond the interim 45° lean cap **[TBC:
+engineer's structural limit]** degrade to single bays with fish plates, so
+MOST of the weave currently degrades. Restoring the true woven system is
+owned by the net re-parameterization roadmap item (§9); until then the
+lamella system is priced as what it actually is.
 
 **Milled-end geometry** (§1a): a butting lamella end is a **skew cut ON the
 continuous piece's side-face plane** — half its 45 mm thickness plus a 2 mm
@@ -183,6 +225,18 @@ lattice/lamella pieces; the grid node at each grammar-chosen foot bearing
 hand impact driver. One screw per grounded node. **[TBC: screw spec per
 ground survey]**
 
+**The splash plane — timber never sits at grade.** Durability (UC3 treated
+timber, end grain) demands the timber stop ABOVE the splash zone: every
+member end arriving at a ground node — swept lattice, lamella and the eave
+band alike — is square-cut so its whole end face clears **y = 150 mm**
+**[TBC: splash clearance per exposure]**. The steel bridges the gap: the
+ground shoe is the base plate over the screw plus a welded **upstand** (hub
+system: upstand fin the strut slots onto, same end program as every other
+end; lamella system: bent-plate stirrup gripping the piece's side faces —
+side bolts, no end slot, because a swept foot bay is too short to carry two
+full slots). The bearing NODE stays at y = 0 — that is the screw — but no
+timber does.
+
 In the lamella system, a two-bay piece that the plunging sweep bays would
 stretch past the sheet limit degrades to single-bay pieces, and that node is
 spliced with a fish plate instead of the plain single bolt — the hardware
@@ -217,6 +271,16 @@ every hub with its node id. The cut files ARE the instructions.
 
 ## 9. Roadmap — bookmarked, not built
 
+- **Net re-parameterization (fairness).** The polar net crowds bays toward
+  the crown, twists the diagonal chains, and the foot sweep compresses the
+  last bay above each shoe. Three quantified debts now hang on it:
+  `subMillableStrutCount` (crown-zone + foot-zone struts too short for two
+  EC5-length slots, counted per design), the §3 net-torsion issue (lamella
+  lean 38–70° → the weave degrades), and the §5 foot detail where the
+  splash standoff consumes most of the last bay (taller engineered upstand
+  **[TBC]**). A re-meshed net with near-uniform bays and low-torsion lamella
+  paths drives all three down and is the single highest-leverage geometry
+  improvement left.
 - **Joint system C — 5-axis all-timber joinery** (BUGA-Wood-Pavilion style
   milled timber-timber connections, no visible steel). Premium line; needs an
   industrial joinery partner (Hundegger/5-axis). Bookmarked in
