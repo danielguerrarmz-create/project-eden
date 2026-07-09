@@ -29,6 +29,7 @@ import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
 import { StrutFieldDiagram } from './engine/StrutFieldDiagram';
 import { HeroReveal } from './splash/HeroReveal';
 import { SplashHeader } from './splash/SplashHeader';
+import { AdaptiveCursor } from './splash/AdaptiveCursor';
 import { BowerIntro } from './splash/BowerIntro';
 import { SeasonalBecomingDiagram } from './splash/SeasonalBecomingDiagram';
 import { RegisterInterest } from './splash/RegisterInterest';
@@ -42,6 +43,10 @@ export function SplashPage() {
 
   return (
     <div className="min-h-screen w-full">
+      {/* Adaptive blend-difference cursor for the home page. Self-gates to fine
+          pointer + motion-allowed; renders nothing (native cursor) otherwise. */}
+      <AdaptiveCursor />
+
       {/* The "bower" intro: assembles center-screen, flies to the nav wordmark.
           Runs once per tab; reduced-motion / already-played render nothing. */}
       <BowerIntro />

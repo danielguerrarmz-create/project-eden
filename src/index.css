@@ -96,3 +96,15 @@ input[type='range'].botanical::-moz-range-thumb {
   border: 3px solid #f6f4ee;
   cursor: pointer;
 }
+
+/* AdaptiveCursor: while the blend-difference ring is live (fine pointer + motion
+   allowed only), the native arrow is replaced by the ring. Scoped to a root class so
+   it is fully removed on unmount / reduced-motion / touch — the native cursor always
+   returns. Range thumbs keep their own grab affordance for pointer precision. */
+html.adaptive-cursor-active,
+html.adaptive-cursor-active * {
+  cursor: none !important;
+}
+html.adaptive-cursor-active input[type='range'] {
+  cursor: pointer !important;
+}
