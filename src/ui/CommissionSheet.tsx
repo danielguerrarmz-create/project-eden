@@ -18,7 +18,7 @@ const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 export function CommissionSheet() {
   const open = useDesign((s) => s.commissionOpen);
   const setOpen = useDesign((s) => s.setCommissionOpen);
-  const { geometry, components, nesting, price, buildPlan, species } = useDesign((s) => s.outputs);
+  const { geometry, components, nesting, price, buildPlan } = useDesign((s) => s.outputs);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -31,9 +31,11 @@ export function CommissionSheet() {
 
   if (!open) return null;
 
-  const designCode = `${WORDMARK.toUpperCase()}-${geometry.footprintM2.toFixed(0)}-${Math.round(
-    geometry.riseM * 100,
-  )}-${Math.round(geometry.params.strutSpacingM * 1000)}-${Math.round(geometry.params.apertureDeg)}`;
+  const designCode = `${WORDMARK.toUpperCase()}-${geometry.params.jointSystem === 'hub' ? 'H' : 'L'}-${geometry.footprintM2.toFixed(
+    0,
+  )}-${Math.round(geometry.riseM * 100)}-${Math.round(
+    geometry.params.strutSpacingM * 1000,
+  )}-${Math.round(geometry.params.apertureDeg)}`;
 
   return (
     <div
@@ -82,14 +84,17 @@ export function CommissionSheet() {
 
         {/* Key figures */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Fact label="components" value={`${components.totalCount}`} />
-          <Fact label="distinct parts" value={`${components.items.length}`} />
+          <Fact
+            label="construction"
+            value={geometry.params.jointSystem === 'hub' ? 'steel hubs' : 'lamella weave'}
+          />
+          <Fact label="timber pieces" value={`${components.totalCount}`} />
+          <Fact label="joints" value={`${geometry.nodes.length} nodes`} />
           <Fact label="CNC sheets" value={`${nesting.sheets.length}`} />
+          <Fact label="ground screws" value={`${geometry.groundScrewCount}`} />
           <Fact label="assembly steps" value={`${buildPlan.assemblySteps}`} />
           <Fact label="lead time" value={`~${buildPlan.leadTimeWeeks} wks`} />
-          <Fact label="feet" value={`${geometry.feetCount} grounded`} />
           <Fact label="canopy" value={`${geometry.spanM.toFixed(1)} × ${geometry.riseM.toFixed(2)} m`} />
-          <Fact label="planting" value={`${buildPlan.plantCount}× ${species.common.toLowerCase()}`} />
         </div>
 
         {/* Nesting preview */}
@@ -102,13 +107,14 @@ export function CommissionSheet() {
           <NestingPreview />
         </Section>
 
-        {/* BOM */}
-        <Section title={`bill of materials · ${components.items.length} distinct parts`}>
+        {/* BOM — timber pieces */}
+        <Section title={`cut schedule · ${components.items.length} distinct pieces`}>
           <div className="max-h-56 overflow-auto rounded-xl border border-line bg-white/40 p-3 font-mono text-[11px] text-inkSoft">
             {components.items.map((it, i) => (
               <div key={i} className="flex justify-between border-b border-line/50 py-0.5 last:border-0">
                 <span>
-                  {it.count}× {it.type}
+                  {it.count}× {it.kind}
+                  <span className="text-inkFaint"> · {it.stock === 'sheet' ? 'LVL sheet' : 'linear C24'}</span>
                 </span>
                 <span>{it.lengthM.toFixed(2)} m</span>
               </div>
@@ -118,10 +124,25 @@ export function CommissionSheet() {
               <span>{components.totalLengthM} m total</span>
             </div>
           </div>
+        </Section>
+
+        {/* BOM — connectors, fasteners, foundations, armature */}
+        <Section title={`hardware schedule · counted from the node graph`}>
+          <div className="max-h-56 overflow-auto rounded-xl border border-line bg-white/40 p-3 font-mono text-[11px] text-inkSoft">
+            {components.hardware.map((h) => (
+              <div key={h.id} className="flex justify-between gap-4 border-b border-line/50 py-0.5 last:border-0">
+                <span>{h.label}</span>
+                <span className="shrink-0">
+                  {h.qty.toLocaleString('en-GB')} {h.unit ?? 'pcs'}
+                </span>
+              </div>
+            ))}
+          </div>
           <p className="mt-2 text-[11px] leading-relaxed text-inkFaint">
-            Real geometry, discretised into flat cuttable members. Structural validity comes from
-            staying inside a pre-engineered family, certainty inside a designed envelope, not a
-            claim that any form is valid.
+            Every joint is an explicit node in the model, so connectors and bolts are counted, not
+            estimated (docs/FABRICATION.md). Structural validity comes from staying inside a
+            pre-engineered family — certainty inside a designed envelope, not a claim that any form
+            is valid.
           </p>
         </Section>
 

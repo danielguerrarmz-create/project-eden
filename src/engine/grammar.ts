@@ -95,11 +95,17 @@ export function deriveBounds(params: DesignParams): GrammarBounds {
     maxRule: rise.rule,
   };
 
+  // The bay cap is JOINT-SYSTEM dependent: a lamella spans two bays through
+  // its node and the whole curved piece must fit the sheet cut limit, so
+  // switching to the lamella system visibly tightens this slider.
+  const lamella = params.jointSystem === 'lamella';
   const strutSpacingM: ParamBound = {
     min: GRAMMAR.minStrutSpacingM,
-    max: GRAMMAR.maxStrutSpacingM,
-    minRule: `node joints would overlap below ${Math.round(GRAMMAR.minStrutSpacingM * 1000)} mm — cuttability limit`,
-    maxRule: `unsupported panel span would exceed the flat-piece curvature tolerance`,
+    max: lamella ? GRAMMAR.maxLamellaSpacingM : GRAMMAR.maxStrutSpacingM,
+    minRule: `connector hardware would overlap below ${Math.round(GRAMMAR.minStrutSpacingM * 1000)} mm bays — joint clearance limit`,
+    maxRule: lamella
+      ? `a two-bay lamella must fit the ${GRAMMAR.maxComponentLengthM} m sheet cut limit`
+      : `unsupported armature span would exceed the flat-piece curvature tolerance`,
   };
 
   const apertureDeg: ParamBound = {
@@ -114,6 +120,11 @@ export function deriveBounds(params: DesignParams): GrammarBounds {
   const notes: string[] = [
     `${feet} feet — eave blanks at ${blank.toFixed(2)} m fit the ${GRAMMAR.sheet.lengthM} m sheet`,
   ];
+  if (lamella) {
+    notes.push(
+      `lamella system — bays cap at ${GRAMMAR.maxLamellaSpacingM} m so a two-bay piece fits the sheet`,
+    );
+  }
   // Narrate the moment the grammar added a foot (within ~0.4 m² of the switch).
   if (feet > GRAMMAR.minFeet) {
     const prevFeetBlank =
@@ -133,11 +144,13 @@ export function deriveBounds(params: DesignParams): GrammarBounds {
 export function clampParams(p: DesignParams): DesignParams {
   const footprintM2 = clamp(p.footprintM2, ENVELOPE.footprintM2.min, ENVELOPE.footprintM2.max);
   const rise = riseCapM(footprintM2);
+  const spacingCap =
+    p.jointSystem === 'lamella' ? GRAMMAR.maxLamellaSpacingM : GRAMMAR.maxStrutSpacingM;
   return {
     ...p,
     footprintM2,
     riseM: clamp(p.riseM, GRAMMAR.minHeadroomM, rise.cap),
-    strutSpacingM: clamp(p.strutSpacingM, GRAMMAR.minStrutSpacingM, GRAMMAR.maxStrutSpacingM),
+    strutSpacingM: clamp(p.strutSpacingM, GRAMMAR.minStrutSpacingM, spacingCap),
     apertureDeg: ((p.apertureDeg % 360) + 360) % 360,
   };
 }

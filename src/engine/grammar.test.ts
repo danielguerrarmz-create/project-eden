@@ -14,8 +14,9 @@ import type { DesignParams } from './types';
 const base: DesignParams = {
   footprintM2: 15,
   riseM: 2.3,
-  strutSpacingM: 0.35,
+  strutSpacingM: 0.55,
   apertureDeg: 90,
+  jointSystem: 'hub',
   speciesId: 'clematis',
   year: 0,
 };
@@ -102,9 +103,23 @@ describe('grammar: deriveBounds + clampParams', () => {
     expect(wild.apertureDeg).toBeLessThan(360);
   });
 
-  it('surfaces a grammar note about feet + sheet fit', () => {
+  it('the lamella system caps bay spacing tighter (two-bay piece must fit the sheet)', () => {
+    const hub = deriveBounds({ ...base, jointSystem: 'hub' });
+    const lam = deriveBounds({ ...base, jointSystem: 'lamella' });
+    expect(hub.strutSpacingM.max).toBe(GRAMMAR.maxStrutSpacingM);
+    expect(lam.strutSpacingM.max).toBe(GRAMMAR.maxLamellaSpacingM);
+    expect(lam.strutSpacingM.max).toBeLessThan(hub.strutSpacingM.max);
+    expect(lam.strutSpacingM.maxRule).toMatch(/two-bay lamella/i);
+
+    const clamped = clampParams({ ...base, jointSystem: 'lamella', strutSpacingM: 9 });
+    expect(clamped.strutSpacingM).toBe(GRAMMAR.maxLamellaSpacingM);
+  });
+
+  it('surfaces a grammar note about feet + sheet fit, and narrates the lamella cap', () => {
     const bounds = deriveBounds(base);
     expect(bounds.notes.length).toBeGreaterThan(0);
     expect(bounds.notes[0]).toMatch(/feet/i);
+    const lam = deriveBounds({ ...base, jointSystem: 'lamella' });
+    expect(lam.notes.some((n) => /lamella/i.test(n))).toBe(true);
   });
 });

@@ -17,6 +17,7 @@ const base: DesignParams = {
   apertureDeg: 90,
   speciesId: 'wisteria',
   year: 0,
+  jointSystem: 'hub',
 };
 
 describe('directManip — pure drag->params fitting', () => {

@@ -10,8 +10,9 @@ const DASHES = /[—–]/; // em dash, en dash: never allowed in rendered copy
 const base: DesignParams = {
   footprintM2: 12, // small footprint: exercises the crown-curvature caption
   riseM: 2.3,
-  strutSpacingM: 0.35,
+  strutSpacingM: 0.55,
   apertureDeg: 90,
+  jointSystem: 'hub',
   speciesId: 'lonicera',
   year: 0,
 };

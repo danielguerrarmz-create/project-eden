@@ -1,18 +1,22 @@
 /**
- * NestingPreview.tsx — components laid out on CNC sheets (demo-spec §2.5).
+ * NestingPreview.tsx — the kit's stock plan, drawn (demo-spec §2.5).
  *
- * The credibility kicker on the spec sheet: the actual cut blanks of THIS
- * design, shelf-nested onto 2.4 × 1.2 m sheet stock, drawn to scale as SVG.
- * Rectangles-on-sheets photographs like the real pipeline because it is the
- * real pipeline, one abstraction earlier.
+ * The credibility kicker on the spec sheet: the actual CURVED pieces of THIS
+ * design (lamellas, eave + crown blanks) shelf-nested onto 2.4 × 1.2 m LVL
+ * sheet stock, drawn to scale as SVG — plus the linear-stock line for the
+ * docking-saw pieces (hub struts), which honestly do NOT come from
+ * sheets. Rectangles-on-sheets photographs like the real pipeline because it
+ * is the real pipeline, one abstraction earlier.
  */
+import { STOCK } from '../data/config';
 import { useDesign } from '../state/store';
-import type { Member } from '../engine/types';
+import type { Piece } from '../engine/types';
 
-const PART_FILL: Record<Member['type'], string> = {
-  lattice: '#b39a77',
-  eave: '#8a7355',
-  foot: '#5b4632',
+const PART_FILL: Record<Piece['kind'], string> = {
+  strut: '#b39a77', // (linear stock — only ever nested if data goes wrong)
+  lamella: '#a98e68',
+  eaveBlank: '#8a7355',
+  crownBlank: '#75603f',
 };
 
 const MAX_SHEETS_SHOWN = 6;
@@ -21,6 +25,7 @@ export function NestingPreview() {
   const nesting = useDesign((s) => s.outputs.nesting);
   const shown = nesting.sheets.slice(0, MAX_SHEETS_SHOWN);
   const hidden = nesting.sheets.length - shown.length;
+  const { stockPlan } = nesting;
 
   // Draw in cm so the numbers stay friendly.
   const W = nesting.sheetLengthM * 100;
@@ -46,7 +51,7 @@ export function NestingPreview() {
                   width={p.lengthM * 100}
                   height={p.widthM * 100}
                   rx={0.8}
-                  fill={PART_FILL[p.type]}
+                  fill={PART_FILL[p.kind]}
                   stroke="#f6f4ee"
                   strokeWidth={0.35}
                 />
@@ -62,12 +67,22 @@ export function NestingPreview() {
       {hidden > 0 && (
         <p className="mt-2 text-[11px] text-inkFaint">+ {hidden} more sheets, same stock</p>
       )}
+      {stockPlan.pieceCount > 0 && (
+        <p className="mt-2 text-[11px] text-inkSoft">
+          + linear stock: {stockPlan.pieceCount} docking-saw pieces from{' '}
+          <span className="font-medium">
+            {stockPlan.lengthsNeeded}× {stockPlan.stockLengthM} m
+          </span>{' '}
+          lengths of {STOCK.strut.widthMm}×{STOCK.strut.depthMm} {STOCK.strut.grade} (
+          {Math.round(stockPlan.utilisation * 100)}% into pieces, offcuts counted)
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-inkFaint">
-        <LegendSwatch color={PART_FILL.lattice} label="lattice struts" />
-        <LegendSwatch color={PART_FILL.eave} label="eave + crown blanks" />
-        <LegendSwatch color={PART_FILL.foot} label="foot sweeps" />
+        <LegendSwatch color={PART_FILL.lamella} label="lamellas" />
+        <LegendSwatch color={PART_FILL.eaveBlank} label="eave blanks" />
+        <LegendSwatch color={PART_FILL.crownBlank} label="crown blanks" />
         <span>
-          stock: {nesting.sheetLengthM} × {nesting.sheetWidthM} m CNC sheet
+          sheet stock: {nesting.sheetLengthM} × {nesting.sheetWidthM} m · {STOCK.blank.thicknessMm} mm LVL
         </span>
       </div>
     </div>

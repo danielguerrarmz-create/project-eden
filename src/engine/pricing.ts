@@ -1,34 +1,44 @@
 /**
- * pricing.ts — price = Σ components × rate + fabrication + install +
- * groundwork + planting + margin, shown as ONE FIXED figure (demo-spec §2.3).
+ * pricing.ts — price built line-by-line from the REAL kit:
+ * stock actually ordered (linear lengths + LVL sheets, waste included),
+ * fabrication ops (sheet CNC + docking programs), the hardware schedule from
+ * joints.ts, install, planting, margin — shown as ONE FIXED figure.
  *
- * The price ticks live beside the viewport on every parameter change. It is
- * built ENTIRELY from named constants in data/config.ts — not one magic number
- * in this file. The decomposition (components / fabrication / install /
- * planting) is shown on the panel because decomposition = credibility; the
- * margin is shown plainly too, because hiding it would be the overclaim the
- * application warns against.
+ * Every rate is a named constant in data/config.ts — not one magic number in
+ * this file. The decomposition is shown on the panel because decomposition =
+ * credibility; the margin is shown plainly too.
  *
  * >>> THE SINGLE MOST IMPORTANT TODO IN THE WHOLE DEMO <<<
- * PRICING.ratePerComponentGBP is a PLACEHOLDER until Clay's fab quote lands
- * (~Day 4–6). Swap the constants in config.ts and every number here is real.
- * Until then: the price MOVES correctly, it is not yet TRUE.
+ * Every unit rate in PRICING is a PLACEHOLDER until fab quotes land. The
+ * price MOVES correctly — it is built from the true BOM — it is not yet TRUE.
  */
 import { PRICING } from '../data/config';
-import type { CanopyGeometry, ComponentList, PriceBreakdown, Species } from './types';
+import type { ComponentList, NestingResult, PriceBreakdown, Species } from './types';
 
 export function priceDesign(
-  geometry: CanopyGeometry,
   components: ComponentList,
+  nesting: NestingResult,
   species: Species,
   plantCount: number,
 ): PriceBreakdown {
-  const componentsGBP = components.totalCount * PRICING.ratePerComponentGBP;
-  const fabricationGBP = components.totalLengthM * PRICING.cutCostPerMetreGBP;
-  const installGBP =
-    PRICING.installBaseGBP +
-    components.totalCount * PRICING.installPerComponentGBP +
-    geometry.feetCount * PRICING.groundworkPerFootGBP;
+  // --- Materials: what actually gets ordered, waste included. ---
+  const timberGBP =
+    nesting.stockPlan.lengthsNeeded * nesting.stockPlan.stockLengthM * PRICING.timberPerMetreGBP;
+  const sheetsGBP = nesting.sheets.length * PRICING.lvlSheetGBP;
+  const hardwareGBP = components.hardware.reduce(
+    (sum, h) => sum + h.qty * (PRICING.hardwareGBP[h.id] ?? 0),
+    0,
+  );
+  const componentsGBP = timberGBP + sheetsGBP + hardwareGBP;
+
+  // --- Fabrication ops: CNC sheet profiling + docking-saw end programs. ---
+  const fabricationGBP =
+    nesting.sheets.length * PRICING.sheetCncGBP +
+    nesting.stockPlan.pieceCount * PRICING.dockingPerPieceGBP;
+
+  // --- Install: mobilisation + per-piece labour (screws priced as driven). ---
+  const installGBP = PRICING.installBaseGBP + components.totalCount * PRICING.installPerComponentGBP;
+
   const plantingGBP = plantCount * PRICING.plantingPerPlantGBP;
 
   const subtotalGBP = componentsGBP + fabricationGBP + installGBP + plantingGBP;
@@ -39,16 +49,26 @@ export function priceDesign(
     Math.ceil((subtotalGBP + marginGBP) / PRICING.roundTotalToGBP) * PRICING.roundTotalToGBP;
 
   const r = (x: number) => Math.round(x);
+  const screws = components.hardware.find((h) => h.id === 'groundScrew')?.qty ?? 0;
 
   const lines: PriceBreakdown['lines'] = [
     {
-      label: `${components.totalCount} CNC components`,
-      valueGBP: r(componentsGBP),
-      note: 'PLACEHOLDER rate — TODO: wire real fab quote',
+      label: `Timber stock — ${nesting.stockPlan.lengthsNeeded}× ${nesting.stockPlan.stockLengthM} m lengths + ${nesting.sheets.length} LVL sheets`,
+      valueGBP: r(timberGBP + sheetsGBP),
+      note: 'ordered stock incl. offcuts — PLACEHOLDER rates until fab quote',
     },
-    { label: `Fabrication (${components.totalLengthM} m cut & finished)`, valueGBP: r(fabricationGBP) },
     {
-      label: `Install & groundwork (${geometry.feetCount} feet)`,
+      label: `Steel & fixings — ${components.hardware
+        .filter((h) => h.id !== 'armatureWirePerM')
+        .reduce((n, h) => n + h.qty, 0)} counted items, ${screws} ground screws`,
+      valueGBP: r(hardwareGBP),
+    },
+    {
+      label: `Fabrication — ${nesting.sheets.length} sheets CNC'd, ${nesting.stockPlan.pieceCount} docking programs`,
+      valueGBP: r(fabricationGBP),
+    },
+    {
+      label: `Install — ${components.totalCount} pieces, crew + delivery`,
       valueGBP: r(installGBP),
     },
     { label: `Planting allowance — ${plantCount}× ${species.common}`, valueGBP: r(plantingGBP) },

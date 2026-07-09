@@ -14,7 +14,7 @@ import { create } from 'zustand';
 import { ENVELOPE, GROWTH } from '../data/config';
 import { runEngine } from '../engine';
 import { DEFAULT_SPECIES_ID, SPECIES_BY_ID } from '../engine/species';
-import type { DesignParams, EngineOutputs } from '../engine/types';
+import type { DesignParams, EngineOutputs, JointSystem } from '../engine/types';
 import type { Year } from '../data/config';
 
 export type OverlayKey = 'strutHeatmap' | 'growth';
@@ -27,6 +27,7 @@ const defaultParams: DesignParams = {
   riseM: ENVELOPE.riseM.default,
   strutSpacingM: ENVELOPE.strutSpacingM.default,
   apertureDeg: ENVELOPE.apertureDeg.default,
+  jointSystem: ENVELOPE.jointSystem,
   speciesId: DEFAULT_SPECIES_ID,
   year: 0,
 };
@@ -49,6 +50,7 @@ export function paramsFromURL(): DesignParams {
     riseM: num(q.get('r')) ?? defaultParams.riseM,
     strutSpacingM: num(q.get('s')) ?? defaultParams.strutSpacingM,
     apertureDeg: num(q.get('ap')) ?? defaultParams.apertureDeg,
+    jointSystem: q.get('j') === 'lamella' ? 'lamella' : q.get('j') === 'hub' ? 'hub' : defaultParams.jointSystem,
     speciesId: q.get('sp') && SPECIES_BY_ID[q.get('sp')!] ? q.get('sp')! : defaultParams.speciesId,
     year: (GROWTH.years as readonly number[]).includes(year ?? -1) ? (year as Year) : 0,
   };
@@ -60,6 +62,7 @@ function urlFor(params: DesignParams): string {
     r: params.riseM.toFixed(2),
     s: params.strutSpacingM.toFixed(2),
     ap: String(Math.round(params.apertureDeg)),
+    j: params.jointSystem,
     sp: params.speciesId,
     y: String(params.year),
   });
@@ -92,6 +95,7 @@ interface DesignState {
   reserved: boolean;
 
   setParam: (key: SliderKey, value: number) => void;
+  setJointSystem: (system: JointSystem) => void;
   setSpecies: (id: string) => void;
   setYear: (year: Year) => void;
   setOverlay: (key: OverlayKey, on: boolean) => void;
@@ -124,6 +128,8 @@ export const useDesign = create<DesignState>((set, get) => {
     reserved: false,
 
     setParam: (key, value) => set(recompute({ [key]: value })),
+
+    setJointSystem: (jointSystem) => set(recompute({ jointSystem })),
 
     setSpecies: (id) => set(recompute({ speciesId: id })),
 
