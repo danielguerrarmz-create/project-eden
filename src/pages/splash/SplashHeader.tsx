@@ -13,19 +13,43 @@
 import { BowerMark } from '../../ui/BowerMark';
 import { routes } from '../../routing';
 
-/** One nav link with a left-origin underline grow on hover/focus. */
+/**
+ * One nav link inside the glass capsule: a left-origin underline grow (unchanged) plus
+ * a soft local backlight under the hovered link only (a backlight, not a glow), which
+ * collapses to instant under reduced motion.
+ */
 function NavLink({ href, children }: { href: string; children: string }) {
   return (
     <a
       href={href}
-      className="group relative font-mono text-[13px] uppercase tracking-[0.14em] text-inkBlack transition-opacity hover:opacity-100 focus-visible:opacity-100"
+      className="group relative rounded-full px-3 py-1.5 font-mono text-[13px] uppercase tracking-[0.14em] text-inkBlack transition-colors duration-150 ease-out hover:bg-white/40 focus-visible:bg-white/40 motion-reduce:transition-none"
     >
       {children}
       <span
         aria-hidden
-        className="pointer-events-none absolute -bottom-1 left-0 h-px w-full origin-left scale-x-0 bg-inkBlack transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100"
+        className="pointer-events-none absolute -bottom-0.5 left-3 right-3 h-px origin-left scale-x-0 bg-inkBlack transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100 motion-reduce:transition-none"
       />
     </a>
+  );
+}
+
+/**
+ * The lens-refraction filter for the glass pill: an feDisplacementMap fed a radial
+ * bump map (white center = undisplaced, gray rim = max warp), chained into the pill's
+ * backdrop-filter so the field colours passing under it bend at the rim like a lens.
+ * Rendered once, hidden; browsers that can't chain an SVG filter into backdrop-filter
+ * simply fall back to plain frosted glass (see .nav-pill in index.css).
+ */
+function LensFilter() {
+  const bump =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='60'><radialGradient id='g'><stop offset='0%' stop-color='%23808080'/><stop offset='75%' stop-color='%23a0a0a0'/><stop offset='100%' stop-color='%23e8e8e8'/></radialGradient><rect width='200' height='60' fill='url(%23g)'/></svg>";
+  return (
+    <svg width="0" height="0" aria-hidden className="absolute">
+      <filter id="lensWarp" x="-20%" y="-20%" width="140%" height="140%">
+        <feImage href={bump} result="bump" preserveAspectRatio="none" />
+        <feDisplacementMap in="SourceGraphic" in2="bump" scale="16" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
   );
 }
 
@@ -41,7 +65,8 @@ export function SplashHeader() {
           · living architecture for the garden
         </span>
       </a>
-      <nav className="flex items-center gap-6">
+      <LensFilter />
+      <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
         <NavLink href="#how-it-works">how it works</NavLink>
         <NavLink href={routes.studio}>engine</NavLink>
         <NavLink href={routes.about}>about</NavLink>

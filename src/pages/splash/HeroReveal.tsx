@@ -18,7 +18,8 @@
  *   - reduced motion    -> the FINAL state, static, no reveal ('staticRender').
  *   - no WebGL / SSR     -> a poster: the Oculus mark + the copy, no canvas ('poster').
  */
-import { Suspense, lazy, useEffect, useRef, type MutableRefObject } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
 import { OculusMark } from '../../ui/OculusMark';
 import { webglSupported } from '../../ui/webgl';
@@ -64,30 +65,124 @@ export function heroMode(o: { isBrowser: boolean; webgl: boolean; reduced: boole
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** The hero copy: one outcome headline (with the animated cursive "Eden") + one mission
- *  line, sized to sit as a slim bottom band so the structure keeps the frame. When
- *  `edenRef` is given, the cursive word is driven by the reveal; else it CSS-writes on. */
-function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | null> }) {
-  const driven = !!edenRef;
+/**
+ * The cursive "Eden" as a single connected stroke path (Track B, spec §3.2): one pen
+ * line that draws itself on via stroke-dashoffset, then a filled copy of the same path
+ * settles in UNDER it so the word firms from a drawn line into a solid wordmark. Using
+ * `pathLength={1}` normalises the dash to [0,1] so the reveal needs no getTotalLength()
+ * measurement and no flash before layout.
+ *
+ * INTERIM ASSET: this path is a hand-authored cursive tracing, structured as one
+ * swappable constant. Replace EDEN_PATH with Daniel's own hand-lettered "Eden" (or a
+ * clean Dancing-Script glyph extraction) for final signature fidelity — the draw-on
+ * mechanics below are asset-agnostic and won't change.
+ */
+const EDEN_PATH =
+  'M66,46 C54,30 30,30 26,48 C23,62 44,64 54,58 C42,66 40,70 48,72 C34,74 22,90 40,100 ' +
+  'C54,110 72,102 74,90 C80,80 88,72 92,62 C86,52 72,52 68,64 C65,76 80,80 90,70 ' +
+  'C96,54 104,38 108,24 C110,18 116,20 114,30 C110,52 106,76 108,90 C109,97 116,97 122,90 ' +
+  'C132,80 132,66 120,64 C110,62 104,74 112,84 C118,92 132,90 140,82 C146,78 148,68 146,62 ' +
+  'C158,54 172,58 172,74 C172,84 170,90 172,96 C178,84 184,70 194,64 C204,60 210,68 208,82 ' +
+  'C207,90 206,94 210,96';
+
+/**
+ * Renders the Eden wordmark. When `strokeRef`/`fillRef` are given the reveal drives them
+ * (stroke starts fully dashed-out, fill starts transparent); otherwise it renders the
+ * FINISHED state directly (full stroke + fill), which is what the poster and
+ * reduced-motion (StaticRender) heroes want — no animation where motion is unwelcome.
+ */
+function EdenWord({
+  strokeRef,
+  fillRef,
+  className = '',
+}: {
+  strokeRef?: MutableRefObject<SVGPathElement | null>;
+  fillRef?: MutableRefObject<SVGPathElement | null>;
+  className?: string;
+}) {
+  const driven = !!strokeRef;
   return (
-    <div>
-      <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.0] tracking-[-0.02em] text-inkBlack">
-        Grow a living{' '}
-        <span
-          ref={edenRef}
-          className={`font-handwrite pr-[0.06em] text-[1.15em] font-semibold not-italic leading-[0.8] ${
-            driven ? '' : 'animate-write-on'
-          }`}
-          style={driven ? { clipPath: 'inset(0 100% 0 0)', opacity: 0.4 } : undefined}
-        >
-          Eden
-        </span>{' '}
-        in your garden.
+    <svg viewBox="0 0 232 128" role="img" aria-label="Eden" className={`block h-auto text-inkBlack ${className}`}>
+      <path ref={fillRef} d={EDEN_PATH} fill="currentColor" stroke="none" style={driven ? { opacity: 0 } : undefined} />
+      <path
+        ref={strokeRef}
+        d={EDEN_PATH}
+        pathLength={1}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={driven ? { strokeDasharray: 1, strokeDashoffset: 1 } : undefined}
+      />
+    </svg>
+  );
+}
+
+/** The hero copy: one outcome headline (with the drawn cursive "Eden") + one mission
+ *  line, sized to sit as a slim bottom band so the structure keeps the frame. When the
+ *  Eden refs are given, the word is driven by the reveal; else it renders finished. */
+/**
+ * The hero copy's GROWTH reveal (spec + Daniel's note: the text should grow into place,
+ * not fade). Each line rises from its own baseline under an upward clip (like something
+ * sprouting) + a slight scale-from-smaller, on a soft spring that settles (no bounce,
+ * no linear fade), and the lines stagger so it composes as one orchestrated moment. The
+ * cursive "Eden" is excluded — its stroke-draw IS its growth. Reduced-motion never
+ * reaches this: those users render the finished state via the non-orchestrated path.
+ */
+const copyContainer: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.14, delayChildren: 0.04 } },
+};
+const growLine: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.96, clipPath: 'inset(100% 0% -12% 0%)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    clipPath: 'inset(0% 0% -12% 0%)',
+    transition: { type: 'spring', stiffness: 120, damping: 20, mass: 0.9 },
+  },
+};
+
+function HeroCopy({
+  edenStrokeRef,
+  edenFillRef,
+  orchestrate = false,
+  show = true,
+}: {
+  edenStrokeRef?: MutableRefObject<SVGPathElement | null>;
+  edenFillRef?: MutableRefObject<SVGPathElement | null>;
+  /** True in the timed reveal: start hidden and grow in when `show` flips. Off elsewhere
+   *  (poster / reduced-motion) so the text renders finished with no motion. */
+  orchestrate?: boolean;
+  show?: boolean;
+}) {
+  return (
+    <motion.div
+      variants={copyContainer}
+      initial={orchestrate ? 'hidden' : 'show'}
+      animate={show ? 'show' : 'hidden'}
+    >
+      <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-inkBlack">
+        <motion.span variants={growLine} className="block origin-bottom will-change-transform">
+          Grow a living
+        </motion.span>
+        {/* The product name is the hero's one display moment: a drawn cursive word on
+            its own line, drastically larger than the sentence. Its stroke-draw is its
+            own growth, so it sits outside the line-stagger variants. */}
+        <EdenWord strokeRef={edenStrokeRef} fillRef={edenFillRef} className="my-1 w-[clamp(11rem,30vw,21rem)]" />
+        <motion.span variants={growLine} className="block origin-bottom will-change-transform">
+          in your garden.
+        </motion.span>
       </h1>
-      <p className="mt-4 max-w-[36ch] font-serifDisplay text-[17px] leading-snug text-inkBlack/70">
+      <motion.p
+        variants={growLine}
+        className="mt-4 max-w-[36ch] origin-bottom font-serifDisplay text-[17px] leading-snug text-inkBlack/70 will-change-transform"
+      >
         Rewilding gardens through architecture anyone can build.
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   );
 }
 
@@ -95,7 +190,7 @@ function HeroCopy({ edenRef }: { edenRef?: MutableRefObject<HTMLSpanElement | nu
  *  reads over the render while the structure keeps the upper frame. */
 function CopyBand({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-28 md:px-10 md:pb-12">
+    <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12">
       <div className="mx-auto max-w-[1120px]">{children}</div>
     </div>
   );
@@ -150,8 +245,13 @@ function AutoHero() {
   const copyRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLDivElement>(null);
-  const edenRef = useRef<HTMLSpanElement>(null);
+  const edenStrokeRef = useRef<SVGPathElement>(null);
+  const edenFillRef = useRef<SVGPathElement>(null);
   const invalidateRef = useRef<(() => void) | null>(null);
+  // Latched once when the reveal reaches the copy beat: flips the growth reveal on. A
+  // ref guards so the rAF loop sets React state exactly once, not every frame.
+  const [showCopy, setShowCopy] = useState(false);
+  const copyLatch = useRef(false);
 
   // Drive every layer imperatively off one progress value: the canvas fade-in, the
   // Oculus fade-out, the copy reveal, and the cursive Eden write-on. Time-driven off
@@ -172,14 +272,20 @@ function AutoHero() {
         oculusRef.current.style.transform = `scale(${1 + 0.15 * Math.min(1, p / ob)})`;
       }
       if (copyRef.current) {
-        const t = clamp01((p - ca) / (cb - ca));
-        copyRef.current.style.opacity = String(t);
-        copyRef.current.style.transform = `translateY(${(1 - t) * 24}px)`;
+        // The band fades its vellum gradient in; the per-line growth spring (below,
+        // latched) carries the motion, so the band itself no longer translates.
+        copyRef.current.style.opacity = String(clamp01((p - ca) / (cb - ca)));
       }
-      if (edenRef.current) {
+      if (!copyLatch.current && p >= ca) {
+        copyLatch.current = true;
+        setShowCopy(true); // fire the framer-motion growth reveal, exactly once
+      }
+      if (edenStrokeRef.current) {
         const t = clamp01((p - ea) / (eb - ea));
-        edenRef.current.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
-        edenRef.current.style.opacity = String(0.4 + 0.6 * t);
+        // Draw the pen line on (dashoffset 1 -> 0), then firm the fill in under it over
+        // the last quarter of the window, so the word resolves line -> solid wordmark.
+        edenStrokeRef.current.style.strokeDashoffset = String(1 - t);
+        if (edenFillRef.current) edenFillRef.current.style.opacity = String(clamp01((t - 0.75) / 0.25));
       }
       // Cross-fade the beauty still in over the resolved render. Off in capture mode and
       // while the still is a placeholder, so the reveal ends on the three.js geometry.
@@ -332,11 +438,11 @@ function AutoHero() {
           the containing block and break the absolute `bottom-0`). */}
       <div
         ref={copyRef}
-        className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-28 md:px-10 md:pb-12"
-        style={{ opacity: 0, transform: 'translateY(24px)', willChange: 'opacity, transform' }}
+        className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12"
+        style={{ opacity: 0, willChange: 'opacity' }}
       >
         <div className="mx-auto max-w-[1120px]">
-          <HeroCopy edenRef={edenRef} />
+          <HeroCopy edenStrokeRef={edenStrokeRef} edenFillRef={edenFillRef} orchestrate show={showCopy} />
         </div>
       </div>
     </section>

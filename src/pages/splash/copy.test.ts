@@ -20,7 +20,7 @@ describe('splash precedent copy (hand-authored, house dash rule)', () => {
   it('the ritual is five steps and carries the live component count', () => {
     const steps = ritualSteps(217);
     expect(steps).toHaveLength(5);
-    expect(steps[2].text).toContain('~217 components');
+    expect(steps[2].text).toContain('~217 flat timber components');
     for (const step of steps) expect(step.text).not.toMatch(DASHES);
   });
 
@@ -47,6 +47,6 @@ describe('ritual figures come from the engine, not hardcoded', () => {
     expect(Number.isInteger(components.totalCount)).toBe(true);
     expect(buildPlan.leadTimeWeeks).toBeGreaterThan(0);
     // The rendered ritual step must reflect whatever the engine actually computed.
-    expect(ritualSteps(components.totalCount)[2].text).toContain(`~${components.totalCount} components`);
+    expect(ritualSteps(components.totalCount)[2].text).toContain(`~${components.totalCount} flat timber components`);
   });
 });
