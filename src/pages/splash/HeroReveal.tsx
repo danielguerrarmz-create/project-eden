@@ -18,7 +18,8 @@
  *   - reduced motion    -> the FINAL state, static, no reveal ('staticRender').
  *   - no WebGL / SSR     -> a poster: the Oculus mark + the copy, no canvas ('poster').
  */
-import { Suspense, lazy, useEffect, useRef, type MutableRefObject } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
 import { OculusMark } from '../../ui/OculusMark';
 import { webglSupported } from '../../ui/webgl';
@@ -121,28 +122,67 @@ function EdenWord({
 /** The hero copy: one outcome headline (with the drawn cursive "Eden") + one mission
  *  line, sized to sit as a slim bottom band so the structure keeps the frame. When the
  *  Eden refs are given, the word is driven by the reveal; else it renders finished. */
+/**
+ * The hero copy's GROWTH reveal (spec + Daniel's note: the text should grow into place,
+ * not fade). Each line rises from its own baseline under an upward clip (like something
+ * sprouting) + a slight scale-from-smaller, on a soft spring that settles (no bounce,
+ * no linear fade), and the lines stagger so it composes as one orchestrated moment. The
+ * cursive "Eden" is excluded — its stroke-draw IS its growth. Reduced-motion never
+ * reaches this: those users render the finished state via the non-orchestrated path.
+ */
+const copyContainer: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.14, delayChildren: 0.04 } },
+};
+const growLine: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.96, clipPath: 'inset(100% 0% -12% 0%)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    clipPath: 'inset(0% 0% -12% 0%)',
+    transition: { type: 'spring', stiffness: 120, damping: 20, mass: 0.9 },
+  },
+};
+
 function HeroCopy({
   edenStrokeRef,
   edenFillRef,
+  orchestrate = false,
+  show = true,
 }: {
   edenStrokeRef?: MutableRefObject<SVGPathElement | null>;
   edenFillRef?: MutableRefObject<SVGPathElement | null>;
+  /** True in the timed reveal: start hidden and grow in when `show` flips. Off elsewhere
+   *  (poster / reduced-motion) so the text renders finished with no motion. */
+  orchestrate?: boolean;
+  show?: boolean;
 }) {
   return (
-    <div>
+    <motion.div
+      variants={copyContainer}
+      initial={orchestrate ? 'hidden' : 'show'}
+      animate={show ? 'show' : 'hidden'}
+    >
       <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-inkBlack">
-        <span className="block">Grow a living</span>
+        <motion.span variants={growLine} className="block origin-bottom will-change-transform">
+          Grow a living
+        </motion.span>
         {/* The product name is the hero's one display moment: a drawn cursive word on
-            its own line, drastically larger than the sentence. Width in clamp() so it
-            scales with the viewport; the two plain lines stay hero-size so the semantic
-            <h1> still reads as one whole sentence (the SVG carries aria-label="Eden"). */}
+            its own line, drastically larger than the sentence. Its stroke-draw is its
+            own growth, so it sits outside the line-stagger variants. */}
         <EdenWord strokeRef={edenStrokeRef} fillRef={edenFillRef} className="my-1 w-[clamp(11rem,30vw,21rem)]" />
-        <span className="block">in your garden.</span>
+        <motion.span variants={growLine} className="block origin-bottom will-change-transform">
+          in your garden.
+        </motion.span>
       </h1>
-      <p className="mt-4 max-w-[36ch] font-serifDisplay text-[17px] leading-snug text-inkBlack/70">
+      <motion.p
+        variants={growLine}
+        className="mt-4 max-w-[36ch] origin-bottom font-serifDisplay text-[17px] leading-snug text-inkBlack/70 will-change-transform"
+      >
         Rewilding gardens through architecture anyone can build.
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   );
 }
 
@@ -208,6 +248,10 @@ function AutoHero() {
   const edenStrokeRef = useRef<SVGPathElement>(null);
   const edenFillRef = useRef<SVGPathElement>(null);
   const invalidateRef = useRef<(() => void) | null>(null);
+  // Latched once when the reveal reaches the copy beat: flips the growth reveal on. A
+  // ref guards so the rAF loop sets React state exactly once, not every frame.
+  const [showCopy, setShowCopy] = useState(false);
+  const copyLatch = useRef(false);
 
   // Drive every layer imperatively off one progress value: the canvas fade-in, the
   // Oculus fade-out, the copy reveal, and the cursive Eden write-on. Time-driven off
@@ -228,9 +272,13 @@ function AutoHero() {
         oculusRef.current.style.transform = `scale(${1 + 0.15 * Math.min(1, p / ob)})`;
       }
       if (copyRef.current) {
-        const t = clamp01((p - ca) / (cb - ca));
-        copyRef.current.style.opacity = String(t);
-        copyRef.current.style.transform = `translateY(${(1 - t) * 24}px)`;
+        // The band fades its vellum gradient in; the per-line growth spring (below,
+        // latched) carries the motion, so the band itself no longer translates.
+        copyRef.current.style.opacity = String(clamp01((p - ca) / (cb - ca)));
+      }
+      if (!copyLatch.current && p >= ca) {
+        copyLatch.current = true;
+        setShowCopy(true); // fire the framer-motion growth reveal, exactly once
       }
       if (edenStrokeRef.current) {
         const t = clamp01((p - ea) / (eb - ea));
@@ -391,10 +439,10 @@ function AutoHero() {
       <div
         ref={copyRef}
         className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12"
-        style={{ opacity: 0, transform: 'translateY(24px)', willChange: 'opacity, transform' }}
+        style={{ opacity: 0, willChange: 'opacity' }}
       >
         <div className="mx-auto max-w-[1120px]">
-          <HeroCopy edenStrokeRef={edenStrokeRef} edenFillRef={edenFillRef} />
+          <HeroCopy edenStrokeRef={edenStrokeRef} edenFillRef={edenFillRef} orchestrate show={showCopy} />
         </div>
       </div>
     </section>
