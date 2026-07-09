@@ -13,6 +13,7 @@ const defaults: DesignParams = {
   apertureDeg: ENVELOPE.apertureDeg.default,
   speciesId: 'lonicera',
   year: 0,
+  jointSystem: ENVELOPE.jointSystem,
 };
 
 describe('splash precedent copy (hand-authored, house dash rule)', () => {

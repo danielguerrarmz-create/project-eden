@@ -104,7 +104,7 @@ describe('formFinding — gridshell construction', () => {
   const shell = buildGridshell();
 
   it('builds (rings+1)*spokes nodes', () => {
-    expect(shell.n).toBe((6 + 1) * 18);
+    expect(shell.n).toBe((4 + 1) * 14);
   });
 
   it('pins exactly `feet` ground anchors at y=0', () => {

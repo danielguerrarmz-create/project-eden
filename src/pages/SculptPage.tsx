@@ -22,16 +22,22 @@ import { FAB_MIN_M, FAB_MAX_M, type ShellStats } from '../engine/formFinding';
 
 /**
  * Density presets. The first three are BUILDABLE (out-of-spec holds at 0). The
- * naive polar grid converges toward the crown, so past ~170 nodes the crown-ring
+ * naive polar grid converges toward the crown, so past a node ceiling the shortest
  * struts fall below the fab minimum — 'perf' deliberately crosses that ceiling to
  * show it: the solver stays real-time but buildability breaks (topology, not the
  * solver, is the production risk — see the plan doc). Oculus scales with spokes to
  * keep the crown ring buildable as long as the grid can.
+ *
+ * Re-tuned for Clay's manufacturable engine: the joint-clearance floor rose from
+ * 0.25 m to FAB_MIN_M = 0.45 m (hub/lamella connectors need real spacing), so the
+ * buildable envelope is COARSER — the three buildable presets top out near ~90
+ * nodes now, not ~170. A finer mesh simply cannot be built under a 0.45 m joint
+ * floor; 'perf' still crosses the line on purpose to visualise that.
  */
 const DENSITY = [
-  { label: 'coarse', spokes: 14, rings: 5, oculus: 0.43, buildable: true },
-  { label: 'default', spokes: 18, rings: 6, oculus: 0.43, buildable: true },
-  { label: 'fine', spokes: 28, rings: 5, oculus: 0.65, buildable: true },
+  { label: 'coarse', spokes: 12, rings: 4, oculus: 0.48, buildable: true },
+  { label: 'default', spokes: 14, rings: 4, oculus: 0.48, buildable: true },
+  { label: 'fine', spokes: 18, rings: 4, oculus: 0.55, buildable: true },
   { label: 'perf', spokes: 40, rings: 14, oculus: 0.6, buildable: false },
 ] as const;
 

@@ -41,8 +41,10 @@ const TGT_TOP = new THREE.Vector3(0, 1.0, 0);
 // beside the copy (which lives bottom-left) rather than behind it.
 const TGT_OBLIQUE = new THREE.Vector3(-2.6, 1.15, 0);
 
-/** Visual gauge per component type (mirrors Folly.tsx). */
-const GAUGE: Record<Member['type'], number> = { lattice: 1, eave: 1.7, foot: 1.9 };
+/** Visual gauge per component type (mirrors Folly.tsx / engine sectionFor). Tracks the
+ *  real section depth: strut 70 mm -> 1, lamella 120 mm -> 1.3, eave/crown blank 180 mm
+ *  -> 1.7, foot 1.9. lamella + crown arrived with Clay's manufacturable engine. */
+const GAUGE: Record<Member['type'], number> = { lattice: 1, lamella: 1.3, eave: 1.7, crown: 1.7, foot: 1.9 };
 
 /** Coverage the hero render shows regardless of the studio's year. Restrained so the
  *  timber structure stays the subject and the greenery reads as climbing, not a hedge. */

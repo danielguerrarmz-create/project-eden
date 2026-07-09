@@ -72,7 +72,7 @@ export interface GrabPoint {
 
 // --- fabrication grammar, surfaced as the HARD limits buildability is judged on ---
 /** Absolute cuttable strut-length limits from the grammar. Nothing may leave these. */
-export const FAB_MIN_M = GRAMMAR.minStrutSpacingM; // 0.25 — joints overlap below this
+export const FAB_MIN_M = GRAMMAR.minStrutSpacingM; // 0.45 — hub/lamella connectors overlap below this
 export const FAB_MAX_M = GRAMMAR.maxComponentLengthM; // 2.35 — longest blank off a sheet
 
 export interface SolveOpts {
@@ -139,9 +139,15 @@ export function bandTarget(len: number, rest: number, lmin: number, lmax: number
 /** Buildable band for a strut of rest length `rest`, clamped inside the fab limits. */
 export function buildBand(rest: number): { lmin: number; lmax: number } {
   // Clay range ±: shrink to half, stretch to 1.6×, then clamp to the hard fab limits.
+  // lmin floors at the joint-clearance minimum (FAB_MIN_M). For a rest so short that
+  // the ×1.6 ceiling would fall BELOW that floor, the band collapses to a single
+  // rigid length at FAB_MIN_M rather than inverting — a strut shorter than a joint
+  // can be is simply pinned up to the minimum, never a negative band. (The seed grid
+  // is tuned so real struts sit above FAB_MIN_M with room; this only guards degenerate
+  // rests that arrive under a hard grab.)
   const lmin = Math.max(FAB_MIN_M, rest * 0.5);
-  const lmax = Math.min(FAB_MAX_M, rest * 1.6);
-  return { lmin: Math.min(lmin, lmax), lmax };
+  const lmax = Math.max(lmin, Math.min(FAB_MAX_M, rest * 1.6));
+  return { lmin, lmax };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,15 +170,21 @@ export interface ShellOpts {
 }
 
 export const DEFAULT_SHELL: ShellOpts = {
-  // A polar grid converges toward the crown, so oculus + spoke count are chosen
-  // so EVERY seed strut — including the shortest crown-ring and near-crown radial
-  // — is born inside the fabrication limits. See the params sweep in the plan doc.
-  rings: 6,
-  spokes: 18,
-  a: 2.2,
-  b: 1.76,
-  rise: 2.3,
-  oculus: 0.43,
+  // A polar grid converges toward the crown, so oculus + spoke count are chosen so
+  // EVERY seed strut — including the shortest (the near-eave radials) — is born inside
+  // the fabrication limits. Clay's manufacturable engine raised the joint-clearance
+  // floor to FAB_MIN_M = 0.45 m (hub/lamella connectors need real spacing, not the
+  // old 0.25 m idealised-node minimum), so the seed grid is COARSER and the pavilion
+  // larger than the pre-fabrication spike: at these params the shortest seed strut is
+  // ~0.52 m (radial) and the longest ~1.56 m, both comfortably inside [0.45, 2.35].
+  // Denser presets (SculptPage 'fine'/'perf') fall below 0.45 and are flagged
+  // unbuildable there — a fine mesh is not manufacturable under a 0.45 m joint floor.
+  rings: 4,
+  spokes: 14,
+  a: 3.1,
+  b: 2.5,
+  rise: 3.0,
+  oculus: 0.48,
   feet: 4,
 };
 
