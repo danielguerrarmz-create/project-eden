@@ -10,10 +10,11 @@
  * and docs/hero-fuser-prompt.md. Bump the version folder (v1 -> v2) to reland a new render.
  */
 export const HERO_STILL = {
-  /** Public path to the beauty still. PLACEHOLDER (our aesthetic-reference render, wrong
-   *  geometry) until the structure-locked Fuser render lands. */
-  src: '/hero/v1/pavilion.jpg',
-  placeholder: true,
+  /** Public path to the beauty still that cross-fades in at the end of the reveal.
+   *  v3: the Eden pavilion in an Austin neighbourhood park at golden hour, framed at
+   *  3:2 (5056x3392) with sky headroom so it covers the full-bleed hero without bars. */
+  src: '/hero/v3/pavilion.jpg',
+  placeholder: false,
 } as const;
 
 /**

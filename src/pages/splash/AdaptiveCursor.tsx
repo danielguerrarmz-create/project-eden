@@ -29,8 +29,17 @@ import { motion, useMotionValue, useSpring } from 'framer-motion';
 
 /** Anything the ring should grow over. Add `data-cursor-hover` to opt something in. */
 const INTERACTIVE = 'a,button,[role="button"],[data-cursor-hover]';
-const SIZE = 14;
-const HOVER_SCALE = 3.14; // 14px -> ~44px
+// The disc is RENDERED at BASE px and only ever scaled DOWN (every scale below is <= 1).
+// This matters: `will-change: transform` + `mix-blend-mode: difference` promotes the ring
+// to a compositor layer rasterised once at its natural size, so scaling UP would upscale
+// that texture and the circle's edge would go blocky/square. Rendering big and downscaling
+// keeps the edge a crisp, perfect circle at every state.
+const BASE = 60;
+const REST = 14 / BASE; // resting disc ~14px
+const GLASS = 30 / BASE; // over the glass nav ~30px
+const HOVER = 56 / BASE; // over interactive targets (logo, links) ~56px — the big state
+// Rendered at BASE, the solid ring's border is scaled by GLASS on screen, so 3px reads ~1.5px.
+const SOLID_BORDER = '3px solid #ACC13A';
 
 export function AdaptiveCursor() {
   const [mounted, setMounted] = useState(false);
@@ -71,7 +80,7 @@ function Ring({ reduced }: { reduced: boolean }) {
   const rawY = useMotionValue(-100);
   const x = useSpring(rawX, posCfg);
   const y = useSpring(rawY, posCfg);
-  const scale = useSpring(1, scaleCfg);
+  const scale = useSpring(REST, scaleCfg);
   const [visible, setVisible] = useState(false);
   // Over the glass nav the blend-difference ring composites THROUGH the backdrop
   // displacement filter and rasterises coarse. So over anything `[data-cursor-solid]`
@@ -85,8 +94,9 @@ function Ring({ reduced }: { reduced: boolean }) {
 
     const onMove = (e: PointerEvent) => {
       // Offset by the radius so the circle's CENTER tracks the pointer, not its corner.
-      rawX.set(e.clientX - SIZE / 2);
-      rawY.set(e.clientY - SIZE / 2);
+      // (Scale is about the element centre, so the visual centre stays on the pointer.)
+      rawX.set(e.clientX - BASE / 2);
+      rawY.set(e.clientY - BASE / 2);
       setVisible(true);
     };
     // pointerover bubbles and fires on every element entered, so recomputing the hover
@@ -97,8 +107,9 @@ function Ring({ reduced }: { reduced: boolean }) {
       const t = e.target as Element | null;
       const overGlass = !!(t && t.closest && t.closest('[data-cursor-solid]'));
       setSolid(overGlass);
-      // Over glass: a modest ring (2.2x). Elsewhere: grow over interactive, else rest.
-      scale.set(overGlass ? 2.2 : t && t.closest && t.closest(INTERACTIVE) ? HOVER_SCALE : 1);
+      // Over glass: a modest ring. Elsewhere: grow big over interactive (logo/links), else rest.
+      // The scale spring animates the smaller<->bigger circle transition on its own.
+      scale.set(overGlass ? GLASS : t && t.closest && t.closest(INTERACTIVE) ? HOVER : REST);
     };
     const onLeave = () => setVisible(false);
     const onEnter = () => setVisible(true);
@@ -121,8 +132,8 @@ function Ring({ reduced }: { reduced: boolean }) {
       aria-hidden
       className="pointer-events-none fixed left-0 top-0 z-[200] rounded-full will-change-transform"
       style={{
-        width: SIZE,
-        height: SIZE,
+        width: BASE,
+        height: BASE,
         x,
         y,
         scale,
@@ -130,7 +141,7 @@ function Ring({ reduced }: { reduced: boolean }) {
         boxSizing: 'border-box',
         // Solid crisp ring over glass; white blend-difference disc everywhere else.
         backgroundColor: solid ? 'transparent' : '#fff',
-        border: solid ? '1.5px solid #ACC13A' : 'none',
+        border: solid ? SOLID_BORDER : 'none',
         mixBlendMode: solid ? 'normal' : 'difference',
       }}
     />

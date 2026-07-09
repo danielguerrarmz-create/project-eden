@@ -66,56 +66,37 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
- * The cursive "Eden" as a single connected stroke path (Track B, spec §3.2): one pen
- * line that draws itself on via stroke-dashoffset, then a filled copy of the same path
- * settles in UNDER it so the word firms from a drawn line into a solid wordmark. Using
- * `pathLength={1}` normalises the dash to [0,1] so the reveal needs no getTotalLength()
- * measurement and no flash before layout.
+ * The product name "Eden" as the hero's one handwritten moment, set in the cursive
+ * `handwrite` face (Dancing Script, already loaded in index.html). It is REAL text —
+ * legible, selectable, accessible — not the old single hand-authored pen-stroke path,
+ * whose filled copy collapsed into an ink blob (a self-intersecting stroke outline can't
+ * be filled into a clean glyph).
  *
- * INTERIM ASSET: this path is a hand-authored cursive tracing, structured as one
- * swappable constant. Replace EDEN_PATH with Daniel's own hand-lettered "Eden" (or a
- * clean Dancing-Script glyph extraction) for final signature fidelity — the draw-on
- * mechanics below are asset-agnostic and won't change.
- */
-const EDEN_PATH =
-  'M66,46 C54,30 30,30 26,48 C23,62 44,64 54,58 C42,66 40,70 48,72 C34,74 22,90 40,100 ' +
-  'C54,110 72,102 74,90 C80,80 88,72 92,62 C86,52 72,52 68,64 C65,76 80,80 90,70 ' +
-  'C96,54 104,38 108,24 C110,18 116,20 114,30 C110,52 106,76 108,90 C109,97 116,97 122,90 ' +
-  'C132,80 132,66 120,64 C110,62 104,74 112,84 C118,92 132,90 140,82 C146,78 148,68 146,62 ' +
-  'C158,54 172,58 172,74 C172,84 170,90 172,96 C178,84 184,70 194,64 C204,60 210,68 208,82 ' +
-  'C207,90 206,94 210,96';
-
-/**
- * Renders the Eden wordmark. When `strokeRef`/`fillRef` are given the reveal drives them
- * (stroke starts fully dashed-out, fill starts transparent); otherwise it renders the
- * FINISHED state directly (full stroke + fill), which is what the poster and
- * reduced-motion (StaticRender) heroes want — no animation where motion is unwelcome.
+ * When `revealRef` is given the reveal drives a left-to-right CLIP wipe, so the word
+ * appears as if being written by hand; otherwise it renders finished (poster /
+ * reduced-motion), where motion is unwelcome.
  */
 function EdenWord({
-  strokeRef,
-  fillRef,
+  revealRef,
   className = '',
 }: {
-  strokeRef?: MutableRefObject<SVGPathElement | null>;
-  fillRef?: MutableRefObject<SVGPathElement | null>;
+  revealRef?: MutableRefObject<HTMLSpanElement | null>;
   className?: string;
 }) {
-  const driven = !!strokeRef;
+  const driven = !!revealRef;
   return (
-    <svg viewBox="0 0 232 128" role="img" aria-label="Eden" className={`block h-auto text-inkBlack ${className}`}>
-      <path ref={fillRef} d={EDEN_PATH} fill="currentColor" stroke="none" style={driven ? { opacity: 0 } : undefined} />
-      <path
-        ref={strokeRef}
-        d={EDEN_PATH}
-        pathLength={1}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={driven ? { strokeDasharray: 1, strokeDashoffset: 1 } : undefined}
-      />
-    </svg>
+    <span
+      ref={revealRef}
+      role="img"
+      aria-label="Eden"
+      className={`inline-block font-handwrite font-semibold leading-[0.9] ${className}`}
+      // Start fully clipped from the right (hidden) when driven; the reveal opens it
+      // left -> right. Negative top/bottom/left insets keep ascenders, descenders and the
+      // leading edge un-shaved.
+      style={driven ? { clipPath: 'inset(-15% 100% -15% -5%)', willChange: 'clip-path' } : undefined}
+    >
+      Eden
+    </span>
   );
 }
 
@@ -146,39 +127,48 @@ const growLine: Variants = {
 };
 
 function HeroCopy({
-  edenStrokeRef,
-  edenFillRef,
+  edenRevealRef,
   orchestrate = false,
   show = true,
+  onImage = false,
 }: {
-  edenStrokeRef?: MutableRefObject<SVGPathElement | null>;
-  edenFillRef?: MutableRefObject<SVGPathElement | null>;
+  edenRevealRef?: MutableRefObject<HTMLSpanElement | null>;
   /** True in the timed reveal: start hidden and grow in when `show` flips. Off elsewhere
    *  (poster / reduced-motion) so the text renders finished with no motion. */
   orchestrate?: boolean;
   show?: boolean;
+  /** True when the copy sits over the photographic beauty still: switch to luminous
+   *  cream ink (the Eden cursive inherits it) so it reads against the render. Off over
+   *  the vellum poster, which keeps the dark house ink. */
+  onImage?: boolean;
 }) {
+  const ink = onImage ? 'text-paperVellum' : 'text-inkBlack';
+  const inkSoft = onImage ? 'text-paperVellum/90' : 'text-inkBlack/70';
   return (
     <motion.div
       variants={copyContainer}
       initial={orchestrate ? 'hidden' : 'show'}
       animate={show ? 'show' : 'hidden'}
+      className={onImage ? '[text-shadow:0_1px_18px_rgba(0,0,0,0.45)]' : undefined}
     >
-      <h1 className="max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-inkBlack">
+      <h1
+        className={`max-w-[15ch] font-quote text-[clamp(2rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-[-0.02em] ${ink}`}
+      >
         <motion.span variants={growLine} className="block origin-bottom will-change-transform">
           Grow a living
         </motion.span>
         {/* The product name is the hero's one display moment: a drawn cursive word on
             its own line, drastically larger than the sentence. Its stroke-draw is its
-            own growth, so it sits outside the line-stagger variants. */}
-        <EdenWord strokeRef={edenStrokeRef} fillRef={edenFillRef} className="my-1 w-[clamp(11rem,30vw,21rem)]" />
+            own growth, so it sits outside the line-stagger variants. It inherits the
+            headline colour, so it goes cream over the render and ink over the poster. */}
+        <EdenWord revealRef={edenRevealRef} className="my-1 text-[clamp(4rem,11vw,7.5rem)]" />
         <motion.span variants={growLine} className="block origin-bottom will-change-transform">
           in your garden.
         </motion.span>
       </h1>
       <motion.p
         variants={growLine}
-        className="mt-4 max-w-[36ch] origin-bottom font-serifDisplay text-[17px] leading-snug text-inkBlack/70 will-change-transform"
+        className={`mt-4 max-w-[36ch] origin-bottom font-serifDisplay text-[17px] leading-snug will-change-transform ${inkSoft}`}
       >
         Rewilding gardens through architecture anyone can build.
       </motion.p>
@@ -186,12 +176,33 @@ function HeroCopy({
   );
 }
 
-/** A slim bottom band holding the copy, with a soft upward vellum gradient so the copy
- *  reads over the render while the structure keeps the upper frame. */
-function CopyBand({ children }: { children: React.ReactNode }) {
+/** The beauty still, full-bleed. The render is framed at 3:2 with sky headroom, so a
+ *  clean object-cover fills the whole hero with no letterbox bars. object-bottom pins the
+ *  image's BOTTOM edge to the viewport, so on short (wide, not-tall) windows the crop eats
+ *  the disposable sky headroom off the TOP and the foreground/people stay fully visible. */
+function HeroStill() {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12">
-      <div className="mx-auto max-w-[1120px]">{children}</div>
+    <img
+      src={HERO_STILL.src}
+      alt=""
+      className="absolute inset-0 h-full w-full object-cover object-bottom"
+    />
+  );
+}
+
+/** A slim bottom band holding the copy. Over the photographic still (`onImage`) it lays a
+ *  soft dark, feathered scrim (a vignette, not a hard block) so the cream copy stands out;
+ *  over the vellum poster it stays clean, the dark ink needing no help. */
+function CopyBand({ children, onImage = false }: { children: React.ReactNode; onImage?: boolean }) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 pt-40 md:px-10 md:pb-12">
+      {onImage && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/25 to-transparent"
+        />
+      )}
+      <div className="relative mx-auto max-w-[1120px]">{children}</div>
     </div>
   );
 }
@@ -229,10 +240,12 @@ function StaticRenderHero() {
         </Suspense>
       </div>
       {STILL_ENABLED && (
-        <img src={HERO_STILL.src} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        <div className="pointer-events-none absolute inset-0">
+          <HeroStill />
+        </div>
       )}
-      <CopyBand>
-        <HeroCopy />
+      <CopyBand onImage={STILL_ENABLED}>
+        <HeroCopy onImage={STILL_ENABLED} />
       </CopyBand>
     </section>
   );
@@ -245,8 +258,7 @@ function AutoHero() {
   const copyRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLDivElement>(null);
-  const edenStrokeRef = useRef<SVGPathElement>(null);
-  const edenFillRef = useRef<SVGPathElement>(null);
+  const edenRevealRef = useRef<HTMLSpanElement>(null);
   const invalidateRef = useRef<(() => void) | null>(null);
   // Latched once when the reveal reaches the copy beat: flips the growth reveal on. A
   // ref guards so the rAF loop sets React state exactly once, not every frame.
@@ -280,12 +292,11 @@ function AutoHero() {
         copyLatch.current = true;
         setShowCopy(true); // fire the framer-motion growth reveal, exactly once
       }
-      if (edenStrokeRef.current) {
+      if (edenRevealRef.current) {
         const t = clamp01((p - ea) / (eb - ea));
-        // Draw the pen line on (dashoffset 1 -> 0), then firm the fill in under it over
-        // the last quarter of the window, so the word resolves line -> solid wordmark.
-        edenStrokeRef.current.style.strokeDashoffset = String(1 - t);
-        if (edenFillRef.current) edenFillRef.current.style.opacity = String(clamp01((t - 0.75) / 0.25));
+        // Left-to-right handwriting wipe: open the clip from the right edge (100% -> 0%)
+        // so the cursive word appears as if being written by hand.
+        edenRevealRef.current.style.clipPath = `inset(-15% ${100 * (1 - t)}% -15% -5%)`;
       }
       // Cross-fade the beauty still in over the resolved render. Off in capture mode and
       // while the still is a placeholder, so the reveal ends on the three.js geometry.
@@ -429,7 +440,7 @@ function AutoHero() {
           className="pointer-events-none absolute inset-0"
           style={{ opacity: 0, willChange: 'opacity' }}
         >
-          <img src={HERO_STILL.src} alt="" className="h-full w-full object-cover" />
+          <HeroStill />
         </div>
       )}
 
@@ -438,11 +449,17 @@ function AutoHero() {
           the containing block and break the absolute `bottom-0`). */}
       <div
         ref={copyRef}
-        className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-paperVellum via-paperVellum/75 to-transparent px-6 pb-10 pt-40 md:px-10 md:pb-12"
+        className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 pt-40 md:px-10 md:pb-12"
         style={{ opacity: 0, willChange: 'opacity' }}
       >
-        <div className="mx-auto max-w-[1120px]">
-          <HeroCopy edenStrokeRef={edenStrokeRef} edenFillRef={edenFillRef} orchestrate show={showCopy} />
+        {STILL_ENABLED && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/25 to-transparent"
+          />
+        )}
+        <div className="relative mx-auto max-w-[1120px]">
+          <HeroCopy edenRevealRef={edenRevealRef} orchestrate show={showCopy} onImage={STILL_ENABLED} />
         </div>
       </div>
     </section>
