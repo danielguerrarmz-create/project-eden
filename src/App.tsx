@@ -7,6 +7,11 @@
  * toggle, a live fixed price beside the viewport, and a Commission button
  * that opens the spec sheet + nesting preview. No steps, no accounts, no
  * backend; the design persists as a URL.
+ *
+ * 2026-07-10 chrome unify: the studio now wears the site's documentation-layer
+ * language (paperVellum ground, editorial serif headings, hairline + mono labels,
+ * olive accent) so it matches the engine and about pages. The 3D Scene, the store,
+ * the sliders, pricing, and every behaviour are UNCHANGED — this is wrapper only.
  */
 import { GROWTH } from './data/config';
 import { SPECIES } from './engine/species';
@@ -18,12 +23,18 @@ import { ParamSlider } from './ui/ParamSlider';
 import { PricePanel } from './ui/PricePanel';
 import { deDash } from './ui/text';
 
+/** Shared panel + label vocabulary for the documentation-layer studio chrome. */
+const PANEL = 'rounded-lg border border-inkBlack/12 bg-white/45 p-5';
+const PANEL_TITLE = 'font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/50';
+const CHIP =
+  'rounded-full border border-inkBlack/12 bg-paperVellum/85 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/70 backdrop-blur';
+
 export default function App() {
   return (
-    <div className="relative min-h-screen w-full bg-paper text-ink">
+    <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
       <Navbar />
 
-      <main className="mx-auto grid w-full max-w-[1360px] gap-5 px-6 pb-6 pt-20 lg:grid-cols-[1fr_360px] lg:items-start">
+      <main className="mx-auto grid w-full max-w-[1360px] gap-6 px-6 pb-10 pt-24 lg:grid-cols-[1fr_360px] lg:items-start">
         <StagePane />
         <ControlRail />
       </main>
@@ -43,21 +54,24 @@ function StagePane() {
 
   return (
     <div>
-      <div className="relative h-[62vh] min-h-[420px] overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-white/40 to-paperDeep/40 shadow-[0_24px_70px_-50px_rgba(30,27,23,0.6)]">
+      <div className="relative h-[62vh] min-h-[420px] overflow-hidden rounded-lg border border-inkBlack/12 bg-gradient-to-b from-white/50 to-paperDeep/40 shadow-[0_24px_70px_-56px_rgba(23,22,15,0.5)]">
         <Scene />
 
-        {/* Engine strategy chip: what the armature is doing for this species */}
-        <div className="pointer-events-none absolute left-4 top-3 max-w-[300px] rounded-2xl border border-line/70 bg-paper/85 px-3 py-2 text-[11px] leading-snug text-inkSoft backdrop-blur">
-          <span className="font-semibold text-mossDeep">engine:</span> {deDash(strut.habitStrategy)}
+        {/* Engine strategy chip: what the armature is doing for this species. A full
+            sentence, so it stays sentence case (only the short data chips go uppercase). */}
+        <div className="pointer-events-none absolute left-4 top-3 max-w-[300px] rounded-lg border border-inkBlack/12 bg-paperVellum/85 px-3 py-2 font-mono text-[11px] leading-snug text-inkBlack/70 backdrop-blur">
+          <span className="uppercase tracking-[0.12em] text-accentOlive">engine ·</span>{' '}
+          {deDash(strut.habitStrategy)}
         </div>
 
         {/* Growth stage chip */}
-        <div className="pointer-events-none absolute right-4 top-3 rounded-full border border-line/70 bg-paper/85 px-3 py-1 text-xs text-inkSoft backdrop-blur">
-          {deDash(growth.label)} · <span className="font-semibold text-mossDeep">{Math.round(growth.coverageFraction * 100)}%</span> clothed
+        <div className={`pointer-events-none absolute right-4 top-3 ${CHIP}`}>
+          {deDash(growth.label)} ·{' '}
+          <span className="text-accentOlive">{Math.round(growth.coverageFraction * 100)}%</span> clothed
         </div>
 
         {/* Dimensions strip */}
-        <div className="pointer-events-none absolute bottom-4 left-4 rounded-full border border-line/70 bg-paper/85 px-3 py-1 text-xs text-inkSoft backdrop-blur">
+        <div className={`pointer-events-none absolute bottom-4 left-4 ${CHIP}`}>
           {geo.spanM.toFixed(1)} m span · {geo.riseM.toFixed(2)} m rise · {geo.footprintM2.toFixed(1)} m² ·{' '}
           {geo.feetCount} feet
         </div>
@@ -77,7 +91,7 @@ function YearToggle() {
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
       <div
-        className="flex items-center gap-1 rounded-full border border-line/70 bg-paper/85 p-1 shadow-sm backdrop-blur"
+        className="flex items-center gap-1 rounded-full border border-inkBlack/12 bg-paperVellum/85 p-1 shadow-sm backdrop-blur"
         role="group"
         aria-label="growth year"
       >
@@ -86,8 +100,8 @@ function YearToggle() {
             key={y}
             onClick={() => setYear(y)}
             aria-pressed={year === y}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              year === y ? 'bg-moss text-paper' : 'text-inkSoft hover:text-ink'
+            className={`rounded-full px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition ${
+              year === y ? 'bg-inkBlack text-paperVellum' : 'text-inkBlack/55 hover:text-inkBlack'
             }`}
           >
             Year {y}
@@ -113,9 +127,9 @@ function EcologyStrip() {
 
 function Eco({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-white/40 px-3 py-2.5">
-      <div className="font-display text-lg font-semibold text-ink">{value}</div>
-      <div className="text-[11px] uppercase tracking-wider text-inkFaint">{label}</div>
+    <div className="rounded-lg border border-inkBlack/12 bg-white/40 px-3 py-2.5">
+      <div className="font-serifDisplay text-[19px] font-semibold leading-none text-inkBlack">{value}</div>
+      <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/45">{label}</div>
     </div>
   );
 }
@@ -130,19 +144,19 @@ function ControlRail() {
     <div className="flex flex-col gap-4">
       <PricePanel />
 
-      <div className="rounded-3xl border border-line bg-white/50 p-5">
-        <h2 className="mb-3 font-display text-xl font-semibold lowercase text-ink">shape it</h2>
-        <div className="space-y-3">
+      <div className={PANEL}>
+        <h2 className={PANEL_TITLE}>Shape it</h2>
+        <div className="mt-4 space-y-4">
           <ParamSlider param="footprintM2" />
           <ParamSlider param="riseM" />
           <ParamSlider param="strutSpacingM" />
           <ParamSlider param="apertureDeg" />
         </div>
         {/* Grammar notes: the engine narrating its own fabrication decisions. */}
-        <div className="mt-3 space-y-1 border-t border-line pt-2.5">
+        <div className="mt-4 space-y-1 border-t border-inkBlack/12 pt-3">
           {notes.map((n) => (
-            <p key={n} className="text-[11px] leading-snug text-inkFaint">
-              <span className="font-semibold text-mossDeep">grammar:</span> {deDash(n)}
+            <p key={n} className="font-mono text-[11px] leading-snug text-inkBlack/55">
+              <span className="uppercase tracking-[0.12em] text-accentOlive">grammar ·</span> {deDash(n)}
             </p>
           ))}
         </div>
@@ -158,12 +172,12 @@ function SpeciesPicker() {
   const setSpecies = useDesign((s) => s.setSpecies);
 
   return (
-    <div className="rounded-3xl border border-line bg-white/50 p-5">
-      <h2 className="mb-1 font-display text-xl font-semibold lowercase text-ink">planting</h2>
-      <p className="mb-3 text-[11px] leading-snug text-inkFaint">
+    <div className={PANEL}>
+      <h2 className={PANEL_TITLE}>Planting</h2>
+      <p className="mt-2 text-[12px] leading-snug text-inkBlack/55">
         the armature re-weights for how each plant climbs, and how heavy it gets
       </p>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="mt-4 grid grid-cols-2 gap-1.5">
         {SPECIES.map((sp) => {
           const active = sp.id === speciesId;
           return (
@@ -171,14 +185,18 @@ function SpeciesPicker() {
               key={sp.id}
               onClick={() => setSpecies(sp.id)}
               aria-pressed={active}
-              className={`rounded-xl border px-2.5 py-1.5 text-left transition ${
-                active ? 'border-bloom bg-bloom/10' : 'border-line bg-white/40 hover:border-bloom/50'
+              className={`rounded-lg border px-2.5 py-2 text-left transition ${
+                active
+                  ? 'border-accentOlive bg-accentOlive/10'
+                  : 'border-inkBlack/12 bg-white/40 hover:border-accentOlive/50'
               }`}
             >
-              <div className={`text-[12px] font-medium leading-tight ${active ? 'text-ink' : 'text-inkSoft'}`}>
+              <div
+                className={`font-serifDisplay text-[13px] leading-tight ${active ? 'text-inkBlack' : 'text-inkBlack/70'}`}
+              >
                 {sp.common}
               </div>
-              <div className="text-[10px] italic text-inkFaint">{sp.habit}</div>
+              <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/40">{sp.habit}</div>
             </button>
           );
         })}

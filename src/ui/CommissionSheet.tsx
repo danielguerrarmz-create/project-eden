@@ -5,6 +5,10 @@
  * step count, lead time, the fixed price, and the nesting preview — the
  * evidence that the form on the stage compiles to files a fab shop can cut.
  * Client-side view only; reserving captures an email locally (no backend).
+ *
+ * 2026-07-10 chrome unify: documentation-layer styling (paperVellum overlay,
+ * mono eyebrows, editorial serif figures + titles, hairline panels, olive/amber
+ * accents). NestingPreview, ReserveCTA, the design code, and all outputs unchanged.
  */
 import { useEffect, useRef } from 'react';
 import { WORDMARK } from '../data/config';
@@ -39,39 +43,41 @@ export function CommissionSheet() {
 
   return (
     <div
-      className="fixed inset-0 z-40 overflow-y-auto bg-paper/95 backdrop-blur-sm"
+      className="fixed inset-0 z-40 overflow-y-auto bg-paperVellum/95 text-inkBlack backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="commission spec sheet"
     >
       <div className="mx-auto w-full max-w-4xl px-6 py-10">
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-widest text-moss">commission · spec sheet</p>
-            <h2 className="font-display text-4xl font-semibold lowercase leading-none text-ink">
-              {WORDMARK} <span className="text-inkFaint">/</span>{' '}
-              <span className="font-mono text-xl font-normal tracking-tight text-inkSoft">{designCode}</span>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">
+              commission · spec sheet
+            </p>
+            <h2 className="mt-2 font-serifDisplay text-[clamp(1.75rem,3.5vw,2.6rem)] font-semibold lowercase leading-none tracking-[-0.01em] text-inkBlack">
+              {WORDMARK} <span className="text-inkBlack/35">/</span>{' '}
+              <span className="font-mono text-xl font-normal tracking-tight text-inkBlack/60">{designCode}</span>
             </h2>
           </div>
           <button
             ref={closeRef}
             onClick={() => setOpen(false)}
-            className="rounded-full border border-line bg-white/60 px-4 py-2 text-sm text-inkSoft transition hover:text-ink"
+            className="shrink-0 rounded-full border border-inkBlack/15 bg-white/60 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/70 transition-colors hover:text-inkBlack"
           >
             ← back to design
           </button>
         </div>
 
         {/* Fixed price hero */}
-        <div className="mb-6 rounded-3xl border border-line bg-white/50 p-6">
+        <div className="mb-6 rounded-lg border border-inkBlack/12 bg-white/45 p-6">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="font-display text-6xl font-semibold tabular-nums text-ink">
+            <span className="font-serifDisplay text-[clamp(2.75rem,6vw,3.75rem)] font-semibold tabular-nums leading-none text-inkBlack">
               {gbp(price.fixedTotalGBP)}
             </span>
-            <span className="text-sm font-medium uppercase tracking-widest text-mossDeep">fixed</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">fixed</span>
           </div>
-          <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-inkSoft">
+          <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-inkBlack/70">
             One figure, guaranteed: fabrication, delivery, install, groundwork and the planting
             allowance. Every reachable form compiles to components, an assembly sequence and this
             price, so the number is a commitment, not an estimate.
@@ -99,7 +105,7 @@ export function CommissionSheet() {
 
         {/* Nesting preview */}
         <Section title="cut sheets, nested">
-          <p className="mb-3 text-[12px] leading-relaxed text-inkSoft">
+          <p className="mb-3 text-[12px] leading-relaxed text-inkBlack/70">
             The actual blanks of this design, laid on standard sheet stock by the engine's
             conservative shelf nesting, so the sheet count errs high rather than flattering the
             quote. These are the files the fab shop receives.
@@ -109,17 +115,17 @@ export function CommissionSheet() {
 
         {/* BOM — timber pieces */}
         <Section title={`cut schedule · ${components.items.length} distinct pieces`}>
-          <div className="max-h-56 overflow-auto rounded-xl border border-line bg-white/40 p-3 font-mono text-[11px] text-inkSoft">
+          <div className="max-h-56 overflow-auto rounded-lg border border-inkBlack/12 bg-white/40 p-3 font-mono text-[11px] text-inkBlack/70">
             {components.items.map((it, i) => (
-              <div key={i} className="flex justify-between border-b border-line/50 py-0.5 last:border-0">
+              <div key={i} className="flex justify-between border-b border-inkBlack/8 py-0.5 last:border-0">
                 <span>
                   {it.count}× {it.kind}
-                  <span className="text-inkFaint"> · {it.stock === 'sheet' ? 'LVL sheet' : 'linear C24'}</span>
+                  <span className="text-inkBlack/40"> · {it.stock === 'sheet' ? 'LVL sheet' : 'linear C24'}</span>
                 </span>
                 <span>{it.lengthM.toFixed(2)} m</span>
               </div>
             ))}
-            <div className="flex justify-between pt-1.5 font-medium text-ink">
+            <div className="flex justify-between pt-1.5 font-medium text-inkBlack">
               <span>{components.totalCount} pieces</span>
               <span>{components.totalLengthM} m total</span>
             </div>
@@ -128,9 +134,9 @@ export function CommissionSheet() {
 
         {/* BOM — connectors, fasteners, foundations, armature */}
         <Section title={`hardware schedule · counted from the node graph`}>
-          <div className="max-h-56 overflow-auto rounded-xl border border-line bg-white/40 p-3 font-mono text-[11px] text-inkSoft">
+          <div className="max-h-56 overflow-auto rounded-lg border border-inkBlack/12 bg-white/40 p-3 font-mono text-[11px] text-inkBlack/70">
             {components.hardware.map((h) => (
-              <div key={h.id} className="flex justify-between gap-4 border-b border-line/50 py-0.5 last:border-0">
+              <div key={h.id} className="flex justify-between gap-4 border-b border-inkBlack/8 py-0.5 last:border-0">
                 <span>{h.label}</span>
                 <span className="shrink-0">
                   {h.qty.toLocaleString('en-GB')} {h.unit ?? 'pcs'}
@@ -138,7 +144,7 @@ export function CommissionSheet() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-inkFaint">
+          <p className="mt-2 text-[11px] leading-relaxed text-inkBlack/45">
             Every joint is an explicit node in the model, so connectors and bolts are counted, not
             estimated (docs/FABRICATION.md). Structural validity comes from staying inside a
             pre-engineered family — certainty inside a designed envelope, not a claim that any form
@@ -153,7 +159,7 @@ export function CommissionSheet() {
           </div>
         </Section>
 
-        <p className="mt-8 text-center text-[11px] text-inkFaint">
+        <p className="mt-8 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/45">
           {deDash(`${WORDMARK} — every form you can touch is buildable; that's the whole idea.`)}
         </p>
       </div>
@@ -163,9 +169,9 @@ export function CommissionSheet() {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-white/40 px-3 py-2.5">
-      <div className="font-display text-lg font-semibold text-ink">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-inkFaint">{label}</div>
+    <div className="rounded-lg border border-inkBlack/12 bg-white/40 px-3 py-2.5">
+      <div className="font-serifDisplay text-[18px] font-semibold leading-tight text-inkBlack">{value}</div>
+      <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/45">{label}</div>
     </div>
   );
 }
@@ -173,7 +179,9 @@ function Fact({ label, value }: { label: string; value: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h3 className="mb-2 font-display text-xl font-semibold lowercase text-ink">{title}</h3>
+      <h3 className="mb-3 font-serifDisplay text-[19px] font-semibold lowercase leading-tight text-inkBlack">
+        {title}
+      </h3>
       {children}
     </div>
   );

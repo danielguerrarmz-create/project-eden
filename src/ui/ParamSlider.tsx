@@ -67,10 +67,10 @@ export function ParamSlider({ param }: { param: SliderKey }) {
     <div>
       <div className="flex items-baseline justify-between">
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-base font-semibold lowercase text-ink">{spec.label}</span>
-          <span className="hidden text-[11px] text-inkFaint sm:inline">{spec.hint}</span>
+          <span className="font-serifDisplay text-[16px] font-semibold lowercase text-inkBlack">{spec.label}</span>
+          <span className="hidden text-[11px] text-inkBlack/45 sm:inline">{spec.hint}</span>
         </div>
-        <span className="font-mono text-[13px] tabular-nums text-ink">{spec.format(value)}</span>
+        <span className="font-mono text-[13px] tabular-nums text-inkBlack">{spec.format(value)}</span>
       </div>
       <input
         type="range"
