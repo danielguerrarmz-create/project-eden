@@ -1,22 +1,17 @@
 /**
- * BowerIntro.tsx — the "bower" intro (Archipedia Preloader mechanic, 1:1).
+ * BowerIntro.tsx — the one-time "bower" intro (2026-07-10 rework).
  *
- * On first load per tab a centered brand lockup loads in together: the Oculus mark
- * (logo) fades / scales / rotates in while the five letters of the "bower" wordmark
- * set themselves into a line below it (deterministic offsets, "type set into a
- * line, not confetti"). They resolve and hold. Then the lockup hands off:
- *   - the WORDMARK flies to the top-left nav wordmark and fades into the real nav
- *     lockup (font metrics match the `[data-wordmark]` span so at scale 1 they land
- *     on top of it);
- *   - the LOGO settles to dead-center at the hero's plan size, i.e. exactly where
- *     HeroReveal's `OculusPlate` big centered Oculus sits at scroll p=0 (same
- *     `absolute inset-0 grid place-items-center` + `w-[min(340px,60vmin)]`), so when
- *     the backdrop clears the intro's logo and the hero's logo are pixel-coincident
- *     and scroll simply takes over into the 2D -> 3D transition.
+ * Spec (Daniel): no loading spinner, no rotating wheel. Simply:
+ *   1. the logo + title (the Oculus mark + "bower" wordmark) LOAD IN, centered;
+ *   2. the lockup then TRAVELS to its position in the top-left corner, landing exactly
+ *      on the real header lockup (measured via [data-intro-logo]);
+ *   3. only THEN does everything else on screen arrive — the veil clears and the hero
+ *      copy grows in (INTRO_DONE_EVENT).
  *
- * We re-measure the nav wordmark after `document.fonts.ready` and on resize. Runs
- * ONCE per tab (sessionStorage). Reduced-motion or already-played -> renders null
- * (no intro). SSR-safe: no window on the server means it never activates.
+ * The intro lockup is an exact replica of the header lockup (same mark size, same mono
+ * wordmark), so at scale 1 it lands pixel-coincident and the crossfade onto the real
+ * nav logo is invisible. Runs ONCE per tab (sessionStorage). Reduced-motion or
+ * already-played -> renders null. SSR-safe: no window on the server.
  */
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -29,8 +24,9 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 const WORD = WORDMARK.toLowerCase(); // "bower"
 const LETTERS = WORD.split('');
 
-/** Deterministic per-letter entrance offsets. Only `y` is consumed now (the
- *  letters rise into a line); `x`/`r` are kept as the original scatter record. */
+/** Deterministic per-letter entrance offsets (Archipedia preloader mechanic): each letter
+ *  drops in from its own height so the word "sets into a line" rather than fading as a
+ *  block. Only `y` is consumed; `x`/`r` are kept as the original scatter record. */
 const OFFSETS = [
   { x: -30, y: -58, r: -5 },
   { x: 24, y: -64, r: 4 },
@@ -39,32 +35,23 @@ const OFFSETS = [
   { x: -40, y: -62, r: 5 },
 ] as const;
 
+/** Header lockup metrics, matched exactly so the landed intro is coincident with the nav. */
+const MARK_PX = 30;
+const NAME_PX = 19;
+
 export const SESSION_KEY = 'bower.intro.played';
-/** Fired on window when the intro finishes (or is skipped), so the hero can start
- *  its timed logo->structure reveal only once the veil has lifted. */
+/** Fired on window when the intro finishes (or is skipped), so the hero copy grows in and
+ *  the rest of the page arrives only once the lockup has taken the corner. */
 export const INTRO_DONE_EVENT = 'bower:intro-done';
+
+const EASE_IN = [0.16, 1, 0.3, 1] as const;
 const EASE_LETTER = [0.16, 1, 0.3, 1] as const;
 const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
 
-/** The logo lockup: sits above the wordmark, then settles to the hero plan (scale 1,
- *  y 0). Tuned to match the slow/large register; adjust freely. */
-const LOGO = {
-  lockupScale: 0.52, // logo size while paired with the big wordmark
-  liftVh: 0.14, // how far above center the lockup logo floats (fraction of vh)
-  enterRotate: -14, // gentle rotate-in
-  enterDur: 0.9, // fade / scale / rotate in
-  settleDur: 1.25, // travel-beat settle to the hero plan position (ends 1150 -> 2400)
-} as const;
-
-/** The big wordmark drops this fraction of vh below center so the logo clears above it. */
-const NAME_DROP_VH = 0.12;
-
-/** Timeline (ms): assemble at 0, travel at 1900, fade at 3300, unmount at 3800.
- *  (Trimmed 0.5s from the previous 4.3s cut.) Letters finish assembling ~1.15s, so
- *  the full "bower" lockup HOLDS still ~0.75s before it flies to the nav. The logo
- *  settle (1900 -> 3150) completes 150ms before the backdrop fade starts; the 0.5s
- *  backdrop fade then completes exactly at done (3300 + 500 = 3800). */
-const T = { travel: 1900, fade: 3300, done: 3800 } as const;
+/** Timeline (ms): the mark fades in + the letters assemble into the line (~0 -> 1.1s),
+ *  hold, then the settled lockup travels to the corner at `travel`; the page arrives
+ *  (veil clears + lockup crossfades onto the real nav) at `arrive`; unmount at `done`. */
+const T = { travel: 1350, arrive: 2200, done: 2650 } as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. Unit-tested. */
 export function shouldPlayIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
@@ -79,8 +66,8 @@ interface Rect {
 }
 
 export function BowerIntro() {
-  // Decide SYNCHRONOUSLY on the first render (client only) so the veil is painted on
-  // the very first frame — no gap where the full page flashes before the intro mounts.
+  // Decide SYNCHRONOUSLY on the first render (client only) so the veil is painted on the
+  // very first frame — no flash of the full page before the intro mounts.
   const [active, setActive] = useState(() => {
     if (typeof window === 'undefined') return false;
     let played = false;
@@ -92,23 +79,24 @@ export function BowerIntro() {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
     return shouldPlayIntro(reduced, played);
   });
-  const [phase, setPhase] = useState<'assemble' | 'travel' | 'fade'>('assemble');
+  const [phase, setPhase] = useState<'load' | 'travel'>('load');
+  const [fade, setFade] = useState(false);
   const [target, setTarget] = useState<Rect | null>(null);
 
-  // Pin the scroll to the top while the one-time intro plays so its centered logo hands
-  // off to the hero's plan view cleanly; a reload mid-page would otherwise restore scroll
-  // and settle the logo over the wrong spot. Restored to 'auto' on unmount (cleanup below).
+  // Pin scroll to the top while the one-time intro plays so the lockup lands over the real
+  // header cleanly; a reload mid-page would otherwise restore scroll behind the veil.
   useEffect(() => {
     if (!active || typeof window === 'undefined') return;
     window.history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
   }, [active]);
 
-  // Measure the nav wordmark (after fonts settle), re-measure on resize.
+  // Measure the real header lockup (after fonts settle), re-measure on resize. The intro
+  // lockup flies onto this rect at scale 1.
   useIsomorphicLayoutEffect(() => {
     if (!active || typeof document === 'undefined') return;
     const measure = () => {
-      const el = document.querySelector('[data-wordmark]') as HTMLElement | null;
+      const el = document.querySelector('[data-intro-logo]') as HTMLElement | null;
       if (!el) return;
       const r = el.getBoundingClientRect();
       setTarget({ left: r.left, top: r.top, width: r.width, height: r.height });
@@ -123,24 +111,23 @@ export function BowerIntro() {
   useEffect(() => {
     if (!active) return;
     const t1 = setTimeout(() => setPhase('travel'), T.travel);
-    const t2 = setTimeout(() => setPhase('fade'), T.fade);
+    const t2 = setTimeout(() => {
+      setFade(true); // veil clears + lockup crossfades onto the real nav
+      window.dispatchEvent(new Event(INTRO_DONE_EVENT)); // hero copy + page arrive now
+    }, T.arrive);
     const t3 = setTimeout(() => {
       try {
         sessionStorage.setItem(SESSION_KEY, '1');
       } catch {
         /* ignore */
       }
-      // Tell the hero the veil has lifted, so its timed reveal can start now.
-      window.dispatchEvent(new Event(INTRO_DONE_EVENT));
       setActive(false);
     }, T.done);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
-      // Resume normal back/forward scroll restoration whenever the intro leaves:
-      // on normal completion (active -> false via t3) AND on early unmount /
-      // navigation mid-intro, so scrollRestoration is never left stuck on 'manual'.
+      // Never leave scrollRestoration stuck on 'manual' (normal end or early unmount).
       if (typeof window !== 'undefined' && window.history.scrollRestoration === 'manual') {
         window.history.scrollRestoration = 'auto';
       }
@@ -151,78 +138,82 @@ export function BowerIntro() {
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const w = target?.width ?? 60;
-  const h = target?.height ?? 16;
+  const w = target?.width ?? 110;
+  const h = target?.height ?? 30;
 
-  // Centered-big state: the word spans ~90vw, clamped to 3.2–8x the nav size (large),
-  // dropped below center so the logo lockup clears above it.
-  const bigScale = Math.min(8, Math.max(3.2, (0.9 * vw) / w));
-  const bigX = vw / 2 - (w * bigScale) / 2;
-  const bigY = vh / 2 - (h * bigScale) / 2 + NAME_DROP_VH * vh;
+  // Centered "load-in" state: the lockup, scaled up so it reads as a title, sat a little
+  // above the vertical middle. Scale clamps so it fills a comfortable band on any width.
+  const bigScale = Math.min(5, Math.max(2.6, (0.42 * vw) / w));
+  const centerX = vw / 2 - (w * bigScale) / 2;
+  const centerY = vh * 0.44 - (h * bigScale) / 2;
 
-  const traveled = phase !== 'assemble' && !!target;
-  const settled = phase !== 'assemble'; // the logo drops to the hero plan on the same beat
-  const wordAnim = traveled
-    ? { x: target!.left, y: target!.top, scale: 1, opacity: phase === 'fade' ? 0 : 1 }
-    : { x: bigX, y: bigY, scale: bigScale, opacity: 1 };
+  const traveled = phase === 'travel' && !!target;
+  // At scale 1 the replica lands exactly on the measured header lockup (top-left origin).
+  const lockupAnim = traveled
+    ? { x: target!.left, y: target!.top, scale: 1, opacity: fade ? 0 : 1 }
+    : { x: centerX, y: centerY, scale: bigScale, opacity: 1 };
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[100]">
-      {/* Backdrop clears on the fade beat. */}
+      {/* Vellum veil: clears on the arrive beat so the page shows through beneath. */}
       <motion.div
         className="absolute inset-0 bg-paperVellum"
         initial={{ opacity: 1 }}
-        animate={{ opacity: phase === 'fade' ? 0 : 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        animate={{ opacity: fade ? 0 : 1 }}
+        transition={{ duration: 0.55, ease: 'easeOut' }}
       />
 
-      {/* The LOGO. Same container + mark sizing as HeroReveal's OculusPlate, so once
-          it settles (scale 1, y 0) it is pixel-coincident with the hero's plan view.
-          It does NOT fade on the fade beat: it becomes the hero plan and the backdrop
-          simply clears from behind it. */}
-      <div className="absolute inset-0 grid place-items-center">
+      {/* The logo + title lockup: the mark fades in while the letters ASSEMBLE into the
+          line (Archipedia mechanic), then the settled lockup travels to the top-left corner
+          and crossfades onto the real nav logo as the page arrives. Rendered once the header
+          rect is measured (the veil covers the one-frame gap). The container carries only
+          position/scale + the final fade; the mark and the letters carry their own entrances. */}
+      {target && (
         <motion.div
-          className="w-[min(340px,60vmin)] text-inkBlack"
-          initial={{ opacity: 0, scale: LOGO.lockupScale * 0.9, rotate: LOGO.enterRotate, y: -LOGO.liftVh * vh }}
-          animate={
-            settled
-              ? { opacity: 1, scale: 1, rotate: 0, y: 0 }
-              : { opacity: 1, scale: LOGO.lockupScale, rotate: 0, y: -LOGO.liftVh * vh }
+          className="absolute left-0 top-0 inline-flex items-center gap-1.5 text-inkBlack"
+          style={{ transformOrigin: 'top left' }}
+          initial={{ x: centerX, y: centerY, scale: bigScale }}
+          animate={{ x: lockupAnim.x, y: lockupAnim.y, scale: lockupAnim.scale, opacity: fade ? 0 : 1 }}
+          transition={
+            traveled
+              ? {
+                  x: { duration: 0.9, ease: EASE_TRAVEL },
+                  y: { duration: 0.9, ease: EASE_TRAVEL },
+                  scale: { duration: 0.9, ease: EASE_TRAVEL },
+                  opacity: { duration: 0.3, ease: 'easeOut' },
+                }
+              : { default: { duration: 0 } }
           }
-          transition={{ duration: settled ? LOGO.settleDur : LOGO.enterDur, ease: EASE_TRAVEL }}
         >
-          <OculusMark size={360} className="h-auto w-full" />
-        </motion.div>
-      </div>
-
-      {/* The word: assembles in place (below the logo), then travels to the nav
-          wordmark. Font metrics match the nav lockup so at scale 1 they land on it. */}
-      <motion.div
-        className="absolute left-0 top-0 flex font-mono font-semibold lowercase text-inkBlack"
-        style={{ transformOrigin: 'top left', fontSize: '19px', letterSpacing: '0.1em', lineHeight: 1 }}
-        initial={{ x: bigX, y: bigY, scale: bigScale, opacity: 1 }}
-        animate={wordAnim}
-        transition={
-          traveled
-            ? { duration: 1.35, ease: EASE_TRAVEL, opacity: { duration: 0.85, ease: 'easeOut' } }
-            : { duration: 0 }
-        }
-      >
-        {LETTERS.map((ch, i) => (
-          // Opacity + y only. The blur(4px)->0 and x/rotate were the main repaint
-          // cost (five animated CSS filters at once); dropping them keeps the
-          // "type setting into a line" read with zero per-frame blur repaints.
+          {/* The mark fades + settles in as the letters begin to land. */}
           <motion.span
-            key={i}
-            className="inline-block"
-            initial={{ opacity: 0, y: OFFSETS[i].y }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.72, ease: EASE_LETTER, delay: 0.07 * i }}
+            className="block"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.08, ease: EASE_IN }}
           >
-            {ch}
+            <OculusMark size={MARK_PX} className="block h-auto" />
           </motion.span>
-        ))}
-      </motion.div>
+          {/* The wordmark, set into a line letter by letter. letter-spacing on the flex row
+              adds the same 0.1em tracking as the nav lockup, so it lands coincident. */}
+          <span
+            className="flex font-mono font-semibold lowercase"
+            style={{ fontSize: NAME_PX, letterSpacing: '0.1em', lineHeight: 1 }}
+          >
+            {LETTERS.map((ch, i) => (
+              <motion.span
+                key={i}
+                className="inline-block"
+                initial={{ opacity: 0, y: OFFSETS[i].y }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.72, ease: EASE_LETTER, delay: 0.14 + 0.07 * i }}
+              >
+                {ch}
+              </motion.span>
+            ))}
+          </span>
+        </motion.div>
+      )}
     </div>
   );
 }

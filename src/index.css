@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hero display faces (self-hosted from /public/fonts). Both are dafont families:
+   Realistic Nature carries the hero sentence ("Grow a living … in your garden"),
+   Paperlight Script sets the one big "Eden" word. NOTE: these are free-for-personal-
+   use downloads — a commercial licence is still owed before this ships as a product. */
+@font-face {
+  font-family: 'Realistic Nature';
+  src: url('/fonts/RealisticNature.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Paperlight Script';
+  src:
+    url('/fonts/PaperlightScript.woff') format('woff'),
+    url('/fonts/PaperlightScript.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {

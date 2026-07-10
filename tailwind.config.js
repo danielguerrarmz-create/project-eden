@@ -50,8 +50,10 @@ export default {
         ],
         // High-contrast serif for the single hero / pull-quote moment per page.
         quote: ['"Bodoni Moda"', '"Freight Big Pro"', '"Source Serif 4 Variable"', 'Georgia', 'serif'],
-        // Handwritten cursive for the one "Eden" word in the hero headline.
-        handwrite: ['"Dancing Script"', '"Brush Script MT"', 'cursive'],
+        // Hand-lettered face for the hero sentence ("Grow a living … in your garden").
+        heroScript: ['"Realistic Nature"', '"Bodoni Moda"', 'Georgia', 'serif'],
+        // Handwritten cursive for the one big "Eden" word in the hero headline.
+        handwrite: ['"Paperlight Script"', '"Dancing Script"', '"Brush Script MT"', 'cursive'],
       },
       keyframes: {
         'grow-in': {

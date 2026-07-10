@@ -24,7 +24,7 @@ export function BowerMark({
   nameClass?: string;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 ${className}`}>
+    <span data-intro-logo className={`inline-flex items-center gap-1.5 ${className}`}>
       <OculusMark size={markSize} />
       <span data-wordmark className={nameClass}>
         {WORDMARK}
