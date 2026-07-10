@@ -1,8 +1,8 @@
 /**
  * Root.tsx — top-level route switch.
  *
- * `#/engine`  -> the generative-engine explainer (the documentation layer).
- * `#/company` -> what the company does (same documentation layer).
+ * `/engine`  -> the generative-engine explainer (the documentation layer).
+ * `/company` -> what the company does (same documentation layer).
  * Everything else -> the single-page studio, untouched.
  */
 import App from './App';

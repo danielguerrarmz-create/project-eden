@@ -1,10 +1,10 @@
 /**
- * EnginePage.tsx — the generative-engine explainer (#/engine).
+ * EnginePage.tsx — the generative-engine explainer (/engine).
  *
  * Six full-bleed field-color sections that explain, honestly, what the engine in
  * src/engine actually computes. Every diagram renders live engine output, not
  * illustration. The studio is never touched: this is the documentation layer
- * (field color + editorial serif + hairline linework), opened via hash route,
+ * (field color + editorial serif + hairline linework), opened via its own route,
  * reading the same default design a first-time visitor sees (the store
  * initializes its outputs eagerly). The product name comes from the WORDMARK
  * constant, so this page never hard-codes a name the Day-3 call has not locked.
@@ -12,7 +12,7 @@
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { WORDMARK } from '../data/config';
-import { routes } from '../routing';
+import { routes, RouteLink } from '../routing';
 import { AnnotationStrip, Eyebrow, EngineSection } from './engine/EngineSection';
 import { PipelineSchematic } from './engine/PipelineSchematic';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
@@ -38,12 +38,12 @@ export function EnginePage() {
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-80">
           {WORDMARK} · the engine
         </span>
-        <a
-          href={routes.configurator}
+        <RouteLink
+          to={routes.configurator}
           className="font-mono text-[11px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
         >
           back to the studio
-        </a>
+        </RouteLink>
       </header>
 
       {/* 1 — HERO (field-blue, the one Bodoni moment) */}
@@ -206,12 +206,12 @@ export function EnginePage() {
           true as a number, and the page would rather say so than pretend.
         </p>
 
-        <a
-          href={routes.configurator}
+        <RouteLink
+          to={routes.configurator}
           className="mt-12 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
         >
           Shape your own {NAME} →
-        </a>
+        </RouteLink>
       </EngineSection>
     </div>
   );
