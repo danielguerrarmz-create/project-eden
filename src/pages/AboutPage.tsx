@@ -347,7 +347,7 @@ export function AboutPage() {
             <h2 className="mb-10 font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
               How we crossed paths
             </h2>
-            <CrossPathsTimeline />
+            <CrossPathsTimeline play={revealed} />
           </div>
         </section>
 

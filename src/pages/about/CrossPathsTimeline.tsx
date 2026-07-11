@@ -12,7 +12,9 @@
  * others (UT Austin, Resia/Drafted, Archipedia, Forsite OPS, the engine) are Daniel's to
  * confirm. Everything is one edit away in STRANDS[].start.
  */
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import { line as d3line, curveNatural } from 'd3-shape';
 
 interface Strand {
   label: string;
@@ -48,97 +50,96 @@ const MAX_YEAR = 2025; // the convergence year
 const yearToX = (y: number) => 235 + ((y - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * (CX - 235);
 const laneY = (lane: number) => 46 + lane * ((H - 92) / 5);
 
-/** Catmull-Rom through the points, emitted as smooth cubic beziers. */
-function smooth(pts: { x: number; y: number }[]): string {
-  if (pts.length < 2) return '';
-  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return d;
-}
+/** d3 natural cubic spline: passes through every waypoint, but flows organically
+ *  between them, which is what gives the strands their expressive, hand-drawn weave. */
+const lineGen = d3line<{ x: number; y: number }>()
+  .x((d) => d.x)
+  .y((d) => d.y)
+  .curve(curveNatural);
 
-/** A weaving strand from its dated start point to the shared convergence. */
+/** A weaving strand from its dated start, undulating around its drift to the centre,
+ *  its amplitude tapering to zero as it lands on the shared Bower line at the dot. */
 function strandPath(startX: number, startY: number, lane: number): string {
-  const steps = 7;
+  const steps = 8;
   const pts: { x: number; y: number }[] = [];
   for (let k = 0; k <= steps; k++) {
     const t = k / steps;
     const x = startX + t * (CX - startX);
     const baseY = startY + (CY - startY) * t;
-    const amp = 40 * (1 - t);
-    const y = baseY + amp * Math.sin(2.2 * Math.PI * t + lane * 1.05);
+    const amp = 52 * (1 - t) * (1 - t); // ease the taper so it flows flat into the dot
+    const y = baseY + amp * Math.sin(2.5 * Math.PI * t + lane * 1.05);
     pts.push({ x, y });
   }
   pts[pts.length - 1] = { x: CX, y: CY };
-  return smooth(pts);
+  return lineGen(pts) ?? '';
 }
 
 /* ------------------------------ desktop weave ----------------------------- */
 
-function Weave({ reduced }: { reduced: boolean }) {
-  // Draw order is chronological: earliest thread first, so it "begins with the first
-  // line" and the others weave in over it. The Bower arrow is the last child.
-  const ordered = [...STRANDS].sort((a, b) => a.start - b.start);
+function Weave({ reduced, play }: { reduced: boolean; play: boolean }) {
+  // Chronological reveal WITHOUT staggerChildren (which does not cascade reliably through
+  // an <svg>): every element carries its OWN delay, ranked by the thread's start year, so
+  // the earliest thread draws first and the rest weave in over it, then the connection dot,
+  // then the Bower arrow. motion.svg only supplies the "show" label on scroll into view.
+  const rank = new Map<string, number>();
+  [...STRANDS].sort((a, b) => a.start - b.start).forEach((s, i) => rank.set(s.label, i));
+  const step = 0.34;
+  const dotDelay = 0.1 + STRANDS.length * step;
+  const arrowDelay = dotDelay + 0.25;
 
-  const container: Variants = {
-    hidden: {},
-    show: { transition: { staggerChildren: 0.34, delayChildren: 0.1 } },
-  };
-  const drawStrand: Variants = {
-    hidden: reduced ? { opacity: 1 } : { pathLength: 0, opacity: 0 },
-    show: {
-      pathLength: 1,
-      opacity: 1,
-      transition: { pathLength: { duration: 0.95, ease: EASE }, opacity: { duration: 0.25 } },
-    },
-  };
-  const fade: Variants = {
-    hidden: reduced ? { opacity: 1 } : { opacity: 0 },
-    show: { opacity: 1, transition: { duration: 0.45, ease: EASE, delay: reduced ? 0 : 0.35 } },
-  };
-  const drawArrow: Variants = {
-    hidden: reduced ? { opacity: 1 } : { pathLength: 0, opacity: 0 },
-    show: {
-      pathLength: 1,
-      opacity: 1,
-      transition: { pathLength: { duration: 0.7, ease: EASE }, opacity: { duration: 0.2 } },
-    },
-  };
+  // Draw with a CSS keyframe ANIMATION (a transition needs a painted "hidden" frame first,
+  // which we cannot guarantee; an animation plays the moment it is applied). pathLength=1
+  // normalises every path to one unit, so a dashoffset of 1 hides it and 0 reveals it. Each
+  // element carries its own animation-delay, so when `play` flips true (the graphic is on
+  // screen, after the intro) the earliest thread strokes on first and the rest weave in,
+  // then the connection dot, then the Bower arrow.
+  const EZ = 'cubic-bezier(0.16,1,0.3,1)';
+  // The hidden value is ALSO the base style, so during the animation-delay the element stays
+  // hidden (backwards-fill of the keyframe is unreliable for stroke-dashoffset); the keyframe
+  // then draws it in and `forwards` holds the finished state.
+  const drawStyle = (delay: number): CSSProperties =>
+    reduced
+      ? { strokeDasharray: 1, strokeDashoffset: 0 }
+      : play
+        ? { strokeDasharray: 1, strokeDashoffset: 1, animation: `cptl-draw 0.9s ${EZ} ${delay}s forwards` }
+        : { strokeDasharray: 1, strokeDashoffset: 1 };
+  const fadeStyle = (delay: number, extra?: CSSProperties): CSSProperties =>
+    reduced
+      ? { opacity: 1, ...extra }
+      : play
+        ? { opacity: 0, animation: `cptl-fade 0.45s ease ${delay}s forwards`, ...extra }
+        : { opacity: 0, ...extra };
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, amount: 0.4 }}
-      className="hidden lg:block"
-    >
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="A time-line: our threads begin at their real dates, weave together, and converge into Bower.">
-        {ordered.map((s) => {
+    <div className="hidden lg:block">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-auto w-full"
+        role="img"
+        aria-label="A time-line: our threads begin at their real dates, weave together, and converge into Bower."
+      >
+        {/* The invisible main line: the Bower through-line every thread flows into. Barely
+            there on the left (implied), it becomes the solid arrow past the connection dot. */}
+        <line x1={210} y1={CY} x2={CX} y2={CY} stroke={MERGE_COLOR} strokeWidth={1.25} opacity={0.14} strokeDasharray="1 6" strokeLinecap="round" />
+
+        {STRANDS.map((s) => {
           const sx = yearToX(s.start);
           const sy = laneY(s.lane);
+          const d = 0.1 + (rank.get(s.label) ?? 0) * step;
           return (
-            <motion.g key={s.label} variants={{ hidden: {}, show: {} }}>
+            <g key={s.label}>
               {/* the weaving strand */}
-              <motion.path
+              <path
                 d={strandPath(sx, sy, s.lane)}
+                pathLength={1}
                 fill="none"
                 stroke={s.color}
                 strokeWidth={3.5}
                 strokeLinecap="round"
-                variants={drawStrand}
+                style={drawStyle(d)}
               />
               {/* the dated start: dot + label + year, with a paper halo so text reads over lines */}
-              <motion.g variants={fade} style={{ paintOrder: 'stroke' }}>
+              <g style={fadeStyle(d + 0.5, { paintOrder: 'stroke' })}>
                 <circle cx={sx} cy={sy} r={4} fill={s.color} stroke="#FBF9F3" strokeWidth={2.5} />
                 <text x={sx - 12} y={sy - 3} textAnchor="end" className="font-serifDisplay" fontSize="14.5" fill="#17160F" stroke="#FBF9F3" strokeWidth="3">
                   {s.label}
@@ -146,34 +147,31 @@ function Weave({ reduced }: { reduced: boolean }) {
                 <text x={sx - 12} y={sy + 13} textAnchor="end" className="font-mono" fontSize="10" fill="#17160F" opacity="0.5" stroke="#FBF9F3" strokeWidth="3">
                   {s.note} · {s.start}
                 </text>
-              </motion.g>
-            </motion.g>
+              </g>
+            </g>
           );
         })}
 
-        {/* the merged Bower arrow, last */}
-        <motion.g variants={{ hidden: {}, show: {} }}>
-          <motion.path
-            d={`M ${CX} ${CY} L ${W - 54} ${CY}`}
-            fill="none"
-            stroke={MERGE_COLOR}
-            strokeWidth={6}
-            strokeLinecap="round"
-            variants={drawArrow}
-          />
-          <motion.path d={`M ${W - 62} ${CY - 13} L ${W - 30} ${CY} L ${W - 62} ${CY + 13} Z`} fill={MERGE_COLOR} variants={fade} />
-          <motion.text x={W - 40} y={CY - 24} textAnchor="end" className="font-serifDisplay" fontSize="21" fontStyle="italic" fill="#17160F" variants={fade}>
-            Bower
-          </motion.text>
-        </motion.g>
+        {/* The connection dot: where every thread becomes one line, Bower. */}
+        <g style={fadeStyle(dotDelay)}>
+          <circle cx={CX} cy={CY} r={11} fill="#FBF9F3" stroke={MERGE_COLOR} strokeWidth={2} />
+          <circle cx={CX} cy={CY} r={5} fill={MERGE_COLOR} />
+        </g>
+
+        {/* The merged Bower main line + arrow. */}
+        <path d={`M ${CX + 11} ${CY} L ${W - 54} ${CY}`} pathLength={1} fill="none" stroke={MERGE_COLOR} strokeWidth={6} strokeLinecap="round" style={drawStyle(arrowDelay)} />
+        <path d={`M ${W - 62} ${CY - 13} L ${W - 30} ${CY} L ${W - 62} ${CY + 13} Z`} fill={MERGE_COLOR} style={fadeStyle(arrowDelay + 0.4)} />
+        <text x={W - 40} y={CY - 24} textAnchor="end" className="font-serifDisplay" fontSize="21" fontStyle="italic" fill="#17160F" style={fadeStyle(arrowDelay + 0.4)}>
+          Bower
+        </text>
       </svg>
-    </motion.div>
+    </div>
   );
 }
 
 /* ------------------------------ mobile (vertical) ------------------------- */
 
-function Vertical({ reduced }: { reduced: boolean }) {
+function Vertical({ reduced, play }: { reduced: boolean; play: boolean }) {
   const ordered = [...STRANDS].sort((a, b) => a.start - b.start);
   const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
   const rise: Variants = {
@@ -184,8 +182,9 @@ function Vertical({ reduced }: { reduced: boolean }) {
     <motion.ol
       variants={container}
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, amount: 0.15 }}
+      animate={play ? undefined : 'hidden'}
+      whileInView={play ? 'show' : undefined}
+      viewport={play ? { once: true, amount: 0.15 } : undefined}
       className="relative ml-1 border-l border-inkBlack/15 pl-6 lg:hidden"
     >
       {ordered.map((s) => (
@@ -206,12 +205,35 @@ function Vertical({ reduced }: { reduced: boolean }) {
   );
 }
 
-export function CrossPathsTimeline() {
+export function CrossPathsTimeline({ play = true }: { play?: boolean }) {
   const reduced = useReducedMotion() ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+  // Own the trigger: start hidden, then flip once the graphic is actually on screen (via an
+  // IntersectionObserver, which fires on the next tick). That false -> true change is what
+  // drives the CSS draw. Gated by `play` (the page's post-intro reveal) so it never runs
+  // under the veil. reduced motion shows the finished state at once.
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const started = reduced || (play && inView);
+
   return (
-    <div>
-      <Weave reduced={reduced} />
-      <Vertical reduced={reduced} />
+    <div ref={ref}>
+      <Weave reduced={reduced} play={started} />
+      <Vertical reduced={reduced} play={started} />
       <p className="mt-6 max-w-[54ch] font-serifDisplay text-[14px] leading-snug text-inkBlack/50">
         Two people and a handful of obsessions, met at UT Austin and woven, over five years, into
         one studio.

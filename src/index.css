@@ -151,3 +151,22 @@ html.adaptive-cursor-active * {
 html.adaptive-cursor-active input[type='range'] {
   cursor: pointer !important;
 }
+
+/* Crossing-paths timeline: keyframe draw-in (applied only when the graphic scrolls into
+   view after the intro), so each strand strokes itself on and each label fades in. */
+@keyframes cptl-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cptl-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
