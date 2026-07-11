@@ -277,6 +277,35 @@ function TeamCard({ person }: { person: TeamMember }) {
   );
 }
 
+/* ------------------------------ capabilities ------------------------------ */
+
+/** What the two of us bring, each capability paired with the evidence for it on this
+ *  page. It frames the deliberate spread (ML, startups, solo operations, architecture,
+ *  manufacturing) in one glance; the projects and bios below are the substantiation. */
+const CAPABILITIES: [string, string][] = [
+  ['Machine learning', 'Three published papers on reading building geometry, at AAG, ACADIA, and CAADRIA.'],
+  ['Startups', 'Resia AI, an AI home-renovation platform Clay cofounded, raised funding for, and scaled a team on.'],
+  ['Solo operations', 'Forsite OPS, an AI operations layer Daniel built and runs end to end, on his own.'],
+  ['Architecture', 'A decade of built and speculative work, in the projects below.'],
+  ['Manufacturing', 'The Plentify bio-composite, tested +30% over hempcrete, and robotic fabrication.'],
+];
+
+function CapabilityStrip() {
+  return (
+    <section aria-label="What we bring" className="mt-20 border-t border-inkBlack/12 pt-10">
+      <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">What we bring</h2>
+      <dl className="mt-8 grid gap-x-12 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+        {CAPABILITIES.map(([cap, ev]) => (
+          <div key={cap} className="border-t border-inkBlack/10 pt-4">
+            <dt className="font-serifDisplay text-[19px] leading-tight text-inkBlack">{cap}</dt>
+            <dd className="mt-1.5 font-serifDisplay text-[14px] leading-snug text-inkBlack/60">{ev}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 /* --------------------------------- page ----------------------------------- */
 
 export function AboutPage() {
@@ -335,7 +364,10 @@ export function AboutPage() {
           </div>
         </section>
 
-        {/* 3 — Projects: the master-detail selection menu + images. */}
+        {/* 3 — What we bring: the capability spread, framed once. */}
+        <CapabilityStrip />
+
+        {/* 4 — Projects: the master-detail selection menu + images. */}
         <section aria-label="Projects" className="mt-20 border-t border-inkBlack/12 pt-10">
           <div className="mb-10 flex items-center justify-between">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">

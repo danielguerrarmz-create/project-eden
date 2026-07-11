@@ -79,7 +79,7 @@ export const TEAM: TeamMember[] = [
   {
     name: 'Daniel Guerra',
     role: 'Cofounder · engine & systems',
-    bio: 'Architect, product designer, and software engineer. He designs and builds Bower’s generative engine and the systems around it, the part that turns a shaped form into a buildable, priced structure in real time. He and Clay set the studio’s direction together.',
+    bio: 'Architect, product designer, and software engineer. He designs and builds Bower’s generative engine and the systems around it, the part that turns a shaped form into a buildable, priced structure in real time. On his own he also built and runs Forsite OPS, an AI operations layer that runs an architecture studio end to end, Slack to n8n to a multi-model router to Postgres, generating and scheduling content and syncing the live site, with a human sign-off on anything that goes out. He and Clay set the studio’s direction together.',
     image: '/assets/about/daniel-headshot.jpg',
   },
 ];
