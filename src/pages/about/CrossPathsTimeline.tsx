@@ -43,9 +43,6 @@ const STATIONS: Station[] = [
   { spine: { label: 'Bower', note: 'the studio, one product', year: '2025' }, emphasis: 'terminus' },
 ];
 
-/** The threads that made two paths one, shown as a quiet band beneath the timeline. */
-const SHARED = ['Computational design', 'Living architecture', 'Fabrication', 'AI'];
-
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** A milestone card. `side` places it and points its connector at the spine. */
@@ -209,21 +206,6 @@ export function CrossPathsTimeline() {
     <div>
       <Horizontal reduced={reduced} />
       <Vertical reduced={reduced} />
-
-      {/* Shared interests: the threads that made two paths one. */}
-      <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-inkBlack/12 pt-6">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-          What we both chase
-        </span>
-        {SHARED.map((s) => (
-          <span
-            key={s}
-            className="rounded-full border border-inkBlack/15 px-3 py-1 font-mono text-[11px] tracking-[0.04em] text-inkBlack/70"
-          >
-            {s}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

@@ -357,17 +357,12 @@ export function AboutPage() {
           aria-label="Projects"
           className="mt-24 flex min-h-screen flex-col border-t border-inkBlack/12 pt-16"
         >
-          <div className="mb-10 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-            <div className="flex items-baseline gap-4">
-              <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-                The work
-              </h2>
-              <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">
-                in the order our interests grew
-              </span>
-            </div>
-            <span className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              {PROJECTS.length} projects
+          <div className="mb-10 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+              The work
+            </h2>
+            <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">
+              in the order our interests grew
             </span>
           </div>
           <ListView reduced={reduced} />
