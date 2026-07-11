@@ -24,6 +24,7 @@ import {
   type TeamMember,
 } from './about/projects';
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
+import { CrossPathsTimeline } from './about/CrossPathsTimeline';
 
 /** The page title, shared verbatim between the header and the intro's flying title so they
  *  land coincident — and it IS the narration's payoff line. */
@@ -157,8 +158,11 @@ function ProjectText({ project }: { project: Project }) {
 /* ------------------------------- LIST view -------------------------------- */
 
 function ListView({ reduced }: { reduced: boolean }) {
+  // Ordered by the narrative sequence (the `n` index) — the way our interests grew —
+  // not the array's authoring order.
+  const items = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
   const [active, setActive] = useState(0);
-  const project = PROJECTS[active];
+  const project = items[active];
 
   return (
     <div>
@@ -166,7 +170,7 @@ function ListView({ reduced }: { reduced: boolean }) {
           project info on the right. */}
       <div className="hidden gap-x-14 gap-y-8 lg:grid lg:grid-cols-[2fr_3fr]">
         <ol className="min-w-0">
-          {PROJECTS.map((p, i) => {
+          {items.map((p, i) => {
             const on = i === active;
             return (
               <li key={p.n} className="border-t border-inkBlack/12 last:border-b">
@@ -227,7 +231,7 @@ function ListView({ reduced }: { reduced: boolean }) {
 
       {/* Mobile: the same projects stacked, each with its images + text inline. */}
       <div className="space-y-16 lg:hidden">
-        {PROJECTS.map((p) => (
+        {items.map((p) => (
           <section key={p.n} aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}>
             <div className="mb-3 flex items-baseline gap-3">
               <span className="font-mono text-[11px] tracking-[0.14em] text-accentOlive">{p.n}</span>
@@ -277,35 +281,6 @@ function TeamCard({ person }: { person: TeamMember }) {
   );
 }
 
-/* ------------------------------ capabilities ------------------------------ */
-
-/** What the two of us bring, each capability paired with the evidence for it on this
- *  page. It frames the deliberate spread (ML, startups, solo operations, architecture,
- *  manufacturing) in one glance; the projects and bios below are the substantiation. */
-const CAPABILITIES: [string, string][] = [
-  ['Machine learning', 'Three published papers on reading building geometry, at AAG, ACADIA, and CAADRIA.'],
-  ['Startups', 'Resia AI, the platform Clay cofounded and raised funding for, then Drafted AI, a San Francisco startup he went on to build at.'],
-  ['Solo operations', 'Forsite OPS, an AI operations layer Daniel built and runs end to end, on his own.'],
-  ['Architecture', 'A decade of built and speculative work, in the projects below.'],
-  ['Manufacturing', 'The Plentify bio-composite, tested +30% over hempcrete, and robotic fabrication.'],
-];
-
-function CapabilityStrip() {
-  return (
-    <section aria-label="What we bring" className="mt-20 border-t border-inkBlack/12 pt-10">
-      <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">What we bring</h2>
-      <dl className="mt-8 grid gap-x-12 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
-        {CAPABILITIES.map(([cap, ev]) => (
-          <div key={cap} className="border-t border-inkBlack/10 pt-4">
-            <dt className="font-serifDisplay text-[19px] leading-tight text-inkBlack">{cap}</dt>
-            <dd className="mt-1.5 font-serifDisplay text-[14px] leading-snug text-inkBlack/60">{ev}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
 /* --------------------------------- page ----------------------------------- */
 
 export function AboutPage() {
@@ -333,46 +308,64 @@ export function AboutPage() {
         animate={{ opacity: revealed ? 1 : 0 }}
         transition={{ duration: revealed ? 0.6 : 0, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* 1 — Header: the title, and the two questions set apart and large. */}
-        <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
-          <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
-            {TITLE}
-          </h1>
-          <dl className="lg:max-w-[30rem]">
-            {QUESTIONS.map((q, i) => (
-              <div key={q.label} className={i > 0 ? 'mt-5 border-t border-inkBlack/12 pt-5' : ''}>
-                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-                  {q.label}
-                </dt>
-                <dd className="mt-1.5 font-serifDisplay text-[clamp(1.15rem,1.8vw,1.6rem)] leading-snug text-inkBlack">
-                  {q.text}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </header>
+        {/* PORTION ONE — the founders: who we are, and the timeline of how we crossed
+            paths. A full-height first "page" before the work. */}
+        <section aria-label="The founders" className="flex min-h-[calc(100vh-8rem)] flex-col">
+          {/* Header: the title, and the two questions set apart and large. */}
+          <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
+            <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
+              {TITLE}
+            </h1>
+            <dl className="lg:max-w-[30rem]">
+              {QUESTIONS.map((q, i) => (
+                <div key={q.label} className={i > 0 ? 'mt-5 border-t border-inkBlack/12 pt-5' : ''}>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+                    {q.label}
+                  </dt>
+                  <dd className="mt-1.5 font-serifDisplay text-[clamp(1.15rem,1.8vw,1.6rem)] leading-snug text-inkBlack">
+                    {q.text}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </header>
 
-        {/* 2 — Co-founders: a short introduction to Clay and Daniel. */}
-        <section aria-label="Co-founders" className="mt-16 border-t border-inkBlack/12 pt-10">
-          <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-            The two of us
-          </h2>
-          <div className="mt-8 grid gap-10 sm:grid-cols-2">
-            {TEAM.map((person) => (
-              <TeamCard key={person.name} person={person} />
-            ))}
+          {/* Co-founders: short and sweet. */}
+          <div aria-label="Co-founders" className="mt-14 border-t border-inkBlack/12 pt-10">
+            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+              The two of us
+            </h2>
+            <div className="mt-8 grid gap-10 sm:grid-cols-2">
+              {TEAM.map((person) => (
+                <TeamCard key={person.name} person={person} />
+              ))}
+            </div>
+          </div>
+
+          {/* The animated crossing-paths timeline. */}
+          <div className="mt-14 border-t border-inkBlack/12 pt-10">
+            <h2 className="mb-10 font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+              How we crossed paths
+            </h2>
+            <CrossPathsTimeline />
           </div>
         </section>
 
-        {/* 3 — What we bring: the capability spread, framed once. */}
-        <CapabilityStrip />
-
-        {/* 4 — Projects: the master-detail selection menu + images. */}
-        <section aria-label="Projects" className="mt-20 border-t border-inkBlack/12 pt-10">
-          <div className="mb-10 flex items-center justify-between">
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              Projects
-            </h2>
+        {/* PORTION TWO — the work, ordered the way our interests grew. A full-height
+            second "page". */}
+        <section
+          aria-label="Projects"
+          className="mt-24 flex min-h-screen flex-col border-t border-inkBlack/12 pt-16"
+        >
+          <div className="mb-10 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <div className="flex items-baseline gap-4">
+              <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+                The work
+              </h2>
+              <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">
+                in the order our interests grew
+              </span>
+            </div>
             <span className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
               {PROJECTS.length} projects
             </span>

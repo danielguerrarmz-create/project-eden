@@ -150,16 +150,12 @@ function HeroStill() {
   );
 }
 
-/** The copy sits in a lower-LEFT column so the middle + right of the image stay open. A
- *  soft dark scrim rises from the bottom-left corner so the cream copy reads over any
- *  part of the photo without darkening the whole frame. */
+/** The copy sits in a lower-LEFT column so the middle + right of the image stay open. The
+ *  legibility scrim is a separate FULL-BLEED layer (see StillHero), not clipped to this
+ *  column, so it fades smoothly with no visible horizontal edge. */
 function CopyColumn({ children }: { children: React.ReactNode }) {
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 pt-40 md:px-10 md:pb-14">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/60 via-black/25 to-transparent"
-      />
       <div className="relative mr-auto max-w-[34rem]">{children}</div>
     </div>
   );
@@ -197,6 +193,13 @@ function StillHero({ animate }: { animate: boolean }) {
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-paperVellum text-inkBlack">
       <HeroStill />
+      {/* Full-bleed legibility scrim: darkest at the bottom-left where the copy sits, fading
+          to transparent toward the top-right. Because it covers the whole hero (not a clipped
+          bottom column), there is no hard horizontal edge across the sky. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/60 via-black/10 to-transparent"
+      />
       <CopyColumn>
         <HeroCopy orchestrate={animate} show={show} />
       </CopyColumn>

@@ -22,18 +22,18 @@ export function PricePanel() {
   const setCommissionOpen = useDesign((s) => s.setCommissionOpen);
 
   return (
-    <div className="rounded-lg border border-inkBlack/12 bg-white/45 p-5">
+    <div className="rounded-lg border border-inkBlack/12 bg-white/45 p-4">
       <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/50">your price, fixed</div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-serifDisplay text-[44px] font-semibold leading-none tabular-nums text-inkBlack">
+        <span className="font-serifDisplay text-[40px] font-semibold leading-none tabular-nums text-inkBlack">
           {gbp(price.fixedTotalGBP)}
         </span>
       </div>
-      <p className="mt-2 text-[12px] leading-snug text-inkBlack/60">
+      <p className="mt-1.5 text-[12px] leading-snug text-inkBlack/60">
         one figure, held: fabrication, install, groundwork and planting
       </p>
 
-      <details className="group mt-3 border-t border-inkBlack/12 pt-3">
+      <details className="group mt-2.5 border-t border-inkBlack/12 pt-2.5">
         <summary className="flex cursor-pointer list-none items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/55 hover:text-inkBlack">
           <span>how this price is built</span>
           <span className="text-inkBlack/40 transition group-open:rotate-90">›</span>
@@ -62,7 +62,7 @@ export function PricePanel() {
 
       <button
         onClick={() => setCommissionOpen(true)}
-        className="mt-5 w-full rounded-lg bg-inkBlack px-4 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-paperVellum transition-colors hover:bg-accentOlive hover:text-inkBlack"
+        className="mt-4 w-full rounded-lg bg-inkBlack px-4 py-2.5 font-mono text-[12px] uppercase tracking-[0.16em] text-paperVellum transition-colors hover:bg-accentOlive hover:text-inkBlack"
       >
         Commission this Eden
       </button>

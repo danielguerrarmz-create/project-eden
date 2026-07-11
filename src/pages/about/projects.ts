@@ -73,13 +73,13 @@ export const TEAM: TeamMember[] = [
   {
     name: 'Clay Seifert',
     role: 'Cofounder · design & research',
-    bio: 'Architect, researcher, and B.Arch candidate at UT Austin. He has built computational design tools at TestFit, cofounded his first startup Resia AI, and went on to build at Drafted AI in San Francisco. He created Archipedia, the first search engine for architecture, and his work on recovering the latent geometry of building fragments has been published at AAG, ACADIA, and CAADRIA. At Bower he leads design and the living-architecture research the studio is built on.',
+    bio: 'Architect and researcher at UT Austin. He leads Bower’s design and the living-architecture research it grew from.',
     image: null, // portrait forthcoming
   },
   {
     name: 'Daniel Guerra',
     role: 'Cofounder · engine & systems',
-    bio: 'Architect, product designer, and software engineer. He designs and builds Bower’s generative engine and the systems around it, the part that turns a shaped form into a buildable, priced structure in real time. On his own he also built and runs Forsite OPS, an AI operations layer that runs an architecture studio end to end, Slack to n8n to a multi-model router to Postgres, generating and scheduling content and syncing the live site, with a human sign-off on anything that goes out. He and Clay set the studio’s direction together.',
+    bio: 'Architect, product designer, and engineer. He builds Bower’s generative engine and the systems around it.',
     image: '/assets/about/daniel-headshot.jpg',
   },
 ];
@@ -89,7 +89,7 @@ const A = '/assets/projects';
 /** The imported set, HERO (Search by Assembly) first, then the rest. */
 export const PROJECTS: Project[] = [
   {
-    n: '01',
+    n: '07',
     title: 'Search by Assembly',
     by: 'clay+daniel',
     year: '2025',
@@ -127,7 +127,7 @@ export const PROJECTS: Project[] = [
     },
   },
   {
-    n: '02',
+    n: '05',
     title: 'Synthetic Vision',
     by: 'clay',
     year: '2025',
@@ -169,7 +169,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '03',
+    n: '06',
     title: 'Patterns Across Languages',
     by: 'clay',
     year: '2025',
@@ -211,7 +211,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '04',
+    n: '01',
     title: 'flowerfield',
     by: 'clay',
     year: '2022',
@@ -258,7 +258,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '05',
+    n: '02',
     title: 'Synergy with the Cosmos',
     by: 'clay+daniel',
     year: '2023',
@@ -310,7 +310,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '06',
+    n: '03',
     title: 'Dougherty Arts Center',
     by: 'clay+daniel',
     year: '2024',
@@ -342,7 +342,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '07',
+    n: '04',
     title: 'Kuka Robotics',
     by: 'daniel',
     year: '2026',
