@@ -18,7 +18,7 @@
  */
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { WORDMARK } from '../data/config';
-import { routes, RouteLink } from '../routing';
+import { routes } from '../routing';
 import { Eyebrow, EngineSection, AnnotationStrip } from './engine/EngineSection';
 import { OperatingLoop } from './company/OperatingLoop';
 
@@ -41,18 +41,16 @@ export function CompanyPage() {
           {WORDMARK} · what we do
         </span>
         <nav className="flex items-center gap-5">
-          <RouteLink
-            to={routes.engine}
+          <a href={routes.engine}
             className="font-mono text-[11px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
           >
             the engine
-          </RouteLink>
-          <RouteLink
-            to={routes.configurator}
+          </a>
+          <a href={routes.studio}
             className="font-mono text-[11px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
           >
             the studio
-          </RouteLink>
+          </a>
         </nav>
       </header>
 
@@ -159,12 +157,11 @@ export function CompanyPage() {
           of places that will never exist. The technology points back toward the world, not away from
           it.
         </p>
-        <RouteLink
-          to={routes.engine}
+        <a href={routes.engine}
           className="mt-10 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
         >
           See exactly what the engine computes →
-        </RouteLink>
+        </a>
       </EngineSection>
 
       {/* 6 — STEWARDSHIP (chartreuse) */}
@@ -223,12 +220,11 @@ export function CompanyPage() {
           Architecture the garden grows into.
         </p>
 
-        <RouteLink
-          to={routes.configurator}
+        <a href={routes.studio}
           className="mt-12 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkNavy/40 underline-offset-4 transition hover:decoration-inkNavy focus-visible:decoration-inkNavy"
         >
           Shape a {NAME} in the studio →
-        </RouteLink>
+        </a>
       </EngineSection>
     </div>
   );

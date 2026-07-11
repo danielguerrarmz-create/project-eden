@@ -357,6 +357,31 @@ export const LEAD_TIME = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// WORDMARK — the name is locked on the Day-3 call; one constant to swap.
+// NAMING — two distinct proper nouns, both correct (confirmed 2026-07-05):
+//   WORDMARK ("Bower")  = the COMPANY / studio / brand behind the work. Used in
+//                         all brand chrome (headers, nav, commission-sheet mark).
+//   PRODUCT  ("Eden")   = the thing a client commissions (the object itself).
+//                         Used in product copy, e.g. "Commission a living Eden".
+// The common noun "bower" (a garden structure, like pavilion/arbor) may still be
+// used lowercase in generic prose; only the COMPANY brand is the proper noun.
 // ---------------------------------------------------------------------------
-export const WORDMARK = 'bower';
+export const WORDMARK = 'Bower';
+export const PRODUCT = 'Eden';
+
+/**
+ * ENGINE_NAME — the generative engine's proper noun. NOT YET DECIDED: Daniel and
+ * Clay have an open call (candidates floated: Espalier / Trellis / Grammar /
+ * Understory). Until it lands, the engine is named with the lowercase generic
+ * "the engine", and every splash/engine chrome reference reads it from HERE, so
+ * locking the name is a one-line swap.
+ */
+export const ENGINE_NAME = 'the engine';
+
+/**
+ * PRIMARY CTA labels — one filled action on the splash, audience-dependent. Until
+ * the Jul 17 evaluator deadline the filled action sends to the proof (the engine
+ * page); after it, the buyer action (the studio) leads. Both labels live here so
+ * the swap is one line. Do NOT swap without the call.
+ */
+export const CTA_PRIMARY_EVALUATOR = 'See how the engine works';
+export const CTA_PRIMARY_BUYER = 'Shape your Eden';

@@ -3,9 +3,35 @@
  * No engine logic here; purely turns engine data into transforms.
  */
 import * as THREE from 'three';
+import type { Vec3 } from '../engine/types';
 
-// (Member solids + connector steel are built in Folly.tsx / connectors.ts
-// from the engine's cut planes — see FABRICATION.md §1a.)
+// (BUILT-view member solids + connector steel come from Folly.tsx /
+// connectors.ts via the engine's cut planes — see FABRICATION.md §1a.
+// segmentMatrix below is the lightweight cylinder used ONLY by the splash
+// hero's stylised preview, never by the studio's built view.)
+
+const UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Compose an instance matrix for a unit (radius r, height 1) cylinder so it
+ * spans from `start` to `end`. Splash-hero preview members only.
+ */
+export function segmentMatrix(
+  start: Vec3,
+  end: Vec3,
+  scratch: THREE.Object3D,
+  radiusScale = 1,
+): THREE.Matrix4 {
+  const s = new THREE.Vector3(...start);
+  const e = new THREE.Vector3(...end);
+  const dir = new THREE.Vector3().subVectors(e, s);
+  const len = dir.length() || 1e-6;
+  scratch.position.copy(s).add(e).multiplyScalar(0.5);
+  scratch.quaternion.setFromUnitVectors(UP, dir.clone().normalize());
+  scratch.scale.set(radiusScale, len, radiusScale);
+  scratch.updateMatrix();
+  return scratch.matrix.clone();
+}
 
 /** Heat colour ramp: 0 (cool sparse) -> 1 (hot dense). Green -> amber -> red. */
 export function heatColor(t: number): THREE.Color {

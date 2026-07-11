@@ -23,10 +23,17 @@ export function EngineSection({
   ground,
   reduced,
   children,
+  id,
+  wide = false,
 }: {
   ground: Ground;
   reduced: boolean;
   children: ReactNode;
+  /** Optional anchor id on the section root (e.g. the splash's #register). */
+  id?: string;
+  /** Widen the reading column for two-column editorial spreads (Engine page). The home
+   *  never passes this, so its sections keep the 880px column unchanged. */
+  wide?: boolean;
 }) {
   const g = GROUND[ground];
   const ref = useRef<HTMLElement>(null);
@@ -61,6 +68,7 @@ export function EngineSection({
   return (
     <section
       ref={ref}
+      id={id}
       className={`w-full ${g.bg} ${g.text}`}
       style={{
         opacity: shown ? 1 : 0,
@@ -68,7 +76,9 @@ export function EngineSection({
         transition: reduced ? 'none' : 'opacity 350ms ease-out, transform 350ms ease-out',
       }}
     >
-      <div className="mx-auto max-w-[880px] px-6 py-20 md:px-10 md:py-32">
+      <div
+        className={`mx-auto px-6 py-20 md:px-10 md:py-32 ${wide ? 'max-w-[1180px]' : 'max-w-[880px]'}`}
+      >
         <InkProvider value={g.ink}>{children}</InkProvider>
       </div>
     </section>

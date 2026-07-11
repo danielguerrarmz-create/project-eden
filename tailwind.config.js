@@ -50,6 +50,10 @@ export default {
         ],
         // High-contrast serif for the single hero / pull-quote moment per page.
         quote: ['"Bodoni Moda"', '"Freight Big Pro"', '"Source Serif 4 Variable"', 'Georgia', 'serif'],
+        // Hand-lettered face for the hero sentence ("Grow a living … in your garden").
+        heroScript: ['"Realistic Nature"', '"Bodoni Moda"', 'Georgia', 'serif'],
+        // Handwritten cursive for the one big "Eden" word in the hero headline.
+        handwrite: ['"Paperlight Script"', '"Dancing Script"', '"Brush Script MT"', 'cursive'],
       },
       keyframes: {
         'grow-in': {
@@ -60,10 +64,16 @@ export default {
           '0%,100%': { transform: 'rotate(-1.2deg)' },
           '50%': { transform: 'rotate(1.2deg)' },
         },
+        // "Handwriting appears" left-to-right reveal for the cursive Eden word.
+        'write-on': {
+          '0%': { clipPath: 'inset(0 100% 0 0)', opacity: '0.4' },
+          '100%': { clipPath: 'inset(0 0 0 0)', opacity: '1' },
+        },
       },
       animation: {
         'grow-in': 'grow-in 0.5s cubic-bezier(0.2,0.8,0.2,1) both',
         sway: 'sway 6s ease-in-out infinite',
+        'write-on': 'write-on 1.1s cubic-bezier(0.22,0.61,0.36,1) both',
       },
     },
   },
