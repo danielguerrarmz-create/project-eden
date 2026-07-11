@@ -42,4 +42,6 @@ export const routes = {
   shape: '#/shape',
   /** Form-finding spike: sculpt a control lattice, relax onto a buildable gridshell. */
   sculpt: '#/sculpt',
+  /** The machine-learning agenda, told three times at increasing depth (anyone → investor → practitioner). */
+  machineLearning: '#/machine-learning',
 } as const;

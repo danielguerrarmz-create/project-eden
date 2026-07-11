@@ -162,6 +162,11 @@ export function CompanyPage() {
         >
           See exactly what the engine computes →
         </a>
+        <a href={routes.machineLearning}
+          className="mt-3 block w-fit font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+        >
+          Where machine learning fits, three levels deep →
+        </a>
       </EngineSection>
 
       {/* 6 — STEWARDSHIP (chartreuse) */}

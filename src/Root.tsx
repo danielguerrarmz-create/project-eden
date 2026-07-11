@@ -10,6 +10,7 @@
  *                condensed engine section at `#how-it-works`).
  * `#/engine`  -> the full six-section engine walkthrough (EnginePage chrome).
  * `#/company` -> what the company does (same documentation layer, one level up).
+ * `#/machine-learning` -> the ML agenda at three depths (same documentation layer).
  * `#/studio`  -> the single-page studio (the configurator, untouched component).
  * anything else -> the splash landing (fallback, so a stray hash never dead-ends
  * and the splash's in-page `#how-it-works` / `#register` anchors keep resolving).
@@ -17,6 +18,7 @@
 import App from './App';
 import { EnginePage } from './pages/engine/EnginePage';
 import { CompanyPage } from './pages/CompanyPage';
+import { MachineLearningPage } from './pages/MachineLearningPage';
 import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
 import { ShapePage } from './pages/ShapePage';
@@ -28,6 +30,7 @@ export function Root() {
   if (route === '/studio') return <App />;
   if (route === '/engine') return <EnginePage />;
   if (route === '/company') return <CompanyPage />;
+  if (route === '/machine-learning') return <MachineLearningPage />;
   if (route === '/about') return <AboutPage />;
   if (route === '/shape') return <ShapePage />;
   if (route === '/sculpt') return <SculptPage />;
