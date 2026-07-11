@@ -185,9 +185,24 @@ export function BowerIntro() {
               : { default: { duration: 0 } }
           }
         >
+          {/* Glass-pill chrome grows in DURING the travel, so the lockup LANDS
+              already wearing the header's pill — before this, the logo landed
+              naked and the real pill + nav popped in around it as the veil
+              cleared (the "opacity blink" on the header at page-open). Sized
+              to the header anchor's px-4/py-2 around the measured lockup. A
+              solid approximation of .nav-pill: backdrop-filter here would
+              sample the fading veil and shimmer. */}
+          <motion.span
+            aria-hidden
+            className="absolute rounded-full border border-inkBlack/10 bg-white/60 shadow-[0_1px_2px_rgba(23,22,15,0.06),0_8px_24px_rgba(23,22,15,0.08)]"
+            style={{ left: -16, top: -8, width: w + 32, height: h + 16 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: traveled && !fade ? 1 : 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          />
           {/* The mark fades + settles in as the letters begin to land. */}
           <motion.span
-            className="block"
+            className="relative block"
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.08, ease: EASE_IN }}
@@ -197,7 +212,7 @@ export function BowerIntro() {
           {/* The wordmark, set into a line letter by letter. letter-spacing on the flex row
               adds the same 0.1em tracking as the nav lockup, so it lands coincident. */}
           <span
-            className="flex font-mono font-semibold lowercase"
+            className="relative flex font-mono font-semibold lowercase"
             style={{ fontSize: NAME_PX, letterSpacing: '0.1em', lineHeight: 1 }}
           >
             {LETTERS.map((ch, i) => (
