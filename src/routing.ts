@@ -36,8 +36,12 @@ export const routes = {
   engine: '#/engine',
   studio: '#/studio',
   about: '#/about',
+  /** What the company does — documentation layer, one level above the engine. */
+  company: '#/company',
   /** Direct-manipulation shaping prototype (draggable cage, no sliders). */
   shape: '#/shape',
   /** Form-finding spike: sculpt a control lattice, relax onto a buildable gridshell. */
   sculpt: '#/sculpt',
+  /** The machine-learning agenda, told three times at increasing depth (anyone → investor → practitioner). */
+  machineLearning: '#/machine-learning',
 } as const;

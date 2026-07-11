@@ -17,7 +17,7 @@
  * PURE. Also owns the shared plan maths (ellipse dims, perimeter, feet count)
  * so grammar and geometry can never disagree about them.
  */
-import { ENVELOPE, GRAMMAR } from '../data/config';
+import { ENVELOPE, GRAMMAR, JOINTS } from '../data/config';
 import type { DesignParams, GrammarBounds, ParamBound } from './types';
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
@@ -55,6 +55,41 @@ export function feetCountFor(footprintM2: number): number {
 export function eaveBlankLengthM(footprintM2: number): number {
   const { a, b } = planDims(footprintM2);
   return ellipsePerimeterM(a, b) / (feetCountFor(footprintM2) * GRAMMAR.eaveBlanksPerFootSpan);
+}
+
+/**
+ * The tightest bay the HUB joint physically allows — DERIVED, not asserted
+ * (FABRICATION.md §2): the shortest strut must still carry two full bolted
+ * end slots (whose depth is itself derived from EC5 bolt rules) plus clear
+ * timber between them, plus a typical computed standoff at each end. Bay
+ * spacing relates to strut length by the shared diamond factor.
+ */
+export function hubMinSpacingM(): number {
+  const slotM = JOINTS.hub.slotMm.depth / 1000;
+  const clearM = JOINTS.hub.slotClearanceMm / 1000;
+  const nominal =
+    (2 * slotM + clearM + 2 * JOINTS.hub.standoffAllowanceM) / GRAMMAR.diagonalFactor;
+  // Real bays undershoot nominal spacing on the current net — bind on real.
+  // Round UP: a derived safety minimum must never round into the unsafe side.
+  return Math.ceil((nominal / (1 - GRAMMAR.netBayVarianceFrac)) * 100) / 100;
+}
+
+/** The governing bay-spacing minimum + its rule for a joint system. */
+export function minSpacingFor(jointSystem: DesignParams['jointSystem']): {
+  min: number;
+  rule: string;
+} {
+  const base = {
+    min: GRAMMAR.minStrutSpacingM,
+    rule: `connector hardware would overlap below ${Math.round(GRAMMAR.minStrutSpacingM * 1000)} mm bays — joint clearance limit`,
+  };
+  if (jointSystem !== 'hub') return base;
+  const derived = hubMinSpacingM();
+  if (derived <= base.min) return base;
+  return {
+    min: derived,
+    rule: `the shortest strut must fit two bolted end slots (EC5 bolt spacing) between its hubs`,
+  };
 }
 
 /** The rise cap for a footprint: planning OR crown curvature, whichever bites. */
@@ -95,14 +130,16 @@ export function deriveBounds(params: DesignParams): GrammarBounds {
     maxRule: rise.rule,
   };
 
-  // The bay cap is JOINT-SYSTEM dependent: a lamella spans two bays through
-  // its node and the whole curved piece must fit the sheet cut limit, so
-  // switching to the lamella system visibly tightens this slider.
+  // The bay bounds are JOINT-SYSTEM dependent: a lamella spans two bays
+  // through its node and must fit the sheet cut limit (max), while the hub
+  // system's minimum is DERIVED from what a strut's end milling physically
+  // needs (min) — see minSpacingFor / hubMinSpacingM.
   const lamella = params.jointSystem === 'lamella';
+  const spacingMin = minSpacingFor(params.jointSystem);
   const strutSpacingM: ParamBound = {
-    min: GRAMMAR.minStrutSpacingM,
+    min: spacingMin.min,
     max: lamella ? GRAMMAR.maxLamellaSpacingM : GRAMMAR.maxStrutSpacingM,
-    minRule: `connector hardware would overlap below ${Math.round(GRAMMAR.minStrutSpacingM * 1000)} mm bays — joint clearance limit`,
+    minRule: spacingMin.rule,
     maxRule: lamella
       ? `a two-bay lamella must fit the ${GRAMMAR.maxComponentLengthM} m sheet cut limit`
       : `unsupported armature span would exceed the flat-piece curvature tolerance`,
@@ -123,6 +160,10 @@ export function deriveBounds(params: DesignParams): GrammarBounds {
   if (lamella) {
     notes.push(
       `lamella system — bays cap at ${GRAMMAR.maxLamellaSpacingM} m so a two-bay piece fits the sheet`,
+    );
+  } else {
+    notes.push(
+      `hub struts need ≥ ${hubMinSpacingM().toFixed(2)} m bays for their two bolted end slots (EC5 spacing) — the ${GRAMMAR.minStrutSpacingM} m joint-clearance floor ${hubMinSpacingM() <= GRAMMAR.minStrutSpacingM ? 'governs' : 'is overridden'}`,
     );
   }
   // Narrate the moment the grammar added a foot (within ~0.4 m² of the switch).
@@ -150,7 +191,7 @@ export function clampParams(p: DesignParams): DesignParams {
     ...p,
     footprintM2,
     riseM: clamp(p.riseM, GRAMMAR.minHeadroomM, rise.cap),
-    strutSpacingM: clamp(p.strutSpacingM, GRAMMAR.minStrutSpacingM, spacingCap),
+    strutSpacingM: clamp(p.strutSpacingM, minSpacingFor(p.jointSystem).min, spacingCap),
     apertureDeg: ((p.apertureDeg % 360) + 360) % 360,
   };
 }

@@ -35,12 +35,18 @@ export function EnginePage() {
 
       {/* Direct-manipulation prototype: reviewable, off the home nav. */}
       <div className="w-full bg-paperVellum px-6 pb-16 md:px-10">
-        <div className="mx-auto max-w-[1180px] border-t border-inkBlack/15 pt-8">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap gap-x-8 gap-y-3 border-t border-inkBlack/15 pt-8">
           <a
             href={routes.shape}
             className="inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
           >
             Prototype: shape one by direct manipulation →
+          </a>
+          <a
+            href={routes.machineLearning}
+            className="inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+          >
+            The machine-learning agenda, three levels deep →
           </a>
         </div>
       </div>

@@ -162,7 +162,75 @@ function ControlRail() {
         </div>
       </div>
 
+      <ConstructionPicker />
+
       <SpeciesPicker />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Construction: the two physical-kit choices (FABRICATION.md §2–§5). These
+// change the joint schedule, the stock plan and the price — visibly.
+// ---------------------------------------------------------------------------
+function ConstructionPicker() {
+  const jointSystem = useDesign((s) => s.params.jointSystem);
+  const setJointSystem = useDesign((s) => s.setJointSystem);
+
+  return (
+    <div className="rounded-3xl border border-line bg-white/50 p-5">
+      <h2 className="mb-1 font-display text-xl font-semibold lowercase text-ink">build it</h2>
+      <p className="mb-3 text-[11px] leading-snug text-inkFaint">
+        two ways to joint the lattice — the cut files and hardware schedule follow your choice.
+        the canopy always sweeps to the lawn and roots on driven ground screws
+      </p>
+      <Segmented
+        label="joints"
+        value={jointSystem}
+        onChange={(v) => setJointSystem(v as 'hub' | 'lamella')}
+        options={[
+          { value: 'hub', title: 'steel hubs', hint: 'straight struts, laser-cut nodes' },
+          { value: 'lamella', title: 'lamella', hint: 'all-timber weave, one bolt per node' },
+        ]}
+      />
+    </div>
+  );
+}
+
+function Segmented({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; title: string; hint: string }[];
+}) {
+  return (
+    <div role="group" aria-label={label}>
+      <div className="mb-1 text-[11px] uppercase tracking-wider text-inkFaint">{label}</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {options.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              aria-pressed={active}
+              className={`rounded-xl border px-2.5 py-1.5 text-left transition ${
+                active ? 'border-moss bg-moss/10' : 'border-line bg-white/40 hover:border-moss/50'
+              }`}
+            >
+              <div className={`text-[12px] font-medium leading-tight ${active ? 'text-ink' : 'text-inkSoft'}`}>
+                {o.title}
+              </div>
+              <div className="text-[10px] text-inkFaint">{o.hint}</div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

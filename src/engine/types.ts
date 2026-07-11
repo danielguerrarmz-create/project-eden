@@ -113,6 +113,13 @@ export interface Member {
    */
   normal: Vec3;
   /**
+   * The TRUE surface point at this bay's middle — the waypoint a sheet
+   * piece's CNC-cut curve passes through between the nodes (straight linear
+   * stock ignores it). This is what makes every curved piece specific to
+   * its place on the shell rather than a universal extrusion.
+   */
+  arcMid: Vec3;
+  /**
    * MILLED-END reality (FABRICATION.md §1a): the planar cut each physical end
    * is made on, resolved per node by the joint rules. The solid the scene
    * draws and the length the BOM prices both derive from these planes.
@@ -150,6 +157,20 @@ export interface Piece {
   stock: 'linear' | 'sheet';
   /** Nested width on sheet (sheet pieces) — the piece's structural depth. */
   depthM: number;
+  /**
+   * SHEET pieces only — the flat-piece rule (FABRICATION.md §1a): the ONE
+   * plane this piece is cut from flat stock in. Every segment's section is
+   * oriented to this plane; the CNC profile lives in it.
+   */
+  plane?: { origin: Vec3; normal: Vec3 };
+  /** Max centreline deviation from the piece plane (m) — grammar-capped. */
+  flatDevM?: number;
+  /** Max section lean off the ideal surface normal (deg) — grammar-capped. */
+  leanDeg?: number;
+  /** SHEET pieces: max in-plane camber of the piece's true CNC curve off its
+   *  chord (m). Added to the structural depth when nesting — the sheet count
+   *  prices the curved profile, not a wishful rectangle. */
+  camberM?: number;
 }
 
 /** One reason-carrying bound for one slider (the grammar surfaced). */
@@ -203,6 +224,13 @@ export interface CanopyGeometry {
   /** Longest single piece (m) — every piece is also checked against its own
    *  stock rule (sheet cut limit / linear handling cap) at generation. */
   maxComponentLengthM: number;
+  /**
+   * HONEST DEBT COUNTER (FABRICATION.md §2/§9): hub struts too short to
+   * carry two EC5-length end slots. Non-zero only in the crown zone, where
+   * the polar net crowds — the net re-parameterization roadmap item owns
+   * driving this to 0. Never hidden.
+   */
+  subMillableStrutCount: number;
 }
 
 /** One line in the cut-list: "N pieces of kind K at length L". */
@@ -210,8 +238,11 @@ export interface CutItem {
   lengthM: number;
   kind: Piece['kind'];
   stock: Piece['stock'];
-  /** Nested width for sheet pieces (their structural depth). */
+  /** Structural depth of the section. */
   depthM: number;
+  /** NESTED width on the sheet: structural depth + the piece's camber —
+   *  a curved profile occupies its curve's band, not its section. */
+  widthM: number;
   count: number;
 }
 

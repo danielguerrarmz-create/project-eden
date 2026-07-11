@@ -1,15 +1,20 @@
 /**
  * util.ts — small three.js helpers shared by the scene + overlays.
- * No engine logic here; purely turns engine coordinates into transforms.
+ * No engine logic here; purely turns engine data into transforms.
  */
 import * as THREE from 'three';
 import type { Vec3 } from '../engine/types';
+
+// (BUILT-view member solids + connector steel come from Folly.tsx /
+// connectors.ts via the engine's cut planes — see FABRICATION.md §1a.
+// segmentMatrix below is the lightweight cylinder used ONLY by the splash
+// hero's stylised preview, never by the studio's built view.)
 
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * Compose an instance matrix for a unit (radius r, height 1) cylinder so it
- * spans from `start` to `end`. Used for every timber member.
+ * spans from `start` to `end`. Splash-hero preview members only.
  */
 export function segmentMatrix(
   start: Vec3,

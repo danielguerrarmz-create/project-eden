@@ -26,7 +26,13 @@ export function decomposeComponents(
   for (const p of geometry.pieces) {
     const roundedLen = Math.max(bucket, Math.round(p.lengthM / bucket) * bucket);
     totalLengthM += p.lengthM;
-    const k = `${p.kind}:${roundedLen.toFixed(2)}`;
+    // NESTED width: a curved profile occupies depth + camber of the sheet
+    // (rounded UP — stock estimates never round into the flattering side).
+    const widthM =
+      p.stock === 'sheet'
+        ? Math.ceil((p.depthM + (p.camberM ?? 0)) * 100) / 100
+        : p.depthM;
+    const k = `${p.kind}:${roundedLen.toFixed(2)}:${widthM.toFixed(2)}`;
     const existing = map.get(k);
     if (existing) {
       existing.count += 1;
@@ -36,6 +42,7 @@ export function decomposeComponents(
         kind: p.kind,
         stock: p.stock,
         depthM: p.depthM,
+        widthM,
         count: 1,
       });
     }

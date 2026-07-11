@@ -34,7 +34,9 @@ export function nestComponents(components: ComponentList): NestingResult {
   for (const item of components.items) {
     for (let n = 0; n < item.count; n++) {
       if (item.stock === 'sheet') {
-        sheetBlanks.push({ lengthM: item.lengthM, widthM: item.depthM, kind: item.kind });
+        // Nested width = depth + camber (CutItem.widthM): the curved
+        // profile's true band on the sheet.
+        sheetBlanks.push({ lengthM: item.lengthM, widthM: item.widthM, kind: item.kind });
       } else {
         linearLengths.push(item.lengthM);
       }

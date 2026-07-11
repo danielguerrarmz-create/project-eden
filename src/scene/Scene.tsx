@@ -18,6 +18,21 @@ import { GrowthOverlay } from './overlays/GrowthOverlay';
 import { CageHandles } from './CageHandles';
 
 /**
+ * ?inspect — joint-inspection mode (dev/review affordance): hides the soft
+ * overlays and frees the camera so the joinery can be examined close up.
+ * Optionally takes an orbit target: ?inspect=x,y,z (e.g. a foot position).
+ * Read once at load; the app already treats the URL as load-time state.
+ */
+const INSPECT_RAW = new URLSearchParams(window.location.search).get('inspect');
+const INSPECT = INSPECT_RAW !== null;
+const INSPECT_TARGET: [number, number, number] | null = (() => {
+  const parts = (INSPECT_RAW ?? '').split(',').map(Number);
+  return parts.length === 3 && parts.every((n) => Number.isFinite(n))
+    ? [parts[0], parts[1], parts[2]]
+    : null;
+})();
+
+/**
  * `manipulate` turns the stage into the direct-manipulation cage: draggable
  * handles reshape the pavilion (routed through the grammar), overlays are hidden
  * for a clean cage view, and auto-rotate stops so shaping never fights the camera.
@@ -51,20 +66,20 @@ export function Scene({ manipulate = false }: { manipulate?: boolean }) {
       <GardenContext />
       <Folly />
 
-      {!manipulate && overlays.strutHeatmap && <StrutHeatmap />}
-      {!manipulate && overlays.growth && <GrowthOverlay />}
+      {!manipulate && !INSPECT && overlays.strutHeatmap && <StrutHeatmap />}
+      {!manipulate && !INSPECT && overlays.growth && <GrowthOverlay />}
       {manipulate && <CageHandles />}
 
       <ContactShadows position={[0, 0.015, 0]} opacity={0.28} scale={18} blur={2.6} far={7} color="#5a5443" />
 
       <OrbitControls
         makeDefault
-        target={[0, 1.15, 0]}
-        minDistance={4}
+        target={INSPECT_TARGET ?? [0, 1.15, 0]}
+        minDistance={INSPECT ? 0.3 : 4}
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.05}
         enablePan={false}
-        autoRotate={!reducedMotion && !manipulate}
+        autoRotate={!reducedMotion && !manipulate && !INSPECT}
         autoRotateSpeed={0.35}
       />
     </Canvas>

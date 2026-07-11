@@ -16,14 +16,58 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { memberPrism, sectionFor } from '../engine/jointGeometry';
+import { buildPieceSolid } from '../engine/pieceSolid';
 import type { Vec3 } from '../engine/types';
 import { useDesign } from '../state/store';
 import { buildSteel } from './connectors';
 
+const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+/** Flat-shaded quad emitter: winds (a,b,c,d) so the face points along `out`. */
+function emitQuad(
+  positions: number[],
+  normals: number[],
+  va: Vec3,
+  vb: Vec3,
+  vc: Vec3,
+  vd: Vec3,
+  out: Vec3,
+) {
+  let n = cross(sub(vc, va), sub(vd, vb)); // planar-quad normal (diagonals)
+  let [a, b, c, d] = [va, vb, vc, vd];
+  if (dot(n, out) < 0) {
+    [b, d] = [d, b];
+    n = [-n[0], -n[1], -n[2]];
+  }
+  const l = Math.hypot(n[0], n[1], n[2]) || 1e-9;
+  const un: Vec3 = [n[0] / l, n[1] / l, n[2] / l];
+  for (const tri of [
+    [a, b, c],
+    [a, c, d],
+  ]) {
+    for (const p of tri) {
+      positions.push(p[0], p[1], p[2]);
+      normals.push(un[0], un[1], un[2]);
+    }
+  }
+}
+
+const mid4 = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Vec3 => [
+  (a[0] + b[0] + c[0] + d[0]) / 4,
+  (a[1] + b[1] + c[1] + d[1]) / 4,
+  (a[2] + b[2] + c[2] + d[2]) / 4,
+];
+
 // Prism corners come ordered [start 0..3, end 0..3] around the section.
 const FACES: [number, number, number, number][] = [
-  [0, 1, 2, 3], // start cut face
-  [4, 5, 6, 7], // end cut face
+  [0, 1, 2, 3],
+  [4, 5, 6, 7],
   [0, 1, 5, 4],
   [1, 2, 6, 5],
   [2, 3, 7, 6],
@@ -34,50 +78,61 @@ const FACES: [number, number, number, number][] = [
 function prismsToGeometry(prisms: Vec3[][]): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
-  const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const cross = (a: Vec3, b: Vec3): Vec3 => [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
-  const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
   for (const v of prisms) {
-    const centroid: [number, number, number] = [0, 0, 0];
-    for (const p of v) {
-      centroid[0] += p[0] / 8;
-      centroid[1] += p[1] / 8;
-      centroid[2] += p[2] / 8;
-    }
-    for (const face of FACES) {
-      const fc: [number, number, number] = [0, 0, 0];
-      for (const i of face) {
-        fc[0] += v[i][0] / 4;
-        fc[1] += v[i][1] / 4;
-        fc[2] += v[i][2] / 4;
-      }
-      // Planar-quad normal from the diagonals, oriented outward (away from
-      // the prism centroid), winding fixed to match.
-      let [a, b, c, d] = face;
-      let n = cross(sub(v[c], v[a]), sub(v[d], v[b]));
-      if (dot(n, sub(fc, centroid)) < 0) {
-        [b, d] = [d, b];
-        n = [-n[0], -n[1], -n[2]];
-      }
-      const l = Math.hypot(n[0], n[1], n[2]) || 1e-9;
-      const un: Vec3 = [n[0] / l, n[1] / l, n[2] / l];
-      for (const tri of [
-        [a, b, c],
-        [a, c, d],
-      ]) {
-        for (const i of tri) {
-          positions.push(v[i][0], v[i][1], v[i][2]);
-          normals.push(un[0], un[1], un[2]);
-        }
-      }
+    const centre: Vec3 = [
+      v.reduce((s, p) => s + p[0], 0) / 8,
+      v.reduce((s, p) => s + p[1], 0) / 8,
+      v.reduce((s, p) => s + p[2], 0) / 8,
+    ];
+    for (const [a, b, c, d] of FACES) {
+      const fc = mid4(v[a], v[b], v[c], v[d]);
+      emitQuad(positions, normals, v[a], v[b], v[c], v[d], sub(fc, centre));
     }
   }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geo;
+}
 
+/**
+ * Merge curved piece solids (pieceSolid.ts rings) into one BufferGeometry:
+ * side quads between consecutive rings + the two end caps. Each sheet piece
+ * renders as its true CNC-cut curve — camber, fish-belly taper and all.
+ */
+function ringsToGeometry(solids: Vec3[][][]): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  for (const rings of solids) {
+    for (let i = 0; i + 1 < rings.length; i++) {
+      const r0 = rings[i];
+      const r1 = rings[i + 1];
+      const centre = mid4(
+        mid4(r0[0], r0[1], r0[2], r0[3]),
+        mid4(r1[0], r1[1], r1[2], r1[3]),
+        mid4(r0[0], r0[1], r0[2], r0[3]),
+        mid4(r1[0], r1[1], r1[2], r1[3]),
+      );
+      for (let k = 0; k < 4; k++) {
+        const k2 = (k + 1) % 4;
+        const fc = mid4(r0[k], r0[k2], r1[k2], r1[k]);
+        emitQuad(positions, normals, r0[k], r0[k2], r1[k2], r1[k], sub(fc, centre));
+      }
+    }
+    // End caps, facing away from the body of the piece.
+    const first = rings[0];
+    const second = rings[1];
+    emitQuad(
+      positions, normals, first[0], first[1], first[2], first[3],
+      sub(mid4(first[0], first[1], first[2], first[3]), mid4(second[0], second[1], second[2], second[3])),
+    );
+    const last = rings[rings.length - 1];
+    const prev = rings[rings.length - 2];
+    emitQuad(
+      positions, normals, last[0], last[1], last[2], last[3],
+      sub(mid4(last[0], last[1], last[2], last[3]), mid4(prev[0], prev[1], prev[2], prev[3])),
+    );
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
@@ -100,28 +155,40 @@ function useInstanceMatrices(
 export function Folly() {
   const geometry = useDesign((s) => s.outputs.geometry);
   const system = geometry.params.jointSystem;
-  const lamellaSystem = system === 'lamella';
 
   const boxesRef = useRef<THREE.InstancedMesh>(null);
   const cylsRef = useRef<THREE.InstancedMesh>(null);
 
-  // Timber split by STOCK, matching the BOM: planed C24 off the docking saw
-  // vs LVL off the CNC sheets. Each member is its plane-clipped solid.
+  // Timber split by STOCK, matching the BOM: LINEAR pieces (planed C24 off
+  // the docking saw) draw as straight plane-clipped prisms — that IS their
+  // fabrication; SHEET pieces (CNC LVL) draw as their true cut solids —
+  // cambered, fish-bellied, no two alike (pieceSolid.ts).
   const { c24Geo, lvlGeo, c24Count, lvlCount } = useMemo(() => {
-    const c24: Vec3[][] = [];
-    const lvl: Vec3[][] = [];
-    for (const m of geometry.members) {
-      const { widthM, depthM } = sectionFor(m.type, system);
-      const isLinear = !lamellaSystem && (m.type === 'lattice' || m.type === 'foot');
-      (isLinear ? c24 : lvl).push(memberPrism(m, widthM, depthM));
+    const prisms: Vec3[][] = [];
+    const solids: Vec3[][][] = [];
+    const memberById = new Map(geometry.members.map((m) => [m.id, m]));
+    for (const piece of geometry.pieces) {
+      if (piece.stock === 'sheet') {
+        const solid = buildPieceSolid(
+          piece,
+          piece.memberIds.map((id) => memberById.get(id)!),
+        );
+        if (solid) solids.push(solid.rings);
+      } else {
+        for (const id of piece.memberIds) {
+          const m = memberById.get(id)!;
+          const { widthM, depthM } = sectionFor(m.type, system);
+          prisms.push(memberPrism(m, widthM, depthM));
+        }
+      }
     }
     return {
-      c24Geo: prismsToGeometry(c24),
-      lvlGeo: prismsToGeometry(lvl),
-      c24Count: c24.length,
-      lvlCount: lvl.length,
+      c24Geo: prismsToGeometry(prisms),
+      lvlGeo: ringsToGeometry(solids),
+      c24Count: prisms.length,
+      lvlCount: solids.length,
     };
-  }, [geometry.members, system, lamellaSystem]);
+  }, [geometry.pieces, geometry.members, system]);
   useEffect(
     () => () => {
       c24Geo.dispose();
@@ -140,15 +207,15 @@ export function Folly() {
     <>
       {c24Count > 0 && (
         <mesh geometry={c24Geo} castShadow receiveShadow>
-          {/* Planed C24 spruce/larch, UC3 treated. */}
-          <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
+          {/* Planed C24 spruce/larch, UC3 treated — pale honey, not muddy. */}
+          <meshStandardMaterial color="#b39672" roughness={0.72} metalness={0} />
         </mesh>
       )}
 
       {lvlCount > 0 && (
         <mesh geometry={lvlGeo} castShadow receiveShadow>
-          {/* Spruce LVL, CNC-profiled — paler than the sawn stock. */}
-          <meshStandardMaterial color="#c2ab84" roughness={0.75} metalness={0} />
+          {/* Spruce LVL, CNC-profiled — paler + yellower than sawn stock. */}
+          <meshStandardMaterial color="#d2bd94" roughness={0.68} metalness={0} />
         </mesh>
       )}
 
@@ -159,9 +226,10 @@ export function Folly() {
           args={[undefined, undefined, steel.boxes.length]}
           castShadow
         >
-          {/* Fins, clamp plates, base plates, fish plates — S355 HDG. */}
+          {/* Fins, clamp plates, base plates, fish plates — hot-dip galv:
+              light matte zinc grey, QUIET against the timber. */}
           <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="#878c93" roughness={0.45} metalness={0.7} />
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.45} />
         </instancedMesh>
       )}
 
@@ -172,9 +240,9 @@ export function Folly() {
           args={[undefined, undefined, steel.cylinders.length]}
           castShadow
         >
-          {/* Core drums + bolts (unit Ø1 × h1, scaled per instance). */}
-          <cylinderGeometry args={[0.5, 0.5, 1, 16]} />
-          <meshStandardMaterial color="#878c93" roughness={0.45} metalness={0.7} />
+          {/* Core discs + bolts (unit Ø1 × h1, scaled per instance). */}
+          <cylinderGeometry args={[0.5, 0.5, 1, 24]} />
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.45} />
         </instancedMesh>
       )}
     </>
