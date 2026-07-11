@@ -1,13 +1,16 @@
 /**
  * CrossPathsTimeline.tsx — the animated "how we crossed paths" motion graphic.
  *
- * Per the reference: a handful of strands (our threads, Clay's and Daniel's) start
- * apart on the left, weave over and under each other across the middle, and converge
- * into one bold arrow, Bower. On scroll into view each strand draws itself in, staggered,
- * then the merged arrow draws and its head lands. Reduced motion renders the final state.
+ * The horizontal axis is TIME. Each thread begins at the year it really started, so an
+ * early thread (meeting at UT Austin) runs long and a late one (the engine) is short;
+ * they weave over and under each other and converge into one bold arrow, Bower. The
+ * animation is chronological: the earliest thread draws itself in first, then each later
+ * one weaves in on top, and last the Bower arrow lands. Reduced motion renders the final
+ * state. Small screens fall back to a vertical list.
  *
- * Desktop shows the woven SVG; small screens fall back to a legible vertical list of the
- * same strands (the weave does not read at phone width). Strand data lives in STRANDS.
+ * DATES: the studio-project years (2022 flowerfield, Synergy, Dougherty) are firm; the
+ * others (UT Austin, Resia/Drafted, Archipedia, Forsite OPS, the engine) are Daniel's to
+ * confirm. Everything is one edit away in STRANDS[].start.
  */
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 
@@ -16,28 +19,34 @@ interface Strand {
   note: string;
   who: 'Clay' | 'Daniel' | 'both';
   color: string;
+  /** The year this thread began (drives its start on the time axis). */
+  start: number;
+  /** Vertical lane, top (0) to bottom (5). Clay's threads sit high, Daniel's low. */
+  lane: number;
 }
 
-/** The threads that wove into Bower. Ordered top to bottom on the desktop weave. */
 const STRANDS: Strand[] = [
-  { label: 'Where we met', note: 'UT Austin, School of Architecture', who: 'both', color: '#4C9FC2' },
-  { label: 'Startups', note: 'Resia AI, then Drafted AI', who: 'Clay', color: '#C2673B' },
-  { label: 'Research', note: 'Archipedia and papers', who: 'Clay', color: '#E0A63C' },
-  { label: 'Studio work', note: 'flowerfield, Synergy, Dougherty', who: 'both', color: '#A85BA0' },
-  { label: 'Operations', note: 'Forsite OPS, run solo', who: 'Daniel', color: '#6B7A99' },
-  { label: 'The engine', note: 'the generative core', who: 'Daniel', color: '#2E3A6E' },
+  { label: 'Where we met', note: 'UT Austin', who: 'both', color: '#4C9FC2', start: 2020, lane: 0 },
+  { label: 'Startups', note: 'Resia, then Drafted', who: 'Clay', color: '#C2673B', start: 2021, lane: 1 },
+  { label: 'Research', note: 'Archipedia and papers', who: 'Clay', color: '#E0A63C', start: 2023, lane: 2 },
+  { label: 'Studio work', note: 'flowerfield to Dougherty', who: 'both', color: '#A85BA0', start: 2022, lane: 3 },
+  { label: 'Operations', note: 'Forsite OPS', who: 'Daniel', color: '#6B7A99', start: 2024, lane: 4 },
+  { label: 'The engine', note: 'the generative core', who: 'Daniel', color: '#2E3A6E', start: 2024, lane: 5 },
 ];
 
-const MERGE_COLOR = '#8FA61E'; // a deep accent-olive: the resolved Bower line
+const MERGE_COLOR = '#8FA61E'; // deep accent-olive: the resolved Bower line
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /* --------------------------------- geometry ------------------------------- */
 
 const W = 1000;
 const H = 380;
-const X0 = 250; // strands begin here (room for the right-aligned labels on the left)
-const CX = 715; // convergence x
-const CY = 190; // convergence y (centre)
+const CX = 762; // convergence x (Bower, 2025)
+const CY = 190;
+const MIN_YEAR = 2020;
+const MAX_YEAR = 2025; // the convergence year
+const yearToX = (y: number) => 235 + ((y - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * (CX - 235);
+const laneY = (lane: number) => 46 + lane * ((H - 92) / 5);
 
 /** Catmull-Rom through the points, emitted as smooth cubic beziers. */
 function smooth(pts: { x: number; y: number }[]): string {
@@ -57,52 +66,53 @@ function smooth(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-/** One weaving strand from its start height to the shared convergence point. The
- *  sinusoid (its amplitude tapering to zero at the merge) makes the strands cross. */
-function strandPath(i: number, n: number): { d: string; startY: number } {
-  const startY = 46 + i * ((H - 92) / (n - 1));
+/** A weaving strand from its dated start point to the shared convergence. */
+function strandPath(startX: number, startY: number, lane: number): string {
   const steps = 7;
   const pts: { x: number; y: number }[] = [];
   for (let k = 0; k <= steps; k++) {
     const t = k / steps;
-    const x = X0 + t * (CX - X0);
+    const x = startX + t * (CX - startX);
     const baseY = startY + (CY - startY) * t;
-    const amp = 44 * (1 - t);
-    const y = baseY + amp * Math.sin(2.3 * Math.PI * t + i * 1.15);
+    const amp = 40 * (1 - t);
+    const y = baseY + amp * Math.sin(2.2 * Math.PI * t + lane * 1.05);
     pts.push({ x, y });
   }
   pts[pts.length - 1] = { x: CX, y: CY };
-  return { d: smooth(pts), startY };
+  return smooth(pts);
 }
 
 /* ------------------------------ desktop weave ----------------------------- */
 
 function Weave({ reduced }: { reduced: boolean }) {
+  // Draw order is chronological: earliest thread first, so it "begins with the first
+  // line" and the others weave in over it. The Bower arrow is the last child.
+  const ordered = [...STRANDS].sort((a, b) => a.start - b.start);
+
   const container: Variants = {
     hidden: {},
-    show: { transition: { staggerChildren: 0.16, delayChildren: 0.05 } },
+    show: { transition: { staggerChildren: 0.34, delayChildren: 0.1 } },
   };
   const drawStrand: Variants = {
     hidden: reduced ? { opacity: 1 } : { pathLength: 0, opacity: 0 },
     show: {
       pathLength: 1,
       opacity: 1,
-      transition: { pathLength: { duration: 1.2, ease: EASE }, opacity: { duration: 0.3 } },
+      transition: { pathLength: { duration: 0.95, ease: EASE }, opacity: { duration: 0.25 } },
     },
+  };
+  const fade: Variants = {
+    hidden: reduced ? { opacity: 1 } : { opacity: 0 },
+    show: { opacity: 1, transition: { duration: 0.45, ease: EASE, delay: reduced ? 0 : 0.35 } },
   };
   const drawArrow: Variants = {
     hidden: reduced ? { opacity: 1 } : { pathLength: 0, opacity: 0 },
     show: {
       pathLength: 1,
       opacity: 1,
-      transition: { pathLength: { duration: 0.7, ease: EASE, delay: 0.2 }, opacity: { duration: 0.2, delay: 0.2 } },
+      transition: { pathLength: { duration: 0.7, ease: EASE }, opacity: { duration: 0.2 } },
     },
   };
-  const fade: Variants = {
-    hidden: reduced ? { opacity: 1 } : { opacity: 0 },
-    show: { opacity: 1, transition: { duration: 0.5, ease: EASE } },
-  };
-  const paths = STRANDS.map((_, i) => strandPath(i, STRANDS.length));
 
   return (
     <motion.div
@@ -112,58 +122,50 @@ function Weave({ reduced }: { reduced: boolean }) {
       viewport={{ once: true, amount: 0.4 }}
       className="hidden lg:block"
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="A timeline: our separate threads weaving together into Bower.">
-        {/* left-hand strand labels */}
-        {STRANDS.map((s, i) => (
-          <motion.g key={s.label} variants={fade}>
-            <text x={X0 - 16} y={paths[i].startY - 3} textAnchor="end" className="font-serifDisplay" fontSize="15" fill="#17160F">
-              {s.label}
-            </text>
-            <text x={X0 - 16} y={paths[i].startY + 13} textAnchor="end" className="font-mono" fontSize="10.5" fill="#17160F" opacity="0.5">
-              {s.note}
-            </text>
-          </motion.g>
-        ))}
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="A time-line: our threads begin at their real dates, weave together, and converge into Bower.">
+        {ordered.map((s) => {
+          const sx = yearToX(s.start);
+          const sy = laneY(s.lane);
+          return (
+            <motion.g key={s.label} variants={{ hidden: {}, show: {} }}>
+              {/* the weaving strand */}
+              <motion.path
+                d={strandPath(sx, sy, s.lane)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={3.5}
+                strokeLinecap="round"
+                variants={drawStrand}
+              />
+              {/* the dated start: dot + label + year, with a paper halo so text reads over lines */}
+              <motion.g variants={fade} style={{ paintOrder: 'stroke' }}>
+                <circle cx={sx} cy={sy} r={4} fill={s.color} stroke="#FBF9F3" strokeWidth={2.5} />
+                <text x={sx - 12} y={sy - 3} textAnchor="end" className="font-serifDisplay" fontSize="14.5" fill="#17160F" stroke="#FBF9F3" strokeWidth="3">
+                  {s.label}
+                </text>
+                <text x={sx - 12} y={sy + 13} textAnchor="end" className="font-mono" fontSize="10" fill="#17160F" opacity="0.5" stroke="#FBF9F3" strokeWidth="3">
+                  {s.note} · {s.start}
+                </text>
+              </motion.g>
+            </motion.g>
+          );
+        })}
 
-        {/* the weaving strands */}
-        {STRANDS.map((s, i) => (
+        {/* the merged Bower arrow, last */}
+        <motion.g variants={{ hidden: {}, show: {} }}>
           <motion.path
-            key={s.label}
-            d={paths[i].d}
+            d={`M ${CX} ${CY} L ${W - 54} ${CY}`}
             fill="none"
-            stroke={s.color}
-            strokeWidth={3.5}
+            stroke={MERGE_COLOR}
+            strokeWidth={6}
             strokeLinecap="round"
-            variants={drawStrand}
+            variants={drawArrow}
           />
-        ))}
-
-        {/* the merged Bower arrow */}
-        <motion.path
-          d={`M ${CX} ${CY} L ${W - 54} ${CY}`}
-          fill="none"
-          stroke={MERGE_COLOR}
-          strokeWidth={6}
-          strokeLinecap="round"
-          variants={drawArrow}
-        />
-        <motion.path
-          d={`M ${W - 62} ${CY - 13} L ${W - 30} ${CY} L ${W - 62} ${CY + 13} Z`}
-          fill={MERGE_COLOR}
-          variants={fade}
-        />
-        <motion.text
-          x={W - 40}
-          y={CY - 24}
-          textAnchor="end"
-          className="font-serifDisplay"
-          fontSize="20"
-          fontStyle="italic"
-          fill="#17160F"
-          variants={fade}
-        >
-          Bower
-        </motion.text>
+          <motion.path d={`M ${W - 62} ${CY - 13} L ${W - 30} ${CY} L ${W - 62} ${CY + 13} Z`} fill={MERGE_COLOR} variants={fade} />
+          <motion.text x={W - 40} y={CY - 24} textAnchor="end" className="font-serifDisplay" fontSize="21" fontStyle="italic" fill="#17160F" variants={fade}>
+            Bower
+          </motion.text>
+        </motion.g>
       </svg>
     </motion.div>
   );
@@ -172,7 +174,8 @@ function Weave({ reduced }: { reduced: boolean }) {
 /* ------------------------------ mobile (vertical) ------------------------- */
 
 function Vertical({ reduced }: { reduced: boolean }) {
-  const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.09 } } };
+  const ordered = [...STRANDS].sort((a, b) => a.start - b.start);
+  const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
   const rise: Variants = {
     hidden: reduced ? {} : { opacity: 0, y: 10 },
     show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
@@ -185,25 +188,19 @@ function Vertical({ reduced }: { reduced: boolean }) {
       viewport={{ once: true, amount: 0.15 }}
       className="relative ml-1 border-l border-inkBlack/15 pl-6 lg:hidden"
     >
-      {STRANDS.map((s) => (
+      {ordered.map((s) => (
         <motion.li key={s.label} variants={rise} className="relative pb-6">
-          <span
-            className="absolute -left-[30px] top-1 block h-2.5 w-2.5 rounded-full ring-4 ring-paperVellum"
-            style={{ background: s.color }}
-            aria-hidden
-          />
-          <p className="font-serifDisplay text-[16px] leading-tight text-inkBlack">{s.label}</p>
+          <span className="absolute -left-[30px] top-1 block h-2.5 w-2.5 rounded-full ring-4 ring-paperVellum" style={{ background: s.color }} aria-hidden />
+          <p className="font-serifDisplay text-[16px] leading-tight text-inkBlack">
+            {s.label} <span className="font-mono text-[11px] text-inkBlack/40">{s.start}</span>
+          </p>
           <p className="mt-0.5 font-mono text-[11px] leading-snug text-inkBlack/50">{s.note}</p>
         </motion.li>
       ))}
       <motion.li variants={rise} className="relative">
-        <span
-          className="absolute -left-[32px] top-1 block h-3.5 w-3.5 rounded-full ring-4 ring-paperVellum"
-          style={{ background: MERGE_COLOR }}
-          aria-hidden
-        />
+        <span className="absolute -left-[32px] top-1 block h-3.5 w-3.5 rounded-full ring-4 ring-paperVellum" style={{ background: MERGE_COLOR }} aria-hidden />
         <p className="font-serifDisplay text-[19px] italic leading-tight text-inkBlack">Bower</p>
-        <p className="mt-0.5 font-mono text-[11px] text-inkBlack/50">the studio, one product</p>
+        <p className="mt-0.5 font-mono text-[11px] text-inkBlack/50">2025, the studio</p>
       </motion.li>
     </motion.ol>
   );
@@ -215,7 +212,7 @@ export function CrossPathsTimeline() {
     <div>
       <Weave reduced={reduced} />
       <Vertical reduced={reduced} />
-      <p className="mt-6 max-w-[52ch] font-serifDisplay text-[14px] leading-snug text-inkBlack/50">
+      <p className="mt-6 max-w-[54ch] font-serifDisplay text-[14px] leading-snug text-inkBlack/50">
         Two people and a handful of obsessions, met at UT Austin and woven, over five years, into
         one studio.
       </p>
