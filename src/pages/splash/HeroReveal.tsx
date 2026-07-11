@@ -22,6 +22,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
+import { routes } from '../../routing';
+import { CTA_PRIMARY_BUYER } from '../../data/config';
 import { SESSION_KEY, INTRO_DONE_EVENT } from './BowerIntro';
 import { HERO_STILL } from './heroStill';
 
@@ -107,10 +109,31 @@ function HeroCopy({
       </h1>
       <motion.p
         variants={growLine}
-        className="mt-4 max-w-[34ch] origin-bottom font-serifDisplay text-[17px] leading-snug text-paperVellum/90 will-change-transform"
+        className="mt-4 max-w-[36ch] origin-bottom font-serifDisplay text-[17px] leading-snug text-paperVellum/90 will-change-transform"
       >
-        Rewilding gardens through architecture anyone can build.
+        A one of a kind living structure, computed for your garden and finished when the garden has
+        grown into it.
       </motion.p>
+
+      {/* One filled action (the buyer path) + a quiet proof link (the engine), so both the
+          person who wants to shape one and the person testing the claim have a next step. */}
+      <motion.div
+        variants={growLine}
+        className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 origin-bottom will-change-transform"
+      >
+        <a
+          href={routes.studio}
+          className="rounded-full bg-paperVellum px-6 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-inkBlack shadow-lg transition-colors hover:bg-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paperVellum"
+        >
+          {CTA_PRIMARY_BUYER}
+        </a>
+        <a
+          href={routes.engine}
+          className="font-mono text-[12px] uppercase tracking-[0.14em] text-paperVellum/90 underline decoration-paperVellum/40 underline-offset-4 transition hover:decoration-paperVellum"
+        >
+          See how it works →
+        </a>
+      </motion.div>
     </motion.div>
   );
 }

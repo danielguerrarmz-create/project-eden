@@ -111,6 +111,10 @@ export function HowItWorks({ outputs, reduced }: { outputs: EngineOutputs; reduc
             parameters, a species, and the sun go in. A structure you could actually cut, on feet that
             land on the ground, comes out. Nothing is selected from a range of preset shapes.
           </p>
+          <p className="mt-6 max-w-[54ch] font-serifDisplay text-[clamp(1.15rem,1.7vw,1.55rem)] italic leading-snug">
+            The engine is the asset. Each commission a chartered engineer signs off widens the family
+            it can build, so the studio compounds with every Eden it makes.
+          </p>
         </div>
 
         {/* Meta strip: what the engine is, in three words. */}

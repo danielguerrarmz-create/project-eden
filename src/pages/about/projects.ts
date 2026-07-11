@@ -20,6 +20,21 @@ export interface ProjectImage {
   alt: string;
   /** Optional short caption shown under the image. */
   caption?: string;
+  /** How the image fills its tile. Renders (default) crop with 'cover'; paper figures
+   *  and diagrams use 'contain' so nothing is cut off. */
+  fit?: 'cover' | 'contain';
+}
+
+/** A published paper behind a project (the project IS the research). Renders a
+ *  "read the paper" download framed in the project's text. */
+export interface ProjectPaper {
+  /** Where and when it was published, e.g. "AAG 2025 · MIT". */
+  venue: string;
+  authors: string;
+  /** Public path to the downloadable PDF. */
+  pdf: string;
+  /** Human-readable file size for the download affordance, e.g. "PDF · 3.7 MB". */
+  pdfSize: string;
 }
 
 export interface Project {
@@ -34,6 +49,8 @@ export interface Project {
   description: string;
   /** The big takeaway: "What we learned" that informed our findings. */
   learned: string;
+  /** Present when the project is a published paper: adds venue, authors, and a PDF. */
+  paper?: ProjectPaper;
 }
 
 /** How each `by` value reads in the UI. */
@@ -55,14 +72,14 @@ export interface TeamMember {
 export const TEAM: TeamMember[] = [
   {
     name: 'Clay Seifert',
-    role: 'Cofounder · design & vision',
-    bio: 'Architect and designer. He holds the thesis behind Bower and drives the living-architecture vision, from the fabrication grammar to how a structure grows into its garden.',
+    role: 'Cofounder · design & research',
+    bio: 'Architect, researcher, and B.Arch candidate at UT Austin. He has built computational design tools at TestFit, cofounded Resia AI, and created Archipedia, the first search engine for architecture. His work on recovering the latent geometry of building fragments has been published at AAG, ACADIA, and CAADRIA. At Bower he leads design and the living-architecture research the studio is built on.',
     image: null, // portrait forthcoming
   },
   {
     name: 'Daniel Guerra',
     role: 'Cofounder · engine & systems',
-    bio: 'Architect, product designer, and software engineer. He builds the generative engine and the systems behind it, turning the vision into something you can shape and price in real time.',
+    bio: 'Architect, product designer, and software engineer. He designs and builds Bower’s generative engine and the systems around it, the part that turns a shaped form into a buildable, priced structure in real time. He and Clay set the studio’s direction together.',
     image: '/assets/about/daniel-headshot.jpg',
   },
 ];
@@ -102,9 +119,146 @@ export const PROJECTS: Project[] = [
         caption: 'Ranked precedents, each one legible',
       },
     ],
+    paper: {
+      venue: 'CAADRIA 2025',
+      authors: 'Clay Seifert, Daniel Guerra',
+      pdf: '',
+      pdfSize: '',
+    },
   },
   {
     n: '02',
+    title: 'Synthetic Vision',
+    by: 'clay',
+    year: '2025',
+    description:
+      'A Vision Transformer is trained on a synthetic taxonomy of the operations that generate architectural form, extrusion, revolution, truncation, Boolean subtraction, then used to read those same operations back out of eroded photogrammetric fragments. It recovers how a form was built, not just what it is called.',
+    learned:
+      'The same premise, that a form’s geometry maps to how it is fabricated, is what lets Bower’s engine price a shape before it is ever cut.',
+    paper: {
+      venue: 'AAG 2025 · MIT',
+      authors: 'Clay Seifert, Patrick Danahy',
+      pdf: `${A}/08-synthetic-vision/aag-2025-synthetic-vision-seifert-danahy.pdf`,
+      pdfSize: 'PDF · 3.7 MB',
+    },
+    images: [
+      {
+        src: `${A}/08-synthetic-vision/synthetic-vision-patch-probe-saliency-heatmaps.webp`,
+        alt: 'Grid of saliency heatmaps over architectural fragments, warm colors marking where each geometric primitive is detected',
+        caption: 'Patch-probe saliency, where each fragment reads as a known primitive',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/08-synthetic-vision/synthetic-vision-56-class-geometry-taxonomy.webp`,
+        alt: 'Grid of 56 line-drawn geometry classes, vaults, domes, cones, prisms, pyramids, and arches, each labelled',
+        caption: 'The 56-class taxonomy of generative operations the model learns',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/08-synthetic-vision/synthetic-vision-two-stage-vit-pipeline.webp`,
+        alt: 'Diagram of the two-stage pipeline: a synthetic pretraining stage feeding a Vision Transformer with two task heads',
+        caption: 'The two-stage pipeline, synthetic pretraining then fragment analysis',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/08-synthetic-vision/synthetic-vision-umap-latent-geometry.webp`,
+        alt: 'UMAP scatter plot of fragment descriptors colored by source building, clustering by shared geometry',
+        caption: 'Fragments embedded by shared geometry, colored by building',
+        fit: 'contain',
+      },
+    ],
+  },
+  {
+    n: '03',
+    title: 'Patterns Across Languages',
+    by: 'clay',
+    year: '2025',
+    description:
+      'The method scales across cultures: 158 fragments from Gothic, Romanesque, and Islamic monuments of the 11th to 14th centuries, mapped by their latent projective geometry rather than their style labels. It quantifies where distant traditions share a constructive grammar and where they diverge.',
+    learned:
+      'Turn an archive into evidence you can measure, not a catalogue you can only browse, and scale stops meaning sameness.',
+    paper: {
+      venue: 'ACADIA 2025 · Computing for Resilience',
+      authors: 'Clay Seifert',
+      pdf: `${A}/09-patterns-across-languages/acadia-2025-patterns-across-languages-seifert.pdf`,
+      pdfSize: 'PDF · 12.9 MB',
+    },
+    images: [
+      {
+        src: `${A}/09-patterns-across-languages/patterns-medieval-fragments-ten-monuments.webp`,
+        alt: 'Grid of photogrammetric fragment renders from ten medieval monuments across Islamic, Romanesque, and Gothic traditions',
+        caption: 'Fragments from ten medieval monuments across three traditions',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/09-patterns-across-languages/patterns-multiscale-saliency-fragment.webp`,
+        alt: 'Multi-scale saliency rows over one fragment, showing which geometric primitives the model reads at each image scale',
+        caption: 'Multi-scale saliency, the same fragment read at four resolutions',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/09-patterns-across-languages/patterns-umap-latent-geometry-clusters.webp`,
+        alt: 'UMAP scatter plot embedding the 158 fragments into a latent geometry space, colored by cluster',
+        caption: 'The fragments embedded by shared geometry, not by style',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/09-patterns-across-languages/patterns-style-foldchange-heatmaps.webp`,
+        alt: 'Three log fold-change heatmaps comparing which geometric motifs are enriched between Gothic, Romanesque, and Islamic fragments',
+        caption: 'Where the traditions diverge, motif by motif and scale by scale',
+        fit: 'contain',
+      },
+    ],
+  },
+  {
+    n: '04',
+    title: 'flowerfield',
+    by: 'clay',
+    year: '2022',
+    description:
+      "Austin's first ecodistrict: a high-density, low-rise housing community grown like nature, curving, flowing, and alive. It reaches net-zero energy and carbon neutrality, filters all of its water on site down to the city's blackwater, and lifts the block from 155 to 630 homes, with room for 2,000 more.",
+    learned:
+      'A building can carry the full complexity of a living system, its water, growth, and habitat, and house more people rather than fewer. This is the closest ancestor to Eden.',
+    images: [
+      {
+        src: `${A}/07-flowerfield/flowerfield-biophilic-ecodistrict-hero-render.webp`,
+        alt: 'Aerial-level render of the flowerfield ecodistrict, organic white buildings above a field of flowers and filtration ponds with the Austin skyline behind',
+        caption: 'flowerfield, an ecodistrict grown like nature',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-vaulted-pavilion-boardwalk-water.webp`,
+        alt: 'People on a boardwalk crossing filtered water beneath the branching vaults of a flowerfield pavilion',
+        caption: 'Under the vaults, boardwalks cross the filtered water',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-watercolor-site-plan.webp`,
+        alt: 'Watercolor site plan of flowerfield, buildings and lagoons drawn as organic petal-shaped plots',
+        caption: 'The site plan, drawn as petals and lagoons',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-exploded-systems-axonometric.webp`,
+        alt: 'Exploded axonometric annotating the systems: wind scoops, solar panels, green roofs, geothermal floor heating, and 3D-printed hempcrete',
+        caption: 'How it works, from wind scoops to 3D-printed hempcrete',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-cherry-blossom-garden-people.webp`,
+        alt: 'Residents walking through a spring garden of flowering trees and wildflowers along a stream in flowerfield',
+        caption: 'Spring in the district, the planting doing the cooling',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-organic-perforated-facade-boardwalk.webp`,
+        alt: 'Close view of a flowerfield building, its curved white facade perforated with organic openings, meeting a timber boardwalk',
+        caption: 'The perforated organic facade meets the boardwalk',
+      },
+      {
+        src: `${A}/07-flowerfield/flowerfield-site-section-terrain.webp`,
+        alt: 'Long site section of flowerfield showing the buildings settling into the rolling terrain among trees',
+        caption: 'Site section, the buildings settling into the terrain',
+      },
+    ],
+  },
+  {
+    n: '05',
     title: 'Synergy with the Cosmos',
     by: 'clay+daniel',
     year: '2023',
@@ -156,7 +310,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '03',
+    n: '06',
     title: 'Dougherty Arts Center',
     by: 'clay+daniel',
     year: '2024',
@@ -188,7 +342,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '04',
+    n: '07',
     title: 'Kuka Robotics',
     by: 'daniel',
     year: '2026',

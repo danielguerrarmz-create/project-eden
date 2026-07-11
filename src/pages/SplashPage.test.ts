@@ -12,7 +12,9 @@ describe('SplashPage', () => {
   it('renders live copy and diagrams without throwing', () => {
     // New stripped hero: outcome headline + mission line (the cursive "Eden" word).
     expect(html).toContain('Grow a living');
-    expect(html).toContain('Rewilding gardens through architecture anyone can build');
+    expect(html).toContain('computed for your garden');
+    // hero's single filled buyer CTA
+    expect(html).toContain('Shape your Eden');
     // the register section's form label is still present lower on the page
     expect(html).toContain('register interest');
     // the hero's old CTAs / stats strip are gone
@@ -42,14 +44,13 @@ describe('SplashPage', () => {
     expect(html).toContain('Bower'); // the company wordmark (hero header)
   });
 
-  it('carries the global nav: how it works, engine, about', () => {
+  it('carries the global nav: how it works, studio, about', () => {
     // The fixed SplashHeader teaches "how it works" (the /engine walkthrough page),
-    // "engine" (the tool,
-    // renamed from "the studio"), and "about" (empty placeholder page).
+    // "studio" (the configurator, its label now matching its destination), and "about".
     expect(html).toContain('how it works');
     expect(html).toContain('about');
-    // "engine" nav label (renamed from "the studio"), pointing at the studio route
-    expect(html).toContain('>engine<');
+    // "studio" nav label now points honestly at the studio route (was mislabeled "engine").
+    expect(html).toContain('>studio<');
     expect(html).toContain('href="#/studio"');
     expect(html).not.toContain('(the pavilion)');
   });

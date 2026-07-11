@@ -16,12 +16,9 @@ export function ReserveCTA() {
 
   if (reserved) {
     return (
-      <div className="rounded-2xl border border-moss/50 bg-moss/12 p-4 text-sm text-ink">
-        <span className="font-medium">Reserved.</span> We'll be in touch to arrange a site visit
-        and confirm the quote.
-        <div className="mt-1 text-[11px] text-inkFaint">
-          MVP: intent logged to the console, no backend wired.
-        </div>
+      <div className="rounded-lg border border-accentOlive/40 bg-accentOlive/10 p-4 text-[13px] leading-relaxed text-inkBlack">
+        <span className="font-medium">Held.</span> We will be in touch to arrange a site visit and
+        confirm the quote against your garden.
       </div>
     );
   }
@@ -40,16 +37,16 @@ export function ReserveCTA() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@email.com"
-        className="w-full rounded-full border border-line bg-white/70 px-4 py-3 text-sm text-ink placeholder:text-inkFaint/70 focus:border-moss focus:outline-none"
+        className="w-full rounded-lg border border-inkBlack/25 bg-white/60 px-4 py-3 font-mono text-[13px] text-inkBlack outline-none transition placeholder:text-inkBlack/35 focus:border-inkBlack"
       />
       <button
         type="submit"
-        className="w-full rounded-full bg-ink px-4 py-3 text-sm font-medium text-paper transition-colors hover:bg-mossDeep"
+        className="w-full rounded-lg bg-inkBlack px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-paperVellum transition-colors hover:bg-accentOlive hover:text-inkBlack"
       >
-        Reserve this design · {gbp(price)} fixed
+        Hold this design · {gbp(price)}
       </button>
-      <p className="text-center text-[11px] text-inkFaint">
-        Reserves a slot for a site visit. No payment taken.
+      <p className="text-center text-[11px] leading-relaxed text-inkBlack/45">
+        Starts a conversation and a site visit. No payment taken.
       </p>
     </form>
   );

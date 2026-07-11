@@ -34,7 +34,26 @@ export default function App() {
     <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
       <Navbar />
 
-      <main className="mx-auto grid w-full max-w-[1360px] gap-6 px-6 pb-10 pt-24 lg:grid-cols-[1fr_360px] lg:items-start">
+      {/* A crafted header so the studio reads as a commissioning instrument, not a bare
+          control panel: what this is, and how it behaves, before you touch anything. */}
+      <header className="mx-auto w-full max-w-[1360px] px-6 pt-24">
+        <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-3 border-b border-inkBlack/10 pb-5">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/45">
+              The studio
+            </p>
+            <h1 className="mt-2 font-serifDisplay text-[clamp(1.5rem,2.8vw,2.2rem)] leading-tight text-inkBlack">
+              Shape your <em className="italic">Eden</em>.
+            </h1>
+          </div>
+          <p className="max-w-[46ch] font-serifDisplay text-[14px] leading-snug text-inkBlack/60">
+            Move any control and the structure, the planting, and the price settle together. Every
+            form you can reach is one a fabricator could cut tomorrow.
+          </p>
+        </div>
+      </header>
+
+      <main className="mx-auto grid w-full max-w-[1360px] gap-6 px-6 pb-10 pt-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <StagePane />
         <ControlRail />
       </main>

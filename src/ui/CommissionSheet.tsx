@@ -82,9 +82,9 @@ export function CommissionSheet() {
             allowance. Every reachable form compiles to components, an assembly sequence and this
             price, so the number is a commitment, not an estimate.
           </p>
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber">
-            <span className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber" aria-hidden />
-            <span>demo: the per-component rate is a placeholder until the fab quote is wired in</span>
+          <p className="mt-2 text-[11px] leading-relaxed text-inkBlack/50">
+            Indicative until your site survey and fabrication quote. Every figure is built from this
+            design's real cut list, so it moves correctly as you shape the form.
           </p>
         </div>
 
@@ -146,9 +146,8 @@ export function CommissionSheet() {
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-inkBlack/45">
             Every joint is an explicit node in the model, so connectors and bolts are counted, not
-            estimated (docs/FABRICATION.md). Structural validity comes from staying inside a
-            pre-engineered family — certainty inside a designed envelope, not a claim that any form
-            is valid.
+            estimated. Structural validity comes from staying inside a pre-engineered family:
+            certainty inside a designed envelope, not a claim that any form is valid.
           </p>
         </Section>
 

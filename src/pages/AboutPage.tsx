@@ -54,14 +54,18 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
   );
 }
 
-/** One framed image on the paper ground. object-cover crops to a clean 3:2 tile. */
+/** One framed image on the paper ground. Renders crop to a clean 3:2 tile with
+ *  object-cover; paper figures set fit:'contain' so nothing is cut, on a white ground. */
 function ProjectImg({ image, className = '' }: { image: ProjectImage; className?: string }) {
+  const contain = image.fit === 'contain';
   return (
     <img
       src={image.src}
       alt={image.alt}
       loading="lazy"
-      className={`w-full border border-inkBlack/12 bg-paperDeep/40 object-cover ${className}`}
+      className={`w-full border border-inkBlack/12 ${
+        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
+      } ${className}`}
     />
   );
 }
@@ -91,14 +95,41 @@ function Gallery({ project }: { project: Project }) {
   );
 }
 
-/** The description + "What we learned" block, beneath the gallery. */
+/** A small down-arrow-into-tray glyph for the paper-download affordance. */
+function DownloadGlyph() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8 2v8m0 0 3-3m-3 3L5 7" />
+      <path d="M2.5 12.5v1h11v-1" />
+    </svg>
+  );
+}
+
+/** The description + "What we learned" block, beneath the gallery. For paper-based
+ *  projects, adds the venue/authors line and a "read the paper" download. */
 function ProjectText({ project }: { project: Project }) {
+  const paper = project.paper;
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
         <Meta project={project} className="shrink-0" />
       </div>
+      {paper && (
+        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
+          {paper.venue} · {paper.authors}
+        </p>
+      )}
       <p className="mt-2 font-serifDisplay text-[15px] leading-snug text-inkBlack/70">
         {project.description}
       </p>
@@ -108,6 +139,17 @@ function ProjectText({ project }: { project: Project }) {
           {project.learned}
         </p>
       </div>
+      {paper?.pdf && (
+        <a
+          href={paper.pdf}
+          download
+          className="group mt-5 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+        >
+          <DownloadGlyph />
+          Read the paper
+          <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
+        </a>
+      )}
     </div>
   );
 }

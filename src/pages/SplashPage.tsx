@@ -23,6 +23,7 @@ import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { deDash } from '../ui/text';
 import { routes } from '../routing';
+import { CONTACT_EMAIL } from '../data/config';
 import { AnnotationStrip, EngineSection } from './engine/EngineSection';
 import { PipelineSchematic } from './engine/PipelineSchematic';
 import { SiteEnvelopeDiagram } from './engine/SiteEnvelopeDiagram';
@@ -78,7 +79,14 @@ export function SplashPage() {
           pipeline mechanics + one envelope diagram + a honesty coda. The full
           six-section walkthrough (sun path, growth phases) lives at /engine. */}
       <EngineSection ground="vellum" reduced={reduced} id="how-it-works">
-        <h2 className={H2}>
+        {/* The wedge, said plainly once: what Bower is, for whom, and why it is a studio and
+            not a catalogue. Every reader gets the frame before the mechanics. */}
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-55">What Bower is</p>
+        <p className="mt-3 max-w-[44ch] font-serifDisplay text-[clamp(1.35rem,2.4vw,2rem)] leading-snug">
+          A generative design studio. An engine computes a one of a kind timber structure for your
+          garden, priced and buildable as you shape it, that a climber grows into season after season.
+        </p>
+        <h2 className={`mt-12 ${H2}`}>
           Instead of a catalogue of shapes to choose from, a grammar computes the{' '}
           <em className="italic">one</em> that's yours.
         </h2>
@@ -103,12 +111,13 @@ export function SplashPage() {
           {bounds.notes[0] && <AnnotationStrip>grammar: {deDash(bounds.notes[0])}</AnnotationStrip>}
         </div>
 
-        {/* Honesty coda, hairline-divided beneath the diagrams (folds HowItWorks sec 6). */}
+        {/* Honesty coda: lead with what's automated, then the moat, then the honest caveat. */}
         <div className="mt-12 border-t border-inkBlack/15 pt-8">
-          <p className="max-w-[60ch] text-[17px] leading-relaxed opacity-90">
-            Every shape in the family is buildable; widening the family still takes a chartered
-            engineer. The ecology figures are honest rules of thumb, not a survey, and the price is
-            computed from the same cut list a fabricator would quote from.
+          <p className="max-w-[62ch] text-[17px] leading-relaxed opacity-90">
+            The price is computed from the same cut list a fabricator would quote from, and every
+            shape you can reach is buildable. Widening that family takes a chartered engineer, and
+            each commission widens it, so the engine compounds with every Eden it makes. The ecology
+            figures are honest rules of thumb, not a survey.
           </p>
         </div>
 
@@ -179,19 +188,38 @@ export function SplashPage() {
         </dl>
       </EngineSection>
 
-      {/* 6 — CLOSE (vellum), one purpose: register email. The commission-ritual
-          restatement and the repeated #how-it-works CTA are gone (each was shown
-          twice); the engine section above is the single reasoning destination. */}
+      {/* 6 — CLOSE (vellum): the low-commitment register, then quiet real doors so no
+          reader (buyer, advisor, investor) dead-ends. Each door is a working link. */}
       <EngineSection ground="vellum" reduced={reduced} id="register">
         <h2 className={H2}>
-          Two ways to <em className="italic">begin</em>.
+          <em className="italic">Begin.</em>
         </h2>
         <p className={BODY}>
-          See the reasoning in the engine section above, or just put your name down, which takes
-          about ten seconds.
+          These are the first Edens, and yours could be among them. Put your name down, which takes
+          about ten seconds, or find your way in below.
         </p>
 
         <RegisterInterest />
+
+        <div className="mt-12 grid gap-x-10 gap-y-6 border-t border-inkBlack/15 pt-8 sm:grid-cols-3">
+          <Door label="Commission one" href={routes.studio} note="Shape it in the studio." />
+          <Door
+            label="Designers & architects"
+            href={`mailto:${CONTACT_EMAIL}?subject=Bower%20for%20my%20client`}
+            note="Specify an Eden for a client."
+          />
+          <Door
+            label="Investors"
+            href={`mailto:${CONTACT_EMAIL}?subject=Bower%20%E2%80%94%20investment`}
+            note="The engine, the model, the plan."
+          />
+        </div>
+        <a
+          href={routes.about}
+          className="mt-8 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+        >
+          Who is behind this →
+        </a>
       </EngineSection>
 
       {/* Company monument: Bower is the company, Eden its one product. One quiet,
@@ -214,6 +242,24 @@ function StaysRow({ label, value }: { label: string; value: string }) {
       <div className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-60">{label}</div>
       <div className="font-mono text-[13px] leading-relaxed tracking-[0.02em] opacity-90">{value}</div>
     </div>
+  );
+}
+
+/** One "door" in the close: a labelled way in (buyer, advisor, investor), each a real link.
+ *  A left-origin olive underline grows on hover, matching the nav's quiet motion register. */
+function Door({ label, href, note }: { label: string; href: string; note: string }) {
+  return (
+    <a href={href} className="group block">
+      <span className="font-serifDisplay text-[19px] leading-tight text-inkBlack">
+        {label}
+        <span className="ml-1.5 inline-block text-accentOlive transition-transform duration-200 group-hover:translate-x-1">
+          →
+        </span>
+      </span>
+      <span className="mt-1 block font-mono text-[11px] leading-relaxed tracking-[0.04em] text-inkBlack/50">
+        {note}
+      </span>
+    </a>
   );
 }
 

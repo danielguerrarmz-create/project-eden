@@ -30,11 +30,7 @@ export function PricePanel() {
         </span>
       </div>
       <p className="mt-2 text-[12px] leading-snug text-inkBlack/60">
-        includes fabrication, install, groundwork and planting
-      </p>
-      <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber">
-        <span className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber" aria-hidden />
-        <span>placeholder fab rate, real quote lands here (config.ts)</span>
+        one figure, held: fabrication, install, groundwork and planting
       </p>
 
       <details className="group mt-3 border-t border-inkBlack/12 pt-3">
@@ -56,15 +52,23 @@ export function PricePanel() {
             <span className="font-medium text-inkBlack">fixed total</span>
             <span className="font-mono font-medium tabular-nums text-inkBlack">{gbp(price.fixedTotalGBP)}</span>
           </div>
+          {/* Honesty, kept, but where it belongs: inside the build-up, not on the headline. */}
+          <p className="pt-2 text-[10px] leading-relaxed text-inkBlack/45">
+            Indicative until your site survey and fabrication quote. The figure is built from this
+            design's real cut list, so it moves correctly as you shape it.
+          </p>
         </div>
       </details>
 
       <button
         onClick={() => setCommissionOpen(true)}
-        className="mt-5 w-full rounded-lg bg-inkBlack px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-paperVellum transition-colors hover:bg-accentOlive hover:text-inkBlack"
+        className="mt-5 w-full rounded-lg bg-inkBlack px-4 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-paperVellum transition-colors hover:bg-accentOlive hover:text-inkBlack"
       >
-        Commission · {components.totalCount} components, ~{buildPlan.leadTimeWeeks} wks
+        Commission this Eden
       </button>
+      <p className="mt-2 text-center font-mono text-[10px] tracking-[0.08em] text-inkBlack/40">
+        {components.totalCount} components · ~{buildPlan.leadTimeWeeks} weeks, planted
+      </p>
     </div>
   );
 }

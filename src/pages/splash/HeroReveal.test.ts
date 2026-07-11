@@ -38,7 +38,10 @@ describe('HeroReveal SSR (finished still + copy visible)', () => {
     expect(html).toContain('Grow a living');
     expect(html).toContain('Eden');
     expect(html).toContain('in your garden');
-    expect(html).toContain('Rewilding gardens through architecture anyone can build');
+    expect(html).toContain('computed for your garden');
+    // The hero now carries one filled buyer CTA + a quiet proof link.
+    expect(html).toContain('Shape your Eden');
+    expect(html).toContain('See how it works');
     // The 3D reveal is tabled: no three.js canvas is referenced by the hero.
     expect(html).not.toContain('<canvas');
     // The nav lives in the global fixed SplashHeader, not the hero SSR.

@@ -321,3 +321,12 @@ export const ENGINE_NAME = 'the engine';
  */
 export const CTA_PRIMARY_EVALUATOR = 'See how the engine works';
 export const CTA_PRIMARY_BUYER = 'Shape your Eden';
+
+/**
+ * CONTACT — the one address every "door" on the site writes to (mailto). These are
+ * real, working doors (no backend needed), so the studio, the close, and the advisor
+ * path all reach a human today. TODO: swap to a Bower inbox when it exists; this is
+ * the single place to change it.
+ */
+export const CONTACT_EMAIL = 'danielguerrarmz@utexas.edu';
+

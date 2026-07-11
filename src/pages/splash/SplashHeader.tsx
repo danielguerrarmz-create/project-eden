@@ -73,7 +73,7 @@ export function SplashHeader() {
       </a>
       <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
         <NavLink href={routes.engine}>how it works</NavLink>
-        <NavLink href={routes.studio}>engine</NavLink>
+        <NavLink href={routes.studio}>studio</NavLink>
         <NavLink href={routes.about}>about</NavLink>
       </nav>
     </header>
