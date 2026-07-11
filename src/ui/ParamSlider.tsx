@@ -28,25 +28,25 @@ const compassName = (deg: number) => COMPASS[Math.round(((deg % 360) / 22.5)) % 
 const SPECS: Record<SliderKey, SliderSpec> = {
   footprintM2: {
     label: 'footprint',
-    hint: 'plan area of the canopy',
+    hint: 'how much ground it covers',
     step: 0.1,
     format: (v) => `${v.toFixed(1)} m²`,
   },
   riseM: {
-    label: 'rise',
-    hint: 'crown height above ground',
+    label: 'height',
+    hint: 'how tall it stands',
     step: 0.01,
     format: (v) => `${v.toFixed(2)} m`,
   },
   strutSpacingM: {
     label: 'lattice',
-    hint: 'strut spacing of the diagrid',
+    hint: 'how open the weave is',
     step: 0.005,
     format: (v) => `${Math.round(v * 1000)} mm`,
   },
   apertureDeg: {
-    label: 'aperture',
-    hint: 'where the canopy lifts open',
+    label: 'opening',
+    hint: 'which way it faces the sun',
     step: 1,
     format: (v) => `${compassName(v)} · ${Math.round(v)}°`,
   },

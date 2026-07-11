@@ -17,7 +17,6 @@ const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 
 export function PricePanel() {
   const price = useDesign((s) => s.outputs.price);
-  const components = useDesign((s) => s.outputs.components);
   const buildPlan = useDesign((s) => s.outputs.buildPlan);
   const setCommissionOpen = useDesign((s) => s.setCommissionOpen);
 
@@ -67,7 +66,7 @@ export function PricePanel() {
         Commission this Eden
       </button>
       <p className="mt-2 text-center font-mono text-[10px] tracking-[0.08em] text-inkBlack/40">
-        {components.totalCount} components · ~{buildPlan.leadTimeWeeks} weeks, planted
+        ready in about {buildPlan.leadTimeWeeks} weeks, planted
       </p>
     </div>
   );

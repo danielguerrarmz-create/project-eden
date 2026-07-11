@@ -66,17 +66,11 @@ export default function App() {
 function StudioToolbar() {
   return (
     <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-inkBlack/10 px-1 pb-2.5">
-      <div className="flex items-baseline gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/45">
-          The studio
-        </span>
-        <h1 className="font-serifDisplay text-[18px] leading-none text-inkBlack">
-          Shape your <em className="italic">Eden</em>.
-        </h1>
-      </div>
-      <p className="hidden max-w-[64ch] font-serifDisplay text-[12px] leading-snug text-inkBlack/55 md:block">
-        Move any control and the structure, planting and price settle together. Every form you can
-        reach is one a fabricator could cut tomorrow.
+      <h1 className="font-serifDisplay text-[20px] leading-none text-inkBlack">
+        Make it <em className="italic">yours</em>.
+      </h1>
+      <p className="hidden font-serifDisplay text-[13px] leading-snug text-inkBlack/55 md:block">
+        Pick a plant, shape the canopy, watch it grow.
       </p>
     </header>
   );
@@ -87,8 +81,6 @@ function StudioToolbar() {
 // four shaping sliders with their grammar reasons.
 // ---------------------------------------------------------------------------
 function LeftRail() {
-  const notes = useDesign((s) => s.outputs.bounds.notes);
-
   return (
     <div className="flex min-h-0 flex-col gap-3 lg:overflow-y-auto">
       <PricePanel />
@@ -101,14 +93,6 @@ function LeftRail() {
           <ParamSlider param="strutSpacingM" />
           <ParamSlider param="apertureDeg" />
         </div>
-        {/* Grammar notes: the engine narrating its own fabrication decisions. */}
-        <div className="mt-3 space-y-1 border-t border-inkBlack/12 pt-2.5">
-          {notes.map((n) => (
-            <p key={n} className="font-mono text-[11px] leading-snug text-inkBlack/55">
-              <span className="uppercase tracking-[0.12em] text-accentOlive">grammar ·</span> {deDash(n)}
-            </p>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -119,32 +103,14 @@ function LeftRail() {
 // the whole cell (Scene is absolute inset-0) so it flexes with the viewport.
 // ---------------------------------------------------------------------------
 function StagePane() {
-  const geo = useDesign((s) => s.outputs.geometry);
-  const strut = useDesign((s) => s.outputs.strutField);
   const growth = useDesign((s) => s.outputs.growth);
 
   return (
     <div className="relative h-[56vh] min-h-[360px] overflow-hidden rounded-lg border border-inkBlack/12 bg-gradient-to-b from-white/50 to-paperDeep/40 shadow-[0_24px_70px_-56px_rgba(23,22,15,0.5)] lg:h-full lg:min-h-0">
       <Scene />
 
-      {/* Engine strategy chip: what the armature is doing for this species. A full
-          sentence, so it stays sentence case (only the short data chips go uppercase). */}
-      <div className="pointer-events-none absolute left-4 top-3 max-w-[300px] rounded-lg border border-inkBlack/12 bg-paperVellum/85 px-3 py-2 font-mono text-[11px] leading-snug text-inkBlack/70 backdrop-blur">
-        <span className="uppercase tracking-[0.12em] text-accentOlive">engine ·</span>{' '}
-        {deDash(strut.habitStrategy)}
-      </div>
-
-      {/* Growth stage chip */}
-      <div className={`pointer-events-none absolute right-4 top-3 ${CHIP}`}>
-        {deDash(growth.label)} ·{' '}
-        <span className="text-accentOlive">{Math.round(growth.coverageFraction * 100)}%</span> clothed
-      </div>
-
-      {/* Dimensions strip */}
-      <div className={`pointer-events-none absolute bottom-4 left-4 ${CHIP}`}>
-        {geo.spanM.toFixed(1)} m span · {geo.riseM.toFixed(2)} m rise · {geo.footprintM2.toFixed(1)} m² ·{' '}
-        {geo.feetCount} feet
-      </div>
+      {/* One quiet growth-stage chip (which of the three years you're seeing). */}
+      <div className={`pointer-events-none absolute right-4 top-3 ${CHIP}`}>{deDash(growth.label)}</div>
 
       <YearToggle />
     </div>
@@ -198,9 +164,9 @@ function SpeciesPicker() {
 
   return (
     <div className={PANEL}>
-      <h2 className={PANEL_TITLE}>Planting</h2>
+      <h2 className={PANEL_TITLE}>Plant</h2>
       <p className="mt-1.5 text-[12px] leading-snug text-inkBlack/55">
-        the armature re-weights for how each plant climbs, and how heavy it gets
+        Pick your climber. The structure quietly re-tunes for it.
       </p>
       <div className="mt-3 grid grid-cols-2 gap-1.5">
         {SPECIES.map((sp) => {
@@ -210,7 +176,7 @@ function SpeciesPicker() {
               key={sp.id}
               onClick={() => setSpecies(sp.id)}
               aria-pressed={active}
-              className={`rounded-lg border px-2.5 py-1.5 text-left transition ${
+              className={`rounded-lg border px-2.5 py-2 text-left transition ${
                 active
                   ? 'border-accentOlive bg-accentOlive/10'
                   : 'border-inkBlack/12 bg-white/40 hover:border-accentOlive/50'
@@ -221,7 +187,6 @@ function SpeciesPicker() {
               >
                 {sp.common}
               </div>
-              <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/40">{sp.habit}</div>
             </button>
           );
         })}
