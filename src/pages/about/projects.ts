@@ -73,7 +73,7 @@ export const TEAM: TeamMember[] = [
   {
     name: 'Clay Seifert',
     role: 'Cofounder · design & research',
-    bio: 'Architect, researcher, and B.Arch candidate at UT Austin. He has built computational design tools at TestFit, cofounded Resia AI, and created Archipedia, the first search engine for architecture. His work on recovering the latent geometry of building fragments has been published at AAG, ACADIA, and CAADRIA. At Bower he leads design and the living-architecture research the studio is built on.',
+    bio: 'Architect, researcher, and B.Arch candidate at UT Austin. He has built computational design tools at TestFit, cofounded his first startup Resia AI, and went on to build at Drafted AI in San Francisco. He created Archipedia, the first search engine for architecture, and his work on recovering the latent geometry of building fragments has been published at AAG, ACADIA, and CAADRIA. At Bower he leads design and the living-architecture research the studio is built on.',
     image: null, // portrait forthcoming
   },
   {

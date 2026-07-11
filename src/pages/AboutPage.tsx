@@ -284,7 +284,7 @@ function TeamCard({ person }: { person: TeamMember }) {
  *  manufacturing) in one glance; the projects and bios below are the substantiation. */
 const CAPABILITIES: [string, string][] = [
   ['Machine learning', 'Three published papers on reading building geometry, at AAG, ACADIA, and CAADRIA.'],
-  ['Startups', 'Resia AI, an AI home-renovation platform Clay cofounded, raised funding for, and scaled a team on.'],
+  ['Startups', 'Resia AI, the platform Clay cofounded and raised funding for, then Drafted AI, a San Francisco startup he went on to build at.'],
   ['Solo operations', 'Forsite OPS, an AI operations layer Daniel built and runs end to end, on his own.'],
   ['Architecture', 'A decade of built and speculative work, in the projects below.'],
   ['Manufacturing', 'The Plentify bio-composite, tested +30% over hempcrete, and robotic fabrication.'],
