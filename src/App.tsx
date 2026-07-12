@@ -20,12 +20,13 @@
  * language (paperVellum ground, editorial serif headings, hairline + mono labels,
  * olive accent) so it matches the engine and about pages.
  */
+import { useState } from 'react';
 import { GROWTH } from './data/config';
 import { SPECIES } from './engine/species';
+import { SplashHeader } from './pages/splash/SplashHeader';
 import { Scene } from './scene/Scene';
-import { useDesign } from './state/store';
+import { useDesign, shareURL } from './state/store';
 import { CommissionSheet } from './ui/CommissionSheet';
-import { Navbar } from './ui/Navbar';
 import { ParamSlider } from './ui/ParamSlider';
 import { PricePanel } from './ui/PricePanel';
 import { deDash } from './ui/text';
@@ -39,15 +40,15 @@ const CHIP =
 export default function App() {
   return (
     <div className="relative w-full bg-paperVellum text-inkBlack lg:h-screen lg:overflow-hidden">
-      <Navbar />
+      {/* The studio wears the SAME header as every other page — no separate studio
+          chrome, no title band restating what the screen obviously is. The only
+          studio-local addition is the utilities capsule. */}
+      <SplashHeader actions={<StudioActions />} />
 
-      {/* The whole instrument sits below the floating nav pill and fills the
-          viewport: a thin title toolbar, then a work area that flexes to the
-          bottom of the screen. min-h-0 lets the canvas own the leftover height. */}
-      <div className="flex flex-col px-3 pb-3 pt-[68px] lg:h-full">
-        <StudioToolbar />
-
-        <main className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
+      {/* The instrument sits below the header and fills the rest of the viewport.
+          min-h-0 lets the canvas own the leftover height. */}
+      <div className="flex flex-col px-3 pb-3 pt-[84px] lg:h-full">
+        <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
           <LeftRail />
           <StagePane />
           <RightRail />
@@ -60,19 +61,41 @@ export default function App() {
 }
 
 // ---------------------------------------------------------------------------
-// Top toolbar — the crafted label, folded into a single thin band so it never
-// pushes the canvas down. What this is, and how it behaves, in one line.
+// Studio utilities — the two page-local actions, in the header's own capsule
+// language. `copy link` is the studio's only "send" mechanism: the design IS
+// the URL, so the link is the deliverable.
 // ---------------------------------------------------------------------------
-function StudioToolbar() {
+function StudioActions() {
+  const reset = useDesign((s) => s.reset);
+  const params = useDesign((s) => s.params);
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareURL(params));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard can be denied in odd embeds; the URL bar already has the link.
+      window.prompt('copy this link', shareURL(params));
+    }
+  };
+
   return (
-    <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-inkBlack/10 px-1 pb-2.5">
-      <h1 className="font-serifDisplay text-[20px] leading-none text-inkBlack">
-        Make it <em className="italic">yours</em>.
-      </h1>
-      <p className="hidden font-serifDisplay text-[13px] leading-snug text-inkBlack/55 md:block">
-        Pick a plant, shape the canopy, watch it grow.
-      </p>
-    </header>
+    <div data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
+      <button
+        onClick={copyLink}
+        className="rounded-full px-3 py-1.5 font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-inkBlack transition-colors duration-150 ease-out hover:bg-white/40 focus-visible:bg-white/40"
+      >
+        {copied ? 'copied' : 'copy link'}
+      </button>
+      <button
+        onClick={reset}
+        className="rounded-full px-3 py-1.5 font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-inkBlack/50 transition-colors duration-150 ease-out hover:bg-white/40 hover:text-inkBlack focus-visible:bg-white/40"
+      >
+        start over
+      </button>
+    </div>
   );
 }
 

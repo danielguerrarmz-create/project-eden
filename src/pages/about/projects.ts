@@ -7,8 +7,10 @@
  * the whole story lives in the master-detail LIST on the About page: a curated set of
  * images (hero first), a short description, and the "What we learned" takeaway.
  *
- * The set leads with the HERO project (Search by Assembly, the flagship), then the
- * rest. Clay has projects to add later, and Daniel has more of his own to add later.
+ * DISPLAY ORDER (2026-07-12) is REVERSE CHRONOLOGICAL — most recent work first — and the
+ * `n` index encodes it, so the number the reader sees IS the position. The array below is
+ * still in authoring order; the page sorts by `n`. Clay has projects to add later, and
+ * Daniel has more of his own to add later.
  * `by`: 'clay+daniel' | 'daniel' | 'clay'.
  */
 export type Author = 'clay+daniel' | 'daniel' | 'clay';
@@ -38,7 +40,9 @@ export interface ProjectPaper {
 }
 
 export interface Project {
-  /** Two-digit index shown in the list (01..). */
+  /** Two-digit index shown in the list. It encodes the DISPLAY order, which is reverse
+   *  chronological: 01 is the most recent work, and the numbers climb as you go back in
+   *  time. Keep it in sync with `year` when a project is added. */
   n: string;
   title: string;
   by: Author;
@@ -89,7 +93,7 @@ const A = '/assets/projects';
 /** The imported set, HERO (Search by Assembly) first, then the rest. */
 export const PROJECTS: Project[] = [
   {
-    n: '07',
+    n: '02',
     title: 'Search by Assembly',
     by: 'clay+daniel',
     year: '2025',
@@ -127,7 +131,7 @@ export const PROJECTS: Project[] = [
     },
   },
   {
-    n: '05',
+    n: '03',
     title: 'Synthetic Vision',
     by: 'clay',
     year: '2025',
@@ -169,7 +173,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '06',
+    n: '04',
     title: 'Patterns Across Languages',
     by: 'clay',
     year: '2025',
@@ -211,8 +215,8 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '01',
-    title: 'flowerfield',
+    n: '07',
+    title: 'Flowerfield',
     by: 'clay',
     year: '2022',
     description:
@@ -258,7 +262,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '02',
+    n: '06',
     title: 'Synergy with the Cosmos',
     by: 'clay+daniel',
     year: '2023',
@@ -267,6 +271,11 @@ export const PROJECTS: Project[] = [
     learned:
       'Architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
     images: [
+      {
+        src: `${A}/01-synergy/synergy-cosmos-growth-loop.gif`,
+        alt: 'Looping animation of the building growing from bare structure to fully planted, bamboo and hemp filling in the planter cells',
+        caption: 'Grown in, frame by frame',
+      },
       {
         src: `${A}/01-synergy/synergy-cosmos-courtyard-render.webp`,
         alt: 'Courtyard planted with the crops that become the walls around it',
@@ -310,7 +319,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '03',
+    n: '05',
     title: 'Dougherty Arts Center',
     by: 'clay+daniel',
     year: '2024',
@@ -342,8 +351,8 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '04',
-    title: 'Kuka Robotics',
+    n: '01',
+    title: 'KUKA Robotics',
     by: 'daniel',
     year: '2026',
     description:

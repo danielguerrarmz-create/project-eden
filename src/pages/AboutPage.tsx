@@ -56,11 +56,24 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
 }
 
 /** One framed image on the paper ground. Renders crop to a clean 3:2 tile with
- *  object-cover; paper figures set fit:'contain' so nothing is cut, on a white ground. */
-function ProjectImg({ image, className = '' }: { image: ProjectImage; className?: string }) {
+ *  object-cover; paper figures set fit:'contain' so nothing is cut, on a white ground.
+ *
+ *  Every image is a BUTTON: click it and it opens full-bleed in the Lightbox. The image
+ *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view
+ *  (a shared-element transition) rather than cross-fading a second copy of it. */
+function ProjectImg({
+  image,
+  className = '',
+  onOpen,
+}: {
+  image: ProjectImage;
+  className?: string;
+  onOpen?: (image: ProjectImage) => void;
+}) {
   const contain = image.fit === 'contain';
-  return (
-    <img
+  const img = (
+    <motion.img
+      layoutId={`shot-${image.src}`}
       src={image.src}
       alt={image.alt}
       loading="lazy"
@@ -69,16 +82,50 @@ function ProjectImg({ image, className = '' }: { image: ProjectImage; className?
       } ${className}`}
     />
   );
+
+  if (!onOpen) return img;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(image)}
+      aria-label={`Enlarge: ${image.alt}`}
+      className="group relative block w-full cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+    >
+      {img}
+      {/* The affordance stays invisible until you're on the image. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-inkBlack/0 transition-colors duration-300 group-hover:bg-inkBlack/[0.06] motion-reduce:transition-none"
+      />
+    </button>
+  );
 }
 
 /** The curated gallery: the hero large (with its caption), then the rest as a thumbnail
- *  grid — which surfaces the prototyping shots for projects like Synergy. */
-function Gallery({ project }: { project: Project }) {
+ *  grid — which surfaces the prototyping shots for projects like Synergy.
+ *
+ *  `fit` caps the hero against the VIEWPORT, not a fixed aspect, so the whole project
+ *  (images AND text) lands inside one page on any display instead of pushing the words
+ *  below the fold on a tall monitor. */
+function Gallery({
+  project,
+  onOpen,
+  capped = false,
+}: {
+  project: Project;
+  onOpen?: (image: ProjectImage) => void;
+  capped?: boolean;
+}) {
   const [hero, ...rest] = project.images;
   return (
     <figure className="space-y-3">
       <div className="space-y-2">
-        <ProjectImg image={hero} className="aspect-[3/2]" />
+        <ProjectImg
+          image={hero}
+          className={capped ? 'max-h-[min(48vh,540px)] object-cover' : 'aspect-[3/2]'}
+          onOpen={onOpen}
+        />
         {hero.caption && (
           <figcaption className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/40">
             {hero.caption}
@@ -88,11 +135,121 @@ function Gallery({ project }: { project: Project }) {
       {rest.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {rest.map((img) => (
-            <ProjectImg key={img.src} image={img} className="aspect-[3/2]" />
+            <ProjectImg
+              key={img.src}
+              image={img}
+              className={capped ? 'aspect-[3/2] max-h-[15vh]' : 'aspect-[3/2]'}
+              onOpen={onOpen}
+            />
           ))}
         </div>
       )}
     </figure>
+  );
+}
+
+/* ------------------------------- lightbox --------------------------------- */
+
+/**
+ * Lightbox — click any project image and it opens large.
+ *
+ * The motion is a SHARED ELEMENT: the tile you clicked carries `layoutId`, and the
+ * large image claims the same one, so framer-motion morphs the actual thumbnail up to
+ * full size instead of fading in a duplicate. That is what makes it read as "this image
+ * got bigger" rather than "a modal appeared".
+ *
+ * Close: Escape, the backdrop, or the button. Arrow keys walk the project's other shots
+ * (the whole set is passed in, so the lightbox is a small viewer, not a dead end).
+ */
+function Lightbox({
+  images,
+  index,
+  onClose,
+  onStep,
+  reduced,
+}: {
+  images: ProjectImage[];
+  index: number | null;
+  onClose: () => void;
+  onStep: (delta: number) => void;
+  reduced: boolean;
+}) {
+  const open = index !== null;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') onStep(1);
+      if (e.key === 'ArrowLeft') onStep(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    // The page behind must not scroll while the viewer owns the screen.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose, onStep]);
+
+  const image = index === null ? null : images[index];
+
+  return (
+    <AnimatePresence>
+      {image && (
+        <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label={image.alt}
+          className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center p-4 md:p-10"
+          onClick={onClose}
+          initial={reduced ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={reduced ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ duration: reduced ? 0 : 0.28, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {/* The paper ground dims rather than blacks out — this is a study, not a cinema. */}
+          <div aria-hidden className="absolute inset-0 bg-paperVellum/92 backdrop-blur-sm" />
+
+          <motion.img
+            layoutId={reduced ? undefined : `shot-${image.src}`}
+            src={image.src}
+            alt={image.alt}
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-h-[82vh] w-auto max-w-[min(1600px,94vw)] cursor-default border border-inkBlack/15 bg-white object-contain shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]"
+            transition={{ duration: reduced ? 0 : 0.42, ease: [0.16, 1, 0.3, 1] }}
+          />
+
+          <motion.div
+            className="relative mt-4 flex w-full max-w-[min(1600px,94vw)] items-baseline justify-between gap-6"
+            initial={reduced ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : 0.12 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
+              {image.caption ?? image.alt}
+            </p>
+            <div className="flex shrink-0 items-center gap-4 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
+              {images.length > 1 && (
+                <span className="tabular-nums">
+                  {index! + 1} / {images.length}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="transition-colors hover:text-inkBlack focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -158,18 +315,35 @@ function ProjectText({ project }: { project: Project }) {
 /* ------------------------------- LIST view -------------------------------- */
 
 function ListView({ reduced }: { reduced: boolean }) {
-  // Ordered by the narrative sequence (the `n` index) — the way our interests grew —
-  // not the array's authoring order.
+  // REVERSE CHRONOLOGICAL: the most recent work leads. `n` encodes that order (01 = newest),
+  // so sorting by it and sorting by year agree — the number the reader sees is the position.
   const items = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
   const [active, setActive] = useState(0);
   const project = items[active];
 
+  // The lightbox works on the ACTIVE project's image set, so the arrow keys walk that
+  // project's shots and nothing else.
+  const [shot, setShot] = useState<number | null>(null);
+  const closeShot = useCallback(() => setShot(null), []);
+  const stepShot = useCallback(
+    (delta: number) =>
+      setShot((i) => (i === null ? i : (i + delta + project.images.length) % project.images.length)),
+    [project.images.length],
+  );
+  const openShot = useCallback(
+    (image: ProjectImage) => setShot(project.images.findIndex((im) => im.src === image.src)),
+    [project.images],
+  );
+  // Changing project while a shot is open would strand the index in the wrong set.
+  useEffect(() => setShot(null), [project.n]);
+
   return (
-    <div>
-      {/* Desktop master-detail: the numbered SELECTION MENU on the left, the images +
-          project info on the right. */}
-      <div className="hidden gap-x-14 gap-y-8 lg:grid lg:grid-cols-[2fr_3fr]">
-        <ol className="min-w-0">
+    <div className="min-h-0 flex-1">
+      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the images +
+          project info on the right. The whole thing is sized to the frame it sits in, so
+          the work reads as ONE page — no scrolling to reach a project. */}
+      <div className="hidden h-full min-h-0 gap-x-16 gap-y-8 lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
+        <ol className="min-w-0 self-start">
           {items.map((p, i) => {
             const on = i === active;
             return (
@@ -206,23 +380,23 @@ function ListView({ reduced }: { reduced: boolean }) {
           })}
         </ol>
 
-        {/* Sticky detail: the active project's images + description + takeaway, cross-fading
-            as the selection changes. Capped to the viewport so a tall project scrolls
-            internally rather than running off-screen. */}
-        <div className="block">
-          <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Detail: the active project's images + description + takeaway, cross-fading as
+            the selection changes. On a wide display the words sit BESIDE the images rather
+            than under them, so a project is one glance: pictures left, meaning right, all
+            of it above the fold. Narrower than xl they stack and the panel scrolls. */}
+        <div className="flex min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={project.n}
+                className="grid gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr]"
                 initial={reduced ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={reduced ? { opacity: 1 } : { opacity: 0 }}
                 transition={{ duration: reduced ? 0 : 0.35, ease: 'easeOut' }}
               >
-                <Gallery project={project} />
-                <div className="mt-5">
-                  <ProjectText project={project} />
-                </div>
+                <Gallery project={project} onOpen={openShot} capped />
+                <ProjectText project={project} />
               </motion.div>
             </AnimatePresence>
           </div>
@@ -246,6 +420,14 @@ function ListView({ reduced }: { reduced: boolean }) {
           </section>
         ))}
       </div>
+
+      <Lightbox
+        images={project.images}
+        index={shot}
+        onClose={closeShot}
+        onStep={stepShot}
+        reduced={reduced}
+      />
     </div>
   );
 }
@@ -303,7 +485,7 @@ export function AboutPage() {
       <SplashHeader />
 
       <motion.main
-        className="mx-auto max-w-[1360px] px-8 pb-24 pt-28 md:px-16 md:pt-28"
+        className="mx-auto max-w-[1760px] px-8 pb-24 pt-28 md:px-14 xl:px-20"
         initial={false}
         animate={{ opacity: revealed ? 1 : 0 }}
         transition={{ duration: revealed ? 0.6 : 0, ease: [0.16, 1, 0.3, 1] }}
@@ -351,18 +533,19 @@ export function AboutPage() {
           </div>
         </section>
 
-        {/* PORTION TWO — the work, ordered the way our interests grew. A full-height
-            second "page". */}
+        {/* PORTION TWO — the work, most recent first. Sized to ONE page: the section owns a
+            viewport's height, the header takes what it needs, and the master-detail fills
+            the rest. Nothing about the work requires scrolling to reach. */}
         <section
           aria-label="Projects"
-          className="mt-24 flex min-h-screen flex-col border-t border-inkBlack/12 pt-16"
+          className="mt-24 flex h-[calc(100vh-3rem)] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
         >
-          <div className="mb-10 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <div className="mb-8 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              The work
+              The Work
             </h2>
             <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">
-              in the order our interests grew
+              most recent first
             </span>
           </div>
           <ListView reduced={reduced} />

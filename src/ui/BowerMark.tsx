@@ -6,8 +6,9 @@
  * so a naming lock is a one-line change. Mono, quiet: it does not compete with the
  * hero's one display-serif moment.
  *
- * Company chrome uses the locked Oculus mark (2026-07-06); the studio configurator
- * (Eden-product usage) keeps the Sprout glyph.
+ * Company chrome uses the locked Oculus mark (2026-07-06). As of 2026-07-12 this is the
+ * ONLY mark on the site: the studio's old pill + Sprout glyph are gone, and every page
+ * wears the same header, so the chrome never changes shape between routes.
  */
 import { WORDMARK } from '../data/config';
 import { OculusMark } from './OculusMark';

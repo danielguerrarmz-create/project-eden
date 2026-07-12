@@ -53,7 +53,14 @@ function LensFilter() {
   );
 }
 
-export function SplashHeader() {
+/**
+ * The one header for the whole site. Every page wears it — splash, engine, studio, about —
+ * so the chrome never changes shape as you move between them.
+ *
+ * `actions` is an optional second capsule to the right of the nav, for page-local utilities
+ * (the studio parks "copy link" / "start over" there). It is the ONLY thing a page may add.
+ */
+export function SplashHeader({ actions }: { actions?: React.ReactNode }) {
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-4 pt-5 md:px-10">
       <LensFilter />
@@ -71,11 +78,14 @@ export function SplashHeader() {
           nameClass="font-mono text-[19px] font-semibold lowercase tracking-[0.1em]"
         />
       </a>
-      <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
-        <NavLink href={routes.engine}>how it works</NavLink>
-        <NavLink href={routes.studio}>studio</NavLink>
-        <NavLink href={routes.about}>about</NavLink>
-      </nav>
+      <div className="flex items-center gap-3">
+        <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
+          <NavLink href={routes.engine}>how it works</NavLink>
+          <NavLink href={routes.studio}>studio</NavLink>
+          <NavLink href={routes.about}>about</NavLink>
+        </nav>
+        {actions}
+      </div>
     </header>
   );
 }
