@@ -549,41 +549,39 @@ export function AboutPage() {
             </dl>
           </header>
 
-          {/* Co-founders: short and sweet. */}
-          <div aria-label="Co-founders" className="mt-14 border-t border-inkBlack/12 pt-10">
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              The two of us
-            </h2>
-            <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {TEAM.map((person) => (
-                <TeamCard key={person.name} person={person} />
-              ))}
-            </div>
-          </div>
-
-        </section>
-
-        {/* PORTION TWO — how they crossed paths. It reads DOWNWARD, with the page: time
-            descends, Clay falls left, Daniel falls right, and the gap between them is the
-            story. It gets its own screen because it is the argument, not an ornament. */}
-        <section
-          aria-label="How we crossed paths"
-          className="mt-24 flex h-[calc(100svh-var(--header-h))] min-h-[760px] flex-col border-t border-inkBlack/12 pt-10"
-        >
-          <div className="mb-8 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
-            <div>
-              <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-                How we crossed paths
-              </h2>
-              <p className="mt-3 max-w-[46ch] font-serifDisplay text-[15px] leading-snug text-inkBlack/60">
-                Clay was already drafting in Dallas before Daniel enrolled. We met at UT Austin,
-                built together, spent a year apart in different cities chasing different things,
-                and came back to the same idea.
-              </p>
-            </div>
+          {/* The line the whole sequence hangs off. The title lands, this says what is about
+              to happen, and then you scroll and it happens. */}
+          <div className="mt-auto flex flex-wrap items-end justify-between gap-x-10 gap-y-5 border-t border-inkBlack/12 pt-10">
+            <p className="max-w-[42ch] font-serifDisplay text-[clamp(1.05rem,1.5vw,1.35rem)] leading-snug text-inkBlack/70">
+              It started as one line, in Dallas, in 2020. Everything since has merged into it.
+            </p>
             <CrossPathsKey />
           </div>
-          <CrossPathsTimeline play={revealed} />
+        </section>
+
+        {/* THE SEQUENCE — it comes STRAIGHT off the title, because it is the argument, not an
+            ornament. The section is a tall scroll track and the graphic pins inside it, so
+            scrolling down IS travelling forward through the years, one or two events to a
+            frame. There is no pre-drawn spine: Clay's first line becomes the main line, and
+            everything after it merges in from its own side. */}
+        <section aria-label="How we crossed paths" className="mt-6">
+          <CrossPathsTimeline />
+        </section>
+
+        {/* The two of us. AFTER the sequence: by the time you meet them, you already know
+            where they came from. */}
+        <section
+          aria-label="The two of us"
+          className="mt-24 border-t border-inkBlack/12 pt-10"
+        >
+          <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+            The two of us
+          </h2>
+          <div className="mt-8 grid gap-10 sm:grid-cols-2">
+            {TEAM.map((person) => (
+              <TeamCard key={person.name} person={person} />
+            ))}
+          </div>
         </section>
 
         {/* PORTION TWO — the work, most recent first. Sized to ONE page: the section owns a
