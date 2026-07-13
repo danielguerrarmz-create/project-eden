@@ -10,7 +10,7 @@
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
@@ -24,12 +24,13 @@ import {
   type TeamMember,
 } from './about/projects';
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
-import { CrossPathsTimeline, CrossPathsKey, CLAY, DANIEL, SHARED } from './about/CrossPathsTimeline';
+import { CrossPathsTimeline, INK_BLUE } from './about/CrossPathsTimeline';
 
-/** ONE colour rule across the whole page: Clay is blue, Daniel is green, shared work is the
- *  olive that is also the egg. The timeline's strands and this list say the same thing. */
-function authorColor(by: Project['by']): string {
-  return by === 'clay' ? CLAY : by === 'daniel' ? DANIEL : SHARED;
+/** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
+ *  is already stated in words by the meta line, so saying it a second time in colour only
+ *  fragmented the page. Blue is the practice's colour and everything selected takes it. */
+function authorColor(_by: Project['by']): string {
+  return INK_BLUE;
 }
 
 /** The page title, shared verbatim between the header and the intro's flying title so they
@@ -70,16 +71,101 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
  *  Every image is a BUTTON: click it and it opens full-bleed in the Lightbox. The image
  *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view
  *  (a shared-element transition) rather than cross-fading a second copy of it. */
+function ProjectVideoEl({
+  image,
+  className,
+  contain,
+  reduced,
+}: {
+  image: ProjectImage;
+  className: string;
+  contain: boolean;
+  reduced: boolean;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const rate = image.video?.rate ?? 1;
+
+  // React has no playbackRate prop, so it must be set on the element — and a rate under 1 is
+  // the whole point: it stops a render loop reading as a GIF and starts it reading as growth.
+  //
+  // Starting playback is fussier than it looks. `autoPlay` alone does not survive: React sets
+  // `muted` as a property only AFTER the node is in the document, so Chrome has already judged
+  // the autoplay policy against an unmuted video and refused. And calling play() straight away
+  // in an effect refuses too, because at that instant the browser has not finished picking a
+  // <source> and there is nothing to play. So: kick it once now for the already-warm case, and
+  // again from the element's own ready event, which is the one that actually lands.
+  const start = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.playbackRate = rate;
+    el.muted = true;
+    void el.play().catch(() => {});
+  }, [rate]);
+
+  useEffect(start, [start]);
+
+  const frame = `w-full border border-inkBlack/12 ${
+    contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
+  } ${className}`;
+
+  // Reduced motion gets the poster still. Nothing moves.
+  if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
+
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      loop
+      muted
+      playsInline
+      poster={image.src}
+      aria-label={image.alt}
+      className={frame}
+      onLoadedData={start}
+      onCanPlay={start}
+    >
+      {image.video?.webm && <source src={image.video.webm} type="video/webm" />}
+      <source src={image.video?.mp4} type="video/mp4" />
+    </video>
+  );
+}
+
 function ProjectImg({
   image,
   className = '',
   onOpen,
+  reduced = false,
 }: {
   image: ProjectImage;
   className?: string;
   onOpen?: (image: ProjectImage) => void;
+  reduced?: boolean;
 }) {
   const contain = image.fit === 'contain';
+
+  // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
+  // into an <img> without a visible swap. It still opens the lightbox, on its poster.
+  if (image.video) {
+    const el = (
+      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} />
+    );
+    if (!onOpen) return el;
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(image)}
+        aria-label={`Enlarge: ${image.alt}`}
+        className="group relative block w-full cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+      >
+        {el}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-inkBlack/0 transition-colors duration-300 group-hover:bg-inkBlack/[0.06] motion-reduce:transition-none"
+        />
+      </button>
+    );
+  }
+
   // The layoutId is set ONLY on the interactive copy. The mobile stack is still mounted (it is
   // merely `lg:hidden`), so tagging both trees would put the SAME layoutId in the DOM twice,
   // framer-motion would pair the visible desktop image with the hidden mobile one, and the
@@ -134,10 +220,12 @@ function Gallery({
   project,
   onOpen,
   capped = false,
+  reduced = false,
 }: {
   project: Project;
   onOpen?: (image: ProjectImage) => void;
   capped?: boolean;
+  reduced?: boolean;
 }) {
   const [hero, ...rest] = project.images;
   return (
@@ -147,6 +235,7 @@ function Gallery({
           image={hero}
           className={capped ? 'max-h-[min(48vh,540px)] object-cover' : 'aspect-[3/2]'}
           onOpen={onOpen}
+          reduced={reduced}
         />
         {hero.caption && (
           <figcaption className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/40">
@@ -162,6 +251,7 @@ function Gallery({
               image={img}
               className={capped ? 'aspect-[3/2] max-h-[15vh]' : 'aspect-[3/2]'}
               onOpen={onOpen}
+              reduced={reduced}
             />
           ))}
         </div>
@@ -171,6 +261,39 @@ function Gallery({
 }
 
 /* ------------------------------- lightbox --------------------------------- */
+
+/** The large view of a video tile: the same loop, at the same slowed rate, big. */
+function LightboxVideo({ image }: { image: ProjectImage }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const rate = image.video?.rate ?? 1;
+  // Same two-step start as the tile — see ProjectVideoEl for why asking once is not enough.
+  const start = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.playbackRate = rate;
+    el.muted = true;
+    void el.play().catch(() => {});
+  }, [rate]);
+  useEffect(start, [start]);
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      loop
+      muted
+      playsInline
+      poster={image.src}
+      aria-label={image.alt}
+      onLoadedData={start}
+      onCanPlay={start}
+      onClick={(e) => e.stopPropagation()}
+      className="relative max-h-[82vh] w-auto max-w-[min(1600px,94vw)] cursor-default border border-inkBlack/15 bg-white object-contain shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]"
+    >
+      {image.video?.webm && <source src={image.video.webm} type="video/webm" />}
+      <source src={image.video?.mp4} type="video/mp4" />
+    </video>
+  );
+}
 
 /**
  * Lightbox — click any project image and it opens large.
@@ -234,14 +357,18 @@ function Lightbox({
           {/* The paper ground dims rather than blacks out — this is a study, not a cinema. */}
           <div aria-hidden className="absolute inset-0 bg-paperVellum/92 backdrop-blur-sm" />
 
-          <motion.img
-            layoutId={reduced ? undefined : `shot-${image.src}`}
-            src={image.src}
-            alt={image.alt}
-            onClick={(e) => e.stopPropagation()}
-            className="relative max-h-[82vh] w-auto max-w-[min(1600px,94vw)] cursor-default border border-inkBlack/15 bg-white object-contain shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]"
-            transition={{ duration: reduced ? 0 : 0.42, ease: [0.16, 1, 0.3, 1] }}
-          />
+          {image.video && !reduced ? (
+            <LightboxVideo image={image} />
+          ) : (
+            <motion.img
+              layoutId={reduced || image.video ? undefined : `shot-${image.src}`}
+              src={image.src}
+              alt={image.alt}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-h-[82vh] w-auto max-w-[min(1600px,94vw)] cursor-default border border-inkBlack/15 bg-white object-contain shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]"
+              transition={{ duration: reduced ? 0 : 0.42, ease: [0.16, 1, 0.3, 1] }}
+            />
+          )}
 
           {/* The caption is CENTRED under the image, with the counter and close beneath it, so
               the whole viewer reads on one vertical axis instead of the caption drifting left. */}
@@ -416,19 +543,23 @@ function ListView({ reduced }: { reduced: boolean }) {
             of it above the fold. Narrower than xl they stack and the panel scrolls. */}
         <div className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={project.n}
-                className="grid gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr]"
-                initial={reduced ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={reduced ? { opacity: 1 } : { opacity: 0 }}
-                transition={{ duration: reduced ? 0 : 0.35, ease: 'easeOut' }}
-              >
-                <Gallery project={project} onOpen={openShot} capped />
-                <ProjectText project={project} />
-              </motion.div>
-            </AnimatePresence>
+            {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against
+                the `layoutId` images inside this subtree: framer-motion holds the exiting panel
+                open waiting on a shared-layout transition that never resolves, so the exit never
+                completes, the incoming panel never mounts, and the detail FREEZES on whichever
+                project rendered first while the list happily highlights another. (That is the
+                bug this page shipped with.) Keying a plain motion.div remounts it on every
+                change and fades the new one in — same read, no exit to get stuck on. */}
+            <motion.div
+              key={project.n}
+              className="grid gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr]"
+              initial={reduced ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: reduced ? 0 : 0.35, ease: 'easeOut' }}
+            >
+              <Gallery project={project} onOpen={openShot} capped reduced={reduced} />
+              <ProjectText project={project} />
+            </motion.div>
           </div>
         </div>
       </div>
@@ -447,7 +578,7 @@ function ListView({ reduced }: { reduced: boolean }) {
                 {p.year}
               </span>
             </div>
-            <Gallery project={p} />
+            <Gallery project={p} reduced={reduced} />
             <div className="mt-5">
               <ProjectText project={p} />
             </div>
@@ -524,56 +655,25 @@ export function AboutPage() {
         animate={{ opacity: revealed ? 1 : 0 }}
         transition={{ duration: revealed ? 0.6 : 0, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* PORTION ONE — the founders: who we are, and the timeline of how we crossed
-            paths. A full-height first "page" before the work. */}
-        <section
-          aria-label="The founders"
-          className="flex min-h-[calc(100svh-var(--header-h)-2rem)] flex-col"
-        >
-          {/* Header: the title, and the two questions set apart and large. */}
-          <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
-            <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
-              {TITLE}
-            </h1>
-            <dl className="lg:max-w-[30rem]">
-              {QUESTIONS.map((q, i) => (
-                <div key={q.label} className={i > 0 ? 'mt-5 border-t border-inkBlack/12 pt-5' : ''}>
-                  <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-                    {q.label}
-                  </dt>
-                  <dd className="mt-1.5 font-serifDisplay text-[clamp(1.15rem,1.8vw,1.6rem)] leading-snug text-inkBlack">
-                    {q.text}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </header>
-
-          {/* The line the whole sequence hangs off. The title lands, this says what is about
-              to happen, and then you scroll and it happens. */}
-          <div className="mt-auto flex flex-wrap items-end justify-between gap-x-10 gap-y-5 border-t border-inkBlack/12 pt-10">
-            <p className="max-w-[42ch] font-serifDisplay text-[clamp(1.05rem,1.5vw,1.35rem)] leading-snug text-inkBlack/70">
-              It started as one line, in Dallas, in 2020. Everything since has merged into it.
-            </p>
-            <CrossPathsKey />
-          </div>
-        </section>
-
-        {/* THE SEQUENCE — it comes STRAIGHT off the title, because it is the argument, not an
-            ornament. The section is a tall scroll track and the graphic pins inside it, so
-            scrolling down IS travelling forward through the years, one or two events to a
-            frame. There is no pre-drawn spine: Clay's first line becomes the main line, and
-            everything after it merges in from its own side. */}
-        <section aria-label="How we crossed paths" className="mt-6">
-          <CrossPathsTimeline />
+        {/* PORTION ONE — the title AND the sequence, together. The drawing starts immediately,
+            in the same frame as the sentence it is the proof of, and the two questions surface
+            in that same column as the camera reaches the years that earned them. There is no
+            preamble screen, no colour key, and no rule drawn across the page: the argument IS
+            the first thing, and it begins at once. */}
+        <section aria-label="How we crossed paths">
+          <CrossPathsTimeline
+            title={
+              <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
+                {TITLE}
+              </h1>
+            }
+            questions={QUESTIONS}
+          />
         </section>
 
         {/* The two of us. AFTER the sequence: by the time you meet them, you already know
             where they came from. */}
-        <section
-          aria-label="The two of us"
-          className="mt-24 border-t border-inkBlack/12 pt-10"
-        >
+        <section aria-label="The two of us" className="mt-24 pt-10">
           <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
             The two of us
           </h2>

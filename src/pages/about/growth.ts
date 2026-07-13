@@ -64,30 +64,45 @@ export function lateral(t: number, g: number, phase: number, amplitude: number, 
 }
 
 /**
- * An EGG, not an ellipse. Two half-ellipses sharing one height, so the curve is continuous
- * and its tangent is vertical where they meet: one smooth closed form, round at one end and
- * narrow at the other.
+ * A SEED, not an egg and not an ellipse.
  *
- * This is the honest choice. Hügelschäffer's egg is the named historical curve and its
- * two-circle construction is real, but the closed-form parametrisation could not be verified
- * against a primary source, so rather than ship a formula that might be mistranscribed, the
- * shape here is one that can be checked by inspection.
+ * The distinction matters: an egg is laid finished and waits, a seed is a plan for a plant
+ * that has not happened yet. The timeline arrives at the second thing. Formally the seed is
+ * an asymmetric ovoid, pointed at one end (the micropyle, where the root will emerge) and
+ * full at the other (the chalaza, where the food is) — which is exactly the shape of the
+ * page's argument, so the tip is drawn UPWARD, at the strands, and the strands gather into
+ * the point of highest curvature the way converging lines want to.
  *
- * The NARROW end points back down the timeline, at the strands. The narrow end is the point
- * of highest curvature, which is where converging lines naturally want to gather.
+ * Drawn in local coordinates around (0,0): tip at (0,-b), body swelling below.
  *
- * @param narrowRatio semi-axis of the narrow end over the round end. Real eggs sit near 0.65.
+ * @param a half-width at the widest point
+ * @param b half-height, tip to base
  */
-export function eggPath(cx: number, cy: number, aWide: number, height: number, narrowRatio = 0.62) {
-  const b = height / 2;
-  const aNarrow = aWide * narrowRatio;
-  const k = 0.5523; // circular-arc constant: the cubic Bezier approximation of a quarter ellipse
+export function seedPath(a: number, b: number): string {
   return [
-    `M ${cx - aNarrow} ${cy}`,
-    `C ${cx - aNarrow} ${cy - b * k}, ${cx - aNarrow * k} ${cy - b}, ${cx} ${cy - b}`,
-    `C ${cx + aWide * k} ${cy - b}, ${cx + aWide} ${cy - b * k}, ${cx + aWide} ${cy}`,
-    `C ${cx + aWide} ${cy + b * k}, ${cx + aWide * k} ${cy + b}, ${cx} ${cy + b}`,
-    `C ${cx - aNarrow * k} ${cy + b}, ${cx - aNarrow} ${cy + b * k}, ${cx - aNarrow} ${cy}`,
+    `M 0 ${-b}`,
+    // Down the right flank: leaves the tip almost straight, then swells.
+    `C ${a * 0.58} ${-b * 0.56}, ${a} ${-b * 0.06}, ${a * 0.93} ${b * 0.44}`,
+    `C ${a * 0.82} ${b * 0.87}, ${a * 0.44} ${b}, 0 ${b}`,
+    // And back up the left, mirrored: the seed is bilaterally symmetric about its axis.
+    `C ${-a * 0.44} ${b}, ${-a * 0.82} ${b * 0.87}, ${-a * 0.93} ${b * 0.44}`,
+    `C ${-a} ${-b * 0.06}, ${-a * 0.58} ${-b * 0.56}, 0 ${-b}`,
     'Z',
+  ].join(' ');
+}
+
+/**
+ * The EMBRYO inside the seed: the curled radicle-and-cotyledon hook that every dicot seed
+ * carries, drawn as a single open stroke. It is the smallest possible drawing of "this is
+ * not finished, it is folded up waiting" — which is the whole point of ending here.
+ *
+ * It hangs from the tip, curls into the body, and turns back on itself.
+ */
+export function embryoPath(a: number, b: number): string {
+  return [
+    `M 0 ${-b * 0.66}`,
+    `C ${a * 0.1} ${-b * 0.3}, ${a * 0.42} ${-b * 0.16}, ${a * 0.42} ${b * 0.14}`,
+    `C ${a * 0.42} ${b * 0.44}, ${a * 0.1} ${b * 0.56}, ${-a * 0.16} ${b * 0.42}`,
+    `C ${-a * 0.36} ${b * 0.31}, ${-a * 0.38} ${b * 0.05}, ${-a * 0.2} ${-b * 0.06}`,
   ].join(' ');
 }

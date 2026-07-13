@@ -1,11 +1,11 @@
 /**
  * projects.ts — the project set for the About / projects page.
  *
- * These are REAL projects imported from Daniel's portfolio (Search by Assembly,
- * Synergy with the Cosmos, Dougherty Arts Center, Kuka Robotics), each with curated
- * images copied into /public/assets/projects. There are NO individual project pages;
- * the whole story lives in the master-detail LIST on the About page: a curated set of
- * images (hero first), a short description, and the "What we learned" takeaway.
+ * These are REAL projects imported from Daniel's portfolio (Archipedia, Plentify,
+ * Dougherty Arts Center, Kuka Robotics), each with curated images copied into
+ * /public/assets/projects. There are NO individual project pages; the whole story lives
+ * in the master-detail LIST on the About page: a curated set of images (hero first), a
+ * short description, and the "What we learned" takeaway.
  *
  * DISPLAY ORDER (2026-07-12) is REVERSE CHRONOLOGICAL — most recent work first — and the
  * `n` index encodes it, so the number the reader sees IS the position. The array below is
@@ -15,8 +15,17 @@
  */
 export type Author = 'clay+daniel' | 'daniel' | 'clay';
 
+/** A moving hero. `src` is the POSTER still (also what the thumbnail and the lightbox's
+ *  layout morph use), and the sources play in place of it. `rate` is the playback rate:
+ *  under 1 the loop reads slower and calmer than the source render. */
+export interface ProjectVideo {
+  mp4: string;
+  webm?: string;
+  rate?: number;
+}
+
 export interface ProjectImage {
-  /** Public path under /assets/projects/... */
+  /** Public path under /assets/projects/... For a video this is the poster still. */
   src: string;
   /** Accessible description (required — every image carries alt text). */
   alt: string;
@@ -25,6 +34,8 @@ export interface ProjectImage {
   /** How the image fills its tile. Renders (default) crop with 'cover'; paper figures
    *  and diagrams use 'contain' so nothing is cut off. */
   fit?: 'cover' | 'contain';
+  /** Present when this "image" is really a looping video. */
+  video?: ProjectVideo;
 }
 
 /** A published paper behind a project (the project IS the research). Renders a
@@ -90,11 +101,11 @@ export const TEAM: TeamMember[] = [
 
 const A = '/assets/projects';
 
-/** The imported set, HERO (Search by Assembly) first, then the rest. */
+/** The imported set, HERO (Archipedia) first, then the rest. */
 export const PROJECTS: Project[] = [
   {
     n: '01',
-    title: 'Search by Assembly',
+    title: 'Archipedia',
     by: 'clay+daniel',
     year: '2026',
     description:
@@ -135,7 +146,7 @@ export const PROJECTS: Project[] = [
     },
   },
   {
-    n: '03',
+    n: '04',
     title: 'Synthetic Vision',
     by: 'clay',
     year: '2025',
@@ -177,7 +188,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '04',
+    n: '05',
     title: 'Patterns Across Languages',
     by: 'clay',
     year: '2025',
@@ -219,7 +230,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '07',
+    n: '08',
     title: 'Flowerfield',
     by: 'clay',
     year: '2022',
@@ -269,8 +280,8 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '06',
-    title: 'Synergy with the Cosmos',
+    n: '07',
+    title: 'Plentify',
     by: 'clay+daniel',
     year: '2023',
     description:
@@ -279,9 +290,15 @@ export const PROJECTS: Project[] = [
       'Architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
     images: [
       {
-        src: `${A}/01-synergy/synergy-cosmos-growth-loop.gif`,
+        src: `${A}/01-synergy/synergy-cosmos-growth-loop-poster.webp`,
         alt: 'Looping animation of the building growing from bare structure to fully planted, bamboo and hemp filling in the planter cells',
         caption: 'Grown in, frame by frame',
+        video: {
+          mp4: `${A}/01-synergy/synergy-cosmos-growth-loop.mp4`,
+          webm: `${A}/01-synergy/synergy-cosmos-growth-loop.webm`,
+          // Slower than the source render: the growth should read as growth, not as playback.
+          rate: 0.72,
+        },
       },
       {
         src: `${A}/01-synergy/synergy-cosmos-courtyard-render.webp`,
@@ -304,7 +321,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '05',
+    n: '06',
     title: 'Dougherty Arts Center',
     by: 'clay+daniel',
     year: '2024',
@@ -333,6 +350,48 @@ export const PROJECTS: Project[] = [
         src: `${A}/05-dougherty/dougherty-arts-center-physical-model-perspective.webp`,
         alt: 'Photograph of the physical model against a neutral backdrop',
         caption: 'The physical model, proportion in the round',
+      },
+    ],
+  },
+  {
+    // PLACEHOLDER (2026-07-13). The images and the video are real; the description, the
+    // takeaway, the author and the year are inferred from what the renders show and are
+    // waiting on Daniel's real project notes. Do not treat this copy as final.
+    n: '03',
+    title: 'Robotic Factory',
+    by: 'daniel',
+    year: '2025',
+    description:
+      'A factory drawn as architecture rather than as a shed: a long vaulted hall where ranks of robot arms run on rails beneath planted arches, and the landscape is folded over the roof and down into the bays instead of being fenced out. The section is the argument, the machines and the planting share one structure.',
+    learned:
+      'Put the growing and the making under the same vault and the factory stops being infrastructure to hide, it becomes a building people would want to be inside.',
+    images: [
+      {
+        src: `${A}/10-robotic-factory/robotic-factory-section-assembly-poster.webp`,
+        alt: 'Animated long section of the robotic factory assembling itself, the vaulted halls, chimneys and planted terraces building up in sequence',
+        caption: 'The section, assembling itself',
+        video: {
+          mp4: `${A}/10-robotic-factory/robotic-factory-section-assembly-loop.mp4`,
+          webm: `${A}/10-robotic-factory/robotic-factory-section-assembly-loop.webm`,
+          rate: 0.85,
+        },
+      },
+      {
+        src: `${A}/10-robotic-factory/robotic-factory-planted-vaults-interior.webp`,
+        alt: 'Interior of the factory, bronze vaulted arches framing a wall of ferns and flowering planting, robot arms on rails to the right',
+        caption: 'Planting and machines under one vault',
+      },
+      {
+        src: `${A}/10-robotic-factory/robotic-factory-interior-hall-robot-arms.webp`,
+        alt: 'White clay-render cutaway of the production hall, ranks of robot arms mounted on linear rails beneath the vaulted bays',
+        caption: 'The hall, robot arms ranked along the rails',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/10-robotic-factory/robotic-factory-long-section-clipped.webp`,
+        alt: 'Clipped long section of the whole factory in white, the vaulted production halls, stacks and process equipment read end to end',
+        caption: 'The long section, end to end',
+        fit: 'contain',
       },
     ],
   },
