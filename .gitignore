@@ -8,3 +8,13 @@ dist-ssr
 
 # agent worktrees (isolated, own git)
 .claude/worktrees/
+
+# INTERNAL DOCS -- this repo is PUBLIC. Candid internal material (audits, stress
+# tests, accelerator application drafts, reviews of Clay's work) lives in the
+# PRIVATE `bower-docs` repo, mirrored from ~/restless-egg/docs. Never commit it here.
+docs/audit-*
+docs/stress-test-*
+docs/re-application-*
+docs/pr-*-review-*
+docs/handoff-clay-*
+docs/brief-for-evaluators.md
