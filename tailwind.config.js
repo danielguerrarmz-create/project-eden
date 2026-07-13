@@ -3,6 +3,22 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // The frame system (see the :root block in index.css). Surfacing the tokens as
+      // real utilities is what keeps magic numbers from creeping back: a page writes
+      // `max-w-wide px-gutter pt-header`, never `max-w-[1180px] px-6 pt-[84px]`.
+      // NOTE the names: `reading` / `spread` / `instrument`, NOT prose/wide/full.
+      // Tailwind already ships `max-w-prose` and `max-w-full` with different meanings,
+      // and silently redefining a stock utility is a trap for the next reader.
+      maxWidth: {
+        read: 'var(--measure-read)',
+        page: 'var(--measure-page)',
+        canvas: 'var(--measure-canvas)',
+      },
+      spacing: {
+        gutter: 'var(--gutter)',
+        rhythm: 'var(--rhythm)',
+        header: 'var(--header-h)',
+      },
       colors: {
         // Warm paper base + charcoal ink. No blue anywhere.
         paper: '#F6F4EE',

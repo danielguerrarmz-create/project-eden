@@ -53,7 +53,7 @@ function StageHead({ n, eyebrow }: { n: string; eyebrow: string }) {
  *  scrolls past. */
 function Plate({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <figure className="lg:sticky lg:top-28 lg:self-start">
+    <figure className="lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:self-start">
       <Rule />
       <figcaption className="mt-4 font-mono text-[10px] uppercase tracking-[0.16em] opacity-60">
         {label}
@@ -94,13 +94,23 @@ function Stage({
   );
 }
 
-export function HowItWorks({ outputs, reduced }: { outputs: EngineOutputs; reduced: boolean }) {
+export function HowItWorks({
+  outputs,
+  reduced,
+  lead = false,
+}: {
+  outputs: EngineOutputs;
+  reduced: boolean;
+  /** True on the ENGINE page, where this band is the first thing under the fixed header
+   *  and must clear it. On the splash it sits below the hero, so it must NOT. */
+  lead?: boolean;
+}) {
   const { geometry, sunPath, strutField, bounds } = outputs;
 
   return (
     <>
       {/* HERO (field-blue): thesis + meta strip + the pipeline index. */}
-      <EngineSection ground="blue" reduced={reduced} id="how-it-works" wide>
+      <EngineSection ground="blue" reduced={reduced} id="how-it-works" wide lead={lead}>
         <div className="max-w-[62ch]">
           <Eyebrow>The generative engine</Eyebrow>
           <h2 className={`mt-4 ${H1}`}>

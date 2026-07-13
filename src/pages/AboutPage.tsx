@@ -485,14 +485,17 @@ export function AboutPage() {
       <SplashHeader />
 
       <motion.main
-        className="mx-auto max-w-[1760px] px-8 pb-24 pt-28 md:px-14 xl:px-20"
+        className="mx-auto w-full max-w-canvas px-gutter pb-24 pt-[calc(var(--header-h)+2rem)]"
         initial={false}
         animate={{ opacity: revealed ? 1 : 0 }}
         transition={{ duration: revealed ? 0.6 : 0, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* PORTION ONE — the founders: who we are, and the timeline of how we crossed
             paths. A full-height first "page" before the work. */}
-        <section aria-label="The founders" className="flex min-h-[calc(100vh-8rem)] flex-col">
+        <section
+          aria-label="The founders"
+          className="flex min-h-[calc(100svh-var(--header-h)-2rem)] flex-col"
+        >
           {/* Header: the title, and the two questions set apart and large. */}
           <header className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
             <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
@@ -538,7 +541,7 @@ export function AboutPage() {
             the rest. Nothing about the work requires scrolling to reach. */}
         <section
           aria-label="Projects"
-          className="mt-24 flex h-[calc(100vh-3rem)] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
+          className="mt-24 flex h-[calc(100svh-var(--header-h))] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
         >
           <div className="mb-8 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">

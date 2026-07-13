@@ -39,16 +39,18 @@ const CHIP =
 
 export default function App() {
   return (
-    <div className="relative w-full bg-paperVellum text-inkBlack lg:h-screen lg:overflow-hidden">
+    <div className="relative w-full bg-paperVellum text-inkBlack lg:h-[100svh] lg:overflow-hidden">
       {/* The studio wears the SAME header as every other page — no separate studio
           chrome, no title band restating what the screen obviously is. The only
           studio-local addition is the utilities capsule. */}
       <SplashHeader actions={<StudioActions />} />
 
       {/* The instrument sits below the header and fills the rest of the viewport.
+          pt-header is the header's REAL measured height (it publishes --header-h), not a
+          guess, so this stays right even when the header wraps to two rows on a phone.
           min-h-0 lets the canvas own the leftover height. */}
-      <div className="flex flex-col px-3 pb-3 pt-[84px] lg:h-full">
-        <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
+      <div className="flex flex-col px-3 pb-3 pt-header lg:h-full">
+        <main className="mx-auto grid min-h-0 w-full max-w-canvas flex-1 grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
           <LeftRail />
           <StagePane />
           <RightRail />

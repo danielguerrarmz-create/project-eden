@@ -100,7 +100,7 @@ export function SculptPage() {
         )}
 
         {/* Instruction */}
-        <div className="pointer-events-none absolute inset-x-0 top-20 flex justify-center px-6">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(var(--header-h)+0.5rem)] flex justify-center px-gutter">
           <p className="max-w-[58ch] text-center font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/70">
             Spike · grab a node and pull. The lattice relaxes onto the nearest buildable gridshell
             and stiffens at the fabrication limits.

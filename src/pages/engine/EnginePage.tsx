@@ -17,6 +17,7 @@
 import { useDesign } from '../../state/store';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { routes } from '../../routing';
+import { Frame } from '../../ui/Frame';
 import { SplashHeader } from '../splash/SplashHeader';
 import { HowItWorks } from '../splash/HowItWorks';
 
@@ -26,23 +27,25 @@ export function EnginePage() {
 
   return (
     <div className="min-h-screen w-full bg-paperVellum text-inkBlack">
-      {/* The one global nav, shared with the home, fixed + floating over the page. */}
-      <SplashHeader />
+      {/* The one global nav, shared with the home, fixed + floating over the page. It takes
+          the engine's own 'page' measure so the wordmark's left edge lands exactly on the
+          walkthrough's left edge instead of floating outside it. */}
+      <SplashHeader measure="page" />
 
       {/* The entire six-section walkthrough, verbatim (sun path + growth included).
-          Its first section carries enough top padding to clear the floating nav. */}
-      <HowItWorks outputs={outputs} reduced={reduced} />
+          `lead` makes its first band clear the fixed header by the header's REAL height. */}
+      <HowItWorks outputs={outputs} reduced={reduced} lead />
 
       {/* Direct-manipulation prototype: reviewable, off the home nav. */}
-      <div className="w-full bg-paperVellum px-6 pb-16 md:px-10">
-        <div className="mx-auto max-w-[1180px] border-t border-inkBlack/15 pt-8">
+      <div className="w-full bg-paperVellum pb-16">
+        <Frame measure="page" className="border-t border-inkBlack/15 pt-8">
           <a
             href={routes.shape}
             className="inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
           >
             Prototype: shape one by direct manipulation →
           </a>
-        </div>
+        </Frame>
       </div>
     </div>
   );

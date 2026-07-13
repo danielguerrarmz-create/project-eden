@@ -10,7 +10,9 @@
  *
  * Links get a left-origin underline that grows on hover / focus.
  */
+import { useEffect, useRef } from 'react';
 import { BowerMark } from '../../ui/BowerMark';
+import { Frame, type Measure } from '../../ui/Frame';
 import { routes } from '../../routing';
 
 /**
@@ -60,32 +62,72 @@ function LensFilter() {
  * `actions` is an optional second capsule to the right of the nav, for page-local utilities
  * (the studio parks "copy link" / "start over" there). It is the ONLY thing a page may add.
  */
-export function SplashHeader({ actions }: { actions?: React.ReactNode }) {
+export function SplashHeader({
+  actions,
+  measure = 'canvas',
+}: {
+  actions?: React.ReactNode;
+  /** The header must adopt the measure of the PAGE it sits on, or its left edge misses the
+   *  content column it is supposed to frame. The engine walkthrough is a narrower reading
+   *  spread ('page'); the splash, studio and about are all 'canvas'. */
+  measure?: Measure;
+}) {
+  const ref = useRef<HTMLElement>(null);
+
+  /**
+   * The header publishes its own height as `--header-h`.
+   *
+   * Six places used to hand-guess this number (pt-[84px], pt-28, top-28, top-20, and two
+   * different `calc(100vh - magic)` formulas), which is why headings tucked under the
+   * header when you jumped to a section. Measuring it once, here, makes every one of them
+   * correct by construction, and it STAYS correct when the header wraps to two rows on a
+   * phone. The :root default in index.css covers SSR and the first paint.
+   */
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--header-h', `${Math.round(el.offsetHeight)}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-4 pt-5 md:px-10">
+    <header ref={ref} className="fixed inset-x-0 top-0 z-50 pb-4 pt-5">
       <LensFilter />
-      {/* The logo rides in its own glass pill (matching the nav) so it stays distinct and
-          legible on any ground — the frosted capsule gives the dark ink a consistent
-          backing over the hero photo or the vellum pages, no colour-blend needed. */}
-      <a
-        href="#/"
-        aria-label="Bower, home"
-        data-cursor-solid
-        className="nav-pill flex items-center gap-2.5 px-4 py-2 text-inkBlack"
+      {/* The header sits in the SAME frame as the page content, so the wordmark's left edge
+          IS the content's left edge at every width. Before this it gutter'd off the raw
+          viewport, so on a wide monitor it floated hundreds of px outside the column
+          everything else aligned to — the chrome and the page never shared an edge. */}
+      <Frame
+        measure={measure}
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2"
       >
-        <BowerMark
-          markSize={30}
-          nameClass="font-mono text-[19px] font-semibold lowercase tracking-[0.1em]"
-        />
-      </a>
-      <div className="flex items-center gap-3">
-        <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
-          <NavLink href={routes.engine}>how it works</NavLink>
-          <NavLink href={routes.studio}>studio</NavLink>
-          <NavLink href={routes.about}>about</NavLink>
-        </nav>
-        {actions}
-      </div>
+        {/* The logo rides in its own glass pill (matching the nav) so it stays distinct and
+            legible on any ground — the frosted capsule gives the dark ink a consistent
+            backing over the hero photo or the vellum pages, no colour-blend needed. */}
+        <a
+          href="#/"
+          aria-label="Bower, home"
+          data-cursor-solid
+          className="nav-pill flex items-center gap-2.5 px-4 py-2 text-inkBlack"
+        >
+          <BowerMark
+            markSize={30}
+            nameClass="font-mono text-[19px] font-semibold lowercase tracking-[0.1em]"
+          />
+        </a>
+        <div className="flex items-center gap-3">
+          <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
+            <NavLink href={routes.engine}>how it works</NavLink>
+            <NavLink href={routes.studio}>studio</NavLink>
+            <NavLink href={routes.about}>about</NavLink>
+          </nav>
+          {actions}
+        </div>
+      </Frame>
     </header>
   );
 }

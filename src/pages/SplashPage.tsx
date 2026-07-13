@@ -224,8 +224,8 @@ export function SplashPage() {
 
       {/* Company monument: Bower is the company, Eden its one product. One quiet,
           viewport-wide lowercase wordmark closes the page. */}
-      <footer className="w-full overflow-hidden bg-paperVellum px-6 pb-16 md:px-10">
-        <div className="mx-auto max-w-[880px] border-t border-inkBlack/15 pt-8">
+      <footer className="w-full overflow-hidden bg-paperVellum pb-16">
+        <div className="mx-auto w-full max-w-read border-t border-inkBlack/15 px-gutter pt-8">
           <p className="whitespace-nowrap font-serifDisplay font-semibold lowercase leading-none tracking-[-0.03em] text-inkBlack text-[clamp(4rem,20vw,14rem)]">
             bower
           </p>

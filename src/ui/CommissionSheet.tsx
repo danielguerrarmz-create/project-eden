@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { WORDMARK } from '../data/config';
+import { Frame } from './Frame';
 import { useDesign } from '../state/store';
 import { NestingPreview } from './NestingPreview';
 import { ReserveCTA } from './ReserveCTA';
@@ -48,7 +49,7 @@ export function CommissionSheet() {
       aria-modal="true"
       aria-label="commission spec sheet"
     >
-      <div className="mx-auto w-full max-w-4xl px-6 py-10">
+      <Frame measure="read" className="py-10">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
@@ -161,7 +162,7 @@ export function CommissionSheet() {
         <p className="mt-8 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/45">
           {deDash(`${WORDMARK} — every form you can touch is buildable; that's the whole idea.`)}
         </p>
-      </div>
+      </Frame>
     </div>
   );
 }

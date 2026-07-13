@@ -23,11 +23,52 @@
   font-display: swap;
 }
 
+/* ---------------------------------------------------------------------------
+   FRAMING TOKENS — the one place the site decides how content is framed.
+   Every page frames through these (see src/ui/Frame.tsx); no page hardcodes a
+   max-width, a gutter, or a guess at the header's height ever again.
+
+   The three measures are named intents, not magic numbers:
+     read   — a reading column. Fixed, because a measure that grows with the
+              monitor stops being readable. The splash's sections use it.
+     page   — the editorial frame: the engine walkthrough, and the header on
+              those pages. Fluid, and it evaluates to exactly 1180px at a 1440
+              viewport, so the width the site was designed on is unchanged.
+     canvas — the gallery / instrument frame: About's project grid and the
+              studio's three-rail layout, which genuinely want more width than a
+              reading spread. Also ~1354px at 1440, matching what About shipped.
+
+   The header adopts the measure of the page it sits on, so its left edge always
+   registers with that page's content column instead of floating off at the raw
+   viewport edge.
+
+   --header-h is a DEFAULT ONLY: SplashHeader measures itself and overwrites it
+   (see its ResizeObserver). It must stay sane here because server rendering
+   never runs that effect.
+   --------------------------------------------------------------------------- */
+:root {
+  --header-h: 84px;
+  --gutter: clamp(1.25rem, 2.8vw, 4rem);
+  --rhythm: clamp(4rem, 6vw, 8rem);
+  --measure-read: 880px;
+  --measure-page: clamp(1100px, 82vw, 1440px);
+  --measure-canvas: clamp(1200px, 94vw, 1760px);
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+/* Anything that can be scrolled to lands BELOW the fixed header, never tucked
+   under it. Covers both the pipeline index's scrollIntoView and a deep link. */
+html {
+  scroll-padding-top: calc(var(--header-h) + 1rem);
+}
+[id] {
+  scroll-margin-top: calc(var(--header-h) + 1rem);
 }
 
 body {

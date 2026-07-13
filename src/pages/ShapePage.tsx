@@ -41,7 +41,7 @@ export function ShapePage() {
         <Scene manipulate />
 
         {/* Instruction, below the floating nav. */}
-        <div className="pointer-events-none absolute inset-x-0 top-20 flex justify-center px-6">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(var(--header-h)+0.5rem)] flex justify-center px-gutter">
           <p className="max-w-[52ch] text-center font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/70">
             Prototype · drag the handles to shape the pavilion. The fabrication grammar clamps every
             move, so the form stays buildable.

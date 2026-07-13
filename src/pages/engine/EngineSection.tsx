@@ -8,6 +8,7 @@
  * matching how the 3D scene snaps its growth animation.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Frame } from '../../ui/Frame';
 import { INK, InkProvider } from './hairline';
 
 export type Ground = 'blue' | 'chartreuse' | 'yellow' | 'vellum';
@@ -25,6 +26,7 @@ export function EngineSection({
   children,
   id,
   wide = false,
+  lead = false,
 }: {
   ground: Ground;
   reduced: boolean;
@@ -32,8 +34,10 @@ export function EngineSection({
   /** Optional anchor id on the section root (e.g. the splash's #register). */
   id?: string;
   /** Widen the reading column for two-column editorial spreads (Engine page). The home
-   *  never passes this, so its sections keep the 880px column unchanged. */
+   *  never passes this, so its sections keep the reading column unchanged. */
   wide?: boolean;
+  /** This is the page's FIRST band, so it must clear the fixed header itself. */
+  lead?: boolean;
 }) {
   const g = GROUND[ground];
   const ref = useRef<HTMLElement>(null);
@@ -76,11 +80,12 @@ export function EngineSection({
         transition: reduced ? 'none' : 'opacity 350ms ease-out, transform 350ms ease-out',
       }}
     >
-      <div
-        className={`mx-auto px-6 py-20 md:px-10 md:py-32 ${wide ? 'max-w-[1180px]' : 'max-w-[880px]'}`}
-      >
+      {/* One frame, one gutter, one rhythm. `lead` is the page's FIRST band, which must
+          clear the fixed header on its own: below md the header wraps to two rows and the
+          old flat py-20 let the nav sit on top of the eyebrow. */}
+      <Frame measure={wide ? 'page' : 'read'} className={`py-rhythm ${lead ? 'pt-header' : ''}`}>
         <InkProvider value={g.ink}>{children}</InkProvider>
-      </div>
+      </Frame>
     </section>
   );
 }

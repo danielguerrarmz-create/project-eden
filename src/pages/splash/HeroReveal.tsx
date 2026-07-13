@@ -20,6 +20,7 @@
  *   - reduced motion / SSR -> the finished still + copy, no growth animation.
  */
 import { useEffect, useRef, useState } from 'react';
+import { Frame } from '../../ui/Frame';
 import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
 import { routes } from '../../routing';
@@ -155,8 +156,14 @@ function HeroStill() {
  *  column, so it fades smoothly with no visible horizontal edge. */
 function CopyColumn({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 pt-40 md:px-10 md:pb-14">
-      <div className="relative mr-auto max-w-[34rem]">{children}</div>
+    <div className="absolute inset-x-0 bottom-0 z-10 pb-10 pt-40 md:pb-14">
+      {/* The hero copy sits in the site frame, so its left edge is the SAME left edge as
+          the wordmark above it and the page below it. It used to hug the raw viewport,
+          which is why the hero never registered with the rest of the site on a wide
+          display. */}
+      <Frame measure="canvas">
+        <div className="relative mr-auto max-w-[34rem]">{children}</div>
+      </Frame>
     </div>
   );
 }
