@@ -93,12 +93,12 @@ const A = '/assets/projects';
 /** The imported set, HERO (Search by Assembly) first, then the rest. */
 export const PROJECTS: Project[] = [
   {
-    n: '02',
+    n: '01',
     title: 'Search by Assembly',
     by: 'clay+daniel',
-    year: '2025',
+    year: '2026',
     description:
-      'Architectural precedent search rebuilt as something you compose and steer on a node canvas, not a single best-match ranking. Accepted to CAADRIA 2025.',
+      'Architectural precedent search rebuilt as something you compose and steer on a node canvas, not a single best-match ranking. Submitted to ACM DIS 2026.',
     learned:
       'Keep the designer in the loop and the machine widens the search without narrowing the taste.',
     images: [
@@ -128,8 +128,8 @@ export const PROJECTS: Project[] = [
       },
     ],
     paper: {
-      venue: 'CAADRIA 2025',
-      authors: 'Clay Seifert, Daniel Guerra',
+      venue: 'ACM DIS 2026 · submitted',
+      authors: 'Clay Seifert, Daniel Guerra, Armaan Kokan, Patrick Danahy',
       pdf: '',
       pdfSize: '',
     },
@@ -337,7 +337,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '01',
+    n: '02',
     title: 'KUKA Robotics',
     by: 'daniel',
     year: '2026',

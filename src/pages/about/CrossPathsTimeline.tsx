@@ -95,7 +95,7 @@ const STRANDS: Strand[] = [
   {
     id: 'research',
     label: 'Research',
-    note: 'machine learning, three papers',
+    note: 'machine learning, four papers',
     color: CLAY_LIGHT,
     start: 2023,
     side: -1,
