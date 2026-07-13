@@ -15,7 +15,7 @@ Session range: `0dce1ed..3a0f022` (9 commits, merged fast-forward to `main` and 
   01 flowerfield → 02 Synergy → 03 Dougherty → 04 Kuka → 05 Synthetic Vision →
   06 Patterns Across Languages → 07 Search by Assembly (CAADRIA).
 
-**Four-hat audit, executed (`docs/audit-four-hat-2026-07-11.md`, now in-repo)**
+**Four-hat audit, executed** (the audit itself is candid internal material and lives in the PRIVATE `bower-docs` repo, not here)
 - Audit pressure-tested the flow as Restless Egg / generalist investor / founder-peer / luxury
   buyer. Headline finding: the site was serving four readers who want opposite things.
 - Fixes shipped with **zero new pages** (explicit constraint: minimal, simple but rich):
@@ -93,12 +93,12 @@ Session range: `0dce1ed..3a0f022` (9 commits, merged fast-forward to `main` and 
 - Optional: the studio's Ecology panel (habitat / pollinator cells / rainwater / flowering)
   survived the declutter; cut it if it still reads as overload.
 - The merged `about-and-four-hat-overhaul` local branch is redundant and can be deleted.
-- Note: `restless-egg/docs/` (sibling of the repo) is **outside git**. The audit doc has been
-  copied in to `app/docs/`; the rest of that folder is still unversioned.
+- Note: `restless-egg/docs/` is the working copy of the PRIVATE `bower-docs` repo. THIS repo is
+  PUBLIC: never commit audits, stress tests, accelerator drafts, or reviews of Clay's work here.
 
 ## Files
 
-- **New:** `src/pages/about/CrossPathsTimeline.tsx`, `docs/audit-four-hat-2026-07-11.md`
+- **New:** `src/pages/about/CrossPathsTimeline.tsx`
 - **About:** `src/pages/AboutPage.tsx`, `src/pages/about/projects.ts`
 - **Studio:** `src/App.tsx`, `src/ui/ParamSlider.tsx`, `src/ui/PricePanel.tsx`,
   `src/ui/CommissionSheet.tsx`, `src/ui/ReserveCTA.tsx`, `src/ui/Navbar.tsx`
