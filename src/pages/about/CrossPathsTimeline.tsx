@@ -1,167 +1,386 @@
 /**
- * CrossPathsTimeline.tsx — the animated "how we crossed paths" motion graphic.
+ * CrossPathsTimeline.tsx — how Clay and Daniel crossed paths, drawn as growth.
  *
- * The horizontal axis is TIME. Each thread begins at the year it really started, so an
- * early thread (meeting at UT Austin) runs long and a late one (the engine) is short;
- * they weave over and under each other and converge into one bold arrow, Bower. The
- * animation is chronological: the earliest thread draws itself in first, then each later
- * one weaves in on top, and last the Bower arrow lands. Reduced motion renders the final
- * state. Small screens fall back to a vertical list.
+ * IT READS TOP TO BOTTOM, with the page. Time descends. Clay's threads fall on the LEFT in
+ * blue, Daniel's on the RIGHT in green, and the work they did together runs down the spine
+ * between them. The horizontal gap between the two sides IS the story, and you can read it
+ * without reading a word:
  *
- * DATES: the studio-project years (2022 flowerfield, Synergy, Dougherty) are firm; the
- * others (UT Austin, Resia/Drafted, Archipedia, Forsite OPS, the engine) are Daniel's to
- * confirm. Everything is one edit away in STRANDS[].start.
+ *   2020  Clay is already drafting at Rick Wright in Dallas. Daniel is not at UT yet.
+ *   2021  Daniel enrols. The sides start closing.
+ *   2023  Synergy with the Cosmos. They build together. The threads touch the spine.
+ *   2024  Dougherty. Still together.
+ *   2025  They pull APART, and this is the real divergence: Daniel to Rogers Partners in
+ *         New York, Clay deep into Resia AI and the machine-learning research. Widest point.
+ *   2026  Bower. Everything winds into the egg.
+ *
+ * THE CURVATURE IS NOT SPLINE TASTE (see growth.ts). A Gompertz growth function pulls each
+ * strand toward the spine, and the SAME function damps a small arc of a golden logarithmic
+ * spiral that gives the strand its wander. The strands are phased by the golden angle, the
+ * rule a sunflower uses to pack florets without collision. Strokes are UNIFORM: no taper.
+ *
+ * The terminus is an EGG. Their passions are the restless part. The egg is what they became.
+ *
+ * EVERY DATE IS REAL, from Clay's resume and Daniel's CV. Nothing here is an estimate.
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import { line as d3line, curveNatural } from 'd3-shape';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useReducedMotion } from '../../ui/useReducedMotion';
+import { line as d3line, curveCatmullRom } from 'd3-shape';
+import { GOLDEN_ANGLE, clamp01, eggPath, gompertz, lateral, lerp } from './growth';
+
+/**
+ * THE TWO OF THEM, as colour. Clay is blue, Daniel is green, everywhere on this page: these
+ * strands, and the selected project in the list below. One rule, stated once.
+ */
+export const CLAY = '#3E7CA8';
+export const DANIEL = '#6E8C3A';
+/** Work they did together takes the accent olive, which is also the egg. */
+export const SHARED = '#8FA61E';
+
+const CLAY_DEEP = '#2B5A7E';
+const CLAY_LIGHT = '#6BA6CC';
+const DANIEL_DEEP = '#4F6626';
+const DANIEL_LIGHT = '#93B25A';
 
 interface Strand {
+  id: string;
   label: string;
   note: string;
-  who: 'Clay' | 'Daniel' | 'both';
   color: string;
-  /** The year this thread began (drives its start on the time axis). */
+  /** The year this thread really began. Every one of these comes off a resume. */
   start: number;
-  /** Vertical lane, top (0) to bottom (5). Clay's threads sit high, Daniel's low. */
-  lane: number;
+  /** Left of the spine (Clay, -1), right of it (Daniel, +1), or on it (shared, 0). */
+  side: -1 | 0 | 1;
+  /** How far off the spine this thread rides, 0 to 1, before the braid scales it. */
+  offset: number;
 }
 
 const STRANDS: Strand[] = [
-  { label: 'Where we met', note: 'UT Austin', who: 'both', color: '#4C9FC2', start: 2020, lane: 0 },
-  { label: 'Startups', note: 'Resia, then Drafted', who: 'Clay', color: '#C2673B', start: 2021, lane: 1 },
-  { label: 'Research', note: 'Archipedia and papers', who: 'Clay', color: '#E0A63C', start: 2023, lane: 2 },
-  { label: 'Studio work', note: 'flowerfield to Dougherty', who: 'both', color: '#A85BA0', start: 2022, lane: 3 },
-  { label: 'Operations', note: 'Forsite OPS', who: 'Daniel', color: '#6B7A99', start: 2024, lane: 4 },
-  { label: 'The engine', note: 'the generative core', who: 'Daniel', color: '#2E3A6E', start: 2024, lane: 5 },
+  {
+    id: 'clay-practice',
+    label: 'Practice',
+    note: 'Rick Wright Architects, Dallas',
+    color: CLAY_DEEP,
+    start: 2020,
+    side: -1,
+    offset: 0.58,
+  },
+  {
+    id: 'school',
+    label: 'Architecture',
+    note: 'UT Austin, where we met',
+    color: SHARED,
+    start: 2021,
+    side: 0,
+    offset: 0.14,
+  },
+  {
+    id: 'together',
+    label: 'Building together',
+    note: 'Synergy, then Dougherty',
+    color: SHARED,
+    start: 2023,
+    side: 0,
+    offset: 0.38,
+  },
+  {
+    id: 'startups',
+    label: 'Startups',
+    note: 'Resia AI, and TestFit',
+    color: CLAY,
+    start: 2023,
+    side: -1,
+    offset: 1,
+  },
+  {
+    id: 'research',
+    label: 'Research',
+    note: 'machine learning, three papers',
+    color: CLAY_LIGHT,
+    start: 2023,
+    side: -1,
+    offset: 0.8,
+  },
+  {
+    id: 'making',
+    label: 'Making',
+    note: 'Plentify, hemp and bamboo',
+    color: DANIEL_DEEP,
+    start: 2024,
+    side: 1,
+    offset: 0.58,
+  },
+  {
+    id: 'robotics',
+    label: 'Robotics',
+    note: 'Texas Robotics, then KUKA',
+    color: DANIEL_LIGHT,
+    start: 2024,
+    side: 1,
+    offset: 0.8,
+  },
+  {
+    id: 'daniel-practice',
+    label: 'Practice',
+    note: 'Forsite, then Rogers in New York',
+    color: DANIEL,
+    start: 2024,
+    side: 1,
+    offset: 1,
+  },
 ];
-
-const MERGE_COLOR = '#8FA61E'; // deep accent-olive: the resolved Bower line
-const EASE = [0.16, 1, 0.3, 1] as const;
 
 /* --------------------------------- geometry ------------------------------- */
 
+// Wide enough that a long note ("Rick Wright Architects, Dallas") has somewhere to live
+// without running out of the frame. The strands use the middle; the labels use the margins.
 const W = 1000;
-const H = 380;
-const CX = 762; // convergence x (Bower, 2025)
-const CY = 190;
+const H = 940;
+const CX = 500; // the spine: the axis the two of them braid around
+const Y0 = 70; // 2020
+const CONVERGE_Y = 762; // where every strand arrives
 const MIN_YEAR = 2020;
-const MAX_YEAR = 2025; // the convergence year
-const yearToX = (y: number) => 235 + ((y - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * (CX - 235);
-const laneY = (lane: number) => 46 + lane * ((H - 92) / 5);
+const MAX_YEAR = 2026;
+const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
-/** d3 natural cubic spline: passes through every waypoint, but flows organically
- *  between them, which is what gives the strands their expressive, hand-drawn weave. */
+const EGG_RY = 62; // the egg's round-end semi-axis (it stands upright)
+const EGG_RX = 52;
+const NARROW = 0.62;
+const EGG_Y = CONVERGE_Y + EGG_RY * NARROW + 4;
+
+const yearToY = (y: number) => Y0 + ((y - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * (CONVERGE_Y - Y0);
+
+/** How far from the spine a thread can ride. */
+const SPREAD = 212;
+
+/**
+ * THE BRAID: how far apart the two of them are at any moment. This is the one hand-authored
+ * curve in the drawing, and it is hand-authored on purpose. It is a claim about their
+ * history, not about botany, and every year in it is defensible from the two resumes.
+ */
+const BRAID: Array<[year: number, spread: number]> = [
+  [2020, 1],
+  [2021, 0.82],
+  [2022, 0.58],
+  [2023, 0.24],
+  [2024, 0.28],
+  [2025, 0.95],
+  [2026, 0.95],
+];
+
+function braidSpread(year: number): number {
+  if (year <= BRAID[0][0]) return BRAID[0][1];
+  for (let i = 1; i < BRAID.length; i++) {
+    const [y1, s1] = BRAID[i];
+    const [y0, s0] = BRAID[i - 1];
+    if (year <= y1) {
+      const u = (year - y0) / (y1 - y0);
+      return lerp(s0, s1, u * u * (3 - 2 * u)); // smoothstep, so the braid eases, never kinks
+    }
+  }
+  return BRAID[BRAID.length - 1][1];
+}
+
 const lineGen = d3line<{ x: number; y: number }>()
   .x((d) => d.x)
   .y((d) => d.y)
-  .curve(curveNatural);
+  .curve(curveCatmullRom.alpha(0.5));
 
-/** A weaving strand from its dated start, undulating around its drift to the centre,
- *  its amplitude tapering to zero as it lands on the shared Bower line at the dot. */
-function strandPath(startX: number, startY: number, lane: number): string {
-  const steps = 8;
-  const pts: { x: number; y: number }[] = [];
-  for (let k = 0; k <= steps; k++) {
-    const t = k / steps;
-    const x = startX + t * (CX - startX);
-    const baseY = startY + (CY - startY) * t;
-    const amp = 52 * (1 - t) * (1 - t); // ease the taper so it flows flat into the dot
-    const y = baseY + amp * Math.sin(2.5 * Math.PI * t + lane * 1.05);
-    pts.push({ x, y });
+/** Where a strand rests, before growth pulls it in. */
+const restingX = (s: Strand, year: number) =>
+  CX + s.side * s.offset * SPREAD * braidSpread(year);
+
+/**
+ * One strand, sampled. The strand descends linearly in time; its DISTANCE FROM THE SPINE is
+ * what the growth curve governs. At the end g = 1 and the wander is 0, so every strand
+ * arrives at exactly one point, with nothing left over.
+ */
+function strandPath(s: Strand, index: number): string {
+  const phase = index * GOLDEN_ANGLE;
+  const pts: Array<{ x: number; y: number }> = [];
+  const SAMPLES = 96;
+
+  for (let i = 0; i <= SAMPLES; i++) {
+    const u = i / SAMPLES;
+    const year = lerp(s.start, MAX_YEAR, u);
+    const t = clamp01((year - s.start) / (MAX_YEAR - s.start));
+    // The bend lands LATE (p = 0.66). A strand should live its own life out at its own
+    // distance and only commit to the spine near the end, which is what actually happened.
+    // An early inflection collapses all eight into a bundle and the braid stops reading.
+    const g = gompertz(t, 0.66, 7);
+
+    const x =
+      lerp(restingX(s, year), CX, g) + lateral(t, g, phase, 13, 0.72 /* ~41 deg of sweep */);
+
+    pts.push({ x, y: yearToY(year) });
   }
-  pts[pts.length - 1] = { x: CX, y: CY };
   return lineGen(pts) ?? '';
 }
 
-/* ------------------------------ desktop weave ----------------------------- */
+/**
+ * Threads that begin in the SAME year would print their labels on top of each other, so the
+ * later ones step down. This is the only place the drawing overrides its own geometry, and
+ * it is for legibility, not for looks.
+ */
+function labelOffsets(): Map<string, number> {
+  const seen = new Map<number, number>();
+  const out = new Map<string, number>();
+  for (const s of STRANDS) {
+    const n = seen.get(s.start) ?? 0;
+    out.set(s.id, n * 34);
+    seen.set(s.start, n + 1);
+  }
+  return out;
+}
 
-function Weave({ reduced, play }: { reduced: boolean; play: boolean }) {
-  // Chronological reveal WITHOUT staggerChildren (which does not cascade reliably through
-  // an <svg>): every element carries its OWN delay, ranked by the thread's start year, so
-  // the earliest thread draws first and the rest weave in over it, then the connection dot,
-  // then the Bower arrow. motion.svg only supplies the "show" label on scroll into view.
-  const rank = new Map<string, number>();
-  [...STRANDS].sort((a, b) => a.start - b.start).forEach((s, i) => rank.set(s.label, i));
-  const step = 0.34;
-  const dotDelay = 0.1 + STRANDS.length * step;
-  const arrowDelay = dotDelay + 0.25;
+/* ------------------------------- the graphic ------------------------------ */
 
-  // Draw with a CSS keyframe ANIMATION (a transition needs a painted "hidden" frame first,
-  // which we cannot guarantee; an animation plays the moment it is applied). pathLength=1
-  // normalises every path to one unit, so a dashoffset of 1 hides it and 0 reveals it. Each
-  // element carries its own animation-delay, so when `play` flips true (the graphic is on
-  // screen, after the intro) the earliest thread strokes on first and the rest weave in,
-  // then the connection dot, then the Bower arrow.
-  const EZ = 'cubic-bezier(0.16,1,0.3,1)';
-  // The hidden value is ALSO the base style, so during the animation-delay the element stays
-  // hidden (backwards-fill of the keyframe is unreliable for stroke-dashoffset); the keyframe
-  // then draws it in and `forwards` holds the finished state.
-  const drawStyle = (delay: number): CSSProperties =>
-    reduced
-      ? { strokeDasharray: 1, strokeDashoffset: 0 }
-      : play
-        ? { strokeDasharray: 1, strokeDashoffset: 1, animation: `cptl-draw 0.9s ${EZ} ${delay}s forwards` }
-        : { strokeDasharray: 1, strokeDashoffset: 1 };
-  const fadeStyle = (delay: number, extra?: CSSProperties): CSSProperties =>
-    reduced
-      ? { opacity: 1, ...extra }
-      : play
-        ? { opacity: 0, animation: `cptl-fade 0.45s ease ${delay}s forwards`, ...extra }
-        : { opacity: 0, ...extra };
+export function CrossPathsTimeline({ play = true }: { play?: boolean }) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (e) => {
+        if (e[0]?.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.15 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const started = reduced || (play && inView);
+
+  const paths = useMemo(() => STRANDS.map((s, i) => ({ s, d: strandPath(s, i) })), []);
+  const offsets = useMemo(labelOffsets, []);
+  /* The egg stands upright, narrow end UP, pointing back at the strands arriving. The narrow
+     end is the point of highest curvature, which is where converging lines want to gather. */
+  const egg = useMemo(() => eggPath(0, 0, EGG_RY, EGG_RX * 2, NARROW), []);
 
   return (
-    <div className="hidden lg:block">
+    <div ref={ref} className="flex min-h-0 w-full flex-1 justify-center">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-auto w-full"
+        preserveAspectRatio="xMidYMid meet"
+        className="h-full w-auto max-w-full"
         role="img"
-        aria-label="A time-line: our threads begin at their real dates, weave together, and converge into Bower."
+        aria-label="A timeline reading top to bottom, 2020 to 2026. Clay's threads descend on the left in blue, Daniel's on the right in green, and their shared work runs down the middle. Clay is already working in architecture in Dallas when Daniel enrols at UT Austin. They come together to build Synergy with the Cosmos and Dougherty, pull apart through 2025 as Daniel goes to Rogers Partners in New York and Clay goes deep into Resia AI and machine-learning research, then converge at the end of 2025 into Bower."
       >
-        {/* The invisible main line: the Bower through-line every thread flows into. Barely
-            there on the left (implied), it becomes the solid arrow past the connection dot. */}
-        <line x1={210} y1={CY} x2={CX} y2={CY} stroke={MERGE_COLOR} strokeWidth={1.25} opacity={0.14} strokeDasharray="1 6" strokeLinecap="round" />
+        {/* THE SPINE. One quiet line down the middle, with the years as TICKS on it rather
+            than as a grid. The years should be findable, not loud. */}
+        <line
+          x1={CX}
+          y1={Y0 - 18}
+          x2={CX}
+          y2={CONVERGE_Y}
+          stroke="currentColor"
+          className="text-inkBlack"
+          strokeWidth={1}
+          opacity={0.14}
+        />
+        {YEARS.map((y) => (
+          <g key={y}>
+            <line
+              x1={CX - 5}
+              y1={yearToY(y)}
+              x2={CX + 5}
+              y2={yearToY(y)}
+              stroke="currentColor"
+              className="text-inkBlack"
+              strokeWidth={1}
+              opacity={0.25}
+            />
+            <text
+              x={CX + 14}
+              y={yearToY(y) + 3.5}
+              className="fill-inkBlack/30 font-mono"
+              style={{ fontSize: 10, letterSpacing: '0.12em' }}
+            >
+              {y}
+            </text>
+          </g>
+        ))}
 
+        {/* Eight strands, uniform weight. No taper anywhere. */}
+        {paths.map(({ s, d }) => (
+          <path
+            key={s.id}
+            d={d}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={3}
+            strokeLinecap="round"
+            style={{ opacity: started ? 1 : 0 } as CSSProperties}
+          />
+        ))}
+
+        {/* Each thread named where it begins, on its own side, stepped down when two threads
+            start the same year, so nothing ever collides. */}
         {STRANDS.map((s) => {
-          const sx = yearToX(s.start);
-          const sy = laneY(s.lane);
-          const d = 0.1 + (rank.get(s.label) ?? 0) * step;
+          const x = restingX(s, s.start);
+          const y = yearToY(s.start);
+          const left = s.side <= 0;
+          const ly = y + (offsets.get(s.id) ?? 0);
+          const tx = left ? x - 16 : x + 16;
           return (
-            <g key={s.label}>
-              {/* the weaving strand */}
-              <path
-                d={strandPath(sx, sy, s.lane)}
-                pathLength={1}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={3.5}
-                strokeLinecap="round"
-                style={drawStyle(d)}
-              />
-              {/* the dated start: dot + label + year, with a paper halo so text reads over lines */}
-              <g style={fadeStyle(d + 0.5, { paintOrder: 'stroke' })}>
-                <circle cx={sx} cy={sy} r={4} fill={s.color} stroke="#FBF9F3" strokeWidth={2.5} />
-                <text x={sx - 12} y={sy - 3} textAnchor="end" className="font-serifDisplay" fontSize="14.5" fill="#17160F" stroke="#FBF9F3" strokeWidth="3">
-                  {s.label}
-                </text>
-                <text x={sx - 12} y={sy + 13} textAnchor="end" className="font-mono" fontSize="10" fill="#17160F" opacity="0.5" stroke="#FBF9F3" strokeWidth="3">
-                  {s.note} · {s.start}
-                </text>
-              </g>
+            <g key={s.id} style={{ opacity: started ? 1 : 0 } as CSSProperties}>
+              <circle cx={x} cy={y} r={3.4} fill={s.color} />
+              {/* A hairline leader when the label has stepped away from its dot. */}
+              {ly !== y && (
+                <path
+                  d={`M ${x} ${y} L ${x} ${ly - 5} ${left ? 'L ' + (tx + 6) + ' ' + (ly - 5) : 'L ' + (tx - 6) + ' ' + (ly - 5)}`}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={1}
+                  opacity={0.35}
+                />
+              )}
+              <text
+                x={tx}
+                y={ly - 4}
+                textAnchor={left ? 'end' : 'start'}
+                className="fill-inkBlack font-serifDisplay"
+                style={{ fontSize: 19 }}
+              >
+                {s.label}
+              </text>
+              <text
+                x={tx}
+                y={ly + 13}
+                textAnchor={left ? 'end' : 'start'}
+                className="fill-inkBlack/45 font-mono"
+                style={{ fontSize: 11, letterSpacing: '0.04em' }}
+              >
+                {s.note}
+              </text>
             </g>
           );
         })}
 
-        {/* The connection dot: where every thread becomes one line, Bower. */}
-        <g style={fadeStyle(dotDelay)}>
-          <circle cx={CX} cy={CY} r={11} fill="#FBF9F3" stroke={MERGE_COLOR} strokeWidth={2} />
-          <circle cx={CX} cy={CY} r={5} fill={MERGE_COLOR} />
+        {/* THE EGG. Everything the two of them chased, become one thing. */}
+        <g
+          transform={`translate(${CX} ${EGG_Y}) rotate(90)`}
+          style={{ opacity: started ? 1 : 0 } as CSSProperties}
+        >
+          <path d={egg} fill={SHARED} fillOpacity={0.12} stroke={SHARED} strokeWidth={2.4} />
         </g>
-
-        {/* The merged Bower main line + arrow. */}
-        <path d={`M ${CX + 11} ${CY} L ${W - 54} ${CY}`} pathLength={1} fill="none" stroke={MERGE_COLOR} strokeWidth={6} strokeLinecap="round" style={drawStyle(arrowDelay)} />
-        <path d={`M ${W - 62} ${CY - 13} L ${W - 30} ${CY} L ${W - 62} ${CY + 13} Z`} fill={MERGE_COLOR} style={fadeStyle(arrowDelay + 0.4)} />
-        <text x={W - 40} y={CY - 24} textAnchor="end" className="font-serifDisplay" fontSize="21" fontStyle="italic" fill="#17160F" style={fadeStyle(arrowDelay + 0.4)}>
+        <text
+          x={CX}
+          y={EGG_Y + 6}
+          textAnchor="middle"
+          className="fill-inkBlack font-serifDisplay"
+          style={{ fontSize: 18, fontStyle: 'italic', opacity: started ? 1 : 0 }}
+        >
           Bower
         </text>
       </svg>
@@ -169,75 +388,22 @@ function Weave({ reduced, play }: { reduced: boolean; play: boolean }) {
   );
 }
 
-/* ------------------------------ mobile (vertical) ------------------------- */
-
-function Vertical({ reduced, play }: { reduced: boolean; play: boolean }) {
-  const ordered = [...STRANDS].sort((a, b) => a.start - b.start);
-  const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
-  const rise: Variants = {
-    hidden: reduced ? {} : { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
-  };
+/** The colour key, rendered beside the graphic rather than inside it. */
+export function CrossPathsKey() {
   return (
-    <motion.ol
-      variants={container}
-      initial="hidden"
-      animate={play ? undefined : 'hidden'}
-      whileInView={play ? 'show' : undefined}
-      viewport={play ? { once: true, amount: 0.15 } : undefined}
-      className="relative ml-1 border-l border-inkBlack/15 pl-6 lg:hidden"
-    >
-      {ordered.map((s) => (
-        <motion.li key={s.label} variants={rise} className="relative pb-6">
-          <span className="absolute -left-[30px] top-1 block h-2.5 w-2.5 rounded-full ring-4 ring-paperVellum" style={{ background: s.color }} aria-hidden />
-          <p className="font-serifDisplay text-[16px] leading-tight text-inkBlack">
-            {s.label} <span className="font-mono text-[11px] text-inkBlack/40">{s.start}</span>
-          </p>
-          <p className="mt-0.5 font-mono text-[11px] leading-snug text-inkBlack/50">{s.note}</p>
-        </motion.li>
+    <div className="flex flex-wrap items-center gap-x-7 gap-y-3">
+      {[
+        { color: CLAY, name: 'Clay' },
+        { color: DANIEL, name: 'Daniel' },
+        { color: SHARED, name: 'Together' },
+      ].map((k) => (
+        <span key={k.name} className="flex items-center gap-2.5">
+          <span aria-hidden className="h-[3px] w-7 rounded-full" style={{ background: k.color }} />
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack/60">
+            {k.name}
+          </span>
+        </span>
       ))}
-      <motion.li variants={rise} className="relative">
-        <span className="absolute -left-[32px] top-1 block h-3.5 w-3.5 rounded-full ring-4 ring-paperVellum" style={{ background: MERGE_COLOR }} aria-hidden />
-        <p className="font-serifDisplay text-[19px] italic leading-tight text-inkBlack">Bower</p>
-        <p className="mt-0.5 font-mono text-[11px] text-inkBlack/50">2025, the studio</p>
-      </motion.li>
-    </motion.ol>
-  );
-}
-
-export function CrossPathsTimeline({ play = true }: { play?: boolean }) {
-  const reduced = useReducedMotion() ?? false;
-  const ref = useRef<HTMLDivElement>(null);
-  // Own the trigger: start hidden, then flip once the graphic is actually on screen (via an
-  // IntersectionObserver, which fires on the next tick). That false -> true change is what
-  // drives the CSS draw. Gated by `play` (the page's post-intro reveal) so it never runs
-  // under the veil. reduced motion shows the finished state at once.
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setInView(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.2 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  const started = reduced || (play && inView);
-
-  return (
-    <div ref={ref}>
-      <Weave reduced={reduced} play={started} />
-      <Vertical reduced={reduced} play={started} />
-      <p className="mt-6 max-w-[54ch] font-serifDisplay text-[14px] leading-snug text-inkBlack/50">
-        Two people and a handful of obsessions, met at UT Austin and woven, over five years, into
-        one studio.
-      </p>
     </div>
   );
 }

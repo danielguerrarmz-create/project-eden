@@ -24,7 +24,13 @@ import {
   type TeamMember,
 } from './about/projects';
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
-import { CrossPathsTimeline } from './about/CrossPathsTimeline';
+import { CrossPathsTimeline, CrossPathsKey, CLAY, DANIEL, SHARED } from './about/CrossPathsTimeline';
+
+/** ONE colour rule across the whole page: Clay is blue, Daniel is green, shared work is the
+ *  olive that is also the egg. The timeline's strands and this list say the same thing. */
+function authorColor(by: Project['by']): string {
+  return by === 'clay' ? CLAY : by === 'daniel' ? DANIEL : SHARED;
+}
 
 /** The page title, shared verbatim between the header and the intro's flying title so they
  *  land coincident — and it IS the narration's payoff line. */
@@ -49,7 +55,10 @@ function decideAboutIntro(): boolean {
 /** The mono meta pair (author + year). */
 function Meta({ project, className = '' }: { project: Project; className?: string }) {
   return (
-    <span className={`font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/50 ${className}`}>
+    <span
+      className={`font-mono text-[11px] uppercase tracking-[0.14em] ${className}`}
+      style={{ color: authorColor(project.by) }}
+    >
       {AUTHOR_LABEL[project.by]} · {project.year}
     </span>
   );
@@ -71,9 +80,22 @@ function ProjectImg({
   onOpen?: (image: ProjectImage) => void;
 }) {
   const contain = image.fit === 'contain';
-  const img = (
+  // The layoutId is set ONLY on the interactive copy. The mobile stack is still mounted (it is
+  // merely `lg:hidden`), so tagging both trees would put the SAME layoutId in the DOM twice,
+  // framer-motion would pair the visible desktop image with the hidden mobile one, and the
+  // detail panel would silently render blank. It did. Do not tag the non-interactive copy.
+  const img = onOpen ? (
     <motion.img
       layoutId={`shot-${image.src}`}
+      src={image.src}
+      alt={image.alt}
+      loading="lazy"
+      className={`w-full border border-inkBlack/12 ${
+        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
+      } ${className}`}
+    />
+  ) : (
+    <img
       src={image.src}
       alt={image.alt}
       loading="lazy"
@@ -221,18 +243,20 @@ function Lightbox({
             transition={{ duration: reduced ? 0 : 0.42, ease: [0.16, 1, 0.3, 1] }}
           />
 
+          {/* The caption is CENTRED under the image, with the counter and close beneath it, so
+              the whole viewer reads on one vertical axis instead of the caption drifting left. */}
           <motion.div
-            className="relative mt-4 flex w-full max-w-[min(1600px,94vw)] items-baseline justify-between gap-6"
+            className="relative mt-5 flex w-full max-w-[min(1600px,94vw)] flex-col items-center gap-2"
             initial={reduced ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 1 } : { opacity: 0 }}
             transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : 0.12 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
+            <p className="max-w-[70ch] text-center font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
               {image.caption ?? image.alt}
             </p>
-            <div className="flex shrink-0 items-center gap-4 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
+            <div className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
               {images.length > 1 && (
                 <span className="tabular-nums">
                   {index! + 1} / {images.length}
@@ -346,6 +370,7 @@ function ListView({ reduced }: { reduced: boolean }) {
         <ol className="min-w-0 self-start">
           {items.map((p, i) => {
             const on = i === active;
+            const tint = authorColor(p.by);
             return (
               <li key={p.n} className="border-t border-inkBlack/12 last:border-b">
                 <button
@@ -355,23 +380,28 @@ function ListView({ reduced }: { reduced: boolean }) {
                   onClick={() => setActive(i)}
                   aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}
                   aria-current={on}
-                  className="group flex w-full items-baseline gap-3 py-3.5 text-left"
+                  className="group relative flex w-full items-baseline gap-3 py-3.5 pl-4 pr-1 text-left transition-colors duration-200"
+                  style={on ? { backgroundColor: `${tint}14` } : undefined}
                 >
+                  {/* The selection is a BAR in the author's colour: blue for Clay, green for
+                      Daniel. It is the loudest thing in the list, on purpose. */}
                   <span
-                    className={`w-7 shrink-0 font-mono text-[11px] tracking-[0.14em] transition-colors ${
-                      on ? 'text-accentOlive' : 'text-inkBlack/40'
-                    }`}
-                  >
-                    {p.n}
-                  </span>
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
+                    style={{ background: tint, transform: `scaleY(${on ? 1 : 0})` }}
+                  />
                   <span
                     className={`font-serifDisplay text-[clamp(1.05rem,1.9vw,1.55rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
                       on && !reduced ? 'translate-x-1' : ''
                     }`}
+                    style={on ? { color: tint } : undefined}
                   >
                     {p.title}
                   </span>
-                  <span className="ml-auto shrink-0 font-mono text-[11px] tracking-[0.14em] text-inkBlack/40">
+                  <span
+                    className="ml-auto shrink-0 font-mono text-[11px] tracking-[0.14em] text-inkBlack/40 transition-colors"
+                    style={on ? { color: tint } : undefined}
+                  >
                     {p.year}
                   </span>
                 </button>
@@ -407,8 +437,12 @@ function ListView({ reduced }: { reduced: boolean }) {
       <div className="space-y-16 lg:hidden">
         {items.map((p) => (
           <section key={p.n} aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}>
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-[11px] tracking-[0.14em] text-accentOlive">{p.n}</span>
+            <div className="mb-3 flex items-center gap-3">
+              <span
+                aria-hidden
+                className="h-[3px] w-6 rounded-full"
+                style={{ background: authorColor(p.by) }}
+              />
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">
                 {p.year}
               </span>
@@ -527,13 +561,29 @@ export function AboutPage() {
             </div>
           </div>
 
-          {/* The animated crossing-paths timeline. */}
-          <div className="mt-14 border-t border-inkBlack/12 pt-10">
-            <h2 className="mb-10 font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              How we crossed paths
-            </h2>
-            <CrossPathsTimeline play={revealed} />
+        </section>
+
+        {/* PORTION TWO — how they crossed paths. It reads DOWNWARD, with the page: time
+            descends, Clay falls left, Daniel falls right, and the gap between them is the
+            story. It gets its own screen because it is the argument, not an ornament. */}
+        <section
+          aria-label="How we crossed paths"
+          className="mt-24 flex h-[calc(100svh-var(--header-h))] min-h-[760px] flex-col border-t border-inkBlack/12 pt-10"
+        >
+          <div className="mb-8 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
+            <div>
+              <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+                How we crossed paths
+              </h2>
+              <p className="mt-3 max-w-[46ch] font-serifDisplay text-[15px] leading-snug text-inkBlack/60">
+                Clay was already drafting in Dallas before Daniel enrolled. We met at UT Austin,
+                built together, spent a year apart in different cities chasing different things,
+                and came back to the same idea.
+              </p>
+            </div>
+            <CrossPathsKey />
           </div>
+          <CrossPathsTimeline play={revealed} />
         </section>
 
         {/* PORTION TWO — the work, most recent first. Sized to ONE page: the section owns a

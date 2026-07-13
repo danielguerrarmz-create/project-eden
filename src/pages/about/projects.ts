@@ -104,23 +104,27 @@ export const PROJECTS: Project[] = [
     images: [
       {
         src: `${A}/04-search-by-assembly/search-by-assembly-node-based-workflow-canvas.webp`,
-        alt: 'The node-based query canvas, image, text, and attribute nodes wired into a graph',
+        alt: 'The node-based query canvas, image, text, and attribute nodes wired into a graph, ranked results listed alongside',
         caption: 'A query, composed on the canvas',
+        fit: 'contain',
       },
       {
         src: `${A}/04-search-by-assembly/search-by-assembly-nodes-and-relays-visual-graph.webp`,
-        alt: 'Nodes and relays forming the query as a visual graph',
-        caption: 'Nodes and relays, the query as a graph',
+        alt: 'The palette of composable node types: text, image, attributes, constraints, and logic operators',
+        caption: 'The vocabulary, nodes you wire into a query',
+        fit: 'contain',
       },
       {
         src: `${A}/04-search-by-assembly/search-by-assembly-tri-slider-fusion-weights-control.webp`,
-        alt: 'The tri-slider control setting fusion weights across visual, spatial, and contextual evidence',
+        alt: 'The tri-slider control setting fusion weights across visual, spatial, and regional evidence',
         caption: 'The tri-slider, dialing what matters, live',
+        fit: 'contain',
       },
       {
         src: `${A}/04-search-by-assembly/search-by-assembly-search-bar-ranked-precedent-results.webp`,
         alt: 'Ranked precedent results, each traceable to the motifs that matched',
         caption: 'Ranked precedents, each one legible',
+        fit: 'contain',
       },
     ],
     paper: {
@@ -238,11 +242,13 @@ export const PROJECTS: Project[] = [
         src: `${A}/07-flowerfield/flowerfield-watercolor-site-plan.webp`,
         alt: 'Watercolor site plan of flowerfield, buildings and lagoons drawn as organic petal-shaped plots',
         caption: 'The site plan, drawn as petals and lagoons',
+        fit: 'contain',
       },
       {
         src: `${A}/07-flowerfield/flowerfield-exploded-systems-axonometric.webp`,
         alt: 'Exploded axonometric annotating the systems: wind scoops, solar panels, green roofs, geothermal floor heating, and 3D-printed hempcrete',
         caption: 'How it works, from wind scoops to 3D-printed hempcrete',
+        fit: 'contain',
       },
       {
         src: `${A}/07-flowerfield/flowerfield-cherry-blossom-garden-people.webp`,
@@ -258,6 +264,7 @@ export const PROJECTS: Project[] = [
         src: `${A}/07-flowerfield/flowerfield-site-section-terrain.webp`,
         alt: 'Long site section of flowerfield showing the buildings settling into the rolling terrain among trees',
         caption: 'Site section, the buildings settling into the terrain',
+        fit: 'contain',
       },
     ],
   },
@@ -278,43 +285,21 @@ export const PROJECTS: Project[] = [
       },
       {
         src: `${A}/01-synergy/synergy-cosmos-courtyard-render.webp`,
-        alt: 'Courtyard planted with the crops that become the walls around it',
-        caption: 'Courtyards planted with the crops that become the walls',
+        alt: 'Aerial view down into a planted courtyard, terraced buildings and stairways planted with the crops that become the walls',
+        caption: 'The courtyard, planted with the crops that become the walls',
+        fit: 'contain',
       },
       {
-        src: `${A}/01-synergy/synergy-cosmos-eidetic-aerial.webp`,
-        alt: 'Aerial axonometric of the development woven into the neighbourhood fabric',
-        caption: 'The whole development, cultivated from its own ground',
-      },
-      {
-        src: `${A}/01-synergy/synergy-cosmos-living-walls.webp`,
-        alt: 'Interior render of living walls of bamboo and hemp',
-        caption: 'Inside, the planted walls keep growing',
-      },
-      {
-        src: `${A}/01-synergy/synergy-cosmos-biocore-axon.webp`,
-        alt: 'Axonometric of the Biocore system, planter cells aggregated into a building',
-        caption: 'Biocore, how the three cells stack into a building',
-      },
-      {
-        src: `${A}/01-synergy/synergy-cosmos-construction-3.webp`,
-        alt: 'Bamboo culms laid into an emptied planter cell during construction',
-        caption: 'Prototyping, bamboo culms laid into the emptied planter',
-      },
-      {
-        src: `${A}/01-synergy/synergy-cosmos-construction-4.webp`,
-        alt: 'Plentify composite poured and set into the planter cell formwork',
-        caption: 'Prototyping, Plentify poured and set in its own formwork',
+        src: `${A}/01-synergy/synergy-cosmos-construction-closeup.webp`,
+        alt: 'Close view of a Plentify wall under construction, bamboo reinforcement tied into the wet composite beside a window opening',
+        caption: 'On site, bamboo tied into the wall as it goes up',
+        fit: 'contain',
       },
       {
         src: `${A}/01-synergy/synergy-cosmos-compression-test.webp`,
         alt: 'A Plentify sample under compression on the MTS Insight testing machine',
         caption: 'Testing the mix under compression, +30% over hempcrete',
-      },
-      {
-        src: `${A}/01-synergy/synergy-cosmos-building-elevation.webp`,
-        alt: 'Building elevation showing the planter-cell aggregation across the whole block',
-        caption: 'The block resolved, the aggregation across its length',
+        fit: 'contain',
       },
     ],
   },
@@ -342,6 +327,7 @@ export const PROJECTS: Project[] = [
         src: `${A}/05-dougherty/dougherty-arts-center-structural-axonometric-timber-roof.webp`,
         alt: 'Axonometric of the catenary arch and timber roof structure read as one family',
         caption: 'The structural system read as one family',
+        fit: 'contain',
       },
       {
         src: `${A}/05-dougherty/dougherty-arts-center-physical-model-perspective.webp`,
@@ -367,8 +353,9 @@ export const PROJECTS: Project[] = [
       },
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-metal-surface-sanding-end-effector.webp`,
-        alt: 'KUKA arm with a sanding head working a dark metal panel on the worktable',
-        caption: 'Metal-surface sanding, the arm at work',
+        alt: 'KUKA arm with a pen end effector plotting a radial wireframe pattern on black paper, a monitor showing the live setup behind',
+        caption: 'Plotting in progress, ink laid down stroke by stroke',
+        fit: 'contain',
       },
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-ornamentation-pattern-metal-surface.webp`,
@@ -377,8 +364,9 @@ export const PROJECTS: Project[] = [
       },
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-plotted-serpentine-drawing-resolved.webp`,
-        alt: 'Completed serpentine ribbon drawing in red and magenta ink on paper',
-        caption: 'The resolved serpentine drawing',
+        alt: 'A long roll of paper marked edge to edge with a dotted magenta and pink serpentine ribbon pattern',
+        caption: 'The resolved serpentine drawing, plotted in dots',
+        fit: 'contain',
       },
     ],
   },
