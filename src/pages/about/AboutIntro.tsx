@@ -1,11 +1,10 @@
 /**
  * AboutIntro.tsx — the one-time narration intro for the projects page (#/about).
  *
- * On first load per tab a full-bleed narration plays: two "We" beats resolve the
- * page's premise (the two-weeks / five-years contrast), then the page TITLE enters
- * large and centred and FLIES onto the real header title, so the narration "nests"
- * into the regular text section. Same mechanic + easing vocabulary as BowerIntro
- * (measure the target rect, travel to it at scale 1), scoped to this page.
+ * On first load per tab a full-bleed narration plays: the page TITLE enters large and
+ * centred and FLIES onto the real header title, so the narration "nests" into the regular
+ * text section. Same mechanic + easing vocabulary as BowerIntro (measure the target rect,
+ * travel to it at scale 1), scoped to this page.
  *
  * onReveal fires as the title lands, so the page content fades in beneath the
  * clearing veil; onDone fires when the veil has fully lifted. Plays on every visit
@@ -13,21 +12,17 @@
  * never touches window at import.
  */
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 /** Layout effect on the client, plain effect on the server (no SSR warning). */
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-const EASE_LINE = [0.16, 1, 0.3, 1] as const;
 const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
 
-/** The setup line. The contrast IS the story: fast to build, long to arrive — and the
- *  payoff ("We've been chasing it for five years.") is the TITLE itself, which enters big
- *  and settles into the header, so the loading screen and the header are one thought. */
-const SETUP = 'We built this in two weeks.';
-
-/** Timeline (ms): setup [0..], title enters big, title flies onto header, content reveals, done. */
-const T = { title: 1750, settle: 2700, reveal: 3350, done: 3850 } as const;
+/** Timeline (ms): a brief held veil, then the title enters big, flies onto the header, the
+ *  content reveals, done. (The old "we built this in two weeks" setup beat was removed at Daniel's
+ *  request; the title entering and settling into the header is the whole narration now.) */
+const T = { title: 350, settle: 1300, reveal: 1950, done: 2450 } as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. */
 export function shouldPlayAboutIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
@@ -109,25 +104,7 @@ export function AboutIntro({
 
       {rect && (
         <>
-          {/* Setup line — rendered with the header's exact style, in the header's column,
-              vertically centred. Rises in, holds, lifts out. */}
-          <AnimatePresence>
-            {phase === 'setup' && (
-              <motion.p
-                key="setup"
-                className={`absolute ${titleClassName}`}
-                style={{ left: rect.left, top: rect.top, width: rect.width }}
-                initial={{ opacity: 0, y: centerY + 22 }}
-                animate={{ opacity: 1, y: centerY }}
-                exit={{ opacity: 0, y: centerY - 16, transition: { duration: 0.36, ease: 'easeIn' } }}
-                transition={{ duration: 0.65, ease: EASE_LINE }}
-              >
-                {SETUP}
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          {/* Title — appears in the SAME box at the SAME size as the setup line, then rises
+          {/* Title — appears in the header's exact box at scale 1, vertically centred, then rises
               (y: centerY -> 0) to nest exactly onto the header. No scale, no re-align. */}
           {showTitle && (
             <motion.p

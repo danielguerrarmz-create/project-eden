@@ -64,6 +64,10 @@ export interface Project {
   description: string;
   /** The big takeaway: "What we learned" that informed our findings. */
   learned: string;
+  /** Awards or recognitions, one per line. Rendered in the detail panel's "Awards and publications"
+   *  stage alongside any `paper`. None are populated yet; the field exists so adding one is a
+   *  one-line change and the hierarchy has a home for it. */
+  awards?: string[];
   /** Present when the project is a published paper: adds venue, authors, and a PDF. */
   paper?: ProjectPaper;
 }
@@ -83,18 +87,32 @@ export interface TeamMember {
   image: string | null;
 }
 
-/** The two people behind Bower, for the short "who we are" area on the About page. */
+/** The two people behind Bower, for the short "who we are" area on the About page.
+ *
+ * Each bio is TWO sentences: one true, quirky detail drawn only from facts already in this repo,
+ * then the role sentence. Nothing here is invented — the medical device and its numbers come from
+ * the Origami project (n:10), the two papers from Synthetic Vision / Patterns (n:04, n:05).
+ *
+ * TODO(Daniel): Sai drafted fuller candidate bios that lean on facts NOT yet in this repo, held
+ * here so they aren't presented as fact until you confirm them:
+ *   Clay — "Before that: years at Rick Wright Architects in Dallas, and a stretch at TestFit,
+ *     drawing and building software for buildings. He also cofounded Resia, an AI remodeling
+ *     platform." (confirm the Rick Wright / TestFit years and the right verb for his Resia role.)
+ *   Daniel — "taught a KUKA arm to draw with light, and gave a language model a body it can sit on
+ *     a desk with, a lamp that runs Dream Machine. A stint at Rogers Partners in New York, then he
+ *     decided architecture needed an engine, not another renderer." (confirm the Rogers Partners
+ *     dates/role and whether "Dream Machine" is the name to print.) */
 export const TEAM: TeamMember[] = [
   {
     name: 'Clay Seifert',
     role: 'Cofounder · design & research',
-    bio: 'Architect and researcher at UT Austin. He leads Bower’s design and the living-architecture research it grew from.',
+    bio: 'Clay spent two years teaching a computer to tell one vault from another, work that became two published papers (AAG 2025, ACADIA 2025). Architect and researcher at UT Austin, he leads Bower’s design and the living-architecture research it grew from.',
     image: null, // portrait forthcoming
   },
   {
     name: 'Daniel Guerra',
     role: 'Cofounder · engine & systems',
-    bio: 'Architect, product designer, and engineer. He builds Bower’s generative engine and the systems around it.',
+    bio: 'Daniel once directed a fourteen-student team to build a $0.25 origami medical device for a teaching hospital in Kenya. Architect, product designer, and engineer, he builds Bower’s generative engine and the systems around it.',
     image: '/assets/about/daniel-headshot.jpg',
   },
 ];
@@ -135,6 +153,12 @@ export const PROJECTS: Project[] = [
         src: `${A}/04-search-by-assembly/search-by-assembly-search-bar-ranked-precedent-results.webp`,
         alt: 'Ranked precedent results, each traceable to the motifs that matched',
         caption: 'Ranked precedents, each one legible',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/04-search-by-assembly/search-by-assembly-system-pipeline.webp`,
+        alt: 'The system pipeline: images and attributes encoded into features, fused by weight, then ranked into results',
+        caption: 'The pipeline, encode to fuse to rank',
         fit: 'contain',
       },
     ],
@@ -230,7 +254,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '08',
+    n: '11',
     title: 'Flowerfield',
     by: 'clay',
     year: '2022',
@@ -280,7 +304,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '07',
+    n: '09',
     title: 'Plentify',
     by: 'clay+daniel',
     year: '2023',
@@ -321,7 +345,7 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    n: '06',
+    n: '08',
     title: 'Dougherty Arts Center',
     by: 'clay+daniel',
     year: '2024',
@@ -331,6 +355,17 @@ export const PROJECTS: Project[] = [
       'On a floodplain the honest move is to touch the ground lightly and give public space back.',
     images: [
       {
+        src: `${A}/05-dougherty/dougherty-arts-center-wall-section-south-facing-east-wing-HERO.webp`,
+        alt: 'Wall section through the south-facing east wing, the catenary arch and timber roof drawn as one detailed assembly',
+        caption: 'Wall section, the whole assembly in one drawing',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp`,
+        alt: 'Cardboard physical model of the arts center, its white catenary arches standing in the round',
+        caption: 'The model, proportion in the round',
+      },
+      {
         src: `${A}/05-dougherty/dougherty-arts-center-catenary-entrance-skyline-money-shot.webp`,
         alt: 'The catenary arch entrances framing a runner with the downtown Austin skyline behind',
         caption: 'The catenary entrances open the building to the park',
@@ -338,18 +373,23 @@ export const PROJECTS: Project[] = [
       {
         src: `${A}/05-dougherty/dougherty-arts-center-north-facade-perspective-austin-skyline.webp`,
         alt: 'The resolved north facade seen across the park with the Austin skyline behind',
-        caption: 'North facade across the park, skyline beyond',
       },
       {
         src: `${A}/05-dougherty/dougherty-arts-center-structural-axonometric-timber-roof.webp`,
         alt: 'Axonometric of the catenary arch and timber roof structure read as one family',
-        caption: 'The structural system read as one family',
         fit: 'contain',
       },
       {
-        src: `${A}/05-dougherty/dougherty-arts-center-physical-model-perspective.webp`,
-        alt: 'Photograph of the physical model against a neutral backdrop',
-        caption: 'The physical model, proportion in the round',
+        src: `${A}/05-dougherty/dougherty-arts-center-final-site-plan.webp`,
+        alt: 'Final site plan of the Dougherty Arts Center, the building and its landscape set into the floodplain park',
+        caption: 'Site plan',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/05-dougherty/dougherty-arts-center-ground-floor-plan.webp`,
+        alt: 'Ground floor plan of the arts center, studios and public rooms threaded between the arch lines',
+        caption: 'Ground floor plan',
+        fit: 'contain',
       },
     ],
   },
@@ -396,35 +436,153 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    // Year 2023 confirmed by Daniel (2026-07-13); the timeline places this moment at 2023 too.
+    n: '10',
+    title: 'Origami Medical Device',
+    by: 'daniel',
+    year: '2023',
+    description:
+      'A $0.25 origami-inspired device to prevent pressure wounds, prototyped for Moi Teaching Hospital in Kenya with AMPATH. Daniel directed a fourteen-student team, and the design was transferred for clinical deployment.',
+    learned:
+      'A constraint this hard, a device that has to cost cents and fold flat, is a design tool: it forces the idea down to the one move that matters.',
+    images: [
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp`,
+        alt: 'The origami-inspired cardboard wedge prototype, a low-cost wound-prevention device, staged for photography',
+        caption: 'The folded cardboard wedge, prototyped to cost cents',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
+        alt: 'The device tested in hospital at Moi Teaching Hospital, Kenya',
+        caption: 'Tested in hospital at Moi Teaching Hospital, Kenya',
+      },
+    ],
+  },
+  {
+    // MERGED (2026-07-13): the former "KUKA Robotics" and "Texas Robotics" entries are now one
+    // project, framed as robots-as-instruments. KUKA supplies the stills (drawing with light, ink,
+    // and abrasion, plus the new real sanding photo and the toolpath simulation); Texas Robotics
+    // supplies the built, moving device (video + still). Year takes the most recent (KUKA, 2026) so
+    // the merged project keeps its reverse-chronological slot. TODO(Daniel): confirm the Texas
+    // Robotics year and whether it was a lab, a course, or a personal build.
     n: '02',
-    title: 'KUKA Robotics',
+    title: 'Robots as Instruments',
     by: 'daniel',
     year: '2026',
     description:
-      'An industrial arm reframed as a drawing instrument: one script that sands metal, carves sand, plots ink, and draws with light.',
+      'Two ways of treating an industrial robot as an instrument rather than a laborer. On a KUKA arm, one script that sands metal, carves sand, plots ink, and draws with light. At Texas Robotics, a device built to actually move and tested as a working mechanism, not a static model.',
     learned:
-      'Given a well-made tool and a thoughtful toolpath, a robot becomes an expressive partner, not automated labor.',
+      'Given a well made tool and a thoughtful toolpath, a robot becomes an expressive partner rather than automated labor. And building a machine that truly moves, then watching where it fails, teaches more than drawing one ever does.',
     images: [
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-led-light-drawing-long-exposure.webp`,
         alt: 'Long-exposure photograph of the KUKA arm tracing a radial burst of LED light',
-        caption: 'Light drawn in long exposure, the motion made visible',
+        caption: 'Drawing with light, the motion made visible',
       },
       {
-        src: `${A}/06-kuka-robotics/kuka-robotics-metal-surface-sanding-end-effector.webp`,
-        alt: 'KUKA arm with a pen end effector plotting a radial wireframe pattern on black paper, a monitor showing the live setup behind',
-        caption: 'Plotting in progress, ink laid down stroke by stroke',
+        src: `${A}/06-kuka-robotics/kuka-robotics-arm-sanding-aluminum-sheet-platen.webp`,
+        alt: 'The KUKA arm sanding a clamped aluminium sheet with a flat platen end effector',
+        caption: 'Sanding metal with a platen end effector',
+      },
+      {
+        src: `${A}/13-texas-robotics/texas-robotics-robot-device-loop-poster.webp`,
+        alt: 'A Texas Robotics device in motion, built as a working moving mechanism',
+        caption: 'The Texas Robotics device, in motion',
+        video: {
+          mp4: `${A}/13-texas-robotics/texas-robotics-robot-device-loop.mp4`,
+          webm: `${A}/13-texas-robotics/texas-robotics-robot-device-loop.webm`,
+          rate: 0.85,
+        },
+      },
+      {
+        src: `${A}/06-kuka-robotics/kuka-robotics-toolpath-simulation-rosette.webp`,
+        alt: 'A simulation screenshot of the KUKA arm, its toolpath drawn as a red rosette of passes around the tool',
+        caption: 'The toolpath simulated before it cuts',
         fit: 'contain',
       },
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-ornamentation-pattern-metal-surface.webp`,
         alt: 'Finished concentric hexagonal ornamentation drawn in red ink on paper',
-        caption: 'Plotted ornamentation, a concentric hexagonal pattern',
       },
       {
         src: `${A}/06-kuka-robotics/kuka-robotics-plotted-serpentine-drawing-resolved.webp`,
         alt: 'A long roll of paper marked edge to edge with a dotted magenta and pink serpentine ribbon pattern',
-        caption: 'The resolved serpentine drawing, plotted in dots',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/06-kuka-robotics/kuka-robotics-metal-surface-sanding-end-effector.webp`,
+        alt: 'The KUKA arm with a pen end effector plotting a radial wireframe pattern on black paper, a live monitor behind',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/13-texas-robotics/texas-robotics-robot-device-still.webp`,
+        alt: 'The Texas Robotics device at rest',
+      },
+    ],
+  },
+  {
+    // NEW (2026-07-13). Framing from Clay: an experiment, not a finished product. Lineage is MIT
+    // Design Intelligence Lab's Large Language Objects (physical bodies for language models). The
+    // lamp runs "Dream Machine", a tool to DJ a drawing: you sketch, then project generated imagery
+    // over the sketch to push the idea further. TODO(Daniel): confirm the year and your exact role,
+    // and whether "Dream Machine" is the final name for the projection tool.
+    n: '06',
+    title: 'LLO: Dream Machine',
+    by: 'daniel',
+    year: '2024',
+    description:
+      'An experiment, not a product: a desk lamp built to give a language model a body, after MIT’s Large Language Objects. It runs Dream Machine, a tool to DJ a drawing, you sketch, then project imagery back over the sketch to expand the idea. The armature is plywood, pulleys, and string, driven by a small control box.',
+    learned:
+      'It stays deliberately unfinished. The question was whether a model feels different once it has a posture and sits on the desk with you, not whether it ships.',
+    images: [
+      {
+        src: `${A}/14-large-language-object/large-language-object-lamp.webp`,
+        alt: 'The Large Language Object, a plywood articulated desk lamp on a wooden base with pulleys, red string, and a separate control box',
+        caption: 'The Large Language Object, a lamp that gives a model a body',
+      },
+      {
+        src: `${A}/14-large-language-object/large-language-object-draft-1.webp`,
+        alt: 'A working draft of the Large Language Object lamp',
+        caption: 'A working draft',
+      },
+      {
+        src: `${A}/14-large-language-object/large-language-object-draft-2.webp`,
+        alt: 'A second working draft of the Large Language Object lamp',
+        caption: 'A second working draft',
+      },
+    ],
+  },
+  {
+    // NEW (2026-07-13). Resia is Clay's startup. TODO(Daniel): confirm the year and the current
+    // status of the product.
+    n: '07',
+    title: 'Resia',
+    by: 'clay',
+    year: '2024',
+    description:
+      'An AI remodeling platform that carries a homeowner from idea to finished job in one place: generate the design, estimate the cost, write the contract, and manage the build.',
+    learned:
+      'A renovation is a chain of handoffs, and most of the pain is in the seams; putting the whole chain in one tool is where the leverage is.',
+    images: [
+      {
+        src: `${A}/12-resia/resia-product-screenshot-1.webp`,
+        alt: 'The Resia landing page, a one-stop remodeling solution to generate, estimate, contract, and manage a renovation',
+        caption: 'One stop, from generate to manage',
+      },
+      {
+        src: `${A}/12-resia/resia-brand-artboard.webp`,
+        alt: 'A Resia brand artboard, a kitchen shown before and after a renovation with the line "Kitchen Renovation Made Simple"',
+        caption: 'Before and after, the renovation made simple',
+      },
+      {
+        src: `${A}/12-resia/resia-product-screenshot-2.webp`,
+        alt: 'A second Resia product screenshot',
+        caption: 'Inside the product',
+      },
+      {
+        src: `${A}/12-resia/resia-logo.webp`,
+        alt: 'The Resia logo',
+        caption: 'The mark',
         fit: 'contain',
       },
     ],

@@ -10,11 +10,12 @@
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
+import { useAutoplayVideo } from './about/useAutoplayVideo';
 import {
   PROJECTS,
   TEAM,
@@ -76,37 +77,23 @@ function ProjectVideoEl({
   className,
   contain,
   reduced,
+  intrinsic = false,
 }: {
   image: ProjectImage;
   className: string;
   contain: boolean;
   reduced: boolean;
+  /** In the supporting-image pack, render at the poster's true proportions (no crop, height auto)
+   *  so mixed portrait/landscape media fill the column instead of being forced to one shape. */
+  intrinsic?: boolean;
 }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const rate = image.video?.rate ?? 1;
+  const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
-  // React has no playbackRate prop, so it must be set on the element — and a rate under 1 is
-  // the whole point: it stops a render loop reading as a GIF and starts it reading as growth.
-  //
-  // Starting playback is fussier than it looks. `autoPlay` alone does not survive: React sets
-  // `muted` as a property only AFTER the node is in the document, so Chrome has already judged
-  // the autoplay policy against an unmuted video and refused. And calling play() straight away
-  // in an effect refuses too, because at that instant the browser has not finished picking a
-  // <source> and there is nothing to play. So: kick it once now for the already-warm case, and
-  // again from the element's own ready event, which is the one that actually lands.
-  const start = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.playbackRate = rate;
-    el.muted = true;
-    void el.play().catch(() => {});
-  }, [rate]);
-
-  useEffect(start, [start]);
-
-  const frame = `w-full border border-inkBlack/12 ${
-    contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
-  } ${className}`;
+  const frame = intrinsic
+    ? `w-full h-auto block border border-inkBlack/12 ${contain ? 'bg-white p-1.5' : ''} ${className}`
+    : `w-full border border-inkBlack/12 ${
+        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
+      } ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
@@ -135,19 +122,27 @@ function ProjectImg({
   className = '',
   onOpen,
   reduced = false,
+  intrinsic = false,
 }: {
   image: ProjectImage;
   className?: string;
   onOpen?: (image: ProjectImage) => void;
   reduced?: boolean;
+  /** Supporting-pack mode: render at true proportions, no forced aspect or crop. */
+  intrinsic?: boolean;
 }) {
   const contain = image.fit === 'contain';
+  const frame = intrinsic
+    ? `w-full h-auto block border border-inkBlack/12 ${contain ? 'bg-white p-1.5' : ''} ${className}`
+    : `w-full border border-inkBlack/12 ${
+        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
+      } ${className}`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
   if (image.video) {
     const el = (
-      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} />
+      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} intrinsic={intrinsic} />
     );
     if (!onOpen) return el;
     return (
@@ -176,19 +171,10 @@ function ProjectImg({
       src={image.src}
       alt={image.alt}
       loading="lazy"
-      className={`w-full border border-inkBlack/12 ${
-        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
-      } ${className}`}
+      className={frame}
     />
   ) : (
-    <img
-      src={image.src}
-      alt={image.alt}
-      loading="lazy"
-      className={`w-full border border-inkBlack/12 ${
-        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
-      } ${className}`}
-    />
+    <img src={image.src} alt={image.alt} loading="lazy" className={frame} />
   );
 
   if (!onOpen) return img;
@@ -228,12 +214,18 @@ function Gallery({
   reduced?: boolean;
 }) {
   const [hero, ...rest] = project.images;
+  // The supporting pack respects each image's real proportions and fills the column (round 3
+  // section 5): one balanced column for a couple of images, two for three or more, images flowing
+  // at their intrinsic aspect ratio rather than cropped to a uniform grid.
+  const packClass = rest.length >= 3 ? '[columns:2] [column-gap:16px]' : '[columns:1]';
   return (
     <figure className="space-y-3">
       <div className="space-y-2">
+        {/* Hero: full width, height by its own aspect, capped against the viewport so the whole
+            project still lands on one page. Cover for photos, contain on white for baked-in text. */}
         <ProjectImg
           image={hero}
-          className={capped ? 'max-h-[min(48vh,540px)] object-cover' : 'aspect-[3/2]'}
+          className={capped ? 'max-h-[46vh]' : 'aspect-[3/2]'}
           onOpen={onOpen}
           reduced={reduced}
         />
@@ -244,15 +236,11 @@ function Gallery({
         )}
       </div>
       {rest.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className={`[column-fill:balance] ${packClass}`}>
           {rest.map((img) => (
-            <ProjectImg
-              key={img.src}
-              image={img}
-              className={capped ? 'aspect-[3/2] max-h-[15vh]' : 'aspect-[3/2]'}
-              onOpen={onOpen}
-              reduced={reduced}
-            />
+            <div key={img.src} className="mb-4 break-inside-avoid">
+              <ProjectImg image={img} onOpen={onOpen} reduced={reduced} intrinsic />
+            </div>
           ))}
         </div>
       )}
@@ -264,17 +252,7 @@ function Gallery({
 
 /** The large view of a video tile: the same loop, at the same slowed rate, big. */
 function LightboxVideo({ image }: { image: ProjectImage }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const rate = image.video?.rate ?? 1;
-  // Same two-step start as the tile — see ProjectVideoEl for why asking once is not enough.
-  const start = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.playbackRate = rate;
-    el.muted = true;
-    void el.play().catch(() => {});
-  }, [rate]);
-  useEffect(start, [start]);
+  const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
   return (
     <video
       ref={ref}
@@ -426,39 +404,70 @@ function DownloadGlyph() {
 
 /** The description + "What we learned" block, beneath the gallery. For paper-based
  *  projects, adds the venue/authors line and a "read the paper" download. */
+/**
+ * The detail panel, standardized (round 3 section 5) into five explicit stages, in order: title,
+ * credits (the byline), description, awards and publications, lessons learned. The paper's venue,
+ * authors and download now live together in the awards-and-publications stage between the
+ * description and the takeaway, rather than the venue floating above the description and the
+ * download stranded below the takeaway. If a project has neither awards nor a paper, that stage is
+ * omitted entirely so no empty label ever shows.
+ */
 function ProjectText({ project }: { project: Project }) {
   const paper = project.paper;
+  const awards = project.awards;
+  const hasRecognition = (awards && awards.length > 0) || !!paper;
   return (
     <div>
+      {/* 1. Title + 2. Credits (byline, in the same row). */}
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
         <Meta project={project} className="shrink-0" />
       </div>
-      {paper && (
-        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
-          {paper.venue} · {paper.authors}
-        </p>
-      )}
+      {/* 3. Description. */}
       <p className="mt-2 font-serifDisplay text-[15px] leading-snug text-inkBlack/70">
         {project.description}
       </p>
+      {/* 4. Awards and publications. Neutral kicker tone: olive stays reserved for the one payoff
+          line below so it isn't diluted by using it twice on the same panel. */}
+      {hasRecognition && (
+        <div className="mt-5 border-t border-inkBlack/15 pt-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/45">
+            Awards and publications
+          </p>
+          {awards && awards.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {awards.map((award) => (
+                <li key={award} className="font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
+                  {award}
+                </li>
+              ))}
+            </ul>
+          )}
+          {paper && (
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
+              {paper.venue} · {paper.authors}
+            </p>
+          )}
+          {paper?.pdf && (
+            <a
+              href={paper.pdf}
+              download
+              className="group mt-3 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+            >
+              <DownloadGlyph />
+              Read the paper
+              <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
+            </a>
+          )}
+        </div>
+      )}
+      {/* 5. Lessons learned. */}
       <div className="mt-5 border-t border-inkBlack/15 pt-4">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">What we learned</p>
         <p className="mt-2 font-serifDisplay text-[clamp(1.15rem,1.5vw,1.5rem)] leading-snug text-inkBlack">
           {project.learned}
         </p>
       </div>
-      {paper?.pdf && (
-        <a
-          href={paper.pdf}
-          download
-          className="group mt-5 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-        >
-          <DownloadGlyph />
-          Read the paper
-          <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
-        </a>
-      )}
     </div>
   );
 }
@@ -553,9 +562,9 @@ function ListView({ reduced }: { reduced: boolean }) {
             <motion.div
               key={project.n}
               className="grid gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr]"
-              initial={reduced ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: reduced ? 0 : 0.35, ease: 'easeOut' }}
+              initial={reduced ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduced ? 0 : 0.55, ease: [0.16, 1, 0.3, 1] }}
             >
               <Gallery project={project} onOpen={openShot} capped reduced={reduced} />
               <ProjectText project={project} />
@@ -603,7 +612,9 @@ function ListView({ reduced }: { reduced: boolean }) {
 function TeamCard({ person }: { person: TeamMember }) {
   return (
     <div className="flex gap-5">
-      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md border border-inkBlack/12 bg-paperDeep/50 sm:h-28 sm:w-28">
+      {/* A deliberate, slightly heavier mat for the portrait (round 3 section 4): 128px, 1.5px border
+          a shade heavier than the picture-plate borders elsewhere, since this is a portrait. */}
+      <div className="h-32 w-32 shrink-0 overflow-hidden rounded-md border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
         {person.image ? (
           <img
             src={person.image}
@@ -613,7 +624,7 @@ function TeamCard({ person }: { person: TeamMember }) {
           />
         ) : (
           <div className="grid h-full w-full place-items-center text-inkBlack/20">
-            <OculusMark size={40} className="h-auto w-10" />
+            <OculusMark size={44} className="h-auto w-11" />
           </div>
         )}
       </div>
@@ -671,15 +682,25 @@ export function AboutPage() {
           />
         </section>
 
+        {/* The founder block is framed tightly (round 3 section 4, tightened again after live QA:
+            Daniel flagged the frame as still airy at 38svh). 24svh still releases the sticky
+            timeline before "The two of us" can enter (so the finale and the founders never share a
+            frame) — verified live at 1920x876. */}
+        <div aria-hidden className={reduced ? 'h-16' : 'min-h-[24svh]'} />
+
         {/* The two of us. AFTER the sequence: by the time you meet them, you already know
             where they came from. */}
-        <section aria-label="The two of us" className="mt-24 pt-10">
+        <section aria-label="The two of us" className="pt-8">
           <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
             The two of us
           </h2>
-          <div className="mt-8 grid gap-10 sm:grid-cols-2">
+          {/* A single bordered panel with a hairline divider between the two founders, so the block
+              reads as one deliberate framed moment (round 3 section 4) rather than two loose cards. */}
+          <div className="mt-8 grid border border-inkBlack/12 sm:grid-cols-2 sm:divide-x sm:divide-inkBlack/12">
             {TEAM.map((person) => (
-              <TeamCard key={person.name} person={person} />
+              <div key={person.name} className="p-8 sm:p-10">
+                <TeamCard person={person} />
+              </div>
             ))}
           </div>
         </section>
@@ -687,9 +708,12 @@ export function AboutPage() {
         {/* PORTION TWO — the work, most recent first. Sized to ONE page: the section owns a
             viewport's height, the header takes what it needs, and the master-detail fills
             the rest. Nothing about the work requires scrolling to reach. */}
+        {/* Same tight framing below the founder block (round 3 section 4). */}
+        <div aria-hidden className={reduced ? 'h-16' : 'min-h-[24svh]'} />
+
         <section
           aria-label="Projects"
-          className="mt-24 flex h-[calc(100svh-var(--header-h))] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
+          className="flex h-[calc(100svh-var(--header-h))] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
         >
           <div className="mb-8 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">

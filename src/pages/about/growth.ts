@@ -63,46 +63,7 @@ export function lateral(t: number, g: number, phase: number, amplitude: number, 
   return radius * Math.sin(theta + phase);
 }
 
-/**
- * A SEED, not an egg and not an ellipse.
- *
- * The distinction matters: an egg is laid finished and waits, a seed is a plan for a plant
- * that has not happened yet. The timeline arrives at the second thing. Formally the seed is
- * an asymmetric ovoid, pointed at one end (the micropyle, where the root will emerge) and
- * full at the other (the chalaza, where the food is) — which is exactly the shape of the
- * page's argument, so the tip is drawn UPWARD, at the strands, and the strands gather into
- * the point of highest curvature the way converging lines want to.
- *
- * Drawn in local coordinates around (0,0): tip at (0,-b), body swelling below.
- *
- * @param a half-width at the widest point
- * @param b half-height, tip to base
- */
-export function seedPath(a: number, b: number): string {
-  return [
-    `M 0 ${-b}`,
-    // Down the right flank: leaves the tip almost straight, then swells.
-    `C ${a * 0.58} ${-b * 0.56}, ${a} ${-b * 0.06}, ${a * 0.93} ${b * 0.44}`,
-    `C ${a * 0.82} ${b * 0.87}, ${a * 0.44} ${b}, 0 ${b}`,
-    // And back up the left, mirrored: the seed is bilaterally symmetric about its axis.
-    `C ${-a * 0.44} ${b}, ${-a * 0.82} ${b * 0.87}, ${-a * 0.93} ${b * 0.44}`,
-    `C ${-a} ${-b * 0.06}, ${-a * 0.58} ${-b * 0.56}, 0 ${-b}`,
-    'Z',
-  ].join(' ');
-}
-
-/**
- * The EMBRYO inside the seed: the curled radicle-and-cotyledon hook that every dicot seed
- * carries, drawn as a single open stroke. It is the smallest possible drawing of "this is
- * not finished, it is folded up waiting" — which is the whole point of ending here.
- *
- * It hangs from the tip, curls into the body, and turns back on itself.
- */
-export function embryoPath(a: number, b: number): string {
-  return [
-    `M 0 ${-b * 0.66}`,
-    `C ${a * 0.1} ${-b * 0.3}, ${a * 0.42} ${-b * 0.16}, ${a * 0.42} ${b * 0.14}`,
-    `C ${a * 0.42} ${b * 0.44}, ${a * 0.1} ${b * 0.56}, ${-a * 0.16} ${b * 0.42}`,
-    `C ${-a * 0.36} ${b * 0.31}, ${-a * 0.38} ${b * 0.05}, ${-a * 0.2} ${-b * 0.06}`,
-  ].join(' ');
-}
+// The seed and embryo paths were retired in round 3: the finale is no longer a seed but a woven
+// bower arch (see CrossPathsTimeline.tsx, the weave). Daniel's instruction was explicit — no egg,
+// no teardrop — and the fix was a different idea entirely, not a rounder ovoid, so seedPath and
+// embryoPath are gone rather than tweaked. The weave arm math lives inline in the timeline.

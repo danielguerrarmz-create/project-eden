@@ -13,8 +13,10 @@
  * Centers + geometry are exact per the locked spec; do not eyeball-adjust them.
  */
 
-/** The eight circle centers on the radius-15 ring about (50,50). Locked. */
-const CENTERS: ReadonlyArray<readonly [number, number]> = [
+/** The eight circle centers on the radius-15 ring about (50,50). Locked.
+ *  Exported so the About-page seed can reuse the exact geometry (its faint backdrop is this
+ *  mark, scaled up) instead of re-deriving the numbers by eye. */
+export const CENTERS: ReadonlyArray<readonly [number, number]> = [
   [65, 50],
   [60.61, 60.61],
   [50, 65],
