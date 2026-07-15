@@ -1,42 +1,36 @@
 /**
  * CrossPathsTimeline.tsx — how Clay and Daniel crossed paths, drawn as a node graph.
  *
- * v2 (2026-07-13). This is a composition rework of v1 (see docs/2026-07-13-timeline-design-spec-v1.md
- * for the seam fix and piecewise axis, both KEPT). The v2 spec is
- * docs/2026-07-13-timeline-v2-composition-spec.md. What changed, and why:
+ * This is the built form of the 2026-07-14 geometry rulings (prototype:
+ * docs/2026-07-14-geometry-proposals/index.html; holder:
+ * docs/2026-07-14-ornament-and-logo-proposals/holder-a-calyx-v2.svg). It keeps the v2 node-graph
+ * bones (one spine, short branches, piecewise time axis, plate tiers, packSide, one colour) and
+ * replaces the two ends and the connective ornament:
  *
- * ONE SPINE, SHORT BRANCHES. v1 drew a trunk plus seven long parallel tributaries, so the linework
- * covered more area than the pictures. v2 is a node-based graph: there is exactly ONE long line
- * (the spine), and every event is a SHORT branch edge off it to a picture plate. Nodes are plates
- * and named events; edges are the curves; the graph has one long edge and many short ones.
- * Checkable rule: at any scroll position you should see at most the spine plus a couple of branch
- * edges mid-unfurl — MAX_CONCURRENT_STRANDS = 3. If a screenshot ever shows more than three
- * distinct stroked paths, the composition has regressed to v1's web-of-lines.
+ * THE BEGINNING IS A TWIST-FUSE (redline 2). There is no spine above the junction. Two strands of
+ * equal weight come in from off-frame at the top, cross once over-under, and the spine is BORN at
+ * the fuse (at 2021). Neither strand reads as "the main one"; the single line is their child.
  *
- * TWO LINEAGES MERGE INTO THE SPINE AT 2021. Where v1 had a single faint companion, v2 has two
- * symmetric, named pre-2021 whispers (Clay from the left, Daniel from the right). Both terminate at
- * the SAME sampled spine coordinate at UT Austin 2021, running parallel to the spine before they
- * meet, so the join reads as one grown line, not two lines colliding. This is the "ends meet" fix.
+ * THE FINALE IS AN UNRAVEL INTO THE MARK (redline 1). The old woven bower is retired. The spine
+ * leans off its axis over its last stretch, reaches the attach point on the far flank of one Oculus
+ * circle, and then WINDS: the last 2*pi*r units of the line carry constant curvature w/r, so at w=1
+ * the tail has closed into an exact circle of radius r, tangent to the spine, sitting in its slot in
+ * the mark. Arc length is conserved at every w (it is a real unravelling played backwards, not a
+ * morph). The mark's stroke equals the spine's weight (k = SPINE_W / 2.8 = 2.679), so the mark is
+ * the largest single object at the bottom of the piece. Under it: the "bower" wordmark. Nothing else.
  *
- * IMAGES DOMINATE. Four plate tiers, with a hard floor (nothing smaller than the old "Architecture
- * Practice" card). Multi-image events are VERTICAL CLUSTERS: siblings stack straight down one lane
- * with a fixed gap, never fanned or overlapping, each with its own short branch back to the shared
- * spine point.
+ * THE HOLDER IS A CALYX (holder A v2 strengthened). Every plate is borne by a pedicel + a filled
+ * receptacle cup + five sepals, the outer pair climbing the plate's sides. Sepal lengths scale with
+ * plate height (clamped), so the showcase tier fills out and the floor tier stays modest. The old
+ * leaf ornament is gone.
  *
- * ONE COLOUR (INK_BLUE). No colour coding by person. Difference is weight and opacity only.
- *
- * TIME IS PIECEWISE. The axis starts at 2021; 2021 to 2023 is compressed (300 u/yr) against the
- * open later years (760 u/yr). Unchanged from v1.
- *
- * THE FINALE IS A WOVEN BOWER (round 3, seed retired). At WEAVE_START_Y the spine forks into two
- * arms that weave over and under each other and rejoin, framing the wordmark lockup (the Oculus
- * mark + "bower" in the header's mono face). See "THE WEAVE" below.
+ * ONE COLOUR (INK_BLUE). TIME IS PIECEWISE (2021 to 2023 compressed, then open). Unchanged.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { line as d3line, curveCatmullRom } from 'd3-shape';
 import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
-import { clamp01, gompertz, lerp } from './growth';
+import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 
 /** The practice's blue. There is no second colour in this drawing, on purpose. */
@@ -44,14 +38,12 @@ export const INK_BLUE = '#3E7CA8';
 
 /**
  * The checkable ceiling on how many stroked paths may be visible at once: the spine, plus at most
- * two branch edges mid-unfurl. This is a QA contract (screenshot and count), not something the code
- * enforces; the reveal gating below keeps the count low by only drawing a branch as its own plate
- * unfurls.
+ * two branch pedicels mid-unfurl. This is a QA contract (screenshot and count), not something the
+ * code enforces; the reveal gating below keeps the count low.
  */
 export const MAX_CONCURRENT_STRANDS = 3;
 
 type Side = 'left' | 'right';
-type Lineage = 'clay' | 'daniel';
 type PlateTier = 'floor' | 'standard' | 'hero' | 'showcase';
 
 /** One picture on a plate: a still, or a looping video (webm + mp4 + poster). */
@@ -85,8 +77,7 @@ interface Cluster {
   hint: string;
   nodes: Node[];
   /** Optional extra downward nudge for the plate stack only (the branch anchor stays on the true
-   *  year). Used where a plate would otherwise sit over the 2021 merge whispers; safe only where the
-   *  lane has slack below. */
+   *  year). Used where a plate would otherwise crowd the merge; safe only where the lane has slack. */
   dy?: number;
 }
 
@@ -97,18 +88,18 @@ const A = '/assets/projects';
 const W = 1200;
 const CX = 600;
 const MAX_YEAR = 2026;
+const SPINE_W = 7.5;
 
 /** Piecewise time axis: 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1. */
 const Y_2021 = 150;
 const Y_2023 = 750;
 const SLOPE_EARLY = 300; // units per year, 2021 to 2023
 const SLOPE_LATE = 760; // units per year, 2023 to 2026
+/** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
 const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
 
 const yearToY = (y: number) =>
   y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
-const yToYear = (Y: number) =>
-  Y <= Y_2023 ? 2021 + (Y - Y_2021) / SLOPE_EARLY : 2023 + (Y - Y_2023) / SLOPE_LATE;
 
 /**
  * Which side of the spine a year label sits on: OPPOSITE the nearest cluster within 0.15 of a
@@ -124,25 +115,196 @@ export function yearLabelSide(clusters: ReadonlyArray<{ year: number; side: Side
   return near ? (near.side === 'right' ? 'left' : 'right') : 'right';
 }
 
+/* ----------------------------- the twist-fuse ----------------------------- */
+
 /**
- * THE WEAVE, at the end of the line (round 3). The seed is retired. Where the spine used to arrive
- * at a seed, it now FORKS into two arms that weave over and under each other and frame the wordmark,
- * the way real branches frame the doorway of a bower. It is the mirror of the 2021 lineage merge at
- * the top (two into one), run in reverse (one into two, then rejoined).
+ * THE BEGINNING (redline 2). No spine above the junction. Two equal strands come in from off-frame,
+ * run parallel to the spine (a cubic that is already vertical when it touches, so the fuse has no
+ * kink), then in the last stretch cross once over-under and lay up into the spine. The junction is
+ * at 2021: the spine is born there and nowhere above it.
  */
-const WEAVE_START_Y = CONVERGE_Y; // 3030 — where the spine forks
-const WEAVE_ZONE_H = 300;
-const WEAVE_END_Y = WEAVE_START_Y + WEAVE_ZONE_H; // 3330 — where the two arms rejoin
-const WORDMARK_Y = lerp(WEAVE_START_Y, WEAVE_END_Y, 0.48);
-const PAYOFF_Y = WEAVE_END_Y + 90;
-const H = PAYOFF_Y + 60; // 3480
-const WEAVE_AMPLITUDE = 88;
-/** The payoff wordmark lockup: the brand mark (eight circles) + "bower" in the header's mono face. */
-const ICON_R = 50;
-const LOCKUP_GAP = 10;
+export const CONV_JUNCTION_Y = Y_2021; // 150 — the fuse; the spine is born here
+const CONV_TOP_Y = -50; // strand tops, above the frame (cut by frame)
+const CONV_TWIST = 110; // height of the over-under lay above the junction
+const CONV_GATE_Y = CONV_JUNCTION_Y - CONV_TWIST; // 40 — where the wishbone hands off to the twist
+const CONV_AMP = 240; // how far off-axis each strand starts
+const CONV_OFF = 7.5; // half the lay separation through the twist
+/** Root-2 strand weight: each strand is substantial, so neither reads as subordinate. */
+const CONV_WEIGHT = 5.3;
+
+/** One convergence strand for side `dir` (-1 left, +1 right): wishbone in from off-frame, then a
+ *  single over-under crossing that closes onto the spine axis at the junction. */
+export function convArmPts(dir: number): Array<{ x: number; y: number }> {
+  const pts: Array<{ x: number; y: number }> = [];
+  const N = 90;
+  // Cubic h with h(0)=0, h'(0)=0.6, h(1)=1, h'(1)=0: enters at ~26 degrees off vertical and is
+  // already exactly parallel to the spine at the gate, so the lay-up has no kink.
+  const a = -1.4;
+  const b = 1.8;
+  const c = 0.6;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const y = lerp(CONV_TOP_Y, CONV_GATE_Y, u);
+    const h = a * u * u * u + b * u * u + c * u;
+    pts.push({ x: CX + dir * (CONV_AMP - CONV_OFF) * (1 - h) + dir * CONV_OFF, y });
+  }
+  const M = 48;
+  for (let i = 1; i <= M; i++) {
+    const t = i / M;
+    const y = lerp(CONV_GATE_Y, CONV_JUNCTION_Y, t);
+    // cos runs +1 -> -1 (the crossing at t=0.5) while the envelope closes to zero at the junction,
+    // so both strands arrive exactly on the spine axis (x=CX) and become the single line.
+    pts.push({ x: CX + dir * CONV_OFF * Math.cos(Math.PI * t) * (1 - t * t), y });
+  }
+  return pts;
+}
+
+/* --------------------------- the unravel finale --------------------------- */
+
+/**
+ * THE FINALE (redline 1). The line winds itself into the Bower mark. Variant A: the mark is centred,
+ * the spine leans to reach the attach point on the far flank of circle 0. The mark's scale is not a
+ * free choice: its stroke is 2.8 at a 100-unit box, and 2.8 * MARK_K = SPINE_W, so the line becomes
+ * mark linework with no change in weight. That pins the mark at 90 * MARK_K = 241px wide.
+ */
+const MARK_STROKE = 2.8;
+export const MARK_K = SPINE_W / MARK_STROKE; // 2.6786
+export const MARK_R = 30 * MARK_K; // 80.36 — world radius of one mark circle
+const LEAN_SPAN = 620; // descent the spine spends easing off-axis to the attach point
+const MARK_CENTER_X = CX; // variant A: the mark stays on the axis
+const MARK_CENTER_Y = CONVERGE_Y + LEAN_SPAN; // 3650 — the mark's centre
+const WORDMARK_GAP = 92; // from the mark's bottom edge to the wordmark baseline
+const WORDMARK_FONT = 54;
+const H = MARK_CENTER_Y + 45 * MARK_K + WORDMARK_GAP + 70; // total drawing height
+
+/** Resolve the mark + variant A into world geometry: the attach point P on circle 0's far flank
+ *  (phi=0), the spine's heading there (psi0, straight down), and the wind direction (sigma). */
+export function solveMark() {
+  const k = MARK_K;
+  const r = MARK_R;
+  const [c0x, c0y] = MARK_CENTERS[0]; // [65, 50]
+  const C = { x: MARK_CENTER_X + (c0x - 50) * k, y: MARK_CENTER_Y + (c0y - 50) * k };
+  const P = { x: C.x + r, y: C.y }; // phi = 0: the right flank
+  const psi0 = Math.PI / 2; // heading straight down at P
+  return { k, r, C, P, psi0, sigma: 1 };
+}
+
+/**
+ * THE MECHANISM. The last L = 2*pi*r units of the line carry constant curvature w/r.
+ *   w = 0  -> a straight ray from P: the spine, continuing.
+ *   w = 1  -> total turn 2*pi: a closed circle of radius r, tangent to the spine at P, centred on C.
+ * Arc length is exactly L at every w (midpoint-rule integration closes to ~0.01px at w=1), so this
+ * is a real unravelling, not a morph between two shapes.
+ */
+export function tailPts(w: number, N = 420): Array<{ x: number; y: number }> {
+  const g = solveMark();
+  const L = 2 * Math.PI * g.r;
+  const ds = L / N;
+  const kappa = w / g.r;
+  const pts = [{ x: g.P.x, y: g.P.y }];
+  let x = g.P.x;
+  let y = g.P.y;
+  let psi = g.psi0;
+  for (let i = 0; i < N; i++) {
+    const mid = psi + g.sigma * kappa * (ds / 2);
+    x += Math.cos(mid) * ds;
+    y += Math.sin(mid) * ds;
+    psi += g.sigma * kappa * ds;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+
+/** The spine above the attach point: plumb on the axis, then a smoothstep lean into P that arrives
+ *  on P's exact (vertical) tangent, so the spine hands off to the winding tail with no kink. */
+function spineLeanPts(): Array<{ x: number; y: number }> {
+  const g = solveMark();
+  const dx = g.P.x - CX;
+  const y0 = g.P.y - LEAN_SPAN; // = CONVERGE_Y
+  const pts = [{ x: CX, y: y0 }];
+  // psi0 is vertical, so cot(psi0)=0 and the ease reduces to smoothstep s(u)=3u^2-2u^3, which
+  // leaves the axis and arrives at P both with zero horizontal slope.
+  for (let i = 1; i <= 120; i++) {
+    const u = i / 120;
+    const s = u * u * (3 - 2 * u);
+    pts.push({ x: CX + dx * s, y: lerp(y0, g.P.y, u) });
+  }
+  return pts;
+}
+
+/* -------------------------------- the calyx ------------------------------- */
+
+/**
+ * Holder A, the ORIGINAL (light) calyx: a fine pedicel lifts the plate from underneath, and three
+ * slim sepals fan out below the plate's inner-bottom corner. NOT the strengthened v2 cup. `phi` is
+ * the SVG's angle (180 straight down, 225 toward the spine, 135 under the plate); the deviation from
+ * straight down is `phi - 180`. Each length scales with plate height, clamped, so the floor tier
+ * stays modest and only the showcase tier fills out.
+ */
+export const SEPAL_DEFS: ReadonlyArray<{
+  phi: number;
+  lenCoef: number;
+  lenLo: number;
+  lenHi: number;
+}> = [
+  { phi: 225, lenCoef: 0.45, lenLo: 60, lenHi: 150 }, // toward the spine
+  { phi: 180, lenCoef: 0.28, lenLo: 45, lenHi: 110 }, // straight down
+  { phi: 135, lenCoef: 0.36, lenLo: 55, lenHi: 130 }, // under the plate
+];
+
+/** A sepal's length: proportional to plate height, clamped so the floor tier stays modest and the
+ *  showcase tier fills out. Pure and exported for the scaling test. */
+export function sepalLen(def: { lenCoef: number; lenLo: number; lenHi: number }, h: number): number {
+  return clamp(def.lenCoef * h, def.lenLo, def.lenHi);
+}
+
+const PEDICEL_LIFT = 25; // how far the pedicel's control point is raised, for a gentle bow
+
+/** The full calyx path set for a plate: the pedicel from the spine anchor to the plate's inner-
+ *  bottom corner, and three slim sepals fanning down from that corner. Geometry is Holder A (light);
+ *  sepal lengths scale with plate height. */
+function calyxPaths(
+  cx: number,
+  by: number,
+  w: number,
+  h: number,
+  dir: number,
+  spineX: number,
+  anchorY: number,
+) {
+  // The receptacle point: the plate's inner-bottom corner, where the pedicel meets the plate and the
+  // three sepals spring from. The fan mirrors with the plate's side so it always opens the same way
+  // relative to the spine.
+  const Rx = dir === 1 ? cx - w / 2 : cx + w / 2;
+  const Ry = by;
+
+  const sepals = SEPAL_DEFS.map((def) => {
+    const dev = ((def.phi - 180) * Math.PI) / 180; // deviation from straight down
+    const len = sepalLen(def, h);
+    const shw = Math.max(0.11 * len, 8); // sepal half-width
+    const ux = -dir * Math.sin(dev); // axis: down, splayed away from the spine side
+    const uy = Math.cos(dev);
+    const px = -uy; // perpendicular
+    const py = ux;
+    const tipx = Rx + len * ux;
+    const tipy = Ry + len * uy;
+    const c1x = Rx + 0.55 * len * ux + shw * px;
+    const c1y = Ry + 0.55 * len * uy + shw * py;
+    const c2x = Rx + 0.55 * len * ux - shw * px;
+    const c2y = Ry + 0.55 * len * uy - shw * py;
+    return `M ${Rx} ${Ry} Q ${c1x} ${c1y} ${tipx} ${tipy} Q ${c2x} ${c2y} ${Rx} ${Ry} Z`;
+  });
+
+  // The pedicel: from the spine anchor to the receptacle point, bowed gently.
+  const midX = (spineX + Rx) / 2;
+  const midY = (anchorY + Ry) / 2 - PEDICEL_LIFT;
+  const pedicel = `M ${spineX} ${anchorY} Q ${midX} ${midY} ${Rx} ${Ry}`;
+
+  return { sepals, pedicel, cornerX: Rx, cornerY: Ry };
+}
 
 /** Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
- *  drawn is STANDARD, which is still larger than v1's 240x150 card. Images dominate now. */
+ *  drawn is STANDARD. Images dominate. */
 const TIER: Record<PlateTier, { w: number; h: number }> = {
   floor: { w: 240, h: 150 }, // reference size only — the hard minimum, never instantiated
   standard: { w: 264, h: 176 },
@@ -150,8 +312,7 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
   showcase: { w: 400, h: 267 }, // reserved for the two bookends: ut-austin and the NYC door
 };
 
-/** The fixed perpendicular gap from the spine to a plate's inner edge. Bigger than v1's 92 to give
- *  the now-larger plates clearance: 110 + 400 (showcase) = 510 < 600 = CX, a 90px margin. */
+/** The fixed perpendicular gap from the spine to a plate's inner edge. */
 const OFFSET_X = 110;
 /** Minimum vertical gap between two stacked siblings in one cluster (their bounding boxes never
  *  come closer than this — the no-overlap contract). */
@@ -159,34 +320,21 @@ const CLUSTER_GAP_Y = 40;
 /** Minimum vertical gap between two DIFFERENT clusters sharing a side's lane, so dense years do not
  *  collide even though the branch anchors stay on the true year. */
 const CROSS_GAP = 48;
-/** How far a branch bows outward from the spine before easing into the plate. */
-const BRANCH_BOW = 26;
-/** The ornamental leaf where each branch meets its plate (round 3). The last BRANCH_LEAF_LEN units
- *  of every branch become a lanceolate blade instead of a bare line; the size is FIXED, it does not
- *  scale with the plate tier, so the connective tissue keeps one calm rhythm at every destination. */
-const BRANCH_LEAF_LEN = 46;
-const BRANCH_LEAF_WIDTH = 20;
 
-/** Year-label treatment (round 3): heavy, larger, and never occluded. The side each label sits on is
- *  chosen from the data (opposite whichever cluster shares that year) so it is structurally
- *  guaranteed to clear the plates. */
+/** Year-label treatment: heavy, larger, and never occluded. The side each label sits on is chosen
+ *  from the data (opposite whichever cluster shares that year). */
 const YEAR_LABEL_FONT = 30;
 const YEAR_LABEL_OFFSET = 56; // spine to label baseline
 const YEAR_TICK_INNER = 24; // spine to tick inner end
 const YEAR_TICK_LEN = 22;
 const YEAR_LABEL_CLEAR = 20; // label baseline sits this far above the tick
 
-/** The trunk carries a pre-2021 provenance run-in above the first named year. */
-const TRUNK_LEAD = 1.4;
-const LEAD = 0.55;
-
 /** The foliage reveal line sits at 52% of the frame; a plate opens as it rises past it. */
 const CARD_LINE = 0.52;
-/** How much scroll travel a plate takes to unfurl. Wider than v1 (was 130) so the reveal is spread
- *  over more scroll and reads as a smooth settle rather than a quick pop. */
+/** How much scroll travel a plate takes to unfurl. */
 const UNFURL_SPAN = 175;
 /** The structural reveal front sits BELOW the fold, so whatever is inside the frame is fully drawn
- *  and the spine runs through the bottom edge at every scroll position. Unchanged from v1. */
+ *  and the spine runs through the bottom edge at every scroll position. */
 const DRAW_AHEAD = 0.35;
 /** The spine is top-clipped this far above the top edge, so it never shows a top terminus in frame. */
 const TOP_CLIP = 60;
@@ -196,11 +344,15 @@ const lineGen = d3line<{ x: number; y: number }>()
   .y((d) => d.y)
   .curve(curveCatmullRom.alpha(0.5));
 
+/** A plain M/L polyline, for the densely-sampled winding tail where a spline's overshoot would fight
+ *  the exact circle. */
+const poly = (pts: Array<{ x: number; y: number }>) =>
+  pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(2) + ' ' + p.y.toFixed(2)).join(' ');
+
 /* ------------------------------ strand sampling --------------------------- */
 
 /** A sampled strand: its path string, plus per-point y, x and normalised arc-length fraction, so we
- *  can reveal only the middle segment between two Y lines and find where a branch anchors at a given
- *  year. Monotonic in y. Unchanged from v1. */
+ *  can reveal only the middle segment between two Y lines. Monotonic in y. */
 interface Strand {
   id: string;
   d: string;
@@ -223,7 +375,7 @@ function sample(id: string, pts: Array<{ x: number; y: number }>): Strand {
   return { id, d: lineGen(pts) ?? '', ys, xs, fracs };
 }
 
-/** Interpolate the strand at world Y (binary search over the ascending y array). Unchanged from v1. */
+/** Interpolate the strand at world Y (binary search over the ascending y array). */
 function atY(s: Strand, Y: number): { x: number; frac: number } {
   const { ys, xs, fracs } = s;
   const n = ys.length;
@@ -240,29 +392,17 @@ function atY(s: Strand, Y: number): { x: number; frac: number } {
   return { x: lerp(xs[lo], xs[hi], t), frac: lerp(fracs[lo], fracs[hi], t) };
 }
 
-/** A gentle slow-out settle (cubic ease-out): reads as a leaf opening, not a UI pop. Softened from
- *  the old quintic, which shot in too fast at the start and read as an abrupt opacity pop. */
+/** A gentle slow-out settle (cubic ease-out): reads as a leaf opening, not a UI pop. */
 const easeUnfurl = (u: number) => 1 - Math.pow(1 - clamp01(u), 3);
 
 /* --------------------------------- the graph ------------------------------ */
 
 /**
- * The content graph, node by node (spec section 7). `nodes[0]` is the lead (hero, or showcase for
- * the two bookends); later nodes stack below as standard siblings.
- *
- * NODE COUNTS: most clusters ship a single hero on purpose. The 2023-2024 events fall within a few
- * compressed years, and at the new (much larger) plate sizes two-per-cluster there would either
- * overlap or force long branches; "fewer, larger images" is also part of the round-2 ask. The
- * dropped second images are not lost — they live in "The Work" list below (projects.ts). Two clusters
- * keep a genuine pair because they are vertically isolated enough to earn it: `medical` and the
- * `newyork` bookend. Promoting more to pairs later is a per-cluster, one-line change.
+ * The content graph, node by node. `nodes[0]` is the lead (hero, or showcase for the two bookends);
+ * later nodes stack below as standard siblings. The clusters are agnostic to the winding finale and
+ * twist-fuse beginning — this list is content only, and the geometry above holds it whatever it is.
  */
 export const CLUSTERS: Cluster[] = [
-  // The 2021 merge carries NO plate. Daniel's round-2 redline: the "Architecture Practice" whisper
-  // plate (the flowerfield render that used to hang here) rendered badly over the two lineage
-  // whispers, so it is removed from the spine entirely. The merge now reads as just the two named
-  // lineages, "Clay" and "Daniel", resolving into one line. That flowerfield image is not lost: it
-  // still leads Flowerfield in "The Work" list (projects.ts).
   {
     id: 'medical',
     year: 2022.6,
@@ -340,8 +480,6 @@ export const CLUSTERS: Cluster[] = [
     id: 'making',
     year: 2024.0,
     side: 'right',
-    // The real material-prototyping shot, not the AI render that used to sit here: an actual
-    // Plentify sample under compression on the MTS Insight machine (Daniel's round-2 note).
     hint: '',
     nodes: [
       {
@@ -418,7 +556,6 @@ export const CLUSTERS: Cluster[] = [
         },
       },
       {
-        // The cardboard physical model (round-2 add): proportion in the round, below the money shot.
         tier: 'standard',
         media: {
           src: `${A}/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp`,
@@ -428,9 +565,6 @@ export const CLUSTERS: Cluster[] = [
     ],
   },
   {
-    // Robotic Factory (round-2 add): its section-assembly video was living only in "The Work" list;
-    // the timeline now carries it so every video appears and plays here. Left lane at 2025.3, clear
-    // below Dougherty and opposite the New York showcase on the right.
     id: 'factory',
     year: 2025.3,
     side: 'left',
@@ -475,96 +609,17 @@ export const CLUSTERS: Cluster[] = [
   },
 ];
 
-/**
- * The two pre-2021 lineages, whispered in from the sides and merging into the spine at 2021.
- * Round-2 redline: the labels are now just the two names, "Clay" and "Daniel". The "the line comes
- * from" kicker and the "Rick Wright Architects, Dallas" firm line are gone; the merge should read as
- * the two people meeting, nothing more.
- */
-const ORIGINS: Array<{ id: string; lineage: Lineage; side: Side; name: string }> = [
-  { id: 'origin-clay', lineage: 'clay', side: 'left', name: 'Clay' },
-  { id: 'origin-daniel', lineage: 'daniel', side: 'right', name: 'Daniel' },
-];
-
 /* ------------------------------ strand builders --------------------------- */
 
 /**
- * The spine: one continuous line from the pre-2021 provenance to the weave fork. Essentially the
- * central axis (CX) so branches fork symmetrically off both sides, with a faint pre-2021 wander that
- * settles onto CX by 2021, then runs straight down its axis to WEAVE_START_Y.
+ * The spine: one straight line born at the twist-fuse (2021) and running plumb down its axis to
+ * 2026, where the lean into the mark begins. There is nothing above the junction.
  */
-function spinePts(): Array<{ x: number; y: number }> {
+export function spinePts(): Array<{ x: number; y: number }> {
   const pts: Array<{ x: number; y: number }> = [];
-  const N = 170;
-  const from = 2021 - TRUNK_LEAD;
+  const N = 120;
   for (let i = 0; i <= N; i++) {
-    const year = lerp(from, MAX_YEAR, i / N);
-    const Y = yearToY(year);
-    let x = CX;
-    if (year < 2021) {
-      const preU = clamp01((2021 - year) / TRUNK_LEAD);
-      x = CX + Math.sin(preU * 2.4) * 6 * preU; // vanishes at 2021
-    }
-    // The spine now arrives straight down its axis at WEAVE_START_Y, where it forks into the weave
-    // (no terminal bow — that was the old seed-arc echo, retired with the seed).
-    pts.push({ x, y: Y });
-  }
-  return pts;
-}
-
-/**
- * One lineage whisper: comes in from its side and is carried into the spine by a Gompertz curve
- * steep enough that it is already running parallel to the spine (within ~15°) for the last stretch
- * before the merge — the "tangent rule" that makes the join read as one grown line. Its final point
- * is the EXACT shared spine coordinate at 2021, never a hand-placed merge point.
- */
-function lineagePts(side: Side, mergeX: number): Array<{ x: number; y: number }> {
-  const dir = side === 'left' ? -1 : 1;
-  const x0 = CX + dir * 196;
-  const startYear = 2020.2;
-  const mergeYear = 2021.0;
-  // The last stretch runs vertically DOWN the spine's x before the merge, so the join is a clean
-  // tangent (the line is already parallel to and coincident with the spine well before its endpoint)
-  // rather than two curves colliding at a point. Round-2 fix for the "merge renders badly" redline.
-  const RUNIN = 46; // Y-units of vertical run-in coincident with the spine
-  const mergeY = yearToY(mergeYear);
-  const pts: Array<{ x: number; y: number }> = [];
-  const N = 80;
-  for (let i = 0; i <= N; i++) {
-    const u = i / N;
-    const year = lerp(startYear - LEAD, mergeYear, u);
-    const Y = yearToY(year);
-    if (Y >= mergeY - RUNIN) {
-      // Vertical run-in: hold x on the spine so the last segment is exactly parallel to it.
-      pts.push({ x: mergeX, y: Y });
-      continue;
-    }
-    const mu = clamp01((year - startYear) / (mergeYear - startYear));
-    // p=0.42, k=11: g > 0.985 well before the run-in begins, so the curve has already flattened to
-    // near-vertical by the time it hands off to the coincident run-in — no kink at the handoff.
-    const g = gompertz(mu, 0.42, 11);
-    pts.push({ x: lerp(x0, mergeX, g), y: Y });
-  }
-  pts[pts.length - 1] = { x: mergeX, y: mergeY }; // shared endpoint on the spine
-  return pts;
-}
-
-/**
- * One weave arm, sampled over a t-range. `sign` is +1 for the left arm, -1 for the right (spec
- * section 1): x = CX + sign·AMP(t)·sin(θ(t)), with AMP peaking mid-zone and θ running three
- * half-turns so the two arms cross twice. Splitting the arm at the crossing t-values and sampling
- * each range separately is what lets the render alternate which arm paints on top (the over-under
- * weave); because every sub-range is evaluated from the same formula, adjacent segments share their
- * endpoint coordinate exactly, no hand-placed joins.
- */
-function weaveArmPts(sign: number, t0: number, t1: number): Array<{ x: number; y: number }> {
-  const pts: Array<{ x: number; y: number }> = [];
-  const N = 28;
-  for (let i = 0; i <= N; i++) {
-    const t = lerp(t0, t1, i / N);
-    const amp = WEAVE_AMPLITUDE * Math.sin(Math.PI * t); // 0 at both ends, peaks at t=0.5
-    const theta = 3 * Math.PI * t; // three half-turns → two interior crossings
-    pts.push({ x: CX + sign * amp * Math.sin(theta), y: lerp(WEAVE_START_Y, WEAVE_END_Y, t) });
+    pts.push({ x: CX, y: lerp(CONV_JUNCTION_Y, CONVERGE_Y, i / N) });
   }
   return pts;
 }
@@ -585,10 +640,9 @@ interface LaidCluster {
 
 /**
  * Pack one side's clusters down its offset lane so no two bounding boxes overlap. Pure and
- * deterministic (exported for tests): given clusters in ascending anchor order with their node
- * heights, it returns the top Y of each stack. A cluster sits centred on its true anchor year unless
- * that would collide with the previous cluster on this side, in which case it is pushed just far
- * enough down to clear it by CROSS_GAP. The branch anchor itself always stays on the true year.
+ * deterministic (exported for tests): a cluster sits centred on its true anchor year unless that
+ * would collide with the previous cluster on this side, in which case it is pushed just far enough
+ * down to clear it by CROSS_GAP. The branch anchor itself always stays on the true year.
  */
 export function packSide(
   items: Array<{ id: string; anchorY: number; heights: number[] }>,
@@ -668,7 +722,7 @@ export function CrossPathsTimeline({
   const aspect = useFrameAspect(frameRef);
 
   // Scroll smoothing without a dependency: raw progress read from the track, camera driven by a
-  // lerped value so it has weight and no jitter. The rAF idles once caught up. Unchanged from v1.
+  // lerped value so it has weight and no jitter. The rAF idles once caught up.
   useEffect(() => {
     if (reduced) return;
     const el = trackRef.current;
@@ -714,11 +768,10 @@ export function CrossPathsTimeline({
     };
   }, [reduced]);
 
-  // AUTOPLAY ON ENTRY (spec section 7). Once per page load, when the track pins to the top, drive the
-  // REAL scroll position from the track's start to its end over 14s on a piecewise ease (linear reads
-  // as fast-forward). This layers ON TOP of the scroll-driven camera above — the same `kick()` picks
-  // up programmatic scroll for free, so there is no second camera. ANY user input (wheel, touch, key)
-  // stops it instantly and hands control back exactly where it left off. Reduced motion never runs it.
+  // AUTOPLAY ON ENTRY. Once per page load, when the track pins to the top, drive the REAL scroll
+  // position from the track's start to its end over 14s on a piecewise ease. This layers ON TOP of
+  // the scroll-driven camera above — the same kick() picks up programmatic scroll for free. ANY user
+  // input (wheel, touch, key, scrollbar grab) stops it instantly. Reduced motion never runs it.
   useEffect(() => {
     if (reduced) return;
     const el = trackRef.current;
@@ -736,7 +789,6 @@ export function CrossPathsTimeline({
       parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 72;
     const cubicIn = (t: number) => t * t * t;
     const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3);
-    // Ease in over the first 8%, cruise the middle 84%, ease out over the last 8%.
     const autoplayEase = (t: number) =>
       t < 0.08 ? cubicIn(t / 0.08) * 0.08 : t > 0.92 ? 0.92 + cubicOut((t - 0.92) / 0.08) * 0.08 : t;
 
@@ -750,8 +802,6 @@ export function CrossPathsTimeline({
       window.removeEventListener('keydown', onInput);
       window.removeEventListener('pointerdown', onInput);
     };
-    // First user input of any kind hands control back, no snap or correction — the scroll-driven
-    // camera above was tracking window.scrollY the whole time, so it takes over seamlessly.
     const onInput = () => {
       if (running) stopAutoplay();
     };
@@ -762,7 +812,7 @@ export function CrossPathsTimeline({
       const t = clamp01((ts - startTs) / DURATION);
       window.scrollTo(0, lerp(startY, endY, autoplayEase(t)));
       if (t >= 1) {
-        stopAutoplay(); // bottom handoff: nothing to unlock, scroll was only driven, never disabled
+        stopAutoplay();
         return;
       }
       raf = requestAnimationFrame(frame);
@@ -774,26 +824,23 @@ export function CrossPathsTimeline({
       running = true;
       startTs = 0;
       const r = el.getBoundingClientRect();
-      startY = window.scrollY; // where p is ~0 (the track has just pinned)
-      endY = startY + r.top + (r.height - window.innerHeight); // scrolling this far lands p = 1
+      startY = window.scrollY;
+      endY = startY + r.top + (r.height - window.innerHeight);
       window.addEventListener('wheel', onInput, { passive: true });
       window.addEventListener('touchstart', onInput, { passive: true });
       window.addEventListener('touchmove', onInput, { passive: true });
       window.addEventListener('keydown', onInput);
-      // pointerdown catches a scrollbar grab (which fires no wheel/touch/key), so a drag never
-      // fights the programmatic scrollTo.
       window.addEventListener('pointerdown', onInput, { passive: true });
       raf = requestAnimationFrame(frame);
     };
 
-    // Trigger when the track's top first reaches within ~2px of the sticky pin point (header-h).
     const onScroll = () => {
       if (hasAutoplayed) return;
       const top = el.getBoundingClientRect().top;
       if (top <= headerH + 2 && top > -window.innerHeight) begin();
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll(); // in case it is already pinned on mount
+    onScroll();
     return () => {
       window.removeEventListener('scroll', onScroll);
       stopAutoplay();
@@ -802,40 +849,39 @@ export function CrossPathsTimeline({
 
   // The spine, sampled once. Everything else anchors onto it.
   const spine = useMemo(() => sample('spine', spinePts()), []);
-  const mergeX = useMemo(() => atY(spine, yearToY(2021.0)).x, [spine]);
-  const lineages = useMemo(
-    () => ORIGINS.map((o) => ({ ...o, strand: sample(o.id, lineagePts(o.side, mergeX)) })),
-    [mergeX],
-  );
   const laid = useMemo(() => layoutClusters(spine), [spine]);
 
-  // The weave: two arms, each split into three segments at the crossing t-values, sampled like every
-  // other strand. Render order alternates L/R per segment to read as a real over-under basket weave.
-  const weave = useMemo(() => {
-    const bounds = [0, 1 / 3, 2 / 3, 1];
-    const L: Strand[] = [];
-    const R: Strand[] = [];
-    for (let s = 0; s < 3; s++) {
-      L.push(sample(`weave-L${s}`, weaveArmPts(1, bounds[s], bounds[s + 1])));
-      R.push(sample(`weave-R${s}`, weaveArmPts(-1, bounds[s], bounds[s + 1])));
-    }
-    return { L, R };
-  }, []);
-
-  // The payoff wordmark uses the header's own mark: the eight Oculus circles, crisp and full colour
-  // (not the faint backdrop the seed used). markScale = ICON_R/100 keeps the mark's 2:1 ratio.
-  const markScale = ICON_R / 100;
+  // The two convergence strands (the twist-fuse). Sampled for a smooth over-under lay-up; drawn
+  // solid because they ARE the structure, not a whisper. The viewBox pan clips their off-frame tops.
+  const conv = useMemo(
+    () => ({ left: sample('conv-clay', convArmPts(-1)), right: sample('conv-daniel', convArmPts(1)) }),
+    [],
+  );
+  const convNames = useMemo(() => {
+    // Name each strand where it is still clearly separated from the other, near the frame top.
+    const pick = (s: Strand, dir: number) => {
+      const nameY = 22;
+      let best = 0;
+      for (let i = 0; i < s.ys.length; i++) if (Math.abs(s.ys[i] - nameY) < Math.abs(s.ys[best] - nameY)) best = i;
+      return { x: s.xs[best] + dir * 14, y: s.ys[best] - 6, dir };
+    };
+    return [
+      { name: 'Clay', ...pick(conv.left, -1) },
+      { name: 'Daniel', ...pick(conv.right, 1) },
+    ];
+  }, [conv]);
 
   const viewH = clamp(W / aspect, 480, H);
   const camY = reduced ? 0 : lerp(0, Math.max(H - viewH, 0), p);
   const frontY = camY + viewH * (1 + DRAW_AHEAD);
   const topY = camY - TOP_CLIP;
   const cardLineY = reduced ? H : camY + viewH * CARD_LINE;
+  const camBottom = camY + viewH;
 
   const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH}`;
 
   /** The middle-segment reveal for the spine: draw only from the top clip to the draw-ahead front,
-   *  so both terminals sit off-frame and the line runs edge to edge. Unchanged from v1. */
+   *  so both terminals sit off-frame and the line runs edge to edge. */
   const revealProps = (s: Strand) => {
     if (reduced) return { strokeDasharray: undefined, strokeDashoffset: undefined, hidden: false };
     const fTop = atY(s, topY).frac;
@@ -845,20 +891,22 @@ export function CrossPathsTimeline({
     return { strokeDasharray: `${len} 1`, strokeDashoffset: -fTop, hidden: false };
   };
 
-  // The finale's reveal, re-anchored to the camera reaching the bottom. The weave blooms in as one
-  // opacity fade (dash-drawing six woven segments buys nothing visible); the wordmark and payoff
-  // arrive a beat later. Same window shape the seed used.
-  const bottomYear = reduced ? MAX_YEAR : yToYear(cardLineY);
-  const drawnAt = (fromY: number, toY: number) => clamp01((bottomYear - fromY) / Math.max(toY - fromY, 1e-4));
-  const weaveOpacity = drawnAt(MAX_YEAR - 0.75, MAX_YEAR - 0.15);
-  const wordmarkOpacity = drawnAt(MAX_YEAR - 0.25, MAX_YEAR);
-  const payoffOpacity = wordmarkOpacity;
+  // THE FINALE WIND. Driven by the viewport bottom crossing the mark (world constants, so w reaches
+  // 1 at full scroll regardless of aspect). The mark is in view by the time the wind completes.
+  const WIND_START = MARK_CENTER_Y - 200;
+  const WIND_END = MARK_CENTER_Y + 100;
+  const windW = reduced ? 1 : clamp01((camBottom - WIND_START) / (WIND_END - WIND_START));
+  const g = useMemo(() => solveMark(), []);
+  const leanPts = useMemo(() => spineLeanPts(), []);
+  const tail = useMemo(() => tailPts(windW), [windW]);
+  const wordmarkOpacity = clamp01((windW - 0.86) / 0.14);
 
-  // The two lineage whispers ramp 0 to 0.4 as the camera nears 2021, then fade as it passes.
-  const whisperOpacity = reduced ? 0.4 : 0.4 * clamp01((yearToY(2021) + 30 - camY) / 200);
+  // The two convergence names sit at the top of the piece, present from the first frame; the viewBox
+  // pan carries them out of view as you descend past the fuse.
+  const nameOpacity = 0.85;
 
   return (
-    <div ref={trackRef} className="relative" style={{ height: reduced ? 'auto' : '680vh' }}>
+    <div ref={trackRef} className="relative" style={{ height: reduced ? 'auto' : '720vh' }}>
       <div
         className={
           reduced
@@ -898,59 +946,76 @@ export function CrossPathsTimeline({
             preserveAspectRatio="xMidYMid meet"
             className="h-full w-full"
             role="img"
-            aria-label="A timeline from 2021 to 2026 that travels downward as you scroll. One main line runs the whole way: a practice already moving before 2021, where the two founders, Clay and Daniel, meet in 2021. Each later event branches off to a picture: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. In 2026 the line forks into two arms that weave together into a bower framing the wordmark, Bower."
+            aria-label="A timeline from 2021 to 2026 that travels downward as you scroll. At the top, two strands, Clay and Daniel, come in from off the frame and twist together into one line: the spine is born where they fuse in 2021. Each later event branches off the spine to a picture held in a small calyx: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. At the end the line leans off its axis and winds itself up into the Bower mark, with the wordmark, Bower, beneath it."
           >
-            {/* The two lineage whispers, merging into the spine at 2021. Faint, weight-only. */}
-            {lineages.map((l) => {
-              const r = revealProps(l.strand);
-              const end = l.side === 'left' ? 'end' : 'start';
-              const lx = l.side === 'left' ? CX - 96 : CX + 96;
-              return (
-                <g key={l.id} style={{ pointerEvents: 'none' }}>
-                  {!r.hidden && whisperOpacity > 0.01 && (
-                    <path
-                      d={l.strand.d}
-                      fill="none"
-                      stroke={INK_BLUE}
-                      strokeOpacity={whisperOpacity}
-                      strokeWidth={3}
-                      strokeLinecap="round"
-                      pathLength={1}
-                      strokeDasharray={r.strokeDasharray}
-                      strokeDashoffset={r.strokeDashoffset}
-                    />
-                  )}
-                  {whisperOpacity > 0.02 && (
-                    <g opacity={whisperOpacity / 0.4}>
-                      {/* Just the name now: the two lineages read as two people meeting. */}
-                      <text x={lx} y={yearToY(2021) - 66} textAnchor={end} className="fill-inkBlack font-serifDisplay" style={{ fontSize: 21, fontStyle: 'italic' }}>
-                        {l.name}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
+            {/* THE TWIST-FUSE. Two equal strands cross once over-under and become the spine at 2021.
+                The right strand is painted last through the crossing (a vellum halo opens the gap
+                that makes the over-under legible), so it reads as one lay-up, not a flat X. */}
+            <g style={{ pointerEvents: 'none' }}>
+              <path
+                d={conv.left.d}
+                fill="none"
+                stroke={INK_BLUE}
+                strokeWidth={CONV_WEIGHT}
+                strokeLinecap="butt"
+                strokeLinejoin="round"
+              />
+              <path
+                d={conv.right.d}
+                fill="none"
+                stroke="#FBF9F3"
+                strokeWidth={CONV_WEIGHT + 6}
+                strokeLinecap="butt"
+              />
+              <path
+                d={conv.right.d}
+                fill="none"
+                stroke={INK_BLUE}
+                strokeWidth={CONV_WEIGHT}
+                strokeLinecap="butt"
+                strokeLinejoin="round"
+              />
+              {convNames.map((n) => (
+                <text
+                  key={n.name}
+                  x={n.x}
+                  y={n.y}
+                  textAnchor={n.dir === 1 ? 'start' : 'end'}
+                  className="fill-inkBlack font-serifDisplay"
+                  style={{ fontSize: 22, fontStyle: 'italic', opacity: nameOpacity }}
+                >
+                  {n.name}
+                </text>
+              ))}
+            </g>
 
-            {/* THE SPINE. The only long line: heavy, full opacity, always running edge to edge. */}
+            {/* THE SPINE. The only long line: heavy, full opacity, born at the fuse and running edge
+                to edge to 2026. */}
             {(() => {
               const r = revealProps(spine);
               return (
-                <path d={spine.d} fill="none" stroke={INK_BLUE} strokeWidth={7.5} strokeLinecap="round" pathLength={1} strokeDasharray={r.strokeDasharray} strokeDashoffset={r.strokeDashoffset} opacity={r.hidden ? 0 : 1} />
+                <path
+                  d={spine.d}
+                  fill="none"
+                  stroke={INK_BLUE}
+                  strokeWidth={SPINE_W}
+                  strokeLinecap="round"
+                  pathLength={1}
+                  strokeDasharray={r.strokeDasharray}
+                  strokeDashoffset={r.strokeDashoffset}
+                  opacity={r.hidden ? 0 : 1}
+                />
               );
             })()}
 
-            {/* Every cluster: a fork off the spine to one or more stacked plates. */}
+            {/* Every cluster: a pedicel off the spine to one or more plates, each cupped by a calyx. */}
             {laid.map((c) => (
               <ClusterGroup key={c.id} cluster={c} cardLineY={cardLineY} reduced={reduced} />
             ))}
 
-            {/* Year labels: heavy, larger, and painted AFTER the clusters so the numerals always
-                sit above plates and branches — Daniel's rule is that timestamps are never blocked.
-                The side flip (yearLabelSide, unit-tested) still clears the same-year cluster
-                structurally; the vellum halo (paint-order stroke) keeps the numerals legible even
-                where an adjacent-year plate reaches into the label band. 2026 gets the same heavy
-                treatment, sitting just above the weave fork. */}
+            {/* Year labels: heavy, painted AFTER the clusters (numerals never blocked), with a vellum
+                halo (paint-order stroke) so they stay legible over any adjacent-year plate. The side
+                flip (yearLabelSide, unit-tested) clears the same-year cluster structurally. */}
             {[2021, 2022, 2023, 2024, 2025, 2026].map((y) => {
               const ty = yearToY(y);
               const vis = reduced ? 1 : clamp01((camY + viewH + 40 - ty) / 60) * clamp01((ty - camY + 120) / 80);
@@ -969,8 +1034,6 @@ export function CrossPathsTimeline({
                     strokeWidth={2}
                     opacity={0.32}
                   />
-                  {/* Baseline sits well above the tick (YEAR_LABEL_CLEAR) so heavy numerals never
-                      touch a level branch edge forking off the spine at an integer year. */}
                   <text
                     x={CX + dir * YEAR_LABEL_OFFSET}
                     y={ty - YEAR_LABEL_CLEAR}
@@ -994,56 +1057,79 @@ export function CrossPathsTimeline({
               );
             })}
 
-            {/* THE WEAVE. The spine forks into two arms that weave over and under each other and
-                frame the wordmark, the way branches frame the doorway of a bower. Blooms in as one
-                opacity fade; the wordmark and payoff arrive a beat later. */}
-            <g opacity={weaveOpacity} style={{ pointerEvents: 'none' }}>
-              {/* Over-under z-order (back to front): R rides on top into crossing 1, L on top into
-                  crossing 2, R on top into the rejoin — a real basket weave, not two flat crossings. */}
-              {[weave.L[0], weave.R[0], weave.R[1], weave.L[1], weave.L[2], weave.R[2]].map((seg) => (
-                <path key={seg.id} d={seg.d} fill="none" stroke={INK_BLUE} strokeWidth={5.5} strokeLinecap="round" />
-              ))}
-              {/* The gesture visibly opens (fork) and closes (rejoin), same dot language as every
-                  branch anchor up the drawing. */}
-              <circle cx={CX} cy={WEAVE_START_Y} r={4.5} fill={INK_BLUE} />
-              {/* TODO(Daniel): the rejoin below the wordmark closes to a point with this dot, and
-                  from some crops that pointed bud can read as a teardrop — the shape you asked to
-                  retire. Sign off on it as the "closing the weave" gesture, or we can end the arms
-                  in an open tuck (last crossing left open, no terminal dot) instead. */}
-              <circle cx={CX} cy={WEAVE_END_Y} r={4.5} fill={INK_BLUE} />
-              {/* One small leaf at each of the two crossings, at 0.7x — the only ornament the weave
-                  gets, tying it back to the branch-connection language. */}
-              {[WEAVE_START_Y + WEAVE_ZONE_H / 3, WEAVE_START_Y + (2 * WEAVE_ZONE_H) / 3].map((cy) => (
-                <Leaf key={cy} base={[CX, cy - 16]} tip={[CX, cy + 16]} width={BRANCH_LEAF_WIDTH * 0.7} opacity={1} />
-              ))}
-            </g>
+            {/* THE UNRAVEL. The other seven circles bloom outward from the wound one as the tail
+                closes; circle 0 is NOT drawn here because the winding tail below IS circle 0. */}
+            {MARK_CENTERS.map(([mx, my], j) => {
+              if (j === 0) return null;
+              const n = MARK_CENTERS.length;
+              const ring = Math.min(Math.abs(j), n - Math.abs(j));
+              const s = 0.58 + (ring - 1) * 0.06;
+              const o = clamp01((windW - s) / 0.16);
+              if (o <= 0.001) return null;
+              return (
+                <circle
+                  key={j}
+                  cx={MARK_CENTER_X + (mx - 50) * g.k}
+                  cy={MARK_CENTER_Y + (my - 50) * g.k}
+                  r={g.r}
+                  fill="none"
+                  stroke={INK_BLUE}
+                  strokeWidth={MARK_STROKE * g.k}
+                  strokeLinecap="round"
+                  opacity={o}
+                />
+              );
+            })}
 
-            {/* The wordmark, framed in the open space at the widest point of the weave: the header's
-                own mark (eight Oculus circles, crisp and full colour) + "bower" in the header's mono
-                face, both in INK_BLUE so the one-colour rule holds through the very last pixel. */}
-            <g opacity={wordmarkOpacity}>
-              <g transform={`translate(${CX - 57} ${WORDMARK_Y})`} stroke={INK_BLUE} strokeWidth={2.8 * markScale} fill="none" strokeLinecap="round">
-                {MARK_CENTERS.map(([mx, my], i) => (
-                  <circle key={i} cx={(mx - 50) * markScale} cy={(my - 50) * markScale} r={30 * markScale} />
-                ))}
-              </g>
-              <text
-                x={CX - 57 + 45 * markScale + LOCKUP_GAP}
-                y={WORDMARK_Y + 11}
-                textAnchor="start"
-                className="font-mono lowercase"
-                style={{ fontSize: 32, fontWeight: 600, letterSpacing: '0.1em', fill: INK_BLUE }}
-              >
-                bower
-              </text>
-              {/* The year moved out of the lockup: 2026 now gets the same heavy year-label
-                  treatment as every other year, just above the weave fork. */}
-            </g>
+            {/* THE LINE INTO THE MARK: the plumb spine hands off to the lean, and the lean hands off
+                to the winding tail. Daniel's ruling keeps the taper: the tail thins as it becomes
+                mark linework, so the wind reads as the heavy line raveling itself in. */}
+            {(() => {
+              const els: ReactNode[] = [];
+              els.push(
+                <path
+                  key="lean"
+                  d={poly(leanPts)}
+                  fill="none"
+                  stroke={INK_BLUE}
+                  strokeWidth={SPINE_W}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />,
+              );
+              const step = 6;
+              const smooth = (u: number) => u * u * (3 - 2 * u);
+              for (let i = 0; i + step < tail.length; i += step) {
+                const u = i / (tail.length - 1);
+                els.push(
+                  <path
+                    key={`tail-${i}`}
+                    d={poly(tail.slice(i, i + step + 1))}
+                    fill="none"
+                    stroke={INK_BLUE}
+                    strokeWidth={lerp(SPINE_W, 4.6, smooth(u))}
+                    strokeLinecap="round"
+                  />,
+                );
+              }
+              return <g>{els}</g>;
+            })()}
 
-            {/* Payoff line. Retired the seed's "folded up and waiting" (a plan not yet happened) for a
-                line that fits an already-built shelter. TODO(Daniel): sign-off on the exact wording. */}
-            <text x={CX} y={PAYOFF_Y} textAnchor="middle" className="fill-inkBlack/55 font-serifDisplay" style={{ fontSize: 19, opacity: payoffOpacity }}>
-              Everything above, grown into one place.
+            {/* The wordmark, under the mark, once the ring has closed. Nothing else at the end. */}
+            <text
+              x={MARK_CENTER_X}
+              y={MARK_CENTER_Y + 45 * g.k + WORDMARK_GAP}
+              textAnchor="middle"
+              className="font-mono lowercase"
+              style={{
+                fontSize: WORDMARK_FONT,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                fill: INK_BLUE,
+                opacity: wordmarkOpacity,
+              }}
+            >
+              bower
             </text>
           </svg>
         </div>
@@ -1054,52 +1140,8 @@ export function CrossPathsTimeline({
 
 /* --------------------------- plates and clusters -------------------------- */
 
-/**
- * A small lanceolate leaf drawn along the axis from `base` (the stem side) to `tip` (the plate
- * side): a blade bulging to ±width/2 at 55% and tapering to the centerline at both ends, a straight
- * midrib, and two pairs of side veins angled toward the tip. A botanical accent, not a UI connector.
- * Used at the end of every branch edge, and (at 0.7x) at the two weave crossings.
- */
-function Leaf({ base, tip, width, opacity }: { base: [number, number]; tip: [number, number]; width: number; opacity: number }) {
-  const [bx, by] = base;
-  const [tx, ty] = tip;
-  const ax = tx - bx;
-  const ay = ty - by;
-  const len = Math.hypot(ax, ay) || 1;
-  const ux = ax / len;
-  const uy = ay / len; // axis unit
-  const px = -uy;
-  const py = ux; // perpendicular unit
-  const peakX = bx + ax * 0.55;
-  const peakY = by + ay * 0.55;
-  // Control offset = width gives a quadratic bulge of width/2 at the peak (the spec's ±width/2).
-  const outline =
-    `M ${bx} ${by} Q ${peakX + px * width} ${peakY + py * width} ${tx} ${ty} ` +
-    `Q ${peakX - px * width} ${peakY - py * width} ${bx} ${by} Z`;
-  const veinLen = width * 0.45;
-  const c = Math.cos(Math.PI / 6);
-  const s = Math.sin(Math.PI / 6);
-  const veins: string[] = [];
-  for (const frac of [0.35, 0.65]) {
-    const mx = bx + ax * frac;
-    const my = by + ay * frac;
-    // Each vein leaves the midrib tilted 30° toward the tip.
-    veins.push(`M ${mx} ${my} L ${mx + (px * c + ux * s) * veinLen} ${my + (py * c + uy * s) * veinLen}`);
-    veins.push(`M ${mx} ${my} L ${mx + (-px * c + ux * s) * veinLen} ${my + (-py * c + uy * s) * veinLen}`);
-  }
-  return (
-    <g style={{ opacity }} pointerEvents="none">
-      <path d={outline} fill={INK_BLUE} fillOpacity={0.04} stroke={INK_BLUE} strokeOpacity={0.5} strokeWidth={1} strokeLinejoin="round" />
-      <path d={`M ${bx} ${by} L ${tx} ${ty}`} fill="none" stroke={INK_BLUE} strokeOpacity={0.5} strokeWidth={1} />
-      {veins.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke={INK_BLUE} strokeOpacity={0.35} strokeWidth={1} strokeLinecap="round" />
-      ))}
-    </g>
-  );
-}
-
 /** One inline video plate, drawn in SVG via a foreignObject so an HTML <video> can play in the
- *  panning viewBox. Reduced motion gets the poster still instead. Unchanged from v1. */
+ *  panning viewBox. Reduced motion gets the poster still instead. */
 function VineVideo({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y: number; w: number; h: number; reduced: boolean }) {
   const { ref, start } = useAutoplayVideo(plate.video?.rate ?? 1);
   const clip = `cptl-v-${plate.src.replace(/[^a-z0-9]/gi, '')}`;
@@ -1136,8 +1178,7 @@ function VineVideo({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y:
   );
 }
 
-/** One plate: a still image (clipped, cover or contain) or a video, with a hairline border.
- *  Unchanged from v1. */
+/** One plate: a still image (clipped, cover or contain) or a video, with a hairline border. */
 function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y: number; w: number; h: number; reduced: boolean }) {
   const clip = `cptl-c-${plate.src.replace(/[^a-z0-9]/gi, '')}-${Math.round(x)}-${Math.round(y)}`;
   if (plate.pending) {
@@ -1173,8 +1214,8 @@ function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y
 
 /**
  * The unfurl transform for a plate: opens from a lightly furled, foreshortened state to upright,
- * scaling about a pivot at the branch junction so it reads as a leaf opening. Rotation is held to a
- * whisper (2 degrees on the way in only, resting upright) — plates sit axis-upright, never fanned.
+ * scaling about a pivot at the branch junction so it reads as a bloom opening. Rotation is a whisper
+ * (2 degrees on the way in only, resting upright).
  */
 function unfurl(u: number, pivotX: number, pivotY: number) {
   const e = easeUnfurl(u);
@@ -1188,12 +1229,12 @@ function unfurl(u: number, pivotX: number, pivotY: number) {
 }
 
 /**
- * One cluster: the dot on the spine, then for each stacked plate a short branch edge forking from
- * that same shared spine point to the plate's inner edge, and the plate unfurling from it. The lead
- * plate (index 0) carries the hint title.
+ * One cluster: the dot on the spine, then for each plate a pedicel forking from that shared spine
+ * point to the plate, a calyx cupping the plate's base (drawn behind, so its sepal tips frame the
+ * plate), and the plate unfurling on top. The lead plate (index 0) carries the hint title.
  */
 function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; cardLineY: number; reduced: boolean }) {
-  const { dir, spineX, anchorY, innerX, plates, hint } = cluster;
+  const { dir, spineX, anchorY, plates, hint } = cluster;
   const uStem = reduced ? 1 : clamp01((cardLineY - anchorY) / (UNFURL_SPAN * 0.4));
 
   return (
@@ -1201,20 +1242,11 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
       <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_BLUE} opacity={uStem > 0 ? 1 : 0} />
 
       {plates.map((pl, i) => {
-        // Meet the plate at the point on its inner edge NEAREST the shared spine anchor (clamped
-        // within the plate). A plate straddling the anchor gets a level branch; a stacked sibling
-        // below gets a short branch to its top-inner corner. Both siblings therefore fork from the
-        // SAME anchor and the cluster reads as one small fork, never two branch points at different
-        // heights (the NYC selfie edge used to depart the spine visibly below the door's).
-        const inset = Math.min(24, pl.h * 0.16);
-        const meetY = clamp(anchorY, pl.y + inset, pl.y + pl.h - inset);
-        // The thin branch stroke now stops short of the plate; the last BRANCH_LEAF_LEN units are a
-        // leaf blade instead of bare line, its tip touching the plate's inner edge.
-        const leafBaseX = innerX - dir * BRANCH_LEAF_LEN;
-        const branch = `M ${spineX} ${anchorY} C ${spineX + dir * BRANCH_BOW} ${lerp(anchorY, meetY, 0.45)}, ${leafBaseX - dir * 18} ${meetY}, ${leafBaseX} ${meetY}`;
-        // The leaf buds in as the very last beat of the branch's own growth, right before the plate
-        // unfurls — the branch produces the leaf, then the leaf holds the picture.
-        const leafOpacity = reduced ? 1 : clamp01((uStem - 0.7) / 0.3);
+        const cx = pl.x + pl.w / 2;
+        const by = pl.y + pl.h;
+        const { sepals, pedicel, cornerX, cornerY } = calyxPaths(cx, by, pl.w, pl.h, dir, spineX, anchorY);
+        // The calyx buds in as the last beat of the pedicel's growth, right before the plate unfurls.
+        const calyxOpacity = reduced ? 1 : clamp01((uStem - 0.7) / 0.3);
 
         const u = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
         const pivotX = dir === 1 ? pl.x : pl.x + pl.w; // inner corner nearest the spine
@@ -1225,18 +1257,25 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
         return (
           <g key={i}>
             <path
-              d={branch}
+              d={pedicel}
               fill="none"
               stroke={INK_BLUE}
-              strokeOpacity={0.6}
+              strokeOpacity={0.65}
               strokeWidth={3.2}
               strokeLinecap="round"
               pathLength={1}
               strokeDasharray={1}
               strokeDashoffset={reduced ? 0 : 1 - uStem}
             />
-            {leafOpacity > 0.001 && (
-              <Leaf base={[leafBaseX, meetY]} tip={[innerX, meetY]} width={BRANCH_LEAF_WIDTH} opacity={leafOpacity} />
+            {/* The calyx: three slim sepals fanning down from the receptacle point where the pedicel
+                meets the plate. Delicate and light, scaling with plate height. */}
+            {calyxOpacity > 0.001 && (
+              <g style={{ opacity: calyxOpacity }} pointerEvents="none">
+                {sepals.map((d, si) => (
+                  <path key={si} d={d} fill={INK_BLUE} fillOpacity={0.05} stroke={INK_BLUE} strokeOpacity={0.55} strokeWidth={1} strokeLinejoin="round" />
+                ))}
+                <circle cx={cornerX} cy={cornerY} r={3.5} fill={INK_BLUE} />
+              </g>
             )}
             {t.opacity > 0.001 && (
               <g style={{ opacity: t.opacity }} transform={t.transform}>

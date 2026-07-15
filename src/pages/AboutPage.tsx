@@ -1,17 +1,21 @@
 /**
  * AboutPage.tsx — the dedicated projects page (#/about).
  *
- * Order: the header (title + the two questions), then the co-founders (Clay + Daniel),
- * then the projects. The projects use the master-detail LIST that worked best: a slim
- * numbered SELECTION MENU on the left, and on the right the selected project's IMAGES
- * (a large hero + a thumbnail grid of the rest, which now includes the prototyping shots)
- * plus its description and the big "What we learned". On mobile the projects stack, each
- * with its images and text inline.
+ * Order: the header (title + the two questions) drawn AS the cross-paths timeline, then the
+ * co-founders (Clay + Daniel) borne at the node where the finale's ink line forks, then the projects.
+ *
+ * The projects use a master-detail LIST: a slim numbered SELECTION MENU on the left, and on the
+ * right the selected project rendered as a PLATE — a fixed-height CSS-grid frame (one named template
+ * per image count, n=1..8) whose cells are sized by the grid, never by the images, so every project
+ * fills the identical frame with NO inner scroll. Description sits beside it, cut to three stages
+ * (Nº tag + title + folded citation / one description / one payoff), with the payoff pinned so the
+ * description is always the field that absorbs any pressure. Captions live only in the lightbox.
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { packJustified } from './about/justified';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
@@ -19,6 +23,7 @@ import { useAutoplayVideo } from './about/useAutoplayVideo';
 import {
   PROJECTS,
   TEAM,
+  TEAM_CODA,
   AUTHOR_LABEL,
   type Project,
   type ProjectImage,
@@ -66,31 +71,32 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
   );
 }
 
-/** One framed image on the paper ground. Renders crop to a clean 3:2 tile with
- *  object-cover; paper figures set fit:'contain' so nothing is cut, on a white ground.
+/* ------------------------------- media tiles ------------------------------ */
+
+/** One framed image on the paper ground. In `plate` mode it fills its grid cell exactly
+ *  (h-full w-full, object-fit by the image's own `fit`), with no border of its own — the plate
+ *  frame draws the hairline gaps. Otherwise it renders at `className`'s aspect on the mobile stack.
  *
- *  Every image is a BUTTON: click it and it opens full-bleed in the Lightbox. The image
- *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view
- *  (a shared-element transition) rather than cross-fading a second copy of it. */
+ *  Every interactive copy is a BUTTON: click it and it opens full-bleed in the Lightbox. The image
+ *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view. */
 function ProjectVideoEl({
   image,
   className,
   contain,
   reduced,
-  intrinsic = false,
+  plate = false,
 }: {
   image: ProjectImage;
   className: string;
   contain: boolean;
   reduced: boolean;
-  /** In the supporting-image pack, render at the poster's true proportions (no crop, height auto)
-   *  so mixed portrait/landscape media fill the column instead of being forced to one shape. */
-  intrinsic?: boolean;
+  /** Plate mode: fill the grid cell (h-full w-full), no border, object-fit by `contain`. */
+  plate?: boolean;
 }) {
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
-  const frame = intrinsic
-    ? `w-full h-auto block border border-inkBlack/12 ${contain ? 'bg-white p-1.5' : ''} ${className}`
+  const frame = plate
+    ? `block h-full w-full ${contain ? 'bg-white object-contain p-[6%]' : 'object-cover'}`
     : `w-full border border-inkBlack/12 ${
         contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
       } ${className}`;
@@ -122,36 +128,35 @@ function ProjectImg({
   className = '',
   onOpen,
   reduced = false,
-  intrinsic = false,
+  plate = false,
 }: {
   image: ProjectImage;
   className?: string;
   onOpen?: (image: ProjectImage) => void;
   reduced?: boolean;
-  /** Supporting-pack mode: render at true proportions, no forced aspect or crop. */
-  intrinsic?: boolean;
+  /** Plate mode: fill the grid cell (h-full w-full), no border. */
+  plate?: boolean;
 }) {
   const contain = image.fit === 'contain';
-  const frame = intrinsic
-    ? `w-full h-auto block border border-inkBlack/12 ${contain ? 'bg-white p-1.5' : ''} ${className}`
+  const frame = plate
+    ? `block h-full w-full ${contain ? 'bg-white object-contain p-[6%]' : 'object-cover'}`
     : `w-full border border-inkBlack/12 ${
         contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
       } ${className}`;
+
+  const buttonCls = `group relative block cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack ${
+    plate ? 'h-full w-full' : 'w-full'
+  }`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
   if (image.video) {
     const el = (
-      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} intrinsic={intrinsic} />
+      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} plate={plate} />
     );
     if (!onOpen) return el;
     return (
-      <button
-        type="button"
-        onClick={() => onOpen(image)}
-        aria-label={`Enlarge: ${image.alt}`}
-        className="group relative block w-full cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-      >
+      <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={buttonCls}>
         {el}
         <span
           aria-hidden
@@ -166,13 +171,7 @@ function ProjectImg({
   // framer-motion would pair the visible desktop image with the hidden mobile one, and the
   // detail panel would silently render blank. It did. Do not tag the non-interactive copy.
   const img = onOpen ? (
-    <motion.img
-      layoutId={`shot-${image.src}`}
-      src={image.src}
-      alt={image.alt}
-      loading="lazy"
-      className={frame}
-    />
+    <motion.img layoutId={`shot-${image.src}`} src={image.src} alt={image.alt} loading="lazy" className={frame} />
   ) : (
     <img src={image.src} alt={image.alt} loading="lazy" className={frame} />
   );
@@ -180,12 +179,7 @@ function ProjectImg({
   if (!onOpen) return img;
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(image)}
-      aria-label={`Enlarge: ${image.alt}`}
-      className="group relative block w-full cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-    >
+    <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={buttonCls}>
       {img}
       {/* The affordance stays invisible until you're on the image. */}
       <span
@@ -196,51 +190,147 @@ function ProjectImg({
   );
 }
 
-/** The curated gallery: the hero large (with its caption), then the rest as a thumbnail
- *  grid — which surfaces the prototyping shots for projects like Synergy.
- *
- *  `fit` caps the hero against the VIEWPORT, not a fixed aspect, so the whole project
- *  (images AND text) lands inside one page on any display instead of pushing the words
- *  below the fold on a tall monitor. */
-function Gallery({
+/* ------------------------------- plate frame ------------------------------ */
+
+/** Measure a box with a ResizeObserver. The plate packs into whatever WxH the master-detail row
+ *  hands it, and repacks when that changes (breakpoint, window resize), so the fill is always exact
+ *  for the real frame rather than a guessed aspect. */
+function useMeasure<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, size };
+}
+
+/** True when an element's content is taller than its box (it is being clipped). Used to show the
+ *  description's fade ONLY under real overflow pressure, never over a description that fits. */
+function useOverflow<T extends HTMLElement>(deps: unknown[]) {
+  const ref = useRef<T | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return { ref, overflowing };
+}
+
+/** A small play badge for a video plate cell. */
+function PlayBadge() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute left-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-paperVellum/85"
+    >
+      <span className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-inkBlack/70" />
+    </span>
+  );
+}
+
+/** One cell of the plate: the media, a play badge if it's a video, and the Fig. corner tag whose
+ *  number matches the "Nº 0N" beside the title so the description's references point at pictures. */
+function PlateCell({
+  image,
+  index,
+  onOpen,
+  reduced,
+  style,
+}: {
+  image: ProjectImage;
+  index: number;
+  onOpen: (image: ProjectImage) => void;
+  reduced: boolean;
+  style: CSSProperties;
+}) {
+  const contain = image.fit === 'contain';
+  return (
+    <div
+      style={style}
+      className={`absolute overflow-hidden ${contain ? 'bg-white' : 'bg-paperDeep/40'}`}
+    >
+      <ProjectImg image={image} onOpen={onOpen} reduced={reduced} plate />
+      {image.video && <PlayBadge />}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bottom-1.5 right-1.5 bg-paperVellum/85 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.1em] text-inkBlack/55"
+      >
+        Fig. {String(index + 1).padStart(2, '0')}
+      </span>
+    </div>
+  );
+}
+
+/** The plate: an aspect-ratio-aware justified layout that always exactly fills its frame, at every
+ *  image count. The frame's WxH is set by the layout it sits in (the master-detail row), never by the
+ *  images, so the detail panel needs no inner scroll. The packer (justified.ts) reads each image's
+ *  real ratio, gives the hero its own dominant region, and fills the rest as a justified gallery, so
+ *  contain figures barely letterbox and cover shots barely crop — no white voids, no jumble. */
+function PlateFrame({
   project,
   onOpen,
-  capped = false,
-  reduced = false,
+  reduced,
 }: {
   project: Project;
-  onOpen?: (image: ProjectImage) => void;
-  capped?: boolean;
-  reduced?: boolean;
+  onOpen: (image: ProjectImage) => void;
+  reduced: boolean;
 }) {
+  const images = project.images;
+  const { ref, size } = useMeasure<HTMLDivElement>();
+  const GAP = 1;
+  const cells =
+    size.w > 0 && size.h > 0
+      ? packJustified(
+          images.map((im) => ({ ratio: im.ratio })),
+          size.w,
+          size.h,
+          { gap: GAP },
+        )
+      : [];
+
+  return (
+    <figure className="h-full min-h-0 w-full">
+      {/* The bg is the hairline colour; the 1px gaps the packer leaves between cells reveal it as the
+          plate's seams, the same look the old CSS-grid `gap-px` gave. */}
+      <div ref={ref} className="relative h-full min-h-0 w-full border border-inkBlack/15 bg-inkBlack/12">
+        {cells.map((c, i) => (
+          <PlateCell
+            key={images[i].src}
+            image={images[i]}
+            index={i}
+            onOpen={onOpen}
+            reduced={reduced}
+            style={{ left: c.x, top: c.y, width: c.w, height: c.h }}
+          />
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+/** The mobile stack: a hero plus a simple two-column grid of the rest, each at a 3:2 tile
+ *  (plans/diagrams `contain` so nothing crops). No captions — captions live only in the lightbox. */
+function MobileGallery({ project, reduced }: { project: Project; reduced: boolean }) {
   const [hero, ...rest] = project.images;
-  // The supporting pack respects each image's real proportions and fills the column (round 3
-  // section 5): one balanced column for a couple of images, two for three or more, images flowing
-  // at their intrinsic aspect ratio rather than cropped to a uniform grid.
-  const packClass = rest.length >= 3 ? '[columns:2] [column-gap:16px]' : '[columns:1]';
   return (
     <figure className="space-y-3">
-      <div className="space-y-2">
-        {/* Hero: full width, height by its own aspect, capped against the viewport so the whole
-            project still lands on one page. Cover for photos, contain on white for baked-in text. */}
-        <ProjectImg
-          image={hero}
-          className={capped ? 'max-h-[46vh]' : 'aspect-[3/2]'}
-          onOpen={onOpen}
-          reduced={reduced}
-        />
-        {hero.caption && (
-          <figcaption className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/40">
-            {hero.caption}
-          </figcaption>
-        )}
-      </div>
+      <ProjectImg image={hero} className="aspect-[3/2]" reduced={reduced} />
       {rest.length > 0 && (
-        <div className={`[column-fill:balance] ${packClass}`}>
+        <div className="grid grid-cols-2 gap-3">
           {rest.map((img) => (
-            <div key={img.src} className="mb-4 break-inside-avoid">
-              <ProjectImg image={img} onOpen={onOpen} reduced={reduced} intrinsic />
-            </div>
+            <ProjectImg key={img.src} image={img} className="aspect-[3/2]" reduced={reduced} />
           ))}
         </div>
       )}
@@ -273,16 +363,34 @@ function LightboxVideo({ image }: { image: ProjectImage }) {
   );
 }
 
+/** A chevron button for stepping the lightbox with the mouse (arrow keys work too). */
+function LightboxChevron({ side, onClick }: { side: 'left' | 'right'; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={side === 'left' ? 'Previous image' : 'Next image'}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`absolute top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-inkBlack/20 bg-paperVellum/70 font-serifDisplay text-[20px] leading-none text-inkBlack/55 transition-colors hover:bg-paperVellum/95 hover:text-inkBlack focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack ${
+        side === 'left' ? 'left-4 md:left-6' : 'right-4 md:right-6'
+      }`}
+    >
+      {side === 'left' ? '‹' : '›'}
+    </button>
+  );
+}
+
 /**
  * Lightbox — click any project image and it opens large.
  *
- * The motion is a SHARED ELEMENT: the tile you clicked carries `layoutId`, and the
- * large image claims the same one, so framer-motion morphs the actual thumbnail up to
- * full size instead of fading in a duplicate. That is what makes it read as "this image
- * got bigger" rather than "a modal appeared".
+ * The motion is a SHARED ELEMENT: the tile you clicked carries `layoutId`, and the large image
+ * claims the same one, so framer-motion morphs the actual thumbnail up to full size. Captions live
+ * HERE and only here: a "Fig. 0N" mono prefix (matching the plate's corner tag), the real caption in
+ * italic serif, a counter, and visible prev/next chevrons for the mouse.
  *
- * Close: Escape, the backdrop, or the button. Arrow keys walk the project's other shots
- * (the whole set is passed in, so the lightbox is a small viewer, not a dead end).
+ * Close: Escape, the backdrop, or the button. Arrow keys / chevrons walk the project's other shots.
  */
 function Lightbox({
   images,
@@ -317,6 +425,7 @@ function Lightbox({
   }, [open, onClose, onStep]);
 
   const image = index === null ? null : images[index];
+  const many = images.length > 1;
 
   return (
     <AnimatePresence>
@@ -335,6 +444,9 @@ function Lightbox({
           {/* The paper ground dims rather than blacks out — this is a study, not a cinema. */}
           <div aria-hidden className="absolute inset-0 bg-paperVellum/92 backdrop-blur-sm" />
 
+          {many && <LightboxChevron side="left" onClick={() => onStep(-1)} />}
+          {many && <LightboxChevron side="right" onClick={() => onStep(1)} />}
+
           {image.video && !reduced ? (
             <LightboxVideo image={image} />
           ) : (
@@ -348,8 +460,7 @@ function Lightbox({
             />
           )}
 
-          {/* The caption is CENTRED under the image, with the counter and close beneath it, so
-              the whole viewer reads on one vertical axis instead of the caption drifting left. */}
+          {/* The caption is CENTRED under the image, with the counter and close beneath it. */}
           <motion.div
             className="relative mt-5 flex w-full max-w-[min(1600px,94vw)] flex-col items-center gap-2"
             initial={reduced ? false : { opacity: 0, y: 6 }}
@@ -358,11 +469,14 @@ function Lightbox({
             transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : 0.12 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="max-w-[70ch] text-center font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
+            <p className="max-w-[70ch] text-center font-serifDisplay text-[14px] italic leading-snug text-inkBlack/70">
+              <span className="mr-2 font-mono text-[11px] not-italic tracking-[0.1em] text-inkBlack/45">
+                Fig. {String(index! + 1).padStart(2, '0')}
+              </span>
               {image.caption ?? image.alt}
             </p>
             <div className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
-              {images.length > 1 && (
+              {many && (
                 <span className="tabular-nums">
                   {index! + 1} / {images.length}
                 </span>
@@ -386,8 +500,8 @@ function Lightbox({
 function DownloadGlyph() {
   return (
     <svg
-      width="13"
-      height="13"
+      width="12"
+      height="12"
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
@@ -402,67 +516,71 @@ function DownloadGlyph() {
   );
 }
 
-/** The description + "What we learned" block, beneath the gallery. For paper-based
- *  projects, adds the venue/authors line and a "read the paper" download. */
 /**
- * The detail panel, standardized (round 3 section 5) into five explicit stages, in order: title,
- * credits (the byline), description, awards and publications, lessons learned. The paper's venue,
- * authors and download now live together in the awards-and-publications stage between the
- * description and the takeaway, rather than the venue floating above the description and the
- * download stranded below the takeaway. If a project has neither awards nor a paper, that stage is
- * omitted entirely so no empty label ever shows.
+ * The detail text, three stages (project-frame proposal, section 6): Nº tag + title + folded
+ * citation, then one description, then the payoff. There is NO "Awards and publications" heading:
+ * when a project has a paper, its venue + authors fold into a mono line under the title, and the PDF
+ * (if any) is a small inline link under the description.
+ *
+ * The layout guarantees the fit WITHOUT a dead gap. On a normal frame the description takes its
+ * natural height and the payoff flows directly under it (`flex-initial` — the description does not
+ * grow to fill slack, which is what used to push the payoff to the bottom and leave dead air). Under
+ * real pressure (short viewport / very long copy) the description is the ONLY zone that shrinks
+ * (`shrink`, `min-h-0`) and fades at its bottom edge, so the payoff — the one line Daniel's brand
+ * voice depends on — is never the thing that clips. The character budgets in projects.test.ts are the
+ * hard floor underneath this.
  */
 function ProjectText({ project }: { project: Project }) {
   const paper = project.paper;
-  const awards = project.awards;
-  const hasRecognition = (awards && awards.length > 0) || !!paper;
+  const citation = paper ? `${paper.venue} · ${paper.authors}` : null;
+  const { ref: descRef, overflowing } = useOverflow<HTMLDivElement>([project.n]);
   return (
-    <div>
-      {/* 1. Title + 2. Credits (byline, in the same row). */}
-      <div className="flex items-baseline justify-between gap-4">
-        <h3 className="font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
-        <Meta project={project} className="shrink-0" />
-      </div>
-      {/* 3. Description. */}
-      <p className="mt-2 font-serifDisplay text-[15px] leading-snug text-inkBlack/70">
-        {project.description}
-      </p>
-      {/* 4. Awards and publications. Neutral kicker tone: olive stays reserved for the one payoff
-          line below so it isn't diluted by using it twice on the same panel. */}
-      {hasRecognition && (
-        <div className="mt-5 border-t border-inkBlack/15 pt-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/45">
-            Awards and publications
-          </p>
-          {awards && awards.length > 0 && (
-            <ul className="mt-2 space-y-1">
-              {awards.map((award) => (
-                <li key={award} className="font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
-                  {award}
-                </li>
-              ))}
-            </ul>
-          )}
-          {paper && (
-            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
-              {paper.venue} · {paper.authors}
-            </p>
-          )}
-          {paper?.pdf && (
-            <a
-              href={paper.pdf}
-              download
-              className="group mt-3 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-            >
-              <DownloadGlyph />
-              Read the paper
-              <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
-            </a>
-          )}
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Stage 1 — Nº tag + meta, title, folded citation. */}
+      <div className="shrink-0">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="font-mono text-[12px] tracking-[0.06em] tabular-nums text-inkBlack/45">
+            N&ordm; {project.n}
+          </span>
+          <Meta project={project} className="shrink-0" />
         </div>
-      )}
-      {/* 5. Lessons learned. */}
-      <div className="mt-5 border-t border-inkBlack/15 pt-4">
+        <h3 className="mt-1.5 font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
+        {citation && (
+          <p className="mt-1.5 font-mono text-[10.5px] leading-relaxed tracking-[0.08em] text-inkBlack/45">
+            {citation}
+          </p>
+        )}
+      </div>
+
+      {/* Stage 2 — the one description sentence. `flex-initial` (grow 0, shrink 1) so it hugs its
+          content on a normal frame — no dead gap under it — but is the one zone that gives way under
+          pressure, fading at its bottom edge (reads as "there is more") only when it actually clips. */}
+      <div ref={descRef} className="relative mt-3 min-h-0 flex-initial overflow-hidden">
+        <p className="font-serifDisplay text-[15px] leading-snug text-inkBlack/70 [@media(max-height:820px)]:text-[14px]">
+          {project.description}
+        </p>
+        {paper?.pdf && (
+          <a
+            href={paper.pdf}
+            download
+            className="group mt-3 inline-flex items-center gap-2 border border-inkBlack/25 px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+          >
+            <DownloadGlyph />
+            Read the paper
+            <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
+          </a>
+        )}
+        {overflowing && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-paperVellum to-transparent"
+          />
+        )}
+      </div>
+
+      {/* Stage 3 — the payoff. It flows directly under the description on a normal frame, and is
+          `shrink-0` so under pressure the description gives way first and this line is never clipped. */}
+      <div className="mt-4 shrink-0 border-t border-inkBlack/15 pt-4">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">What we learned</p>
         <p className="mt-2 font-serifDisplay text-[clamp(1.15rem,1.5vw,1.5rem)] leading-snug text-inkBlack">
           {project.learned}
@@ -499,11 +617,14 @@ function ListView({ reduced }: { reduced: boolean }) {
 
   return (
     <div className="min-h-0 flex-1">
-      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the images +
-          project info on the right. The whole thing is sized to the frame it sits in, so
-          the work reads as ONE page — no scrolling to reach a project. */}
-      <div className="hidden h-full min-h-0 gap-x-16 gap-y-8 lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
-        <ol className="min-w-0 self-start">
+      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the plate + text on the right.
+          The grid ROW is pinned to the frame's own height (`grid-rows-[minmax(0,1fr)]` + `min-h-0` +
+          `overflow-hidden`) so the tall project MENU can never push the row past the viewport and
+          clip the plate — the whole selected project (plate + text) always fits one frame with no
+          page scroll. When the menu is taller than that frame (short viewports, many projects) it
+          scrolls on its own; the images and the description never do. */}
+      <div className="hidden h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-x-16 overflow-hidden lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
+        <ol className="min-h-0 min-w-0 self-stretch overflow-y-auto">
           {items.map((p, i) => {
             const on = i === active;
             const tint = authorColor(p.by);
@@ -519,8 +640,6 @@ function ListView({ reduced }: { reduced: boolean }) {
                   className="group relative flex w-full items-baseline gap-3 py-3.5 pl-4 pr-1 text-left transition-colors duration-200"
                   style={on ? { backgroundColor: `${tint}14` } : undefined}
                 >
-                  {/* The selection is a BAR in the author's colour: blue for Clay, green for
-                      Daniel. It is the loudest thing in the list, on purpose. */}
                   <span
                     aria-hidden
                     className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
@@ -546,27 +665,24 @@ function ListView({ reduced }: { reduced: boolean }) {
           })}
         </ol>
 
-        {/* Detail: the active project's images + description + takeaway, cross-fading as
-            the selection changes. On a wide display the words sit BESIDE the images rather
-            than under them, so a project is one glance: pictures left, meaning right, all
-            of it above the fold. Narrower than xl they stack and the panel scrolls. */}
+        {/* Detail: the active project's plate + text, cross-fading as the selection changes. On a
+            wide display the words sit BESIDE the plate; below xl they stack (plate above, text below)
+            and both are bounded by the row — no scroll either way. */}
         <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against
-                the `layoutId` images inside this subtree: framer-motion holds the exiting panel
-                open waiting on a shared-layout transition that never resolves, so the exit never
-                completes, the incoming panel never mounts, and the detail FREEZES on whichever
-                project rendered first while the list happily highlights another. (That is the
-                bug this page shipped with.) Keying a plain motion.div remounts it on every
-                change and fades the new one in — same read, no exit to get stuck on. */}
+          <div className="min-h-0 flex-1">
+            {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against the
+                `layoutId` images inside this subtree: framer-motion holds the exiting panel open
+                waiting on a shared-layout transition that never resolves, so the exit never
+                completes and the detail FREEZES on whichever project rendered first while the list
+                highlights another. Keying a plain motion.div remounts it and fades the new one in. */}
             <motion.div
               key={project.n}
-              className="grid gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr]"
+              className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr] xl:grid-rows-1"
               initial={reduced ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0 : 0.55, ease: [0.16, 1, 0.3, 1] }}
             >
-              <Gallery project={project} onOpen={openShot} capped reduced={reduced} />
+              <PlateFrame project={project} onOpen={openShot} reduced={reduced} />
               <ProjectText project={project} />
             </motion.div>
           </div>
@@ -578,16 +694,10 @@ function ListView({ reduced }: { reduced: boolean }) {
         {items.map((p) => (
           <section key={p.n} aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}>
             <div className="mb-3 flex items-center gap-3">
-              <span
-                aria-hidden
-                className="h-[3px] w-6 rounded-full"
-                style={{ background: authorColor(p.by) }}
-              />
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">
-                {p.year}
-              </span>
+              <span aria-hidden className="h-[3px] w-6 rounded-full" style={{ background: authorColor(p.by) }} />
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">{p.year}</span>
             </div>
-            <Gallery project={p} reduced={reduced} />
+            <MobileGallery project={p} reduced={reduced} />
             <div className="mt-5">
               <ProjectText project={p} />
             </div>
@@ -595,26 +705,39 @@ function ListView({ reduced }: { reduced: boolean }) {
         ))}
       </div>
 
-      <Lightbox
-        images={project.images}
-        index={shot}
-        onClose={closeShot}
-        onStep={stepShot}
-        reduced={reduced}
-      />
+      <Lightbox images={project.images} index={shot} onClose={closeShot} onStep={stepShot} reduced={reduced} />
     </div>
   );
 }
 
-/* -------------------------------- team ------------------------------------ */
+/* -------------------------------- founders -------------------------------- */
 
-/** One co-founder card: portrait (or a quiet placeholder while a photo is pending) + bio. */
-function TeamCard({ person }: { person: TeamMember }) {
+/** The coda stem: the finale's ink line, continued. It keeps drawing past the wordmark, forks once,
+ *  and each fork reaches down to a founder node (their portrait). Drawn at the founders block's own
+ *  width so the two forks land over the two column centres (25% / 75% of a 1000-wide field). */
+function FounderStem() {
   return (
-    <div className="flex gap-5">
-      {/* A deliberate, slightly heavier mat for the portrait (round 3 section 4): 128px, 1.5px border
-          a shade heavier than the picture-plate borders elsewhere, since this is a portrait. */}
-      <div className="h-32 w-32 shrink-0 overflow-hidden rounded-md border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
+    <div aria-hidden className="mx-auto max-w-[1000px] px-4">
+      <svg viewBox="0 0 1000 104" width="100%" className="block overflow-visible">
+        <path d="M500 0 V 40" stroke={INK_BLUE} strokeWidth="2.4" fill="none" />
+        <path d="M500 40 C 420 66, 320 74, 250 96" stroke={INK_BLUE} strokeWidth="2" fill="none" />
+        <path d="M500 40 C 580 66, 680 74, 750 96" stroke={INK_BLUE} strokeWidth="2" fill="none" />
+        <circle cx="500" cy="40" r="3.2" fill={INK_BLUE} />
+        <circle cx="250" cy="96" r="3.2" fill={INK_BLUE} />
+        <circle cx="750" cy="96" r="3.2" fill={INK_BLUE} />
+      </svg>
+    </div>
+  );
+}
+
+/** One founder, borne at the node: the portrait is the node where the fork lands, and the facts hang
+ *  off a stem below it on fine leader lines — the botanical-plate register (a specimen hung off a
+ *  stem, each part tagged), not a left-aligned bullet list. The stem/node/leader are the page's ink
+ *  line, INK_BLUE, continued; they are structural, the drawing arriving at a person. */
+function FounderNode({ person }: { person: TeamMember }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-full border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
         {person.image ? (
           <img
             src={person.image}
@@ -623,18 +746,29 @@ function TeamCard({ person }: { person: TeamMember }) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="grid h-full w-full place-items-center text-inkBlack/20">
-            <OculusMark size={44} className="h-auto w-11" />
-          </div>
+          <OculusMark size={44} className="h-auto w-11 text-inkBlack/20" />
         )}
       </div>
-      <div className="min-w-0">
-        <h3 className="font-serifDisplay text-[19px] leading-tight text-inkBlack">{person.name}</h3>
-        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-accentOlive">
-          {person.role}
-        </p>
-        <p className="mt-2 font-serifDisplay text-[14px] leading-snug text-inkBlack/70">{person.bio}</p>
-      </div>
+      <h3 className="mt-4 font-serifDisplay text-[19px] leading-tight text-inkBlack">{person.name}</h3>
+      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-accentOlive">{person.role}</p>
+
+      <ul className="relative mt-7 w-full max-w-[360px] text-left">
+        {/* the stem the facts hang from */}
+        <span aria-hidden className="absolute bottom-2 left-[3px] top-2 w-px" style={{ background: INK_BLUE, opacity: 0.4 }} />
+        {person.facts.map((f) => (
+          <li key={f.label} className="relative border-t border-inkBlack/10 py-3.5 pl-8 first:border-t-0">
+            {/* the leader line out from the stem to the label — no terminal dot (Daniel's
+                "no decorative blue marks" rule; the connector is structural and stays). */}
+            <span
+              aria-hidden
+              className="absolute left-[3px] top-[1.4rem] h-px w-[22px] -translate-y-1/2"
+              style={{ background: INK_BLUE, opacity: 0.4 }}
+            />
+            <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-inkBlack/45">{f.label}</div>
+            <p className="mt-1 font-serifDisplay text-[13.5px] leading-relaxed text-inkBlack/[0.78]">{f.value}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -666,11 +800,9 @@ export function AboutPage() {
         animate={{ opacity: revealed ? 1 : 0 }}
         transition={{ duration: revealed ? 0.6 : 0, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* PORTION ONE — the title AND the sequence, together. The drawing starts immediately,
-            in the same frame as the sentence it is the proof of, and the two questions surface
-            in that same column as the camera reaches the years that earned them. There is no
-            preamble screen, no colour key, and no rule drawn across the page: the argument IS
-            the first thing, and it begins at once. */}
+        {/* PORTION ONE — the title AND the sequence, together. The drawing starts immediately, in the
+            same frame as the sentence it is the proof of, and the two questions surface in that same
+            column as the camera reaches the years that earned them. */}
         <section aria-label="How we crossed paths">
           <CrossPathsTimeline
             title={
@@ -682,46 +814,50 @@ export function AboutPage() {
           />
         </section>
 
-        {/* The founder block is framed tightly (round 3 section 4, tightened again after live QA:
-            Daniel flagged the frame as still airy at 38svh). 24svh still releases the sticky
-            timeline before "The two of us" can enter (so the finale and the founders never share a
-            frame) — verified live at 1920x876. */}
-        <div aria-hidden className={reduced ? 'h-16' : 'min-h-[24svh]'} />
+        {/* Real air above the founders (Daniel, 2026-07-14: loosen back from the round-3 24svh
+            tightening — the founders section now IS the line's continuation, so it can breathe).
+            The seam to the finale's pin/hold/release is owned by CrossPathsTimeline. */}
+        <div aria-hidden className={reduced ? 'h-24' : 'min-h-[42svh]'} />
 
-        {/* The two of us. AFTER the sequence: by the time you meet them, you already know
-            where they came from. */}
-        <section aria-label="The two of us" className="pt-8">
-          <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+        {/* The two of us. AFTER the sequence: by the time you meet them, you already know where they
+            came from. The finale's stem forks here and the facts hang off each fork on leader lines. */}
+        <section aria-label="The two of us">
+          <FounderStem />
+          <p className="mt-2 text-center font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
             The two of us
-          </h2>
-          {/* A single bordered panel with a hairline divider between the two founders, so the block
-              reads as one deliberate framed moment (round 3 section 4) rather than two loose cards. */}
-          <div className="mt-8 grid border border-inkBlack/12 sm:grid-cols-2 sm:divide-x sm:divide-inkBlack/12">
+          </p>
+
+          <div className="mx-auto mt-10 grid max-w-[1000px] gap-x-16 gap-y-14 sm:grid-cols-2">
             {TEAM.map((person) => (
-              <div key={person.name} className="p-8 sm:p-10">
-                <TeamCard person={person} />
-              </div>
+              <FounderNode key={person.name} person={person} />
             ))}
+          </div>
+
+          <div className="mx-auto mt-16 max-w-[640px] text-center">
+            <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
+            <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
+            <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
+              {TEAM_CODA.payoff}
+            </p>
           </div>
         </section>
 
-        {/* PORTION TWO — the work, most recent first. Sized to ONE page: the section owns a
-            viewport's height, the header takes what it needs, and the master-detail fills
-            the rest. Nothing about the work requires scrolling to reach. */}
-        {/* Same tight framing below the founder block (round 3 section 4). */}
-        <div aria-hidden className={reduced ? 'h-16' : 'min-h-[24svh]'} />
+        {/* PORTION TWO — the work, most recent first. Real air here too (Daniel: more spacing from the
+            founders' bottom). Sized to ONE page: the section owns a viewport's height, the header
+            takes what it needs, and the master-detail plate fills the rest. */}
+        <div aria-hidden className={reduced ? 'h-24' : 'min-h-[42svh]'} />
 
         <section
           aria-label="Projects"
-          className="flex h-[calc(100svh-var(--header-h))] min-h-[720px] flex-col border-t border-inkBlack/12 pt-10"
+          className="flex h-[calc(100svh-var(--header-h)-1.5rem)] min-h-[560px] flex-col border-t border-inkBlack/12 pt-6"
         >
-          <div className="mb-8 flex flex-wrap items-baseline gap-x-4 gap-y-2">
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-              The Work
-            </h2>
-            <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">
-              most recent first
-            </span>
+          <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+            <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">The Work</h2>
+            <span className="font-serifDisplay text-[15px] italic text-inkBlack/50">most recent first</span>
           </div>
           <ListView reduced={reduced} />
         </section>
