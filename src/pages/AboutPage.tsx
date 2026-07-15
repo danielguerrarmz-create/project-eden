@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { packJustified } from './about/justified';
+import { packBricks } from './about/bricks';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
@@ -96,7 +96,7 @@ function ProjectVideoEl({
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
   const frame = plate
-    ? `block h-full w-full ${contain ? 'bg-white object-contain p-[6%]' : 'object-cover'}`
+    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'object-cover'}`
     : `w-full border border-inkBlack/12 ${
         contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
       } ${className}`;
@@ -139,7 +139,7 @@ function ProjectImg({
 }) {
   const contain = image.fit === 'contain';
   const frame = plate
-    ? `block h-full w-full ${contain ? 'bg-white object-contain p-[6%]' : 'object-cover'}`
+    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'object-cover'}`
     : `w-full border border-inkBlack/12 ${
         contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
       } ${className}`;
@@ -259,7 +259,7 @@ function PlateCell({
   return (
     <div
       style={style}
-      className={`absolute overflow-hidden ${contain ? 'bg-white' : 'bg-paperDeep/40'}`}
+      className={`absolute overflow-hidden ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'}`}
     >
       <ProjectImg image={image} onOpen={onOpen} reduced={reduced} plate />
       {image.video && <PlayBadge />}
@@ -273,11 +273,18 @@ function PlateCell({
   );
 }
 
-/** The plate: an aspect-ratio-aware justified layout that always exactly fills its frame, at every
- *  image count. The frame's WxH is set by the layout it sits in (the master-detail row), never by the
- *  images, so the detail panel needs no inner scroll. The packer (justified.ts) reads each image's
- *  real ratio, gives the hero its own dominant region, and fills the rest as a justified gallery, so
- *  contain figures barely letterbox and cover shots barely crop — no white voids, no jumble. */
+/** An even gutter, px — the vellum mortar between bricks AND the inset border around the whole pack,
+ *  so the ground shows through consistently on every side (Daniel: "background seeping through"). */
+const GUTTER = 4;
+
+/** The plate: a STACKED-BRICK masonry (Pinterest / CSS multi-column) that FILLS its frame edge to
+ *  edge. The frame's WxH is set by the layout it sits in (the master-detail row), never by the images,
+ *  so the detail panel needs no inner scroll. The packer (bricks.ts) flows the images into balanced
+ *  columns and justifies each column to the frame height, top-aligned, so the bricks butt together
+ *  corner to corner with only a thin vellum gutter — no dead band at the top, bottom, or sides. The
+ *  small per-column scale is absorbed by object-fit (a cover shot crops a hair; a contain figure keeps
+ *  its ratio and shows a thin vellum sliver). The container is paperVellum, so the gutters and any
+ *  contain sliver read as the same mortar. */
 function PlateFrame({
   project,
   onOpen,
@@ -289,30 +296,34 @@ function PlateFrame({
 }) {
   const images = project.images;
   const { ref, size } = useMeasure<HTMLDivElement>();
-  const GAP = 1;
-  const cells =
-    size.w > 0 && size.h > 0
-      ? packJustified(
+  // Inset the pack by one gutter on every side, then pack into the interior, so the border mortar
+  // matches the gutter mortar exactly.
+  const innerW = size.w - GUTTER * 2;
+  const innerH = size.h - GUTTER * 2;
+  const bricks =
+    innerW > 0 && innerH > 0
+      ? packBricks(
           images.map((im) => ({ ratio: im.ratio })),
-          size.w,
-          size.h,
-          { gap: GAP },
+          innerW,
+          innerH,
+          { gap: GUTTER },
         )
       : [];
 
   return (
     <figure className="h-full min-h-0 w-full">
-      {/* The bg is the hairline colour; the 1px gaps the packer leaves between cells reveal it as the
-          plate's seams, the same look the old CSS-grid `gap-px` gave. */}
-      <div ref={ref} className="relative h-full min-h-0 w-full border border-inkBlack/15 bg-inkBlack/12">
-        {cells.map((c, i) => (
+      <div
+        ref={ref}
+        className="relative h-full min-h-0 w-full overflow-hidden border border-inkBlack/10 bg-paperVellum"
+      >
+        {bricks.map((c, i) => (
           <PlateCell
             key={images[i].src}
             image={images[i]}
             index={i}
             onOpen={onOpen}
             reduced={reduced}
-            style={{ left: c.x, top: c.y, width: c.w, height: c.h }}
+            style={{ left: c.x + GUTTER, top: c.y + GUTTER, width: c.w, height: c.h }}
           />
         ))}
       </div>
@@ -712,21 +723,80 @@ function ListView({ reduced }: { reduced: boolean }) {
 
 /* -------------------------------- founders -------------------------------- */
 
-/** The coda stem: the finale's ink line, continued. It keeps drawing past the wordmark, forks once,
- *  and each fork reaches down to a founder node (their portrait). Drawn at the founders block's own
- *  width so the two forks land over the two column centres (25% / 75% of a 1000-wide field). */
-function FounderStem() {
+/** The framing roots: the finale's ink line, continued and made ORNATE. Where the line arrives at
+ *  the top of the founders block it settles on a convergence node, then two roots sweep OUT and DOWN
+ *  each side, wrapping gracefully around the OUTSIDE of a founder column (Clay left, Daniel right) and
+ *  framing the two of them, with soft botanical curls and tendril loops, then meandering back inward
+ *  at the bottom toward The Work. It is a 19th-century root-engraving register: ONE colour INK_BLUE,
+ *  one line weight, drawn and alive.
+ *
+ *  Geometry: an absolutely-positioned layer behind the block. The viewBox is a 1000-wide field mapped
+ *  onto the 1000px content column with `preserveAspectRatio="none"`, so x 0..1000 tracks the column
+ *  and the roots wrap in the open OUTER margins of each half (never across a portrait, name, or fact).
+ *  `vectorEffect="non-scaling-stroke"` keeps the line weight constant under the vertical fill-stretch,
+ *  and `overflow-visible` lets the bottom sweeps trail past the block toward the work below.
+ *
+ *  Only the left root is authored; the right is its mirror (`scale(-1,1)`), so the frame stays
+ *  symmetric. The wrapping form needs the desktop margins, so it is gated to `lg`; narrower screens
+ *  get the simple descending stem below. */
+const ROOT_LEFT = [
+  // Main root: settle from the node, sweep left across the top, plunge down the far-left OUTSIDE the
+  // Clay column (staying left of his fact leaders the whole descent, x < ~60), and only BELOW the
+  // facts does it meander back inward toward the work below, never crossing a line of text.
+  'M500 40 C 372 62, 244 50, 150 116 C 42 186, -10 300, 22 424 C 44 512, 16 606, 40 702 C 56 766, 44 814, 60 856 C 92 910, 190 950, 300 1014',
+  // A soft curl looping off the far-left bend, out in the margin.
+  'M22 424 C -36 398, -34 482, 30 470 C 66 463, 56 436, 26 446',
+  // A small tendril hook in the runway below the facts, pointing toward the work.
+  'M60 856 C 28 880, 42 928, 104 908',
+];
+
+function FounderRoots() {
+  const rootStroke = {
+    stroke: INK_BLUE,
+    strokeWidth: 2.4,
+    fill: 'none' as const,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    vectorEffect: 'non-scaling-stroke' as const,
+  };
   return (
-    <div aria-hidden className="mx-auto max-w-[1000px] px-4">
-      <svg viewBox="0 0 1000 104" width="100%" className="block overflow-visible">
-        <path d="M500 0 V 40" stroke={INK_BLUE} strokeWidth="2.4" fill="none" />
-        <path d="M500 40 C 420 66, 320 74, 250 96" stroke={INK_BLUE} strokeWidth="2" fill="none" />
-        <path d="M500 40 C 580 66, 680 74, 750 96" stroke={INK_BLUE} strokeWidth="2" fill="none" />
-        <circle cx="500" cy="40" r="3.2" fill={INK_BLUE} />
-        <circle cx="250" cy="96" r="3.2" fill={INK_BLUE} />
-        <circle cx="750" cy="96" r="3.2" fill={INK_BLUE} />
-      </svg>
-    </div>
+    <svg
+      aria-hidden
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
+    >
+      {/* the line arrives and settles on the convergence node */}
+      <path d="M500 0 V40" stroke={INK_BLUE} strokeWidth={2.8} fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+      <circle cx={500} cy={40} r={3.4} fill={INK_BLUE} />
+      {ROOT_LEFT.map((d, i) => (
+        <path key={`l${i}`} d={d} {...rootStroke} />
+      ))}
+      <g transform="translate(1000,0) scale(-1,1)">
+        {ROOT_LEFT.map((d, i) => (
+          <path key={`r${i}`} d={d} {...rootStroke} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/** Narrow-screen fallback: a single graceful root descending from the arriving line to a node, with
+ *  two tight tendrils hugging the stem. It continues the line without the desktop wrap (no room to
+ *  frame) and stays ENTIRELY in the space above the label, so it never crosses the "The two of us"
+ *  text or the columns below. */
+function FounderRootStem() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 60 60"
+      className="pointer-events-none absolute left-1/2 top-0 block h-14 w-14 -translate-x-1/2 overflow-visible lg:hidden"
+    >
+      <path d="M30 0 C 30 22, 27 38, 30 52" stroke={INK_BLUE} strokeWidth={2.4} fill="none" strokeLinecap="round" />
+      <path d="M30 36 C 22 42, 19 50, 25 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <path d="M30 36 C 38 42, 41 50, 35 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <circle cx={30} cy={52} r={2.6} fill={INK_BLUE} />
+    </svg>
   );
 }
 
@@ -822,15 +892,24 @@ export function AboutPage() {
         {/* The two of us. AFTER the sequence: by the time you meet them, you already know where they
             came from. The finale's stem forks here and the facts hang off each fork on leader lines. */}
         <section aria-label="The two of us">
-          <FounderStem />
-          <p className="mt-2 text-center font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-            The two of us
-          </p>
+          {/* The roots FRAME the two of them: an ink layer behind the label + portraits, wrapping down
+              the open outer margins of each column. The content rides above it on its own z-layer. */}
+          <div className="relative mx-auto max-w-[1000px] px-4">
+            <FounderRoots />
+            <FounderRootStem />
+            {/* pt drops the label clear of the top arcs; pb gives the roots a runway BELOW the facts
+                to meander inward toward The Work. */}
+            <div className="relative z-10 pt-16 pb-28">
+              <p className="text-center font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
+                The two of us
+              </p>
 
-          <div className="mx-auto mt-10 grid max-w-[1000px] gap-x-16 gap-y-14 sm:grid-cols-2">
-            {TEAM.map((person) => (
-              <FounderNode key={person.name} person={person} />
-            ))}
+              <div className="mt-10 grid gap-x-16 gap-y-14 sm:grid-cols-2">
+                {TEAM.map((person) => (
+                  <FounderNode key={person.name} person={person} />
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="mx-auto mt-16 max-w-[640px] text-center">

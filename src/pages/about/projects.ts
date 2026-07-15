@@ -28,7 +28,7 @@ export interface ProjectImage {
   /** Public path under /assets/projects/... For a video this is the poster still. */
   src: string;
   /** Intrinsic aspect ratio (width / height) of the asset, MEASURED from the file, not guessed.
-   *  The plate packer (justified.ts) reads it to size each cell to the image's real shape. Hardcoded
+   *  The plate packer (bricks.ts) reads it to size each brick to the image's real shape. Hardcoded
    *  rather than measured on load so the layout is deterministic at first paint with no reflow when a
    *  project is selected. If an asset is swapped, re-measure and update this. */
   ratio: number;

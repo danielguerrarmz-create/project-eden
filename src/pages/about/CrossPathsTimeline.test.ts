@@ -11,7 +11,65 @@ import {
   MARK_R,
   sepalLen,
   SEPAL_DEFS,
+  computeBranches,
+  branchAttachY,
 } from './CrossPathsTimeline';
+
+type Pt = { x: number; y: number };
+type Rect = { x: number; y: number; w: number; h: number };
+
+/** Do segments ab and cd cross? (Proper orientation test; collinear-overlap counts as a cross.) */
+function segsCross(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+  const o = (p: Pt, q: Pt, r: Pt) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  const on = (p: Pt, q: Pt, r: Pt) =>
+    Math.min(p.x, q.x) - 1e-9 <= r.x &&
+    r.x <= Math.max(p.x, q.x) + 1e-9 &&
+    Math.min(p.y, q.y) - 1e-9 <= r.y &&
+    r.y <= Math.max(p.y, q.y) + 1e-9;
+  const o1 = o(a, b, c);
+  const o2 = o(a, b, d);
+  const o3 = o(c, d, a);
+  const o4 = o(c, d, b);
+  if (o1 !== o2 && o3 !== o4) return true;
+  if (o1 === 0 && on(a, b, c)) return true;
+  if (o2 === 0 && on(a, b, d)) return true;
+  if (o3 === 0 && on(c, d, a)) return true;
+  if (o4 === 0 && on(c, d, b)) return true;
+  return false;
+}
+
+/** Does the polyline enter the (slightly shrunk) rect: either a vertex inside, or a segment that
+ *  crosses a rect edge? The shrink lets a branch touch a plate's edge at its own attach point without
+ *  counting as an overlap. */
+function polyHitsRect(pts: Pt[], r: Rect, eps = 0.75): boolean {
+  const x0 = r.x + eps;
+  const y0 = r.y + eps;
+  const x1 = r.x + r.w - eps;
+  const y1 = r.y + r.h - eps;
+  const inside = (p: Pt) => p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1;
+  const corners = [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ];
+  for (let i = 0; i < pts.length; i++) {
+    if (inside(pts[i])) return true;
+    if (i > 0) {
+      for (let e = 0; e < 4; e++) {
+        if (segsCross(pts[i - 1], pts[i], corners[e], corners[(e + 1) % 4])) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function poly2Cross(a: Pt[], b: Pt[]): boolean {
+  for (let i = 1; i < a.length; i++)
+    for (let j = 1; j < b.length; j++)
+      if (segsCross(a[i - 1], a[i], b[j - 1], b[j])) return true;
+  return false;
+}
 
 const GAP = 40;
 const CROSS = 48;
@@ -124,6 +182,65 @@ describe('the unravel finale: the winding tail conserves arc length', () => {
     const a = pts[0];
     const b = pts[pts.length - 1];
     expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeLessThan(0.05);
+  });
+});
+
+describe('the branch no-overlap contract (redline 2): a connection never crosses an image or another branch', () => {
+  const branches = computeBranches();
+
+  it('draws a branch for every plate in the real layout', () => {
+    const plateCount = CLUSTERS.reduce((s, c) => s + c.nodes.length, 0);
+    expect(branches.length).toBe(plateCount);
+    expect(branches.length).toBeGreaterThan(10);
+  });
+
+  it('leaves the spine near perpendicular (a big interior angle, not a steep near-vertical dive)', () => {
+    for (const b of branches) {
+      const dx = b.pts[1].x - b.pts[0].x;
+      const dy = b.pts[1].y - b.pts[0].y;
+      // The cubic departs on a horizontal tangent; across the first step it has bent well under 30°
+      // off horizontal. (The old pedicel dove to the plate's bottom corner at a near-vertical slant.)
+      expect(Math.abs(dx)).toBeGreaterThan(1);
+      expect(Math.abs(dy) / Math.abs(dx)).toBeLessThan(0.577); // < 30° from perpendicular-to-spine
+    }
+  });
+
+  it('arrives UNDER each plate at its inner-bottom corner, so the calyx can cup from below', () => {
+    for (const b of branches) {
+      const last = b.pts[b.pts.length - 1];
+      expect(last.y).toBeCloseTo(b.rect.y + b.rect.h, 3); // the plate's bottom edge
+      const innerX = b.side === 'right' ? b.rect.x : b.rect.x + b.rect.w;
+      expect(last.x).toBeCloseTo(innerX, 3); // the near (inner) edge
+    }
+  });
+
+  it('never overlaps ANY plate image except touching its own plate at the attach point', () => {
+    for (let i = 0; i < branches.length; i++) {
+      for (let j = 0; j < branches.length; j++) {
+        if (i === j) continue; // its own plate: it legitimately meets the near edge there
+        expect(polyHitsRect(branches[i].pts, branches[j].rect)).toBe(false);
+      }
+    }
+  });
+
+  it('never crosses another branch (branches that share a fork on the spine excepted)', () => {
+    for (let i = 0; i < branches.length; i++) {
+      for (let j = i + 1; j < branches.length; j++) {
+        // Siblings in one cluster share the fork origin on the spine; that is a shared endpoint, not
+        // a crossing. Every other pair must be strictly disjoint.
+        const sameFork =
+          branches[i].pts[0].x === branches[j].pts[0].x &&
+          branches[i].pts[0].y === branches[j].pts[0].y;
+        if (sameFork) continue;
+        expect(poly2Cross(branches[i].pts, branches[j].pts)).toBe(false);
+      }
+    }
+  });
+
+  it('branchAttachY routes the branch to the plate bottom (cup from below), independent of the anchor', () => {
+    expect(branchAttachY(500, 400, 200)).toBe(600); // bottom = y + h, whatever the anchor
+    expect(branchAttachY(300, 400, 200)).toBe(600);
+    expect(branchAttachY(999, 400, 200)).toBe(600);
   });
 });
 

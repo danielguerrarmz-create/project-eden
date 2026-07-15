@@ -177,6 +177,17 @@ const WORDMARK_GAP = 92; // from the mark's bottom edge to the wordmark baseline
 const WORDMARK_FONT = 54;
 const H = MARK_CENTER_Y + 45 * MARK_K + WORDMARK_GAP + 70; // total drawing height
 
+/** The finale wind begins when the mark has risen to this fraction of the way down the frame, and
+ *  completes at the pin (mark centred). Kept below 1 so the whole ravel is watched INSIDE the frame,
+ *  never above it. */
+const WIND_ENTER = 0.82;
+
+/** Autoplay-on-entry timing. A lead-in lets the entry narration settle, then a smooth eased descent
+ *  runs from the top of the timeline to the finale; a strong gesture fast-forwards to the reveal. */
+const AUTOPLAY_LEAD_IN_MS = 2500;
+const AUTOPLAY_MS = 12000;
+const AUTOPLAY_FF_MS = 650;
+
 /** Resolve the mark + variant A into world geometry: the attach point P on circle 0's far flank
  *  (phi=0), the spine's heading there (psi0, straight down), and the wind direction (sigma). */
 export function solveMark() {
@@ -215,19 +226,29 @@ export function tailPts(w: number, N = 420): Array<{ x: number; y: number }> {
   return pts;
 }
 
-/** The spine above the attach point: plumb on the axis, then a smoothstep lean into P that arrives
- *  on P's exact (vertical) tangent, so the spine hands off to the winding tail with no kink. */
+/** How far the descending root wanders off its drift, and over how many soft waves. Daniel's redlines
+ *  want this root to read as DRAWN and alive (organic S-curves), not a stiff mechanical lean. */
+const LEAN_MEANDER_AMP = 40;
+const LEAN_MEANDER_WAVES = 2.25;
+
+/** The spine above the attach point: plumb on the axis, then an organic, gently MEANDERING descent
+ *  into P. It still arrives on P's exact (vertical) tangent and leaves the axis vertically, so it
+ *  hands off to the winding tail (and up to the plumb spine) with no kink; the wander in between is
+ *  what makes it look drawn by hand. */
 function spineLeanPts(): Array<{ x: number; y: number }> {
   const g = solveMark();
   const dx = g.P.x - CX;
   const y0 = g.P.y - LEAN_SPAN; // = CONVERGE_Y
   const pts = [{ x: CX, y: y0 }];
-  // psi0 is vertical, so cot(psi0)=0 and the ease reduces to smoothstep s(u)=3u^2-2u^3, which
-  // leaves the axis and arrives at P both with zero horizontal slope.
-  for (let i = 1; i <= 120; i++) {
-    const u = i / 120;
+  // Base drift is the old smoothstep (leaves the axis and reaches P with zero horizontal slope). The
+  // meander is a sine enveloped by sin^2(pi*u), whose value AND slope vanish at both ends, so the
+  // wander dies exactly at the plumb spine and at P: the handoffs stay tangent-clean.
+  for (let i = 1; i <= 200; i++) {
+    const u = i / 200;
     const s = u * u * (3 - 2 * u);
-    pts.push({ x: CX + dx * s, y: lerp(y0, g.P.y, u) });
+    const env = Math.sin(Math.PI * u);
+    const meander = LEAN_MEANDER_AMP * Math.sin(2 * Math.PI * LEAN_MEANDER_WAVES * u) * env * env;
+    pts.push({ x: CX + dx * s + meander, y: lerp(y0, g.P.y, u) });
   }
   return pts;
 }
@@ -258,49 +279,85 @@ export function sepalLen(def: { lenCoef: number; lenLo: number; lenHi: number },
   return clamp(def.lenCoef * h, def.lenLo, def.lenHi);
 }
 
-const PEDICEL_LIFT = 25; // how far the pedicel's control point is raised, for a gentle bow
+/* ------------------------------- the branch ------------------------------- */
 
-/** The full calyx path set for a plate: the pedicel from the spine anchor to the plate's inner-
- *  bottom corner, and three slim sepals fanning down from that corner. Geometry is Holder A (light);
- *  sepal lengths scale with plate height. */
-function calyxPaths(
-  cx: number,
-  by: number,
-  w: number,
-  h: number,
-  dir: number,
+/**
+ * THE BRANCH (redline 2). An ornate root from the spine to a plate. It leaves the spine on a near-
+ * horizontal tangent (a big interior angle), then sweeps down the gutter column beside the plate and
+ * arrives UNDER it, at the plate's inner-bottom corner, where the three-sepal calyx cups the plate
+ * from below. Because it stays inside the gutter column (never at the plate's x-range except at that
+ * one corner) it never crosses an image; because attach points are ordered down each side's lane,
+ * branches never cross one another. Pure + exported so the no-overlap contract is unit-tested against
+ * the real layout (see computeBranches).
+ */
+export function branchAttachY(_anchorY: number, plateY: number, plateH: number): number {
+  return plateY + plateH; // the inner-bottom corner: the branch arrives under the plate
+}
+
+/** The ornate branch sampled to a polyline. x runs monotonically across the gap (so the tendril
+ *  never leaves its column, hence never crosses a plate or the spine); y is a smoothstep drift from
+ *  the anchor to the attach, plus an enveloped sine wander for the drawn-by-hand curl. This is the
+ *  single source of truth: the render splines through these points, and the contract test checks
+ *  them, so what is drawn is exactly what is proven not to overlap. */
+export function branchPts(
   spineX: number,
   anchorY: number,
-) {
-  // The receptacle point: the plate's inner-bottom corner, where the pedicel meets the plate and the
-  // three sepals spring from. The fan mirrors with the plate's side so it always opens the same way
-  // relative to the spine.
-  const Rx = dir === 1 ? cx - w / 2 : cx + w / 2;
-  const Ry = by;
+  edgeX: number,
+  attachY: number,
+  N = 48,
+): Array<{ x: number; y: number }> {
+  const dx = edgeX - spineX;
+  // A stable per-branch seed (no per-render randomness) so each tendril bulges a little differently
+  // and the set reads as hand-drawn rather than stamped. Amplitude and first-bulge direction vary;
+  // the shape is still confined to the gap column and enveloped at both ends, so the contract holds.
+  const seed = Math.sin(anchorY * 12.9898 + attachY * 78.233);
+  const amp = BRANCH_WAVE_AMP * (0.75 + 0.5 * Math.abs(seed));
+  const bulge = seed >= 0 ? 1 : -1;
+  const waves = BRANCH_WAVE_WAVES + (Math.abs(seed) > 0.5 ? 0.5 : 0);
+  const pts: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const s = t * t * (3 - 2 * t); // smoothstep: horizontal tangent at both ends
+    const env = Math.sin(Math.PI * t);
+    const wander = amp * bulge * Math.sin(2 * Math.PI * waves * t) * env * env;
+    pts.push({ x: spineX + dx * t, y: lerp(anchorY, attachY, s) + wander });
+  }
+  return pts;
+}
 
-  const sepals = SEPAL_DEFS.map((def) => {
+/** The branch as a smooth path: a Catmull-Rom spline through the ornate sample points, so the tendril
+ *  reads as one continuous drawn line. */
+function branchPath(spineX: number, anchorY: number, edgeX: number, attachY: number): string {
+  return lineGen(branchPts(spineX, anchorY, edgeX, attachY)) ?? '';
+}
+
+/* -------------------------------- the calyx ------------------------------- */
+
+/**
+ * THE CALYX, cup-from-below (Daniel's chosen holder, restored). Three slim sepals fan DOWN from the
+ * plate's inner-bottom corner, cradling the plate from underneath: one toward the spine, one straight
+ * down, one under the plate. The plate sits in the cup; the sepal tips stay in the gutter below the
+ * plate, never over the image. Lengths follow the height-scaled law (sepalLen), but each is capped by
+ * the room actually available below (maxLen), so a stacked plate's cup never reaches the plate under
+ * it. `phi` is the SVG angle (180 straight down, 225 toward the spine, 135 under the plate).
+ */
+function calyxSepals(cornerX: number, cornerY: number, dir: number, h: number, maxLen: number): string[] {
+  return SEPAL_DEFS.map((def) => {
     const dev = ((def.phi - 180) * Math.PI) / 180; // deviation from straight down
-    const len = sepalLen(def, h);
+    const len = Math.min(sepalLen(def, h), maxLen);
     const shw = Math.max(0.11 * len, 8); // sepal half-width
-    const ux = -dir * Math.sin(dev); // axis: down, splayed away from the spine side
+    const ux = -dir * Math.sin(dev); // axis: down, splayed with the plate's side
     const uy = Math.cos(dev);
-    const px = -uy; // perpendicular
+    const px = -uy;
     const py = ux;
-    const tipx = Rx + len * ux;
-    const tipy = Ry + len * uy;
-    const c1x = Rx + 0.55 * len * ux + shw * px;
-    const c1y = Ry + 0.55 * len * uy + shw * py;
-    const c2x = Rx + 0.55 * len * ux - shw * px;
-    const c2y = Ry + 0.55 * len * uy - shw * py;
-    return `M ${Rx} ${Ry} Q ${c1x} ${c1y} ${tipx} ${tipy} Q ${c2x} ${c2y} ${Rx} ${Ry} Z`;
+    const tipx = cornerX + len * ux;
+    const tipy = cornerY + len * uy;
+    const c1x = cornerX + 0.55 * len * ux + shw * px;
+    const c1y = cornerY + 0.55 * len * uy + shw * py;
+    const c2x = cornerX + 0.55 * len * ux - shw * px;
+    const c2y = cornerY + 0.55 * len * uy - shw * py;
+    return `M ${cornerX} ${cornerY} Q ${c1x} ${c1y} ${tipx} ${tipy} Q ${c2x} ${c2y} ${cornerX} ${cornerY} Z`;
   });
-
-  // The pedicel: from the spine anchor to the receptacle point, bowed gently.
-  const midX = (spineX + Rx) / 2;
-  const midY = (anchorY + Ry) / 2 - PEDICEL_LIFT;
-  const pedicel = `M ${spineX} ${anchorY} Q ${midX} ${midY} ${Rx} ${Ry}`;
-
-  return { sepals, pedicel, cornerX: Rx, cornerY: Ry };
 }
 
 /** Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
@@ -312,8 +369,19 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
   showcase: { w: 400, h: 267 }, // reserved for the two bookends: ut-austin and the NYC door
 };
 
-/** The fixed perpendicular gap from the spine to a plate's inner edge. */
+/** The fixed perpendicular gap from the spine to a plate's near (inner) edge. */
 const OFFSET_X = 110;
+/** The branch is an ORNATE root, not a stiff arc: it leaves the spine on a near-horizontal tangent (a
+ *  big interior angle), then sweeps down the gutter beside the plate and arrives under it, wandering
+ *  gently so it reads as drawn and alive. The wander is a sine enveloped to vanish (value + slope) at
+ *  both ends, so the horizontal departure and the no-overlap invariant are preserved. Amplitude is
+ *  kept in scale with the narrow gutter; the big sweeping loops in Daniel's redlines belong to the
+ *  founder stems, which have open room. */
+const BRANCH_WAVE_AMP = 18;
+const BRANCH_WAVE_WAVES = 1.15;
+/** How heavy the roots read. Substantial, in the spine's register, so they look like roots and not
+ *  wires (Daniel: "match the line weight of the spine"), while staying legible in the tight gap. */
+const BRANCH_W = 5;
 /** Minimum vertical gap between two stacked siblings in one cluster (their bounding boxes never
  *  come closer than this — the no-overlap contract). */
 const CLUSTER_GAP_Y = 40;
@@ -403,6 +471,33 @@ const easeUnfurl = (u: number) => 1 - Math.pow(1 - clamp01(u), 3);
  * twist-fuse beginning — this list is content only, and the geometry above holds it whatever it is.
  */
 export const CLUSTERS: Cluster[] = [
+  {
+    // Near the fuse: an honest empty plate for a 2021 moment, image to come. Alternates side with the
+    // 2022 placeholder below; both are held by the same calyx as every real plate.
+    id: 'origin-2021',
+    year: 2021.1,
+    side: 'right',
+    hint: '',
+    nodes: [
+      {
+        tier: 'standard',
+        media: { src: '', alt: 'A 2021 beginning, image to come', pending: true },
+      },
+    ],
+  },
+  {
+    // Before the 2022 medical device: an honest empty plate for a 2022 moment, image to come.
+    id: 'early-2022',
+    year: 2022.0,
+    side: 'left',
+    hint: '',
+    nodes: [
+      {
+        tier: 'standard',
+        media: { src: '', alt: 'A 2022 moment, image to come', pending: true },
+      },
+    ],
+  },
   {
     id: 'medical',
     year: 2022.6,
@@ -634,8 +729,9 @@ interface LaidCluster {
   hint: string;
   spineX: number;
   anchorY: number;
-  innerX: number;
-  plates: Array<{ x: number; y: number; w: number; h: number; media: Plate }>;
+  /** The plates' near edge on this side (where every branch attaches). */
+  edgeX: number;
+  plates: Array<{ x: number; y: number; w: number; h: number; media: Plate; attachY: number }>;
 }
 
 /**
@@ -676,17 +772,51 @@ function layoutClusters(spine: Strand): LaidCluster[] {
     const anchorY = yearToY(c.year);
     const spineX = atY(spine, anchorY).x;
     const dir = c.side === 'left' ? -1 : 1;
-    const innerX = spineX + dir * OFFSET_X;
+    const edgeX = spineX + dir * OFFSET_X; // the plates' near edge, where the branch attaches
     let y = tops.get(c.id)! + (c.dy ?? 0);
     const plates = c.nodes.map((n) => {
       const { w, h } = TIER[n.tier];
-      const x = dir === 1 ? innerX : innerX - w;
-      const box = { x, y, w, h, media: n.media };
+      const x = dir === 1 ? edgeX : edgeX - w;
+      const attachY = branchAttachY(anchorY, y, h);
+      const box = { x, y, w, h, media: n.media, attachY };
       y += h + CLUSTER_GAP_Y;
       return box;
     });
-    return { id: c.id, side: c.side, dir, hint: c.hint, spineX, anchorY, innerX, plates };
+    return { id: c.id, side: c.side, dir, hint: c.hint, spineX, anchorY, edgeX, plates };
   });
+}
+
+/** Every branch resolved to its sampled polyline and its target plate rect, for the no-overlap
+ *  contract test. A branch touches its own plate only at the attach point; it must not intersect any
+ *  other plate, and no two branches from DIFFERENT clusters may cross. */
+export function computeBranches(): Array<{
+  clusterId: string;
+  plateIndex: number;
+  side: Side;
+  pts: Array<{ x: number; y: number }>;
+  rect: { x: number; y: number; w: number; h: number };
+}> {
+  const spine = sample('spine', spinePts());
+  const laid = layoutClusters(spine);
+  const out: Array<{
+    clusterId: string;
+    plateIndex: number;
+    side: Side;
+    pts: Array<{ x: number; y: number }>;
+    rect: { x: number; y: number; w: number; h: number };
+  }> = [];
+  laid.forEach((c) =>
+    c.plates.forEach((pl, i) =>
+      out.push({
+        clusterId: c.id,
+        plateIndex: i,
+        side: c.side,
+        pts: branchPts(c.spineX, c.anchorY, c.edgeX, pl.attachY),
+        rect: { x: pl.x, y: pl.y, w: pl.w, h: pl.h },
+      }),
+    ),
+  );
+  return out;
 }
 
 /* ------------------------------- the graphic ------------------------------ */
@@ -720,6 +850,9 @@ export function CrossPathsTimeline({
   const frameRef = useRef<HTMLDivElement>(null);
   const [p, setP] = useState(0); // 0 to 1, the SMOOTHED camera progress
   const aspect = useFrameAspect(frameRef);
+  // Persists across effect re-runs (StrictMode double-invoke, a reduced-motion media change) so the
+  // entry autoplay fires AT MOST ONCE per page load and can never snap the finished descent back up.
+  const autoplayedRef = useRef(false);
 
   // Scroll smoothing without a dependency: raw progress read from the track, camera driven by a
   // lerped value so it has weight and no jitter. The rAF idles once caught up.
@@ -768,82 +901,93 @@ export function CrossPathsTimeline({
     };
   }, [reduced]);
 
-  // AUTOPLAY ON ENTRY. Once per page load, when the track pins to the top, drive the REAL scroll
-  // position from the track's start to its end over 14s on a piecewise ease. This layers ON TOP of
-  // the scroll-driven camera above — the same kick() picks up programmatic scroll for free. ANY user
-  // input (wheel, touch, key, scrollbar grab) stops it instantly. Reduced motion never runs it.
+  // AUTOPLAY ON ENTRY. Exactly once per page load, after a lead-in that lets the entry narration
+  // settle, the page auto-scrolls SMOOTHLY (rAF-eased, not stepped) from the top of the timeline all
+  // the way down to the finale, where the mark winds up and composes. This drives the REAL scroll
+  // position, so the scroll-driven camera above follows for free: one continuous cinematic descent.
+  // Control is handed to the user exactly at the reveal (the pin, p=1). A strong gesture never traps
+  // the user: mid-descent it FAST-FORWARDS to the reveal; before the descent begins it cancels it
+  // outright. Reduced motion skips the whole thing and lands directly in the controllable state.
   useEffect(() => {
     if (reduced) return;
     const el = trackRef.current;
     if (!el) return;
 
     let raf = 0;
-    let running = false;
-    let hasAutoplayed = false;
+    let phase: 'idle' | 'playing' | 'done' = 'idle';
     let startTs = 0;
     let startY = 0;
     let endY = 0;
+    let duration = AUTOPLAY_MS;
 
-    const DURATION = 14000;
-    const headerH =
-      parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 72;
-    const cubicIn = (t: number) => t * t * t;
-    const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3);
-    const autoplayEase = (t: number) =>
-      t < 0.08 ? cubicIn(t / 0.08) * 0.08 : t > 0.92 ? 0.92 + cubicOut((t - 0.92) / 0.08) * 0.08 : t;
+    const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-    const stopAutoplay = () => {
-      running = false;
+    const playInputs = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+    const detachPlayInputs = () => playInputs.forEach((e) => window.removeEventListener(e, onGesture));
+    const detachEarlyInputs = () => playInputs.forEach((e) => window.removeEventListener(e, onEarly));
+
+    const finish = () => {
+      phase = 'done';
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
-      window.removeEventListener('wheel', onInput);
-      window.removeEventListener('touchstart', onInput);
-      window.removeEventListener('touchmove', onInput);
-      window.removeEventListener('keydown', onInput);
-      window.removeEventListener('pointerdown', onInput);
+      detachPlayInputs();
     };
-    const onInput = () => {
-      if (running) stopAutoplay();
-    };
-
     const frame = (ts: number) => {
-      if (!running) return;
+      if (phase !== 'playing') return;
       if (!startTs) startTs = ts;
-      const t = clamp01((ts - startTs) / DURATION);
-      window.scrollTo(0, lerp(startY, endY, autoplayEase(t)));
-      if (t >= 1) {
-        stopAutoplay();
-        return;
-      }
+      const t = clamp01((ts - startTs) / duration);
+      window.scrollTo(0, Math.round(lerp(startY, endY, easeInOut(t))));
+      if (t >= 1) return finish();
       raf = requestAnimationFrame(frame);
+    };
+    // Mid-descent: a strong gesture fast-forwards to the reveal from wherever it is now, so the user
+    // reaches the controllable state quickly rather than being yanked or frozen mid-timeline.
+    const onGesture = () => {
+      if (phase !== 'playing') return;
+      startY = window.scrollY;
+      startTs = 0;
+      duration = AUTOPLAY_FF_MS;
+      detachPlayInputs(); // one gesture is enough; let the fast-forward run to the reveal
+    };
+    // Before the descent even begins: the user took control, so honour it and skip the set-piece.
+    const onEarly = () => {
+      if (phase !== 'idle') return;
+      phase = 'done';
+      autoplayedRef.current = true; // taken over: no later instance may start a descent either
+      window.clearTimeout(leadIn);
+      detachEarlyInputs();
     };
 
     const begin = () => {
-      if (hasAutoplayed) return;
-      hasAutoplayed = true;
-      running = true;
-      startTs = 0;
-      const r = el.getBoundingClientRect();
-      startY = window.scrollY;
-      endY = startY + r.top + (r.height - window.innerHeight);
-      window.addEventListener('wheel', onInput, { passive: true });
-      window.addEventListener('touchstart', onInput, { passive: true });
-      window.addEventListener('touchmove', onInput, { passive: true });
-      window.addEventListener('keydown', onInput);
-      window.addEventListener('pointerdown', onInput, { passive: true });
+      if (phase !== 'idle' || autoplayedRef.current) return;
+      autoplayedRef.current = true;
+      detachEarlyInputs();
+      const rect = el.getBoundingClientRect();
+      const travel = rect.height - window.innerHeight;
+      if (travel <= 0) {
+        phase = 'done';
+        return;
+      }
+      // Snap to the very top of the timeline so the descent always starts from the beginning, even if
+      // the narration ran a touch long, then ease down to the pin.
+      startY = window.scrollY + rect.top;
+      endY = startY + travel;
+      window.scrollTo(0, Math.round(startY));
+      phase = 'playing';
+      playInputs.forEach((e) =>
+        window.addEventListener(e, onGesture, e === 'keydown' ? undefined : { passive: true }),
+      );
       raf = requestAnimationFrame(frame);
     };
 
-    const onScroll = () => {
-      if (hasAutoplayed) return;
-      const top = el.getBoundingClientRect().top;
-      if (top <= headerH + 2 && top > -window.innerHeight) begin();
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    playInputs.forEach((e) =>
+      window.addEventListener(e, onEarly, e === 'keydown' ? undefined : { passive: true }),
+    );
+    const leadIn = window.setTimeout(begin, AUTOPLAY_LEAD_IN_MS);
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      stopAutoplay();
+      window.clearTimeout(leadIn);
+      detachEarlyInputs();
+      finish();
     };
   }, [reduced]);
 
@@ -858,12 +1002,15 @@ export function CrossPathsTimeline({
     [],
   );
   const convNames = useMemo(() => {
-    // Name each strand where it is still clearly separated from the other, near the frame top.
+    // Name each strand at the very top of the frame, pushed OUTBOARD of its own strand and lifted well
+    // clear of the over-under crossing below (which sits ~90 units down), so a label never lands on a
+    // line. A vellum halo in the render keeps them legible over anything that pans behind them.
     const pick = (s: Strand, dir: number) => {
-      const nameY = 22;
+      const nameY = 12;
       let best = 0;
-      for (let i = 0; i < s.ys.length; i++) if (Math.abs(s.ys[i] - nameY) < Math.abs(s.ys[best] - nameY)) best = i;
-      return { x: s.xs[best] + dir * 14, y: s.ys[best] - 6, dir };
+      for (let i = 0; i < s.ys.length; i++)
+        if (Math.abs(s.ys[i] - nameY) < Math.abs(s.ys[best] - nameY)) best = i;
+      return { x: s.xs[best] + dir * 20, y: s.ys[best] + 4, dir };
     };
     return [
       { name: 'Clay', ...pick(conv.left, -1) },
@@ -872,11 +1019,15 @@ export function CrossPathsTimeline({
   }, [conv]);
 
   const viewH = clamp(W / aspect, 480, H);
-  const camY = reduced ? 0 : lerp(0, Math.max(H - viewH, 0), p);
+  // THE PIN. At full progress (p=1, the end of the track) the camera sits so the mark's centre is at
+  // the frame's vertical centre, which is where the left text block is centred too, so the mark and
+  // the words compose as one still. The natural un-sticky past the track then carries that still up
+  // and out as the user scrolls on. (Reduced motion shows the whole drawing at once instead.)
+  const pinCamY = Math.max(MARK_CENTER_Y - viewH / 2, 0);
+  const camY = reduced ? 0 : lerp(0, pinCamY, p);
   const frontY = camY + viewH * (1 + DRAW_AHEAD);
   const topY = camY - TOP_CLIP;
   const cardLineY = reduced ? H : camY + viewH * CARD_LINE;
-  const camBottom = camY + viewH;
 
   const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH}`;
 
@@ -891,11 +1042,12 @@ export function CrossPathsTimeline({
     return { strokeDasharray: `${len} 1`, strokeDashoffset: -fTop, hidden: false };
   };
 
-  // THE FINALE WIND. Driven by the viewport bottom crossing the mark (world constants, so w reaches
-  // 1 at full scroll regardless of aspect). The mark is in view by the time the wind completes.
-  const WIND_START = MARK_CENTER_Y - 200;
-  const WIND_END = MARK_CENTER_Y + 100;
-  const windW = reduced ? 1 : clamp01((camBottom - WIND_START) / (WIND_END - WIND_START));
+  // THE FINALE WIND. Timed off the CAMERA so the whole ravel plays while the mark is well inside the
+  // frame: it starts when the mark has risen to WIND_ENTER of the way down and completes exactly at
+  // the pin, with the mark centred. The user watches the line wind itself up, never a pre-assembled
+  // mark sliding in from below.
+  const windStartCamY = MARK_CENTER_Y - WIND_ENTER * viewH;
+  const windW = reduced ? 1 : clamp01((camY - windStartCamY) / (pinCamY - windStartCamY || 1));
   const g = useMemo(() => solveMark(), []);
   const leanPts = useMemo(() => spineLeanPts(), []);
   const tail = useMemo(() => tailPts(windW), [windW]);
@@ -982,7 +1134,15 @@ export function CrossPathsTimeline({
                   y={n.y}
                   textAnchor={n.dir === 1 ? 'start' : 'end'}
                   className="fill-inkBlack font-serifDisplay"
-                  style={{ fontSize: 22, fontStyle: 'italic', opacity: nameOpacity }}
+                  style={{
+                    fontSize: 22,
+                    fontStyle: 'italic',
+                    opacity: nameOpacity,
+                    paintOrder: 'stroke',
+                    stroke: '#FBF9F3',
+                    strokeWidth: 6,
+                    strokeLinejoin: 'round',
+                  }}
                 >
                   {n.name}
                 </text>
@@ -1081,39 +1241,28 @@ export function CrossPathsTimeline({
               );
             })}
 
-            {/* THE LINE INTO THE MARK: the plumb spine hands off to the lean, and the lean hands off
-                to the winding tail. Daniel's ruling keeps the taper: the tail thins as it becomes
-                mark linework, so the wind reads as the heavy line raveling itself in. */}
-            {(() => {
-              const els: ReactNode[] = [];
-              els.push(
-                <path
-                  key="lean"
-                  d={poly(leanPts)}
-                  fill="none"
-                  stroke={INK_BLUE}
-                  strokeWidth={SPINE_W}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />,
-              );
-              const step = 6;
-              const smooth = (u: number) => u * u * (3 - 2 * u);
-              for (let i = 0; i + step < tail.length; i += step) {
-                const u = i / (tail.length - 1);
-                els.push(
-                  <path
-                    key={`tail-${i}`}
-                    d={poly(tail.slice(i, i + step + 1))}
-                    fill="none"
-                    stroke={INK_BLUE}
-                    strokeWidth={lerp(SPINE_W, 4.6, smooth(u))}
-                    strokeLinecap="round"
-                  />,
-                );
-              }
-              return <g>{els}</g>;
-            })()}
+            {/* THE LINE INTO THE MARK: the plumb spine hands off to the organic meandering lean, and
+                the lean hands off to the winding tail. All at the spine's weight, which is also the
+                mark's stroke (MARK_STROKE * k = SPINE_W), so the one root reads as a single heavy line
+                that ravels itself into the mark with no change in weight. */}
+            <g>
+              <path
+                d={poly(leanPts)}
+                fill="none"
+                stroke={INK_BLUE}
+                strokeWidth={SPINE_W}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={poly(tail)}
+                fill="none"
+                stroke={INK_BLUE}
+                strokeWidth={SPINE_W}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
 
             {/* The wordmark, under the mark, once the ring has closed. Nothing else at the end. */}
             <text
@@ -1234,7 +1383,7 @@ function unfurl(u: number, pivotX: number, pivotY: number) {
  * plate), and the plate unfurling on top. The lead plate (index 0) carries the hint title.
  */
 function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; cardLineY: number; reduced: boolean }) {
-  const { dir, spineX, anchorY, plates, hint } = cluster;
+  const { dir, spineX, anchorY, edgeX, plates, hint } = cluster;
   const uStem = reduced ? 1 : clamp01((cardLineY - anchorY) / (UNFURL_SPAN * 0.4));
 
   return (
@@ -1242,10 +1391,12 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
       <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_BLUE} opacity={uStem > 0 ? 1 : 0} />
 
       {plates.map((pl, i) => {
-        const cx = pl.x + pl.w / 2;
-        const by = pl.y + pl.h;
-        const { sepals, pedicel, cornerX, cornerY } = calyxPaths(cx, by, pl.w, pl.h, dir, spineX, anchorY);
-        // The calyx buds in as the last beat of the pedicel's growth, right before the plate unfurls.
+        const branchD = branchPath(spineX, anchorY, edgeX, pl.attachY);
+        // Sepal length is capped by the room actually below this plate (the next stacked sibling, or
+        // a generous default when it is the lowest), so a cup never reaches the plate beneath it.
+        const spaceBelow = i + 1 < plates.length ? plates[i + 1].y - pl.attachY : 240;
+        const sepals = calyxSepals(edgeX, pl.attachY, dir, pl.h, Math.max(20, spaceBelow - 12));
+        // The calyx buds in as the last beat of the branch's growth, right before the plate unfurls.
         const calyxOpacity = reduced ? 1 : clamp01((uStem - 0.7) / 0.3);
 
         const u = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
@@ -1257,24 +1408,25 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
         return (
           <g key={i}>
             <path
-              d={pedicel}
+              d={branchD}
               fill="none"
               stroke={INK_BLUE}
-              strokeOpacity={0.65}
-              strokeWidth={3.2}
+              strokeOpacity={0.7}
+              strokeWidth={BRANCH_W}
               strokeLinecap="round"
+              strokeLinejoin="round"
               pathLength={1}
               strokeDasharray={1}
               strokeDashoffset={reduced ? 0 : 1 - uStem}
             />
-            {/* The calyx: three slim sepals fanning down from the receptacle point where the pedicel
-                meets the plate. Delicate and light, scaling with plate height. */}
+            {/* The calyx: three slim sepals fanning DOWN from the plate's inner-bottom corner, cupping
+                the plate from below where the branch arrives under it. Delicate, height-scaled. */}
             {calyxOpacity > 0.001 && (
               <g style={{ opacity: calyxOpacity }} pointerEvents="none">
                 {sepals.map((d, si) => (
                   <path key={si} d={d} fill={INK_BLUE} fillOpacity={0.05} stroke={INK_BLUE} strokeOpacity={0.55} strokeWidth={1} strokeLinejoin="round" />
                 ))}
-                <circle cx={cornerX} cy={cornerY} r={3.5} fill={INK_BLUE} />
+                <circle cx={edgeX} cy={pl.attachY} r={3.5} fill={INK_BLUE} />
               </g>
             )}
             {t.opacity > 0.001 && (
