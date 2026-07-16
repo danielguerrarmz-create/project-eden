@@ -45,6 +45,7 @@ import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
 import { CrossPathsTimeline, INK_SEPIA, INK_SEPIA_TEXT } from './about/CrossPathsTimeline';
 import { FanPainting } from './about/FanPainting';
 import { FOUNDER_SPECIMENS } from './about/paintings';
+import { requestGarland } from '../engine/gongbi/painter';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
@@ -813,6 +814,132 @@ function ListView({ reduced }: { reduced: boolean }) {
  * Recover them from git if ever needed: `git show fa87d33 -- src/pages/AboutPage.tsx`.
  */
 
+/**
+ * FOUNDER BOWER — flowers growing around the two of them.
+ *
+ * NOTE THE BRIEF, because it is the OPPOSITE of the sub-branch engine's and the difference is
+ * deliberate. There, Daniel asked for "an engine or an algorithm" and got space colonization. Here:
+ *
+ *   "It doesn't have to be a specific mathematical pattern. It just has to look pretty."
+ *
+ * So there is no derived geometry in this component and there should not be one. These are four
+ * curves drawn by hand, by eye, in a 160x1100 strip — two down the left margin, two down the right —
+ * and they are tuned by looking at the page, not by computing anything. Growing them from an
+ * algorithm would be answering a question he did not ask, and the last algorithm that got pointed at
+ * a "make it pretty" problem is what produced the choppy lines this replaces.
+ *
+ * They are VINES, not lines: `tube: true`, so the gongbi composer paints the stem in its own
+ * painterly hand along with the foliage, rather than the page stroking a hard sepia bezier and
+ * hanging leaves on it. That is the whole correction — "choppy... just random lines on top of it"
+ * was a description of a bare drawn line with nothing growing on it.
+ *
+ * PIGMENT, and this is a colour-law call worth flagging: CLAUDE.md permits pigment on "the botanical
+ * specimens only" and lists them. A painted vine is a botanical in exactly the register of the
+ * founder specimens it hangs beside — but it is not on that list, so it is an extension of the law
+ * rather than an application of it. Flagged in the handoff for Daniel.
+ *
+ * Desktop only: the margins it lives in do not exist below `lg`, and ornament that overlaps the
+ * reading column is worse than no ornament.
+ */
+/** The strip the vines are painted into, in CSS px, drawn 1:1 on the page — never scaled to fit.
+ *  Measured at 1440x900: the founders section is 1181x1401 with a 1100px content column, so each
+ *  margin is ~169px of real air. 160 fits it with room, and 1500 overruns the section's height on
+ *  purpose: the wrapper clips it, so a taller section (narrower viewport, more text wrapping) simply
+ *  reveals more vine instead of stretching what is there.
+ *
+ *  The first cut stretched a 1100-tall strip to `h-full object-cover` and it upscaled and cropped
+ *  the painting — a painted vine has a real hand and a real scale, and blowing it up 1.8x to fill a
+ *  box is exactly the "image at the wrong size" mistake this whole round is about. */
+const BOWER_STRIP = { w: 160, h: 1500 };
+
+/** Four curves, drawn by eye. Root-first (the composer tapers a vine root → tip). Left pair first,
+ *  then right; the right is authored separately rather than mirrored, because a mirrored vine reads
+ *  as a mirrored vine. */
+const BOWER_VINES: Array<Array<[number, number]>> = [
+  // left, long: enters at the top and falls the length of the block, leaning in and out of the margin
+  [[96, -30], [78, 90], [104, 210], [72, 330], [40, 450], [58, 580], [96, 700], [70, 830], [34, 950], [52, 1080]],
+  // left, short: a lower spur that curls back up and out, so the left side is not one lonely stem
+  [[58, 580], [22, 640], [8, 720], [30, 780], [64, 812]],
+  // right, long: a different rhythm and a later start — it arrives beside Daniel rather than Clay
+  [[64, 120], [96, 240], [70, 370], [34, 500], [56, 620], [98, 740], [76, 870], [40, 990], [58, 1100]],
+  // right, short: a high spur near the kicker
+  [[96, 240], [130, 300], [146, 372], [118, 424], [86, 448]],
+];
+
+function FounderBower({ side }: { side: 'left' | 'right' }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    let objectUrl: string | null = null;
+    // Sliced INSIDE the effect on purpose. As a component-body `const` this is a fresh array every
+    // render, so as an effect dependency it never compares equal: the effect re-ran forever, each
+    // pass minting a blob URL and revoking the last. It painted, so it looked fine — the live QA
+    // caught it as 1233 failed requests for revoked blobs.
+    const vines = side === 'left' ? BOWER_VINES.slice(0, 2) : BOWER_VINES.slice(2);
+    requestGarland({
+      // One seed per side, so the two sides are the same species with different takes — the same
+      // reason the sub-branches batch their vines into one request. Shares the page's pinned
+      // spine seed (see GARLAND_SEED): the page grows one plant.
+      seed: `bower/spine-2/founders-${side}`,
+      voice: 'pigment',
+      width: BOWER_STRIP.w,
+      height: BOWER_STRIP.h,
+      vines: vines.map((path) => ({
+        path,
+        // Stations by eye too: a handful per vine, biased down the length, alternating so no two
+        // blossoms sit adjacent.
+        stations: [0.16, 0.3, 0.45, 0.58, 0.72, 0.86].map((t, i) => ({
+          t,
+          organ: (['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf'] as const)[i],
+        })),
+      })),
+      scale: 1.35,
+      rootWidth: 3.2,
+      tube: true,
+    })
+      .then(async (bitmap) => {
+        const c = document.createElement('canvas');
+        c.width = bitmap.width;
+        c.height = bitmap.height;
+        c.getContext('2d')?.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob || !live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch((err: unknown) => {
+        // The founders read fine with no vine; a broken painting room must not look like taste.
+        console.error(`gongbi founder bower (${side}) failed:`, err);
+      });
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [side]);
+
+  if (!url) return null;
+  // The wrapper reaches OUT past the section (into the page's own margin, where the air is) and
+  // clips there, so the vine is drawn at its native size and simply runs off the page edge like a
+  // vine does. `-left/-right-[150px]` puts the strip's inner edge ~30px clear of the 1100px content
+  // column at 1440 — measured, because at -64px it grew straight across Clay's portrait.
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute inset-y-0 hidden overflow-hidden lg:block ${
+        side === 'left' ? '-left-[150px] w-[150px]' : '-right-[150px] w-[150px]'
+      }`}
+    >
+      <img
+        src={url}
+        alt=""
+        className="absolute top-0 left-0"
+        style={{ width: BOWER_STRIP.w, height: BOWER_STRIP.h }}
+      />
+    </div>
+  );
+}
+
 /** The seam connector: a single vertical INK_SEPIA line at the PAGE centre that carries the finale's
  *  descending line across a spacer. The timeline's unravel exits its frame at the page centre and the
  *  founders' node sits at the page centre, so a plumb line here reads as the ONE line continuing over
@@ -954,25 +1081,34 @@ export function AboutPage() {
             locally — so its founders slid under the fixed SplashHeader (position:fixed, top-0,
             z-50). Ported here the bug cannot recur: this page's <main> carries
             pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
-        <section aria-label="The founders" className="mx-auto w-full max-w-page px-gutter">
-          <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
+        <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
+          {/* The flowers grow around the two of them, down the open margins either side. Behind the
+              content on its own layer; the columns ride above it. */}
+          <FounderBower side="left" />
+          <FounderBower side="right" />
 
-          <div className="mt-12 flex flex-col gap-16">
-            {TEAM.map((person) => (
-              <FounderNode key={person.id} person={person} />
-            ))}
-          </div>
+          <div className="relative z-10">
+            <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
 
-          <div className="mx-auto mt-24 max-w-[640px] text-center">
-            <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
-            <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
-          </div>
+            <div className="mt-12 flex flex-col gap-16">
+              {TEAM.map((person) => (
+                <FounderNode key={person.id} person={person} />
+              ))}
+            </div>
 
-          <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
-            <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
-              {TEAM_CODA.payoff}
-            </p>
+            <div className="mx-auto mt-24 max-w-[640px] text-center">
+              <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
+              <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
+            </div>
+
+            <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">
+                {TEAM_CODA.payoffLabel}
+              </p>
+              <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
+                {TEAM_CODA.payoff}
+              </p>
+            </div>
           </div>
 
           <div aria-hidden className={reduced ? 'h-16' : 'min-h-[20svh]'} />
