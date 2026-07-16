@@ -137,21 +137,28 @@ function surfaceNormal(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
 
 /**
  * Sample the canopy at parametric (u,v): u = around the plan (0..1 from north,
- * clockwise), v = up the canopy (0 = edge, 1 = crown). Returns the world point
- * plus the compass bearing (deg) that facet faces. Used by the strut optimiser
- * + overlays so the living layer keys off coordinates, never off members.
+ * clockwise), v = up the canopy (0 = edge, 1 = crown). Returns the world point,
+ * the outward unit surface normal there, and the compass bearing (deg) that
+ * facet faces. Used by the strut optimiser + overlays so the living layer keys
+ * off coordinates, never off members.
+ *
+ * The normal matters: overlays sit ON the skin by stepping along it. Offsetting
+ * radially about Y instead (the old `p * 1.04` trick) only holds for a vertical
+ * cylinder — on a dome it collapses to zero at the crown and shoves cells off
+ * the face near the eave, where the normal points outward AND down.
  */
 export function surfacePoint(
   params: DesignParams,
   u: number,
   v: number,
-): { point: Vec3; bearingDeg: number } {
+): { point: Vec3; normal: Vec3; bearingDeg: number } {
   const p = clampParams(params);
   const ctx = surfaceCtx(p);
   const theta = u * TWO_PI;
   const r = 1 - v;
   return {
     point: canopyPoint(ctx, r, theta),
+    normal: surfaceNormal(ctx, r, theta),
     bearingDeg: ((theta / DEG) % 360 + 360) % 360,
   };
 }

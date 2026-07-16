@@ -53,11 +53,16 @@ export function GrowthOverlay({
       cells.map((cell, i) => {
         const jitter = ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1;
         const local = 0.4 + 0.6 * cell.density01;
-        const outward = 1.03;
+        const maxSize = local * (0.6 + 0.5 * jitter) * 0.42;
+        // Sit foliage ON the skin: step out along the surface normal by roughly
+        // the leaf's own half-size, so it rests against the face it grows on
+        // rather than being scaled radially off a doubly curved shell.
         const [x, y, z] = cell.position;
+        const [nx, ny, nz] = cell.normal;
+        const off = maxSize * 0.5;
         return {
-          pos: [x * outward, y, z * outward],
-          maxSize: local * (0.6 + 0.5 * jitter) * 0.42,
+          pos: [x + nx * off, y + ny * off, z + nz * off],
+          maxSize,
           color: leafColor(cell.density01),
           // Lower cells (v small) grow in first, denser cells lead: a natural fill.
           threshold: 0.05 + 0.5 * (1 - cell.density01) * jitter,

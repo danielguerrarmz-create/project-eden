@@ -117,11 +117,14 @@ export const JOINTS = {
     /** Bolt hole centres from the strut end face (mm) — FABRICATION.md §2. */
     boltInsetsMm: [40, 85],
     boltDiaMm: 12,
-    /** Hub core drum diameter / height (mm). The core claims a cylindrical
-     *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior core,
-     *  ring flange assembly, ground shoe alike) — timber stays out of it. */
+    /** Hub core disc: a laser-cut disc the fins weld to (FABRICATION.md §2) —
+     *  drawn as the thin plate it is, not a drum. Its Ø claims a cylindrical
+     *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior disc,
+     *  ring flange assembly, ground shoe alike) — timber stays out of it.
+     *  The envelope is a clearance VOLUME, not the physical part: the standoff
+     *  solver reads coreDiaMm only, so the disc thickness is render-only. */
     coreDiaMm: 140,
-    coreHeightMm: 80,
+    coreDiscMm: 8,
     /**
      * MILLED-END STANDOFF (FABRICATION.md §1a): every strut end is a square
      * cut at a COMPUTED standoff — the smallest length where the whole end

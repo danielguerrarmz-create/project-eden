@@ -132,7 +132,7 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
       // Connector body by node kind (FABRICATION.md §2 variants).
       if (node.kind === 'interior') {
         cylinders.push(
-          cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreHeightMm * MM),
+          cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreDiscMm * MM),
         );
       } else if (node.kind === 'ground') {
         // Ground shoe: 200×200×8 base plate over the driven screw.

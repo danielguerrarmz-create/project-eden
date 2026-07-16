@@ -339,6 +339,9 @@ export interface StrutCell {
   density01: number; // 0..1 -> heatmap colour + real strut spacing
   orientation: 'vertical' | 'horizontal' | 'diagonal' | 'mesh';
   position: Vec3;
+  /** Outward unit surface normal at the cell — overlays step along this to sit
+   *  ON the skin. Radial-about-Y offsets do not work on a doubly curved shell. */
+  normal: Vec3;
 }
 
 export interface StrutField {

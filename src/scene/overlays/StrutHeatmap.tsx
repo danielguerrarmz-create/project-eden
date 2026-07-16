@@ -22,11 +22,13 @@ export function StrutHeatmap() {
         // Small nodes so the timber stays legible; taper toward the crown where
         // the (u,v) cells converge, or they'd pile into a pom-pom up top.
         const r = (0.028 + 0.055 * cell.density01) * (0.45 + 0.55 * (1 - cell.v));
-        // Nudge nodes slightly outward from the centre so they sit on the skin.
+        // Sit on the skin: step out along the surface normal by the node's own
+        // radius, so a cell touches the face it marks wherever it is on the
+        // shell — crown, flank or eave.
         const [x, y, z] = cell.position;
-        const outward = 1.04;
+        const [nx, ny, nz] = cell.normal;
         return (
-          <mesh key={i} position={[x * outward, y, z * outward]}>
+          <mesh key={i} position={[x + nx * r, y + ny * r, z + nz * r]}>
             <sphereGeometry args={[r, 10, 8]} />
             <meshStandardMaterial
               color={c}
