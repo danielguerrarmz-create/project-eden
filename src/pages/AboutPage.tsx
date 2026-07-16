@@ -266,47 +266,58 @@ function SupportingRow({
   );
 }
 
-/** The desktop filmstrip's width. No project carries more than three supporting images (measured),
- *  so at this width the tallest strip is ~450px and always fits beside the hero. */
-const STRIP_W = 132;
+/**
+ * THE MEDIA AREA (2026-07-16, round 3). Daniel: "I would like the hero image to be slightly smaller
+ * and to be more adaptable so that smaller images can exist below it and to the right, not just
+ * merely to the right... the main hero image/video takes 60% of the entire area dedicated to photos.
+ * The other 40% is delegated between the rest of the images."
+ *
+ * 60/40 with the remainder BOTH beside and below is an L, and the L is what these two numbers are:
+ * a hero at 74% x 81% of the area is 60% of it, and what is left is a right column (26 x 81 = 21%)
+ * plus a full-width bottom strip (100 x 19 = 19%) — 40%, in two places. So the supporting images are
+ * dealt into both rather than locked to a right-hand rail.
+ *
+ * The previous cut was a vertical filmstrip only, which existed to stop a horizontal strip eating the
+ * hero's height (it had measured 2.2:1 to 2.9:1 against images natively 1.2:1 to 1.9:1). That reason
+ * still holds and the bottom strip is why: it is 19% of the area, not a full row of thumbnails at
+ * their natural height, so it costs the hero far less than the old row did.
+ *
+ * EVERY CELL TAKES ITS IMAGE'S OWN ASPECT (`aspectRatio: img.ratio`), never a fixed shape — Daniel
+ * said the right-side supporting images "are not displayed properly", which is the same
+ * wrong-shaped-box disease as the timeline plates and the old portrait hero. Right-column cells take
+ * the column's width and derive their height; bottom-strip cells take the strip's height and derive
+ * their width. Both are exact, so nothing letterboxes and nothing crops.
+ */
+const MEDIA = { heroW: 74, heroH: 81 };
 
 /**
- * The supporting images as a VERTICAL FILMSTRIP beside the hero (desktop).
+ * How the supporting images are dealt between the two regions — BY SHAPE, not by count.
  *
- * This is here to buy the hero its aspect ratio. The desktop detail is height-locked to the viewport
- * (~729px of panel), and every pixel a horizontal strip takes comes straight out of the hero's height
- * — with the strip under the hero, the hero measured 875x306..401, i.e. 2.2:1 to 2.9:1, against source
- * images that are natively 1.2:1 to 1.9:1. That is Daniel's own complaint (an image forced into a box
- * the wrong shape) arriving from the opposite side: it was portrait, and a naive row made it a slot.
- * Standing the strip on its end spends WIDTH, which this panel has, instead of HEIGHT, which it does
- * not: the hero becomes ~735x415..509 — 1.44:1 to 1.77:1 — which is the source images' own range.
+ * The two regions have opposite proportions, and that is the whole rule: the right column is narrow
+ * and tall, so it suits TALL images; the bottom strip is short and wide, so it suits WIDE ones. The
+ * first cut dealt by position in the array and it was immediately visible why that is wrong — it put
+ * Archipedia's 0.46-ratio image (a very tall UI screenshot) in the bottom strip, where a cell sized
+ * by the strip's height comes out 38px wide. A sliver. The same image in the right column is fine.
  *
- * Each thumb takes the strip's full width at its own `aspectRatio`, so nothing is cropped. They may
- * shrink (and only then cover-crop) if a project ever carries enough supporting images to overrun the
- * column; `overflow-hidden` is the backstop.
+ * So: sort by ratio, the tallest half goes right, the widest half goes bottom. Nothing is cropped and
+ * nothing is a sliver — each image lands in the region shaped like it.
  */
-function SupportingStrip({
-  images,
-  onOpen,
-  reduced,
-}: {
-  images: ProjectImage[];
-  onOpen?: (image: ProjectImage) => void;
-  reduced?: boolean;
-}) {
-  if (images.length === 0) return null;
-  return (
-    <div
-      className="flex min-h-0 shrink-0 flex-col gap-2 overflow-hidden"
-      style={{ width: STRIP_W }}
-    >
-      {images.map((img) => (
-        <div key={img.src} className="relative min-h-0 w-full" style={{ aspectRatio: img.ratio }}>
-          <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
-        </div>
-      ))}
-    </div>
-  );
+export function dealSupporting<T extends { ratio: number }>(rest: T[]): { right: T[]; bottom: T[] } {
+  if (rest.length <= 1) return { right: rest, bottom: [] };
+  const byShape = [...rest].sort((a, b) => a.ratio - b.ratio); // tallest first
+  const rightCount = Math.ceil(rest.length / 2);
+  return { right: byShape.slice(0, rightCount), bottom: byShape.slice(rightCount) };
+}
+
+/** The right column's own aspect: stacking images of full column width gives a total height of
+ *  `width * sum(1/ratio)`, so the column that exactly holds them has this ratio. Feeding it as the
+ *  container's `aspectRatio` alongside `h-full` lets the column DERIVE its width from the height it
+ *  was given — which is what keeps every cell at its exact ratio without clipping. `max-w` then caps
+ *  it at its 26% share; when that bites, the cells simply get shorter (still exact) and the column
+ *  ends early rather than cropping anything. */
+export function stackRatio(images: readonly { ratio: number }[]): number {
+  const inv = images.reduce((s, im) => s + 1 / im.ratio, 0);
+  return inv > 0 ? 1 / inv : 1;
 }
 
 /** Mobile: the hero at 3:2, then the rest as a justified row below. */
@@ -661,6 +672,7 @@ function ListView({ reduced }: { reduced: boolean }) {
   const [activeN, setActiveN] = useState(() => items[0].n);
   const project = items.find((p) => p.n === activeN) ?? items[0];
   const { hero, rest } = heroSplit(project.images);
+  const { right, bottom } = dealSupporting(rest);
 
   // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
   // they are excluded here and never enter the arrow-key walk.
@@ -764,14 +776,39 @@ function ListView({ reduced }: { reduced: boolean }) {
             animate={{ opacity: 1 }}
             transition={{ duration: reduced ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* ROW 1 — the pictures. The main image takes the row, with the supporting filmstrip
-                standing beside it; it fills whatever height the band leaves, so a project with
-                little to say gets a bigger picture. */}
-            <div className="flex min-h-0 flex-1 gap-2">
-              <div data-project-hero className="relative min-h-0 flex-1">
-                <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fill />
+            {/* ROW 1 — the pictures: the hero at ~60% of the area, the rest dealt to the right
+                column and the bottom strip. See the MEDIA comment for why those two regions are
+                what "60%, below and to the right" actually means. */}
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="flex min-h-0 flex-1 gap-2">
+                <div data-project-hero className="relative min-h-0 flex-1">
+                  <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fill />
+                </div>
+                {right.length > 0 && (
+                  <div
+                    className="flex h-full shrink-0 flex-col justify-start gap-2"
+                    style={{ aspectRatio: stackRatio(right), maxWidth: `${100 - MEDIA.heroW}%` }}
+                  >
+                    {right.map((img) => (
+                      <div key={img.src} className="relative w-full" style={{ aspectRatio: img.ratio }}>
+                        <ProjectImg image={img} onOpen={openShot} reduced={reduced} fill />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <SupportingStrip images={rest} onOpen={openShot} reduced={reduced} />
+              {bottom.length > 0 && (
+                <div
+                  className="flex shrink-0 gap-2 overflow-hidden"
+                  style={{ height: `${100 - MEDIA.heroH}%` }}
+                >
+                  {bottom.map((img) => (
+                    <div key={img.src} className="relative h-full" style={{ aspectRatio: img.ratio }}>
+                      <ProjectImg image={img} onOpen={openShot} reduced={reduced} fill />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             {/* ROW 2 — the project information. */}
             <ProjectInfoBand project={project} />
