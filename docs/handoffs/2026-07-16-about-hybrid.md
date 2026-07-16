@@ -397,3 +397,155 @@ to two, `groupProjects` deleted), `src/engine/gongbi/garland.ts` (`vines`),
 **Contested files touched:** `src/engine/gongbi/*` (garland + painter, for `vines`; not on the parallel
 session's Eden list). `src/engine/botanical/*` **not** touched. None of the Eden geometry, scene, or
 engine-page files touched.
+
+---
+
+# ROUND 4 — same day. The lockup, the founders' parenthesis, the growth, the species pool
+
+**Branch:** `about-hybrid-sepia`. **`main` untouched, nothing pushed.** **Author:** Edward (round 4,
+the third of the day). Rounds 1–3 are preserved above, unedited.
+
+Four commits: `b0150ce` the hero lockup · `fa6258d` the founders' parenthesis (task F) ·
+`c460bb9` the growth · `dd8a255` the species pool.
+
+## What
+
+### 1. The hero lockup: the mark comes up to the words (`b0150ce`)
+
+Finishes the previous session's in-flight edit. Its diagnosis was right — round 2 put the centring
+lift on the copy column ALONE, so the words rose and the mark (which sits at the SVG frame's centre)
+did not. Measured at the pin: words 432, mark 492, **60px adrift**. The lift moved to the ROW, where
+`items-stretch` shrinks both columns together.
+
+**Changed from the inherited diff: 2.25rem → 3.25rem.** The lift is pb/2, so moving the padding from
+the column to the row changes what it acts on and the same value is no longer the same nudge — at
+2.25 the words came to rest 10px proud of the screen centre instead of the 18 they had been. 18 is
+the position Daniel called *"perfectly aligned"*, so it is a fixed point: **the mark had to come up
+to the words, not the words down to the mark.** (2.25 → 10 proud, 2.75 → 14, 3.25 → 18.)
+
+### 2. Task F — the line arrives and opens (`fa6258d`)
+
+One continuous line now runs the page: Oculus → spine → trunk across the seam → fork → a parenthesis
+bracketing both founders, with the flowers on the arms. Replaces `FounderBower` (recover:
+`git show b0150ce -- src/pages/AboutPage.tsx`).
+
+**The shape is judged by eye**, per Daniel's *"It just has to look pretty"* — hand-placed anchors
+tuned against screenshots, no derived-geometry system. What is derived is where it ATTACHES, and all
+of it is measured, because every part was got wrong by reasoning first:
+
+- **The arms read the rows' real rects.** The founders' content is left-aligned, so SeamBridge's
+  page-centre plumb line landed in the facts column, on nothing.
+- **The trunk starts where the line actually stops, and the modes differ.** Reduced: the drawing runs
+  80 world units PAST its exit, so the line ends ~85px above the founders' wrapper (a floating stub
+  over a gap). Motion: the sticky row bottoms out at the track's bottom, but **the row's own bottom
+  padding — the lockup fix from the commit before — means the frame stops 134px short of it.** The
+  two changes interact.
+- **One line means one weight.** `SPINE_W` is authored in WORLD units and scales with the frame: it
+  renders at **5.22 CSS px in motion and 7.96 in reduced**, neither of them 7.5. A hardcoded trunk
+  matched the position exactly and still stepped 46% at the join.
+
+Two things only the screenshots caught: the arms left the fork nearly horizontal and read as a **coat
+hanger** (fixed at the shoulder anchor — the spline's tangent at the root points at it); and they
+ended in blunt full-width caps in open paper, so they now **taper root to tip** (SVG cannot taper a
+stroke; `taperRuns` strokes overlapping runs).
+
+**The stems are sepia and the organs pigment** (`tube:false`), where FounderBower painted the whole
+vine. The connection requires it: a painterly tapering gongbi vine and a hard sepia line cannot meet
+without a seam whatever the geometry does. This **settles round 2's flagged colour-law question
+conservatively** — structure sepia, botanicals pigment, nothing extended. Daniel's *"quite beautiful"*
+was about the flowers, and the flowers are untouched.
+
+### 3. The growth (`c460bb9`)
+
+Daniel: *"we could actually see the plants and the branches being assembled as it is coming down...
+both of those emissions should match each other."*
+
+**The sync chose the mechanism.** The plates fade on `clamp01((cardLineY - y - 10) / UNFURL_SPAN)` —
+the camera's card line. So the branches reveal on the SAME line, span and ramp, read at their own
+root. One expression at two places; they cannot drift.
+
+**The brief's entry-triggered IntersectionObserver is the one thing that could not work here:** the
+plates are scroll-driven, so an observer would make the branch a *different event* from the plate
+beside it — the thing the note rules out. Nor is it the expensive kind of scroll-scrubbing: the camera
+already re-renders every frame and the plates already do this. Nothing about painting is deferred.
+
+Does **not** regress "fade, don't grow" — that rule governs the PLATES, whose objection was a
+layout-affecting transform distorting the image. A stroke revealing along its own path distorts
+nothing.
+
+**The organ reveal is the part worth reading.** The first cut was a soft horizontal wipe trailing the
+card line: one rect, cheap, wrong. It assumed foliage sits below its root. **Measured: 195 of 332
+organs sit ABOVE their own branch's root, by up to 278 world units** — space colonization grows in
+every direction. The wipe uncovered blossoms whose twig had not drawn, and the page showed **flowers
+floating on bare paper**. The screenshot caught it; every frame-count number looked fine. No lag value
+fixes it. Each disc is now keyed to its branch's own `grow`, which cannot have the bug by construction.
+
+### 4. The species pool (`dd8a255`)
+
+Positions deterministic, species rolled per load. **One plant per page, not one per station** — the
+per-station reading would make the ornament a crowd of plants sharing a stem, which is what
+`garland.ts` batches vines to avoid, and would need a composer rewrite.
+
+**The brief's cache concern is moot.** `painter.ts`'s cache is `new Map()` — in-memory, per session.
+The page **already repaints every garland on every load**; there is no cross-load cache to lose, so
+the roll is free.
+
+Three of twelve, each signed off by eye; rejections recorded in the ledger. **The measurements do not
+pick:** `pool-m` had the most ink of all twelve and is cream-washed mush; the best take of one sweep
+had the lowest chroma of its six; and **`pool-d` scored blueFrac 0.000 while rendering pale blue-grey
+daisies** — a desaturated steel-blue slips under any saturation threshold, so the one prohibited
+colour is the one the metric is worst at seeing.
+
+`reach` is the exception — a real invariant, measured per member, with a test (53 / 84 / 54 against
+`GARLAND_REACH` 90). `pool-a` leaves **6px of headroom**.
+
+Also fixes a claim the page had been making falsely: the suffixed seeds (`/coda`, `/founders`) were
+never other takes of one plant — `createFlora` derives the **species** from the seed, so the page was
+quietly growing **three species** while its comments said one.
+
+## Verify
+
+- Gates: `npm run typecheck` **0** · `npx vitest run` **350** (was 340) · `npm run build` clean.
+- `qa/hero-lockup.mjs` — drives a real scroll to the pin. Verified by reverting: the harness reports
+  the mark 60px below the words, then 0.00 with the fix.
+- `qa/founder-parenthesis.mjs` (+`--motion`) — the join in both modes: **2px overlap, 0.00px jog, 0%
+  width step.**
+- `qa/growth-frames.mjs` — **motion ON**, emits a frame sequence, because the reduced-motion harness
+  structurally cannot see the feature. Inked stems rise 18 to 219 across frac 0.06 to 0.54, foliage
+  trails (10 to 187 discs), **0 orphans at every stop**.
+- `qa/species-pool.mjs` — two species, identical structure and stations (284 stems).
+- Reduced motion: 284 stems, 0 dashed, mask off — settles instantly, fully grown.
+
+## Left (open) — for Daniel
+
+1. **THE COLD PAINT IS ~30s, and it is the biggest thing on this page.** Measured: the sub-branch
+   garland alone is **6.7–7.6s**, the parenthesis 378ms, and the page paints four garlands per load
+   through the worker pool. A 13s wait screenshotted the founders with **stems and no flowers**. This
+   is pre-existing and species-independent (spine-2 6777ms vs pool-a 7582ms — 12%), and round 1's
+   note says 20-25s cold is *"what sank the rejected draft"*. **The page is at that number now.** The
+   cache is session-only, so every visitor pays it every load. Not fixed here — it is a real piece of
+   work (an organ atlas, or persisting the cache) and it wants your call.
+2. **The pool is 3 members, not the 6-10 the brief wanted.** Nine of twelve were duds. More members
+   need more sweeping, and `reach` leaves only 6px of headroom for a lusher plant.
+3. **`pool-g` is a live judgement call** — violet blooms, handsome, arguably your wisteria, cut
+   because a pool member is a coin toss rather than a choice. Say the word and it goes back in.
+4. **The arms pass close to "THE FOUNDERS." and the lower role line.** Clears them at 1440x900; it is
+   tight, and it is a composition call, not a constant.
+5. The year labels were **not touched** — the `spreadSide` / `yearToY` distortion is still awaiting
+   your ruling.
+6. Mobile / Firefox / WebKit unverified, as in rounds 1–3.
+
+## Files
+
+**New:** `src/pages/about/parenthesis.ts` (+test), `src/pages/about/species.ts` (+test),
+`qa/hero-lockup.mjs`, `qa/founder-parenthesis.mjs`, `qa/growth-frames.mjs`, `qa/species-pool.mjs`.
+
+**Modified:** `src/pages/AboutPage.tsx` (FounderParenthesis replaces FounderBower, the arrival
+wrapper, PAGE_SPECIES), `src/pages/about/CrossPathsTimeline.tsx` (the lockup lift, growth,
+`DESCENT_EXIT_FRAC`, `TIMELINE_W`/`SPINE_W` exported, datums).
+
+**Datums added:** `data-timeline-track`, `data-timeline-frame`, `data-mark-center`,
+`data-descent-exit`, `data-paren-trunk`, `data-founder-row`.
+
+**Contested files touched:** `src/engine/gongbi/*` **not** touched this round. None of the Eden
+geometry, scene or engine-page files touched. `src/routing.ts` / `src/Root.tsx` untouched.
