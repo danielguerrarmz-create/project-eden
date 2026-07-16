@@ -19,10 +19,20 @@
  * morph). The mark's stroke equals the spine's weight (k = SPINE_W / 2.8 = 2.679), so the mark is
  * the largest single object at the bottom of the piece. Under it: the "bower" wordmark. Nothing else.
  *
- * THE HOLDER IS A CALYX (holder A v2 strengthened). Every plate is borne by a pedicel + a filled
- * receptacle cup + five sepals, the outer pair climbing the plate's sides. Sepal lengths scale with
- * plate height (clamped), so the showcase tier fills out and the floor tier stays modest. The old
- * leaf ornament is gone.
+ * NOTHING HOLDS THE PROJECTS (2026-07-16, round 2). The plates used to be BORNE: each forked off the
+ * spine on an ornate branch that arrived under it, where a calyx cupped it from below. Daniel:
+ * "We had initially tried to have the flowers or the leaves actually holding the projects within the
+ * timeline. Scratch that." They now stand ALONGSIDE the line at their year, and their entrance is a
+ * fade rather than a bloom. See the decoupling note further down for the full list of what went and
+ * the two classes of collision that went with it.
+ *
+ * THE ORNAMENT READS THE LAYOUT; THE LAYOUT NEVER READS THE ORNAMENT. This direction is the whole
+ * lesson of round 1, and it is load-bearing. The old branches were STRUCTURE — they carried plates,
+ * so every one of them could collide with a plate, a label, or another branch, and a growing pile of
+ * rules existed to arbitrate that. The sub-branches that replace them (see SubBranches) are ORNAMENT:
+ * they carry nothing, they grow into whatever negative space the plates leave, and if ornament and
+ * layout ever disagree the ornament loses by construction, because it is computed downstream of a
+ * layout that cannot see it.
  *
  * ONE COLOUR (INK_SEPIA — re-keyed from INK_BLUE on 2026-07-16; see the constant). TIME IS
  * PIECEWISE (2021 to 2023 compressed, then open). Unchanged.
@@ -33,7 +43,6 @@ import { line as d3line, curveCatmullRom } from 'd3-shape';
 import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
-import { leafSprite, flowerSprite, type PlantPath } from '../../engine/botanical';
 import { requestGarland } from '../../engine/gongbi/painter';
 import type { GarlandOrgan, GarlandStation } from '../../engine/gongbi/garland';
 
@@ -65,9 +74,9 @@ export const INK_SEPIA_TEXT = '#6F5439';
 export const VELLUM = '#FBF9F3';
 
 /**
- * The checkable ceiling on how many stroked paths may be visible at once: the spine, plus at most
- * two branch pedicels mid-unfurl. This is a QA contract (screenshot and count), not something the
- * code enforces; the reveal gating below keeps the count low.
+ * The checkable ceiling on how many stroked STRUCTURAL paths may be visible at once: the spine plus
+ * its two convergence arms. This is a QA contract (screenshot and count), not something the code
+ * enforces. It counts structure only — the ornamental sub-branches are deliberately not strands.
  */
 export const MAX_CONCURRENT_STRANDS = 3;
 
@@ -129,13 +138,15 @@ export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
 export const yearToY = (y: number) =>
   y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
 
-/** An obstacle a year label must stay clear of: one plate and the branch that carries it.
- *  `computeBranches()` already returns exactly this shape, so the rule below scores the REAL
- *  layout rather than a parallel model of it. */
+/** An obstacle a year label must stay clear of: a plate. `computePlates()` returns exactly this
+ *  shape, so the rule below scores the REAL layout rather than a parallel model of it.
+ *
+ *  This used to carry the plate's BRANCH polyline too, and the branch was by far the harder obstacle:
+ *  it swept the whole gutter, and a label's vellum halo could cut it in half. The branches are gone
+ *  (see the decoupling note below) and that entire class of collision went with them. */
 export interface LabelObstacle {
   side: Side;
   rect: { x: number; y: number; w: number; h: number };
-  pts: Array<{ x: number; y: number }>;
 }
 
 /** The label's glyph box on side `dir` at tick-y `ty`. The box sits ABOVE the tick
@@ -153,41 +164,29 @@ function boxGapToRect(b: ReturnType<typeof yearLabelBox>, r: LabelObstacle['rect
   return dx === 0 && dy === 0 ? -1 : Math.hypot(dx, dy);
 }
 
-/** Clearance from the label box to a stroked polyline, accounting for the stroke's own width. */
-function boxGapToPoly(b: ReturnType<typeof yearLabelBox>, pts: LabelObstacle['pts'], sw: number): number {
-  let best = Infinity;
-  for (const p of pts) {
-    const dx = p.x < b.x0 ? b.x0 - p.x : p.x > b.x1 ? p.x - b.x1 : 0;
-    const dy = p.y < b.y0 ? b.y0 - p.y : p.y > b.y1 ? p.y - b.y1 : 0;
-    best = Math.min(best, Math.hypot(dx, dy) - sw / 2);
-  }
-  return best;
-}
-
 /** How much room a year label has on one side: the tightest clearance to anything on that side. */
 export function yearLabelClearance(obstacles: readonly LabelObstacle[], y: number, side: Side): number {
   const box = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
   let best = Infinity;
   for (const o of obstacles) {
     if (o.side !== side) continue;
-    best = Math.min(best, boxGapToRect(box, o.rect), boxGapToPoly(box, o.pts, BRANCH_W));
+    best = Math.min(best, boxGapToRect(box, o.rect));
   }
   return best;
 }
 
 /**
  * Which side of the spine a year label sits on: THE SIDE WITH MORE ROOM, measured against the
- * laid-out plates and branches. Ties (and an empty layout) default right.
+ * laid-out plates. Ties (and an empty layout) default right.
  *
  * This used to flip "opposite the nearest cluster within 0.15 of a year", reading the AUTHORED
  * cluster years. That model and the page disagreed, because `packSide` moves plates: a cluster
  * authored at 2022.6 has its plates packed down into 2023's label band, and a rule that only
- * looks at same-year clusters cannot see it. It sent 2023's label right, into the medical
- * cluster's branch, and 2025's left, into dougherty's — both measured live on 2026-07-16.
+ * looks at same-year clusters cannot see it.
  *
- * The concept is unchanged (the label steps aside to stay clear); it now derives "clear" from
- * where the plates and branches ACTUALLY are, which is the only model that cannot drift from
- * the drawing. See the contract test, which asserts the chosen side against the real layout.
+ * The concept is unchanged (the label steps aside to stay clear); it derives "clear" from where the
+ * plates ACTUALLY are, which is the only model that cannot drift from the drawing. See the contract
+ * test, which asserts the chosen side against the real layout.
  */
 export function yearLabelSide(obstacles: readonly LabelObstacle[], y: number): Side {
   const right = yearLabelClearance(obstacles, y, 'right');
@@ -402,166 +401,38 @@ export function spineLeanPtsTo(targetX: number): Array<{ x: number; y: number }>
   return pts;
 }
 
-/* -------------------------------- the calyx ------------------------------- */
+/* ------------------- decoupled: what used to live here -------------------- */
 
-/**
- * Holder A, the ORIGINAL (light) calyx: a fine pedicel lifts the plate from underneath, and three
- * slim sepals fan out below the plate's inner-bottom corner. NOT the strengthened v2 cup. `phi` is
- * the SVG's angle (180 straight down, 225 toward the spine, 135 under the plate); the deviation from
- * straight down is `phi - 180`. Each length scales with plate height, clamped, so the floor tier
- * stays modest and only the showcase tier fills out.
+/*
+ * DELETED 2026-07-16 (round 2), when Daniel decoupled the projects from the timeline: "We had
+ * initially tried to have the flowers or the leaves actually holding the projects within the
+ * timeline. Scratch that." Everything below existed only so that a BRANCH could CARRY a PLATE, and a
+ * plate that is not carried needs none of it:
+ *
+ *   SEPAL_DEFS / sepalLen / CALYX_LEAF_PROFILES / calyxSprig / sprigPathStyle / SprigOrgan
+ *       — the holder: the three-sepal calyx, and the generated botanical that replaced it, which
+ *         cupped each plate from below at its inner-bottom corner.
+ *   branchAttachY / branchPts / branchPath / BRANCH_WAVE_AMP / BRANCH_WAVE_WAVES / BRANCH_W
+ *       — the ornate root from the spine to that corner, and the enveloped sine wander that made it
+ *         read as drawn rather than stamped.
+ *   computeBranches
+ *       — the no-overlap contract over those branches. Now `computePlates`, which the year labels
+ *         still need: a plate is still an obstacle, it just isn't hanging off anything.
+ *   unfurl / easeUnfurl
+ *       — the bloom-opening entrance, and the "weird initial distortion" Daniel called out with it.
+ *
+ * TWO WHOLE CLASSES OF PROBLEM LEFT WITH THEM, which is the point rather than a side effect: a branch
+ * can no longer cross a plate or another branch, and a year label can no longer be cut in half by a
+ * branch passing behind it. The 2025 label collision that round 1 fought to a draw and then flagged
+ * for Daniel as a composition call is simply gone — there is no branch at 2025 to cross.
+ *
+ * The page still has branches; they are ORNAMENT now, not structure (see SubBranches). They carry
+ * nothing, so nothing can collide with them: when ornament and layout disagree, the ornament loses by
+ * construction. That inversion is the lesson of round 1 — letting ornament dictate layout is what
+ * produced every collision it then needed rules to solve.
+ *
+ * Recover any of it from git: `git show fa87d33 -- src/pages/about/CrossPathsTimeline.tsx`.
  */
-export const SEPAL_DEFS: ReadonlyArray<{
-  phi: number;
-  lenCoef: number;
-  lenLo: number;
-  lenHi: number;
-}> = [
-  { phi: 225, lenCoef: 0.45, lenLo: 60, lenHi: 150 }, // toward the spine
-  { phi: 180, lenCoef: 0.28, lenLo: 45, lenHi: 110 }, // straight down
-  { phi: 135, lenCoef: 0.36, lenLo: 55, lenHi: 130 }, // under the plate
-];
-
-/** A sepal's length: proportional to plate height, clamped so the floor tier stays modest and the
- *  showcase tier fills out. Pure and exported for the scaling test. */
-export function sepalLen(def: { lenCoef: number; lenLo: number; lenHi: number }, h: number): number {
-  return clamp(def.lenCoef * h, def.lenLo, def.lenHi);
-}
-
-/* ------------------------------- the branch ------------------------------- */
-
-/**
- * THE BRANCH (redline 2). An ornate root from the spine to a plate. It leaves the spine on a near-
- * horizontal tangent (a big interior angle), then sweeps down the gutter column beside the plate and
- * arrives UNDER it, at the plate's inner-bottom corner, where the three-sepal calyx cups the plate
- * from below. Because it stays inside the gutter column (never at the plate's x-range except at that
- * one corner) it never crosses an image; because attach points are ordered down each side's lane,
- * branches never cross one another. Pure + exported so the no-overlap contract is unit-tested against
- * the real layout (see computeBranches).
- */
-export function branchAttachY(_anchorY: number, plateY: number, plateH: number): number {
-  return plateY + plateH; // the inner-bottom corner: the branch arrives under the plate
-}
-
-/** The ornate branch sampled to a polyline. x runs monotonically across the gap (so the tendril
- *  never leaves its column, hence never crosses a plate or the spine); y is a smoothstep drift from
- *  the anchor to the attach, plus an enveloped sine wander for the drawn-by-hand curl. This is the
- *  single source of truth: the render splines through these points, and the contract test checks
- *  them, so what is drawn is exactly what is proven not to overlap. */
-export function branchPts(
-  spineX: number,
-  anchorY: number,
-  edgeX: number,
-  attachY: number,
-  N = 48,
-): Array<{ x: number; y: number }> {
-  const dx = edgeX - spineX;
-  // A stable per-branch seed (no per-render randomness) so each tendril bulges a little differently
-  // and the set reads as hand-drawn rather than stamped. Amplitude and first-bulge direction vary;
-  // the shape is still confined to the gap column and enveloped at both ends, so the contract holds.
-  const seed = Math.sin(anchorY * 12.9898 + attachY * 78.233);
-  const amp = BRANCH_WAVE_AMP * (0.75 + 0.5 * Math.abs(seed));
-  const bulge = seed >= 0 ? 1 : -1;
-  const waves = BRANCH_WAVE_WAVES + (Math.abs(seed) > 0.5 ? 0.5 : 0);
-  const pts: Array<{ x: number; y: number }> = [];
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    const s = t * t * (3 - 2 * t); // smoothstep: horizontal tangent at both ends
-    const env = Math.sin(Math.PI * t);
-    const wander = amp * bulge * Math.sin(2 * Math.PI * waves * t) * env * env;
-    pts.push({ x: spineX + dx * t, y: lerp(anchorY, attachY, s) + wander });
-  }
-  return pts;
-}
-
-/** The branch as a smooth path: a Catmull-Rom spline through the ornate sample points, so the tendril
- *  reads as one continuous drawn line. */
-function branchPath(spineX: number, anchorY: number, edgeX: number, attachY: number): string {
-  return lineGen(branchPts(spineX, anchorY, edgeX, attachY)) ?? '';
-}
-
-/* ------------------------- the holder (a botanical) ----------------------- */
-
-/** One placed organ of the holder sprig: an SVG transform + the generator's paths. */
-export type SprigOrgan = { transform: string; paths: readonly PlantPath[] };
-
-/** Leaf profile per SEPAL_DEFS axis (toward-spine / straight-down / under-plate). */
-const CALYX_LEAF_PROFILES = ['lanceolate', 'ovate', 'lanceolate'] as const;
-
-/**
- * THE HOLDER, a generated botanical (replaces the schematic three-sepal calyx). A small real plant
- * cups each plate from below: three generated LEAVES fan DOWN the same SEPAL_DEFS axes from the
- * plate's inner-bottom corner (one toward the spine, one straight down, one under the plate), plus a
- * small barely-open BUD at the corner. It reuses the sepal axis skeleton and the height-scaled length
- * law (sepalLen), each length still capped by the room actually below (maxLen), so the ornament stays
- * in the gutter under the plate EXACTLY like the sepals did: the leaf tips never reach the plate
- * beneath and never cross an image. Deterministic per plate via `seed`; one colour (INK_SEPIA).
- * `tipY` is the lowest point reached (for the gutter-containment contract test).
- */
-export function calyxSprig(
-  cornerX: number,
-  cornerY: number,
-  dir: number,
-  h: number,
-  maxLen: number,
-  seed: string,
-): { organs: SprigOrgan[]; tipY: number } {
-  const organs: SprigOrgan[] = [];
-  let tipY = cornerY;
-  SEPAL_DEFS.forEach((def, ai) => {
-    const dev = ((def.phi - 180) * Math.PI) / 180; // deviation from straight down
-    // Kept clearly SHORTER than the full sepal envelope so the holder stays small + delicate.
-    const len = Math.min(sepalLen(def, h), maxLen) * 0.82;
-    const ux = -dir * Math.sin(dev); // axis: down, splayed with the plate's side
-    const uy = Math.cos(dev);
-    const rot = (Math.atan2(ux, -uy) * 180) / Math.PI; // rotate the up-growing leaf onto the axis
-    const sprite = leafSprite(`${seed}:leaf:${ai}`, {
-      profile: CALYX_LEAF_PROFILES[ai],
-      veins: ai === 0 ? 1 : 0,
-      length: len,
-      halfWidth: Math.max(0.12 * len, 5),
-    });
-    organs.push({
-      transform: `translate(${cornerX.toFixed(2)} ${cornerY.toFixed(2)}) rotate(${rot.toFixed(2)})`,
-      paths: sprite.paths,
-    });
-    tipY = Math.max(tipY, cornerY + len * uy); // the blade tip is the lowest point on this axis
-  });
-  // A small bud at the corner, splaying DOWN into the gutter (rotate 180 so the rosette faces down).
-  // Short and barely open, so it stays delicate at the base and never fills the gutter.
-  const budLen = Math.min(20, 0.32 * maxLen);
-  const bud = flowerSprite(`${seed}:bud`, {
-    petals: 5,
-    length: budLen,
-    width: Math.max(4, 0.3 * budLen),
-    profile: 'ovate',
-    open: 0.45,
-  });
-  organs.push({
-    transform: `translate(${cornerX.toFixed(2)} ${(cornerY + 2).toFixed(2)}) rotate(180)`,
-    paths: bud.paths,
-  });
-  tipY = Math.max(tipY, cornerY + 2 + budLen);
-  return { organs, tipY };
-}
-
-/** Per-role render style for a holder organ, in the timeline's delicate calyx register. */
-export function sprigPathStyle(p: PlantPath): {
-  fill: string;
-  fillOpacity: number;
-  stroke: string;
-  strokeOpacity: number;
-  strokeWidth: number;
-} {
-  const isBlade = p.role === 'leaf' || p.role === 'petal';
-  return {
-    fill: p.fill === 'none' || p.role === 'vein' ? 'none' : INK_SEPIA,
-    fillOpacity: p.role === 'center' ? 0.5 : 0.05,
-    stroke: INK_SEPIA,
-    strokeOpacity: 0.55,
-    strokeWidth: isBlade ? 1 : 0.8,
-  };
-}
 
 /** Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
  *  drawn is STANDARD. Images dominate. */
@@ -574,17 +445,6 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
 
 /** The fixed perpendicular gap from the spine to a plate's near (inner) edge. */
 export const OFFSET_X = 110;
-/** The branch is an ORNATE root, not a stiff arc: it leaves the spine on a near-horizontal tangent (a
- *  big interior angle), then sweeps down the gutter beside the plate and arrives under it, wandering
- *  gently so it reads as drawn and alive. The wander is a sine enveloped to vanish (value + slope) at
- *  both ends, so the horizontal departure and the no-overlap invariant are preserved. Amplitude is
- *  kept in scale with the narrow gutter; the big sweeping loops in Daniel's redlines belong to the
- *  founder stems, which have open room. */
-const BRANCH_WAVE_AMP = 18;
-const BRANCH_WAVE_WAVES = 1.15;
-/** How heavy the roots read. Substantial, in the spine's register, so they look like roots and not
- *  wires (Daniel: "match the line weight of the spine"), while staying legible in the tight gap. */
-const BRANCH_W = 5;
 /** Minimum vertical gap between two stacked siblings in one cluster (their bounding boxes never
  *  come closer than this — the no-overlap contract). */
 const CLUSTER_GAP_Y = 40;
@@ -681,9 +541,6 @@ function atY(s: Strand, Y: number): { x: number; frac: number } {
   const t = (Y - ys[lo]) / (ys[hi] - ys[lo] || 1);
   return { x: lerp(xs[lo], xs[hi], t), frac: lerp(fracs[lo], fracs[hi], t) };
 }
-
-/** A gentle slow-out settle (cubic ease-out): reads as a leaf opening, not a UI pop. */
-const easeUnfurl = (u: number) => 1 - Math.pow(1 - clamp01(u), 3);
 
 /** Symmetric ease-in-out (cubic): weight at both ends. Used by the post-pin camera pan and the
  *  unravel so neither snaps. (The autoplay effect keeps its own local copy for the entry descent.) */
@@ -1161,16 +1018,21 @@ interface LaidCluster {
   hint: string;
   spineX: number;
   anchorY: number;
-  /** The plates' near edge on this side (where every branch attaches). */
+  /** The plates' near edge on this side: the lane the projects stand in, beside the spine. */
   edgeX: number;
-  plates: Array<{ x: number; y: number; w: number; h: number; media: Plate; attachY: number }>;
+  plates: Array<{ x: number; y: number; w: number; h: number; media: Plate }>;
 }
 
 /**
  * Pack one side's clusters down its offset lane so no two bounding boxes overlap. Pure and
  * deterministic (exported for tests): a cluster sits centred on its true anchor year unless that
  * would collide with the previous cluster on this side, in which case it is pushed just far enough
- * down to clear it by CROSS_GAP. The branch anchor itself always stays on the true year.
+ * down to clear it by CROSS_GAP.
+ *
+ * STILL NEEDED after the 2026-07-16 decoupling, though most of what it was FOR is gone. Plates no
+ * longer hang off branches, so it no longer has to keep a set of branches from crossing each other or
+ * each other's images; but two plates in one lane still cannot occupy the same paper, and that is
+ * this. What left with the branches is everything that had to reason about where a branch attached.
  */
 export function packSide(
   items: Array<{ id: string; anchorY: number; heights: number[] }>,
@@ -1204,13 +1066,12 @@ function layoutClusters(spine: Strand): LaidCluster[] {
     const anchorY = yearToY(c.year);
     const spineX = atY(spine, anchorY).x;
     const dir = c.side === 'left' ? -1 : 1;
-    const edgeX = spineX + dir * OFFSET_X; // the plates' near edge, where the branch attaches
+    const edgeX = spineX + dir * OFFSET_X; // the plates' near edge: the lane beside the spine
     let y = tops.get(c.id)! + (c.dy ?? 0);
     const plates = c.nodes.map((n) => {
       const { w, h } = TIER[n.tier];
       const x = dir === 1 ? edgeX : edgeX - w;
-      const attachY = branchAttachY(anchorY, y, h);
-      const box = { x, y, w, h, media: n.media, attachY };
+      const box = { x, y, w, h, media: n.media };
       y += h + CLUSTER_GAP_Y;
       return box;
     });
@@ -1218,14 +1079,20 @@ function layoutClusters(spine: Strand): LaidCluster[] {
   });
 }
 
-/** Every branch resolved to its sampled polyline and its target plate rect, for the no-overlap
- *  contract test. A branch touches its own plate only at the attach point; it must not intersect any
- *  other plate, and no two branches from DIFFERENT clusters may cross. */
-export function computeBranches(): Array<{
+/**
+ * THE LAID-OUT PLATES — every plate resolved to its rect and its side.
+ *
+ * This is the page's layout, and it is the INPUT to everything ornamental: the year labels dodge it,
+ * and the sub-branch engine grows into the space it leaves. Nothing here reads the ornament back, and
+ * that direction is deliberate and load-bearing (see the decoupling note above).
+ *
+ * Was `computeBranches`, which also sampled each branch's polyline for a no-overlap contract; the
+ * branches are gone and the contract with them.
+ */
+export function computePlates(): Array<{
   clusterId: string;
   plateIndex: number;
   side: Side;
-  pts: Array<{ x: number; y: number }>;
   rect: { x: number; y: number; w: number; h: number };
 }> {
   const spine = sample('spine', spinePts());
@@ -1234,7 +1101,6 @@ export function computeBranches(): Array<{
     clusterId: string;
     plateIndex: number;
     side: Side;
-    pts: Array<{ x: number; y: number }>;
     rect: { x: number; y: number; w: number; h: number };
   }> = [];
   laid.forEach((c) =>
@@ -1243,7 +1109,6 @@ export function computeBranches(): Array<{
         clusterId: c.id,
         plateIndex: i,
         side: c.side,
-        pts: branchPts(c.spineX, c.anchorY, c.edgeX, pl.attachY),
         rect: { x: pl.x, y: pl.y, w: pl.w, h: pl.h },
       }),
     ),
@@ -1450,9 +1315,9 @@ export function CrossPathsTimeline({
   // The spine, sampled once. Everything else anchors onto it.
   const spine = useMemo(() => sample('spine', spinePts()), []);
   const laid = useMemo(() => layoutClusters(spine), [spine]);
-  /** What the year labels must dodge: every plate and every branch, as actually laid out.
-   *  The layout is static, so this is computed once per mount, not per scroll frame. */
-  const labelObstacles = useMemo(() => computeBranches(), []);
+  /** What the year labels must dodge: every plate, as actually laid out. The layout is static, so
+   *  this is computed once per mount, not per scroll frame. */
+  const labelObstacles = useMemo(() => computePlates(), []);
 
   // The two convergence strands (the twist-fuse). Sampled for a smooth over-under lay-up; drawn
   // solid because they ARE the structure, not a whisper. The viewBox pan clips their off-frame tops.
@@ -1845,110 +1710,48 @@ function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y
 }
 
 /**
- * The unfurl transform for a plate: opens from a lightly furled, foreshortened state to upright,
- * scaling about a pivot at the branch junction so it reads as a bloom opening. Rotation is a whisper
- * (2 degrees on the way in only, resting upright).
- */
-function unfurl(u: number, pivotX: number, pivotY: number) {
-  const e = easeUnfurl(u);
-  const sx = lerp(0.92, 1, e);
-  const sy = lerp(0.64, 1, e);
-  const rot = lerp(-2, 0, e);
-  return {
-    transform: `translate(${pivotX} ${pivotY}) rotate(${rot}) scale(${sx} ${sy}) translate(${-pivotX} ${-pivotY})`,
-    opacity: e,
-  };
-}
-
-/**
- * One cluster: the dot on the spine, then for each plate a pedicel forking from that shared spine
- * point to the plate, a calyx cupping the plate's base (drawn behind, so its sepal tips frame the
- * plate), and the plate unfurling on top. The lead plate (index 0) carries the hint title.
+ * One cluster: its plates, standing ALONGSIDE the timeline at their year.
+ *
+ * DECOUPLED 2026-07-16 (Daniel: "We had initially tried to have the flowers or the leaves actually
+ * holding the projects within the timeline. Scratch that."). A plate is no longer BORNE by anything:
+ * the branch that forked off the spine to carry it, the calyx that cupped it from below, and the node
+ * dot that marked the fork are all gone. The spine and its ornament are the drawing; the projects keep
+ * pace beside it. Nothing in the layout depends on the ornament any more, and the ornament reads the
+ * layout rather than producing it — see SubBranches.
+ *
+ * THE ENTRANCE IS A FADE, NOT A GROWTH (Daniel: "Right now it expands from the bottom up. I like for
+ * it to fade in better so the entire thing is already there and doesn't have that weird initial
+ * distortion"). The plate is laid out at full size from the first frame and only its opacity moves.
+ * The old `unfurl()` WAS the distortion he was describing: it opened every plate from
+ * `scale(0.92, 0.64)` about the branch junction, which squashed the image to 64% of its height and
+ * then stretched it back — on landscape photographs, in a page whose whole complaint this round was
+ * pictures at the wrong aspect.
  */
 function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; cardLineY: number; reduced: boolean }) {
-  const { dir, spineX, anchorY, edgeX, plates, hint } = cluster;
-  const uStem = reduced ? 1 : clamp01((cardLineY - anchorY) / (UNFURL_SPAN * 0.4));
-
-  // The holder botanical is generated ONCE per plate (deterministic off cluster id + node index),
-  // memoized so the scroll animation (which re-renders every frame) never regenerates it.
-  const sprigs = useMemo(
-    () =>
-      plates.map((pl, i) => {
-        // Length is capped by the room actually below this plate (the next stacked sibling, or a
-        // generous default when it is the lowest), so the sprig never reaches the plate beneath it.
-        const spaceBelow = i + 1 < plates.length ? plates[i + 1].y - pl.attachY : 240;
-        const maxLen = Math.max(20, spaceBelow - 12);
-        return calyxSprig(edgeX, pl.attachY, dir, pl.h, maxLen, `${cluster.id}:${i}`);
-      }),
-    [plates, edgeX, dir, cluster.id],
-  );
+  const { dir, plates, hint } = cluster;
 
   return (
     <g>
-      <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_SEPIA} opacity={uStem > 0 ? 1 : 0} />
-
       {plates.map((pl, i) => {
-        const branchD = branchPath(spineX, anchorY, edgeX, pl.attachY);
-        const sprig = sprigs[i];
-        // The holder buds in as the last beat of the branch's growth, right before the plate unfurls.
-        const calyxOpacity = reduced ? 1 : clamp01((uStem - 0.7) / 0.3);
-
-        const u = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
-        const pivotX = dir === 1 ? pl.x : pl.x + pl.w; // inner corner nearest the spine
-        const pivotY = pl.y + pl.h;
-        const t = unfurl(u, pivotX, pivotY);
-        if (t.opacity <= 0.001 && uStem <= 0.001) return null;
+        // Composite opacity ONLY: no scale, no rotate, no pivot, no clip. Reduced motion is fully
+        // present from the start, as before.
+        const opacity = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
+        if (opacity <= 0.001) return null;
 
         return (
-          <g key={i}>
-            <path
-              d={branchD}
-              fill="none"
-              stroke={INK_SEPIA}
-              strokeOpacity={0.7}
-              strokeWidth={BRANCH_W}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              pathLength={1}
-              strokeDasharray={1}
-              strokeDashoffset={reduced ? 0 : 1 - uStem}
-            />
-            {/* The holder: a small generated botanical (src/engine/botanical) cupping the plate from
-                below, where the branch arrives under it. Real leaves fan down the calyx axes plus a
-                delicate bud at the corner; height-scaled and gutter-capped like the sepals it replaced. */}
-            {calyxOpacity > 0.001 && (
-              <g style={{ opacity: calyxOpacity }} pointerEvents="none">
-                {sprig.organs.map((org, oi) => (
-                  <g key={oi} transform={org.transform}>
-                    {org.paths.map((p, pi) => (
-                      <path
-                        key={pi}
-                        d={p.d}
-                        {...sprigPathStyle(p)}
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      />
-                    ))}
-                  </g>
-                ))}
-              </g>
+          <g key={i} style={{ opacity }}>
+            {i === 0 && hint && (
+              <text
+                x={dir === 1 ? pl.x : pl.x + pl.w}
+                y={pl.y - 10}
+                textAnchor={dir === 1 ? 'start' : 'end'}
+                className="fill-inkBlack/45 font-mono"
+                style={{ fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}
+              >
+                {hint}
+              </text>
             )}
-            {t.opacity > 0.001 && (
-              <g style={{ opacity: t.opacity }} transform={t.transform}>
-                {i === 0 && hint && (
-                  <text
-                    x={dir === 1 ? pl.x : pl.x + pl.w}
-                    y={pl.y - 10}
-                    textAnchor={dir === 1 ? 'start' : 'end'}
-                    className="fill-inkBlack/45 font-mono"
-                    style={{ fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}
-                  >
-                    {hint}
-                  </text>
-                )}
-                <PlateMedia plate={pl.media} x={pl.x} y={pl.y} w={pl.w} h={pl.h} reduced={reduced} />
-              </g>
-            )}
+            <PlateMedia plate={pl.media} x={pl.x} y={pl.y} w={pl.w} h={pl.h} reduced={reduced} />
           </g>
         );
       })}
