@@ -1,42 +1,45 @@
 /**
- * DrawPage.tsx — `#/draw`. Two steps: pick your place, then draw it.
+ * DrawPage.tsx — `#/draw`. You open on a lawn and start making.
  *
  * WHY. The studio opens on four sliders. Four sliders is a Grasshopper
  * definition with better type: the design act collapses into number entry, the
- * tool contributes arithmetic, and nothing about it needs an engine with an
- * opinion or feels like making something.
+ * tool contributes arithmetic, and an artist has nothing to do.
  *
- * So the input inverts. You start with a PLACE. Then you drag two lines across
- * the lawn — in 3D, in the space the thing will stand in, because a plan view
- * asks people to decode a projection and then believe a dome fell out of it.
- * Each stroke is an arch and its ends are feet. The moment a second one lands,
- * the lattice interpolates between them.
+ * So: no setup, no wizard, no numbers. Drag a line across the lawn and an arc
+ * stands up. Drag a second and a SURFACE appears between them — blended, not
+ * unioned, so it swells where they cross and reads as one vault rather than
+ * two ribs. Then keep going: more lines grow it, lift raises it under your
+ * hand, excavate opens it. The thing stays SOFT the whole time.
  *
- * The engine READS the lines rather than being configured by them: footprint
- * from the ground the feet enclose, and the OPENING from the widest gap those
- * legs leave over — nobody states an aperture, it is a consequence of where
- * you put the legs. Whatever the grammar fits is said out loud, because an
- * engine that silently snaps your line to its bounds is a slider in a costume.
+ * Baking is the last move, not the second. The old flow went from two arcs
+ * straight to a manufacturable kit, which meant the interesting part — making
+ * — lasted about four seconds. Now the kit is something you ask for when
+ * you're done: hit bake and the soft surface becomes the real gridshell, with
+ * nodes, joints, a cut list and a price.
  *
- * The parameters still exist. They are the ENGINE's interface, not the user's:
- * generateGeometry -> nesting -> pricing runs unchanged underneath.
+ * Everything the grammar decides is said out loud, because an engine that
+ * silently snaps your line to its bounds is a slider wearing a costume.
  *
- * DEMO SCOPE, stated rather than implied: parcels are authored (engine/site.ts)
- * and the lattice between the arches is the real gridshell on the footprint the
- * strokes imply — teaching generateGeometry to honour arbitrary drawn foot
- * bearings is the next engine step. NOT faked: the site analysis, the drawing
- * -> params projection, and the geometry, BOM and price.
+ * DEMO SCOPE, stated rather than implied: bake runs the surface's footprint and
+ * the arcs' bearings through the REAL engine (generateGeometry -> nesting ->
+ * pricing), but generateGeometry still roots on its own grammar-derived feet
+ * rather than the exact bearings you drew, and the lattice does not yet follow
+ * your lifts and holes. That is the next engine step and it is the honest gap.
+ * NOT faked: the surface, the sculpt, and every number the bake reports.
+ *
+ * The site step is parked (engine/site.ts + draw/SiteMap.tsx still exist, and
+ * still have their tests) — scaffold to come back to.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import { SplashHeader } from './splash/SplashHeader';
-import { SiteMap, SiteLabels } from './draw/SiteMap';
-import { DrawStage } from './draw/DrawStage';
+import { DrawStage, type Tool } from './draw/DrawStage';
 import { Folly } from '../scene/Folly';
 import { webglSupported } from '../ui/webgl';
-import { analyseSite, type Parcel, type SiteAnalysis } from '../engine/site';
+import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
 import { readDrawing, type Spine } from '../engine/fromDrawing';
+import { surfaceAreaM2, surfacePeakM, type Edit, type SurfaceInput } from '../engine/surface';
 import { buildProjectExport, buildDrawingExport, exportFilename } from '../engine/exportProject';
 import { useDesign } from '../state/store';
 
@@ -50,128 +53,158 @@ function download(name: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
-export function DrawPage() {
-  const [parcel, setParcel] = useState<Parcel | null>(null);
-  const [spines, setSpines] = useState<Spine[]>([]);
+const TOOLS: { id: Tool; label: string; hint: string }[] = [
+  { id: 'draw', label: 'draw', hint: 'drag a line across the lawn' },
+  { id: 'lift', label: 'lift', hint: 'press on it and pull up' },
+  { id: 'hole', label: 'excavate', hint: 'press on it and drag out a hole' },
+];
 
-  const site: SiteAnalysis | null = useMemo(
-    () => (parcel ? analyseSite(parcel) : null),
-    [parcel],
+export function DrawPage() {
+  const [arcs, setArcs] = useState<Spine[]>([]);
+  const [edits, setEdits] = useState<Edit[]>([]);
+  const [tool, setTool] = useState<Tool>('draw');
+  const [baked, setBaked] = useState(false);
+
+  // Without this, loading into a non-rendering tab leaves the canvas dead at
+  // 300x150 for the life of the page. See the hook — it's not paranoia, it's
+  // reproducible.
+  useCanvasSizeGuard();
+
+  const surface: SurfaceInput = useMemo(() => ({ arcs, edits }), [arcs, edits]);
+
+  // The soft thing's own measurements — live, and true of what's on screen.
+  const areaM2 = useMemo(() => surfaceAreaM2(surface), [surface]);
+  const peakM = useMemo(() => surfacePeakM(surface), [surface]);
+
+  // What the engine WOULD build. Computed live so bake is instant and the
+  // nudges can talk before you commit, but only rendered once you ask.
+  const read = useMemo(
+    () => readDrawing({ spines: arcs, outline: undefined }),
+    [arcs],
   );
 
-  const drawing = useMemo(() => ({ spines }), [spines]);
-  const read = useMemo(() => readDrawing(drawing), [drawing]);
-
-  // One engine, one scene layer, two front doors: push what was drawn into the
-  // same store the studio uses, so the SAME Folly draws it.
   const setParams = useDesign((s) => s.setParams);
   const outputs = useDesign((s) => s.outputs);
   useEffect(() => {
-    setParams(read.params);
-  }, [read.params, setParams]);
+    if (baked) setParams(read.params);
+  }, [baked, read.params, setParams]);
 
-  const clearR = site?.placementRadiusM ?? 3.2;
-  // Two lines is when it stops being lines and starts being a structure.
-  const built = spines.length >= 2;
+  const soft = arcs.length > 0 && !baked;
+  const canBake = arcs.length >= 2 && !baked;
+  const activeHint = TOOLS.find((t) => t.id === tool)!.hint;
 
   return (
     <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
       <SplashHeader />
 
       <div className="relative h-[100svh] w-full overflow-hidden pt-[var(--header-h)]">
-        {/* ------------------------------------------------------------------ */}
-        {/* The 3D stage is ALWAYS MOUNTED. The site map lays over it until a   */}
-        {/* place is picked.                                                    */}
-        {/*                                                                     */}
-        {/* This is structural, not cosmetic. Mounting the Canvas conditionally */}
-        {/* (only after the click) means it mounts into a container already at  */}
-        {/* its final size, so R3F's ResizeObserver has no size CHANGE left to  */}
-        {/* report. Miss that first delivery — a throttled or backgrounded tab  */}
-        {/* doesn't run the rendering steps RO callbacks ride on — and nothing  */}
-        {/* ever corrects it: the canvas latches at its 300x150 default and the */}
-        {/* scene never appears, permanently, even once you come back. Mounting */}
-        {/* with the page is how the studio's Canvas has always avoided this.   */}
-        {/* ------------------------------------------------------------------ */}
         <div className="relative h-full w-full p-3">
           <div className="relative h-full w-full overflow-hidden rounded-2xl border border-inkBlack/12">
             {webglSupported() ? (
-                <Canvas
-                  shadows
-                  dpr={[1, 2]}
-                  camera={{ position: [7.2, 4.6, 8.4], fov: 40 }}
-                  className="!absolute inset-0"
-                  resize={{ debounce: 0, scroll: false }}
-                >
-                  <color attach="background" args={['#F6F4EE']} />
-                  <fog attach="fog" args={['#F6F4EE', 22, 52]} />
-                  <ambientLight intensity={0.85} />
-                  <directionalLight
-                    position={[6, 10, 5]}
-                    intensity={1.35}
-                    castShadow
-                    shadow-mapSize={[2048, 2048]}
-                    shadow-bias={-0.0002}
-                  />
-                  <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
+              <Canvas
+                shadows
+                dpr={[1, 2]}
+                camera={{ position: [5.6, 3.6, 6.6], fov: 42 }}
+                className="!absolute inset-0"
+                resize={{ debounce: 0, scroll: false }}
+              >
+                <color attach="background" args={['#F6F4EE']} />
+                <fog attach="fog" args={['#F6F4EE', 24, 54]} />
+                <ambientLight intensity={0.8} />
+                <directionalLight
+                  position={[6, 10, 5]}
+                  intensity={1.35}
+                  castShadow
+                  shadow-mapSize={[2048, 2048]}
+                  shadow-bias={-0.0002}
+                />
+                <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
 
-                  <DrawStage
-                    spines={spines}
-                    clearRadiusM={clearR}
-                    enabled={!!parcel && !built}
-                    resolved={built}
-                    onSpine={(s) => setSpines((xs) => [...xs, s])}
-                  />
+                <DrawStage
+                  arcs={arcs}
+                  edits={edits}
+                  tool={tool}
+                  enabled={!baked}
+                  resolved={baked}
+                  onArc={(s) => setArcs((xs) => [...xs, s])}
+                  onEdit={(e) => setEdits((xs) => [...xs, e])}
+                />
 
-                  {/* The interpolation: two lines in, a structure out. */}
-                  {built && <Folly />}
+                {/* The bake: soft surface out, real kit in. */}
+                {baked && <Folly />}
 
-                  <ContactShadows
-                    position={[0, 0.015, 0]}
-                    opacity={0.26}
-                    scale={20}
-                    blur={2.6}
-                    far={7}
-                    color="#5a5443"
-                  />
-                  <OrbitControls
-                    makeDefault
-                    target={[0, 1.0, 0]}
-                    minDistance={4}
-                    maxDistance={24}
-                    maxPolarAngle={Math.PI / 2.05}
-                    enablePan={false}
-                  />
-                </Canvas>
-              ) : (
-                <div className="grid h-full place-items-center p-6">
-                  <p className="max-w-sm text-center text-sm text-inkBlack/70">
-                    The 3D view needs WebGL. Try a current Chrome, Edge, Firefox or Safari.
-                  </p>
-                </div>
-              )}
-
-              {/* STEP 1 — the map, laid OVER the live stage until a place is picked. */}
-              {!parcel && (
-                <div className="absolute inset-0 bg-[#f1eee4]">
-                  <SiteMap selectedId={null} onSelect={setParcel} />
-                  <SiteLabels selectedId={null} />
-                  <p className="pointer-events-none absolute inset-x-0 top-5 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack/60">
-                    pick your place
-                  </p>
-                </div>
-              )}
-
-              {/* The only instruction, and it disappears once obeyed. */}
-              {parcel && !built && (
-                <p className="pointer-events-none absolute inset-x-0 top-5 mx-auto max-w-[40ch] text-center font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/55">
-                  {spines.length === 0
-                    ? 'drag a line across the lawn'
-                    : 'one more, crossing it'}
+                <ContactShadows
+                  position={[0, 0.015, 0]}
+                  opacity={0.24}
+                  scale={22}
+                  blur={2.6}
+                  far={8}
+                  color="#5a5443"
+                />
+                <OrbitControls
+                  makeDefault
+                  target={[0, 1.0, 0]}
+                  minDistance={4}
+                  maxDistance={18}
+                  maxPolarAngle={Math.PI / 2.05}
+                  enablePan={false}
+                />
+              </Canvas>
+            ) : (
+              <div className="grid h-full place-items-center p-6">
+                <p className="max-w-sm text-center text-sm text-inkBlack/70">
+                  The 3D view needs WebGL. Try a current Chrome, Edge, Firefox or Safari.
                 </p>
-              )}
+              </div>
+            )}
 
-              {/* What it read. Three lines, only once there's something to say. */}
-              {built && (
+            {/* One line of instruction, and it goes away once it's obeyed. */}
+            {!baked && (
+              <p className="pointer-events-none absolute inset-x-0 top-5 mx-auto max-w-[44ch] text-center font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/55">
+                {arcs.length === 0
+                  ? 'drag a line across the lawn'
+                  : arcs.length === 1
+                    ? 'one more, crossing it'
+                    : activeHint}
+              </p>
+            )}
+
+            {/* Tools. Only once there's something to work on. */}
+            {soft && (
+              <div className="absolute left-1/2 top-14 flex -translate-x-1/2 gap-1.5">
+                {TOOLS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTool(t.id)}
+                    className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] backdrop-blur transition ${
+                      tool === t.id
+                        ? 'border-inkBlack/60 bg-inkBlack text-paperVellum'
+                        : 'border-inkBlack/20 bg-paperVellum/80 hover:border-inkBlack/50'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* What it is, while it's still soft. Two numbers, both true. */}
+            {soft && (
+              <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+                  {areaM2.toFixed(1)} m² · {peakM.toFixed(2)} m tall
+                </p>
+                <p className="mt-0.5 font-mono text-[9px] tracking-[0.02em] text-inkBlack/35">
+                  {arcs.length} {arcs.length === 1 ? 'line' : 'lines'}
+                  {edits.length > 0 && ` · ${edits.length} ${edits.length === 1 ? 'edit' : 'edits'}`}
+                  {' · not built yet'}
+                </p>
+              </div>
+            )}
+
+            {/* Baked: what the engine actually made of it. */}
+            {baked && (
+              <>
                 <div className="absolute left-4 top-4 max-w-[290px] rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-3.5 py-2.5 backdrop-blur">
                   <ul className="space-y-1.5">
                     {read.nudges.slice(0, 3).map((n, i) => (
@@ -190,73 +223,76 @@ export function DrawPage() {
                     ))}
                   </ul>
                 </div>
-              )}
 
-              {/* The whole readout: one number that matters, three that back it. */}
-              {built && (
                 <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
                   <p className="font-serif text-[26px] leading-none">
                     £{outputs.price.fixedTotalGBP.toLocaleString()}
                   </p>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
                     fixed · {outputs.geometry.params.footprintM2.toFixed(1)} m² ·{' '}
-                    {outputs.geometry.feetCount} feet · {outputs.geometry.pieces.length} pieces
+                    {outputs.geometry.feetCount} feet · {outputs.geometry.pieces.length} pieces ·{' '}
+                    {outputs.geometry.nodes.length} nodes
                   </p>
                 </div>
-              )}
+              </>
+            )}
 
-              {/* Start over / export. Quiet until they're useful. */}
-              {parcel && (
-              <div className="absolute bottom-4 right-4 flex gap-1.5">
-                {spines.length > 0 && (
-                  <Chip onClick={() => setSpines((xs) => xs.slice(0, -1))}>undo</Chip>
-                )}
-                {built && (
-                  <>
-                    <Chip
-                      onClick={() =>
-                        download(
-                          exportFilename('drawing', site),
-                          buildDrawingExport(drawing, 0, site),
-                        )
-                      }
-                    >
-                      export drawing
-                    </Chip>
-                    <Chip
-                      onClick={() =>
-                        download(
-                          exportFilename('project', site),
-                          buildProjectExport(drawing, 0, site, read, outputs),
-                        )
-                      }
-                    >
-                      export everything
-                    </Chip>
-                  </>
-                )}
+            {/* Actions. */}
+            <div className="absolute bottom-4 right-4 flex gap-1.5">
+              {!baked && (arcs.length > 0 || edits.length > 0) && (
+                <Chip
+                  onClick={() =>
+                    edits.length > 0
+                      ? setEdits((xs) => xs.slice(0, -1))
+                      : setArcs((xs) => xs.slice(0, -1))
+                  }
+                >
+                  undo
+                </Chip>
+              )}
+              {canBake && (
+                <Chip onClick={() => setBaked(true)} strong>
+                  bake it
+                </Chip>
+              )}
+              {baked && (
+                <>
+                  <Chip
+                    onClick={() =>
+                      download(
+                        exportFilename('drawing', null),
+                        buildDrawingExport({ spines: arcs }, 0, null),
+                      )
+                    }
+                  >
+                    export drawing
+                  </Chip>
+                  <Chip
+                    onClick={() =>
+                      download(
+                        exportFilename('project', null),
+                        buildProjectExport({ spines: arcs }, 0, null, read, outputs),
+                      )
+                    }
+                  >
+                    export everything
+                  </Chip>
+                  <Chip onClick={() => setBaked(false)}>keep sculpting</Chip>
+                </>
+              )}
+              {(arcs.length > 0 || edits.length > 0) && (
                 <Chip
                   onClick={() => {
-                    setSpines([]);
-                    setParcel(null);
+                    setArcs([]);
+                    setEdits([]);
+                    setBaked(false);
+                    setTool('draw');
                   }}
                 >
                   start over
                 </Chip>
-              </div>
               )}
-
-              {/* The slot Daniel owns. */}
-              {parcel && (
-                <div className="pointer-events-none absolute right-4 top-4 rounded-xl border border-dashed border-inkBlack/20 px-3 py-2">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-inkBlack/40">
-                    site render · slot
-                  </p>
-                  <p className="mt-0.5 max-w-[20ch] font-mono text-[9px] leading-snug text-inkBlack/30">
-                    splat of your own garden drops in here
-                  </p>
-                </div>
-              )}
+            </div>
           </div>
         </div>
       </div>
@@ -264,11 +300,23 @@ export function DrawPage() {
   );
 }
 
-function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function Chip({
+  children,
+  onClick,
+  strong = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  strong?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
-      className="rounded-md border border-inkBlack/20 bg-paperVellum/80 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] backdrop-blur transition hover:border-inkBlack/50"
+      className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] backdrop-blur transition ${
+        strong
+          ? 'border-inkBlack/70 bg-inkBlack text-paperVellum hover:opacity-90'
+          : 'border-inkBlack/20 bg-paperVellum/80 hover:border-inkBlack/50'
+      }`}
     >
       {children}
     </button>

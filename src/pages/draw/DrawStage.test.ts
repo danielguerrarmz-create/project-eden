@@ -1,23 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { archRiseM, archPoints } from './DrawStage';
-import { GRAMMAR } from '../../data/config';
-
-describe('archRiseM: the arch is ASSUMED from the line, never asked for', () => {
-  it('grows with span', () => {
-    expect(archRiseM(4)).toBeGreaterThan(archRiseM(2));
-  });
-
-  it('never exceeds the planning cap — a drawn line cannot need permission', () => {
-    for (const span of [1, 4, 8, 40, 400]) {
-      expect(archRiseM(span)).toBeLessThanOrEqual(GRAMMAR.pdHeightCapM + 1e-9);
-    }
-  });
-
-  it('never collapses to a lollipop on a short stroke', () => {
-    expect(archRiseM(0)).toBeGreaterThanOrEqual(1.2);
-    expect(archRiseM(0.1)).toBeGreaterThanOrEqual(1.2);
-  });
-});
+import { archPoints } from './DrawStage';
+import { arcRiseM, tentHeight } from '../../engine/surface';
 
 describe('archPoints: the curve the stroke becomes', () => {
   const a = { x: -2, y: 0 };
@@ -37,12 +20,20 @@ describe('archPoints: the curve the stroke becomes', () => {
     expect(pts[pts.length - 1].z).toBeCloseTo(b.y, 6);
   });
 
-  it('peaks in the middle at the arch rise', () => {
+  it('peaks in the middle at the arc rise', () => {
     const pts = archPoints(a, b, 32);
-    const mid = pts[16];
-    expect(mid.y).toBeCloseTo(archRiseM(4), 5);
-    const maxY = Math.max(...pts.map((p) => p.y));
-    expect(maxY).toBeCloseTo(mid.y, 5);
+    expect(pts[16].y).toBeCloseTo(arcRiseM(4), 5);
+    expect(Math.max(...pts.map((p) => p.y))).toBeCloseTo(pts[16].y, 5);
+  });
+
+  it('AGREES WITH THE SURFACE FIELD — the ribbon must ride its own tent', () => {
+    // The drawn arc and the surface it generates are two renderings of one
+    // idea. If they drift, the line you drew floats off the thing it made.
+    for (const t of [0.25, 0.5, 0.75]) {
+      const p = { x: a.x + (b.x - a.x) * t, y: 0 };
+      const onCurve = archPoints(a, b, 1000)[Math.round(t * 1000)].y;
+      expect(tentHeight({ a, b }, p)).toBeCloseTo(onCurve, 3);
+    }
   });
 
   it('never dips below ground anywhere along the curve', () => {
@@ -56,8 +47,7 @@ describe('archPoints: the curve the stroke becomes', () => {
   });
 
   it('survives a degenerate zero-length stroke without NaN', () => {
-    const pts = archPoints({ x: 1, y: 1 }, { x: 1, y: 1 });
-    for (const p of pts) {
+    for (const p of archPoints({ x: 1, y: 1 }, { x: 1, y: 1 })) {
       expect(Number.isFinite(p.x)).toBe(true);
       expect(Number.isFinite(p.y)).toBe(true);
       expect(Number.isFinite(p.z)).toBe(true);

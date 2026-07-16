@@ -1,47 +1,43 @@
 /**
- * DrawStage.tsx — draw the thing in the space it will stand in.
+ * DrawStage.tsx — draw, lift, excavate. Three gestures, no numbers.
  *
- * The plan-view version of this asked people to decode a projection: you drew
- * a flat squiggle and then had to believe a dome came out of it. Nobody thinks
- * in plan except architects, and even they don't want to. So the drawing
- * surface IS the 3D view. You drag across the lawn, an arch rises under the
- * cursor as you go, and the moment a second arch lands the lattice interpolates
- * between them. Draw, and it becomes the thing.
+ * All three are the same shape of move: press somewhere on the thing, drag,
+ * release. What changes is what the drag MEANS.
  *
- * The move is deliberately one gesture: press on the ground, drag, release.
- * A stroke's two ends are its feet, the arch between them is assumed (rise
- * scales with span, capped by the grammar), and every further stroke re-reads
- * the whole set. No modes, no handles, no numbers.
+ *   DRAW      drag across the lawn -> an arc, its ends are feet.
+ *   LIFT      press on the surface and pull up -> it rises under your hand.
+ *   EXCAVATE  press on the surface and drag out -> a hole opens.
  *
- * DEMO SCOPE: the arches you draw are drawn as arches; the lattice between them
- * is the real engine's gridshell placed on the same footprint the strokes
- * imply. Wiring generateGeometry to honour arbitrary drawn foot bearings is the
- * next real engine step — see the handoff. What's here IMPLIES that pipeline
- * honestly rather than faking numbers: everything in the readout is computed.
+ * This is the 2D-logic-on-a-3D-surface hybrid on purpose. Every gesture is
+ * "here, this big" — a point and a radius — which people can reason about on a
+ * picture. Nobody can reason about a trivariate control lattice, and asking
+ * them to is how you end up with Grasshopper.
+ *
+ * Nothing here bakes. The surface stays soft until you say otherwise.
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Pt, Spine } from '../../engine/fromDrawing';
+import { arcRiseM, type Edit, type SurfaceInput } from '../../engine/surface';
+import { SurfaceMesh } from './SurfaceMesh';
 
-/** Rise of a drawn arch: proportional to span, but never a silly lollipop. */
-export function archRiseM(span: number): number {
-  return Math.min(2.5, Math.max(1.2, span * 0.42));
-}
+export type Tool = 'draw' | 'lift' | 'hole';
 
-/** Sample a drawn arch as a 3D curve — a catenary-ish hump over the chord. */
+/** Sample a drawn arc as a 3D curve. Agrees with surface.ts's tent by design. */
 export function archPoints(a: Pt, b: Pt, segments = 32): THREE.Vector3[] {
   const span = Math.hypot(b.x - a.x, b.y - a.y);
-  const rise = archRiseM(span);
+  const rise = arcRiseM(span);
   const out: THREE.Vector3[] = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const x = a.x + (b.x - a.x) * t;
-    const z = a.y + (b.y - a.y) * t;
-    // sin gives a clean spring at the feet and a flat crown — reads as built,
-    // not as a parabola someone plotted.
-    const y = Math.sin(t * Math.PI) ** 0.82 * rise;
-    out.push(new THREE.Vector3(x, y, z));
+    out.push(
+      new THREE.Vector3(
+        a.x + (b.x - a.x) * t,
+        Math.sin(t * Math.PI) ** 0.82 * rise,
+        a.y + (b.y - a.y) * t,
+      ),
+    );
   }
   return out;
 }
@@ -49,142 +45,184 @@ export function archPoints(a: Pt, b: Pt, segments = 32): THREE.Vector3[] {
 function ArchRibbon({ a, b, ghost = false }: { a: Pt; b: Pt; ghost?: boolean }) {
   const geo = useMemo(() => {
     const curve = new THREE.CatmullRomCurve3(archPoints(a, b));
-    return new THREE.TubeGeometry(curve, 40, ghost ? 0.028 : 0.045, 8, false);
+    return new THREE.TubeGeometry(curve, 40, ghost ? 0.03 : 0.05, 8, false);
   }, [a, b, ghost]);
   return (
     <mesh geometry={geo} castShadow={!ghost}>
       <meshStandardMaterial
-        color={ghost ? '#6f6a5c' : '#b99a6b'}
-        roughness={0.75}
+        color={ghost ? '#6f6a5c' : '#a9834f'}
+        roughness={0.7}
         transparent={ghost}
-        opacity={ghost ? 0.45 : 1}
+        opacity={ghost ? 0.5 : 1}
       />
     </mesh>
   );
 }
 
-/** The two feet of a stroke, as the shoes they'll actually be. */
-function Feet({ a, b, ghost = false }: { a: Pt; b: Pt; ghost?: boolean }) {
+/** The live footprint of a lift or a hole, drawn on the ground as you size it. */
+function EditHalo({ at, radiusM, kind }: { at: Pt; radiusM: number; kind: 'lift' | 'hole' }) {
   return (
-    <>
-      {[a, b].map((p, i) => (
-        <mesh key={i} position={[p.x, 0.02, p.y]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[ghost ? 0.1 : 0.14, 20]} />
-          <meshStandardMaterial color="#1b1b18" transparent opacity={ghost ? 0.35 : 0.8} />
-        </mesh>
-      ))}
-    </>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[at.x, 0.03, at.y]}>
+      <ringGeometry args={[Math.max(0.02, radiusM - 0.04), radiusM, 48]} />
+      <meshBasicMaterial color={kind === 'hole' ? '#b8402f' : '#7d8e5b'} transparent opacity={0.85} />
+    </mesh>
   );
 }
 
 export function DrawStage({
-  spines,
-  clearRadiusM,
+  arcs,
+  edits,
+  tool,
   enabled,
   resolved,
-  onSpine,
+  onArc,
+  onEdit,
 }: {
-  spines: Spine[];
-  clearRadiusM: number;
-  /** Off once the structure is built, so orbiting doesn't scribble. */
+  arcs: Spine[];
+  edits: Edit[];
+  tool: Tool;
+  /** Off once baked — orbiting a cut list shouldn't scribble on it. */
   enabled: boolean;
-  /**
-   * True once the lattice has taken over. The drawn arches then STOP being
-   * drawn: they were the input, and the structure is the answer to them.
-   *
-   * Keeping both on screen is worse than either. generateGeometry still roots
-   * the canopy on its own grammar-derived feet rather than the bearings you
-   * drew (that's the next engine step), so the raw arches stand exactly where
-   * you put them while the dome builds on the origin — and the eye reads two
-   * unrelated objects sharing a lawn rather than one thing that came from your
-   * line. Until the engine honours drawn feet, the lines resolve INTO the
-   * result instead of arguing with it.
-   */
+  /** Baked: the surface steps aside for the real structure. */
   resolved: boolean;
-  onSpine: (s: Spine) => void;
+  onArc: (s: Spine) => void;
+  onEdit: (e: Edit) => void;
 }) {
   const controls = useThree((s) => s.controls) as { enabled: boolean } | null;
+  const surface: SurfaceInput = useMemo(() => ({ arcs, edits }), [arcs, edits]);
 
   // Refs are the truth; state only mirrors for painting. A drag is a burst of
-  // events and React batches them — reading the STATE on pointerup reads the
-  // value the drag started from, and the stroke vanishes.
+  // events and React batches them — reading STATE on pointerup reads the value
+  // the drag started from, and the gesture is silently thrown away.
   const startRef = useRef<Pt | null>(null);
   const nowRef = useRef<Pt | null>(null);
+  const screenYRef = useRef(0);
+  const amountRef = useRef(0);
   const [start, setStart] = useState<Pt | null>(null);
   const [now, setNow] = useState<Pt | null>(null);
+  const [amount, setAmount] = useState(0);
 
-  const toPlan = useCallback((e: ThreeEvent<PointerEvent>): Pt => {
-    return { x: e.point.x, y: e.point.z };
-  }, []);
+  const plan = useCallback((e: ThreeEvent<PointerEvent>): Pt => ({ x: e.point.x, y: e.point.z }), []);
 
   const down = (e: ThreeEvent<PointerEvent>) => {
     if (!enabled) return;
     e.stopPropagation();
     if (controls) controls.enabled = false;
-    const p = toPlan(e);
+    const p = plan(e);
     startRef.current = p;
     nowRef.current = p;
+    screenYRef.current = e.nativeEvent.clientY;
+    amountRef.current = 0;
     setStart(p);
     setNow(p);
+    setAmount(0);
   };
 
   const move = (e: ThreeEvent<PointerEvent>) => {
     if (!enabled || !startRef.current) return;
-    const p = toPlan(e);
+    const p = plan(e);
     nowRef.current = p;
     setNow(p);
+    if (tool === 'lift') {
+      // Pull UP the screen to raise. Screen-space, because the gesture is
+      // "lift this", not "set y to 1.8".
+      const dy = screenYRef.current - e.nativeEvent.clientY;
+      amountRef.current = Math.max(-1.2, Math.min(1.6, dy * 0.006));
+      setAmount(amountRef.current);
+    }
   };
 
   const up = () => {
     if (controls) controls.enabled = true;
     const a = startRef.current;
     const b = nowRef.current;
+    const amt = amountRef.current;
     startRef.current = null;
     nowRef.current = null;
+    amountRef.current = 0;
     setStart(null);
     setNow(null);
+    setAmount(0);
     if (!a || !b) return;
-    // A tap isn't a line. Below this it's a misclick, not an arch.
-    if (Math.hypot(b.x - a.x, b.y - a.y) > 0.9) onSpine({ a, b });
+
+    const drag = Math.hypot(b.x - a.x, b.y - a.y);
+    if (tool === 'draw') {
+      if (drag > 0.9) onArc({ a, b }); // a tap isn't a line
+    } else if (tool === 'lift') {
+      if (Math.abs(amt) > 0.05) {
+        onEdit({ kind: 'lift', at: a, radiusM: 1.5, amountM: amt });
+      }
+    } else if (tool === 'hole') {
+      const r = Math.max(0.35, drag);
+      onEdit({ kind: 'hole', at: a, radiusM: r });
+    }
   };
+
+  const liveHoleR = tool === 'hole' && start && now ? Math.max(0.35, Math.hypot(now.x - start.x, now.y - start.y)) : 0;
 
   return (
     <group>
-      {/* The lawn — and the drawing surface. Sized to the room the site found. */}
+      {/* The lawn — and the drawing surface, when nothing is built yet. */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0, 0]}
         receiveShadow
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
         onPointerLeave={up}
       >
-        <circleGeometry args={[Math.max(3, clearRadiusM), 64]} />
-        <meshStandardMaterial color="#93a06a" roughness={1} />
+        {/* Sized so a natural, comfortable stroke lands NEAR the buildable
+            family (12-18 m²) rather than 90 m². The lawn is the only scale cue
+            in the frame, so it quietly teaches how big to draw — and the bake
+            then nudges rather than shocking you with a 5x clamp. */}
+        <circleGeometry args={[6.5, 64]} />
+        <meshStandardMaterial color="#8fa06a" roughness={1} />
       </mesh>
 
-      {/* Beyond the clear radius: still lawn, but not yours to build on. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.012, 0]} receiveShadow>
-        <circleGeometry args={[Math.max(3, clearRadiusM) * 2.4, 64]} />
-        <meshStandardMaterial color="#8a9663" roughness={1} />
-      </mesh>
+      {/* The soft thing. Also a drag target, so you sculpt ON it, not near it. */}
+      {!resolved && arcs.length > 0 && (
+        <group
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+        >
+          <SurfaceMesh input={surface} />
+        </group>
+      )}
 
-      {/* Committed strokes — until the lattice resolves them. */}
+      {/* The arcs you drew, riding on the surface. */}
       {!resolved &&
-        spines.map((s, i) => (
+        arcs.map((s, i) => (
           <group key={i}>
             <ArchRibbon a={s.a} b={s.b} />
-            <Feet a={s.a} b={s.b} />
+            {[s.a, s.b].map((p, j) => (
+              <mesh key={j} position={[p.x, 0.02, p.y]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.14, 20]} />
+                <meshStandardMaterial color="#1b1b18" transparent opacity={0.75} />
+              </mesh>
+            ))}
           </group>
         ))}
 
-      {/* The stroke under the cursor, rising as you drag */}
-      {enabled && start && now && Math.hypot(now.x - start.x, now.y - start.y) > 0.2 && (
-        <group>
-          <ArchRibbon a={start} b={now} ghost />
-          <Feet a={start} b={now} ghost />
-        </group>
+      {/* The gesture in flight */}
+      {enabled && start && now && (
+        <>
+          {tool === 'draw' && Math.hypot(now.x - start.x, now.y - start.y) > 0.2 && (
+            <ArchRibbon a={start} b={now} ghost />
+          )}
+          {tool === 'hole' && <EditHalo at={start} radiusM={liveHoleR} kind="hole" />}
+          {tool === 'lift' && (
+            <>
+              <EditHalo at={start} radiusM={1.5} kind="lift" />
+              {Math.abs(amount) > 0.02 && (
+                <mesh position={[start.x, Math.max(0.1, amount) + 0.1, start.y]}>
+                  <sphereGeometry args={[0.09, 12, 10]} />
+                  <meshBasicMaterial color="#7d8e5b" />
+                </mesh>
+              )}
+            </>
+          )}
+        </>
       )}
     </group>
   );
