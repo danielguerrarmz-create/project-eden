@@ -5,8 +5,20 @@ memory of the session. Companion doc: `2026-07-16-engine-geometry.md` covers the
 (hardware/overlays + the EC5 discovery) in more depth; this one covers the whole arc and is
 the current state of the world.
 
-Branch `engine-geometry`, worktree `restless-egg/engine-session`, off `main`.
+**Branch `engine-draw`**, worktree `restless-egg/engine-session`, off `main`.
 **Nothing pushed. `main` untouched.** Working tree clean.
+
+The work is split across branches on purpose:
+
+| branch | what it is | tests |
+|---|---|---|
+| **`engine-draw`** | **This work.** The drawing/sculpt flow + the engine obeying drawings. The engine assessment. | 384 |
+| `engine-geometry` | The safe, shippable geometry fixes ONLY (spider-disc hubs, overlay normals, HUD honesty). Mergeable as-is; carries no exploration. | 277 |
+| `engine-piecesolid-wip` | Clay's ring-fairing port, parked pending the EC5 decision below. | — |
+
+Split so the fixes that are just *correct* aren't held hostage to a design direction that is
+still being assessed. `engine-geometry` is the first three commits below; `engine-draw` is all
+of them.
 
 ```
 439b369  The engine obeys the drawing: drawn feet, drawn plan, sculpted surface
