@@ -183,3 +183,217 @@ specimens, frontispieces, shared `groupProjects`), `src/pages/about/projects.ts`
 `src/Root.tsx` were touched (route removal only — unavoidable, the drafts had to be unwired).
 `src/engine/botanical/*` was **not** touched: `sprigPathStyle` re-colours its output at render, so
 the sepia re-key needed no change there and other pages keep its blue.
+
+---
+
+# ROUND 2 — same day. Clay's founders, rows, the decoupling, and the growth engine
+
+**Branch:** `about-hybrid-sepia`, seven commits (`85c8ab5` … `aff12cd`). **`main` untouched, nothing pushed.**
+**Author:** Edward (round 2). **Round 1 is preserved above, unedited.**
+
+Round 1 shipped and Daniel liked it: *"It's looking great and the colors are amazing"*, *"it already
+looks better without the extra leaves."* The sepia lane and the pigment specimens are keepers and are
+not touched. This round is his next pass of notes.
+
+## What
+
+| # | Ask | Commit |
+|---|---|---|
+| 1 | Founders: copy Clay's page wholesale | `85c8ab5` |
+| 2 | Projects: columns to rows; flat index | `ea819ae` |
+| 3 | Project entrance: fade, don't grow | `74f7bce` |
+| 4 | Decouple the projects from the timeline | `74f7bce` |
+| 5 | The sub-branch growth engine | `39fc982` + `5f018a4` |
+| 6 | Founder ornamentation: flowers, by eye | `aff12cd` |
+| 7 | Hero lockup sits too low | `ad232f7` |
+
+### 1. The founders are Clay's, wholesale
+
+`git show about-v2-nonflowers:src/pages/ascent/AscentPage.tsx` then `Founders()`, ported entire: the
+5/7/5 measure, the bordered 4:5 portrait with its caption under it, facts as a real `<dl>` at 17px on
+a 52ch measure, the specimen hung at 340 on the outer edge, at Clay's own `max-w-page`. The old
+`FounderNode` (112px circular crop, olive role line, 13.5px facts on leader lines) is gone.
+
+Three departures, all deliberate and commented at the site:
+
+- Clay's draft forced `voice: 'ink'` on the specimen because his page rationed pigment to two events.
+  This page's law is the inverse and Daniel likes the colours, so the commissions hang in **pigment**.
+- Kept the stable `TeamMember.id` keying. The draft used `member.name.startsWith('Clay')`.
+- Dropped the draft's `flex-col-reverse` wrappers — they existed only to invert DOM order for the
+  ascent's column-reverse scroller. Reading order is already visual order here, so Clay's intended
+  sequence (kicker, Clay, Daniel) survives unchanged.
+
+**The nav-pill collision cannot recur.** Clay's `<main>` had no `pt-header` (only `Summit()` added one
+locally). This page's `<main>` carries `pt-[calc(var(--header-h)+2rem)]` globally and the founders sit
+mid-page. Verified at 1440x900.
+
+### 2. Rows, and a flat index
+
+Daniel was right and it was measurable. The hero sat in the left column of a `[1.55fr_1fr]` split
+beside its text: **505x557 at 1440 — portrait — against images that are natively 1.23 to 2.09.**
+
+Now: **row 1 = the pictures** (hero + supporting filmstrip), **row 2 = the information band**. The hero
+box measures **735x414..509 (1.44 to 1.77)** — the source images' own range. Box-vs-native mismatch
+across all twelve fell from **~50% to 0-25%, median ~17%**.
+
+Two non-obvious things, both measured, both commented because the naive version is wrong:
+
+- **The supporting strip is VERTICAL.** The detail is height-locked to the viewport, so a horizontal
+  strip under the hero spends the hero's height: that version measured 875x306..401 (2.2:1 to 2.9:1),
+  the same wrong-aspect complaint from the other side. Standing it on its end spends width, which this
+  panel has.
+- **The information band is three columns, and the split is a HEIGHT BUDGET.** A grid row is as tall as
+  its tallest column and that height comes out of the hero. Stacking description + recognition in one
+  column made it 319px (hero fell to 254, a 3.4:1 letterbox). Splitting into FOUR columns made it
+  *worse* (465px) — narrower columns wrap more and every column grows at once. Three columns with the
+  description paired with the title balances at ~195/~180.
+- The band is **not capped and not scrollable**. An earlier cut capped it at 240 with `overflow-y-auto`
+  and silently hid up to 61px of seven projects' awards behind a scrollbar nobody would find.
+
+**Flat index:** the three discipline headers and their 44px frontispieces are gone. Deleted with them,
+not left inert: `PAINTINGS.Architecture` / `'Product Design'` / `Software` (the ledger is now the two
+founder specimens, with a new test pinning that it holds nothing else), and `groupProjects` /
+`WorkGroup`. **Each project keeps its `discipline`; nothing draws it** — that field is authored content
+and removing it is Daniel's call, not mine. Titles are bigger in both index and detail.
+
+### 3 + 4. The decoupling, and why the fade is the same change
+
+`unfurl()` opened every plate from `scale(0.92, 0.64)` about the branch junction — it squashed each
+image to 64% height and stretched it back. **That is the "weird initial distortion"**, and it existed
+only because it was miming a bloom opening off the branch that carried it. Kill the branch and the
+reason for the transform goes with it. Composite opacity only now.
+
+**Deleted (not left inert), net -298 lines in `CrossPathsTimeline.tsx`:**
+`SEPAL_DEFS`, `sepalLen`, `CALYX_LEAF_PROFILES`, `calyxSprig`, `sprigPathStyle`, `SprigOrgan`,
+`branchAttachY`, `branchPts`, `branchPath`, `BRANCH_WAVE_AMP`, `BRANCH_WAVE_WAVES`, `BRANCH_W`,
+`unfurl`, `easeUnfurl`, `boxGapToPoly`, `LabelObstacle.pts`, the cluster node dot, the timeline's
+import of `engine/botanical` entirely, and `computeBranches` became `computePlates`.
+
+**THE 2025 COLLISION IS GONE.** Round 1 fought it to a draw (-2.5 both sides), shipped it
+grandfathered at `> -6` ("must not get worse"), and flagged it to you as a composition call. It had
+exactly one cause — a branch — and there is no branch at 2025 now. The test asserts **> 0 clearance at
+every year including 2025**, and passes.
+
+`packSide` survives doing much less: two plates in one lane still cannot share paper.
+
+### 5. The sub-branch engine — space colonization
+
+**`src/pages/about/spaceColonization.ts`** is the paper's algorithm (Runions et al. 2007), pure,
+deterministic, 16 tests, no page knowledge. **This does not reverse #4**, and the inversion is the
+whole design:
+
+> The old branches were STRUCTURE — they carried plates, the layout depended on them, and a pile of
+> rules existed to arbitrate the collisions that caused. The new ones are ORNAMENT — they read a
+> layout that is already final. **If a branch and a plate disagree, the branch loses**, not by a rule
+> but because the plate was placed before `colonize()` ran and cannot hear the answer.
+
+That is expressed three times over: the ornament reads `computePlates()` and nothing reads it back; it
+is painted before the clusters; and no attractor is ever scattered on an occupied rect. Filling the
+whitespace and avoiding the plates are **the same mechanism** — a plate has no attractors on it, so
+nothing grows there. There is no collision test in any of it.
+
+**Measured: 0 of 1217 branch points land on a real plate.** Pinned as a test *with its reason*, because
+the algorithm does **not** promise this on its own: it declines to grow *toward* an empty region, but
+nothing in it stops a branch crossing a plate to reach an attractor beyond. What holds is
+`SUB_PLATE_PAD` (18) > `SUB_SEGMENT` (9).
+
+**The hint lines are obstacles too**, and that had to be found by looking — they have no box of their
+own, and foliage grew straight through "LLO: DREAM MACHINE" and "NYC: ROGERS PARTNERS".
+
+**`garland.ts` gains `vines`** (many vines, one canvas, ONE genome, ONE rng sequence). Not an
+optimisation — it is the only way to get a garland: `createFlora` derives the *species* from the seed,
+so a request per branch either needs a seed per branch (different species per branch) or reuses one
+seed (each request restarts the same rng and stamps identical organs). Keyed into `geoHash`.
+
+**Parameters** (all in `CrossPathsTimeline.tsx`, tuned by looking over three passes — the first was
+wallpaper at attractor step 46, the second overshot to sparse):
+
+| constant | value |
+|---|---|
+| `SUB_SEED` | `bower/spine-2` (shares the spine's species: one plant) |
+| `SUB_SEGMENT` / `SUB_INFLUENCE` / `SUB_KILL` | 9 / 130 / 26 |
+| `SUB_WOBBLE` | 0.34 |
+| `SUB_ATTRACTOR_STEP` | 60 — **the density dial** |
+| `SUB_SPINE_CLEAR` / `SUB_PLATE_PAD` | 30 / 18 |
+| `SUB_BRANCH_W` / `SUB_ORGAN_SCALE` | 2.2 / 0.95 |
+| density ramp | `lerp(0.18, 0.92, t)` with y |
+
+Stems are **sepia SVG** (structure is one colour); the composer contributes **pigment foliage** only
+(`tube: false`) — the same graft the spine garland already uses.
+
+### 6. Founder ornamentation — by eye, and note the brief is the OPPOSITE of #5
+
+Four gongbi vines painted down the open margins either side of the founders. **No derived geometry,
+deliberately**: he said "It doesn't have to be a specific mathematical pattern. It just has to look
+pretty." The curves are drawn by hand in a 160x1500 strip and tuned by looking. They are vines, not
+lines (`tube: true`) — "choppy... just random lines on top of it" describes a bare bezier with nothing
+growing on it.
+
+Two things measurement caught: the strip is drawn **1:1, never scaled** (the first cut stretched a
+1100-tall strip to `h-full object-cover`, upscaling the painting 1.8x — an image at the wrong size,
+which is the one mistake this whole round is about); and the wrapper reaches out past the section into
+the page's own margin (section 1181x1401, content column 1100, so ~169px of real air each side)
+because at -64px the vine grew across Clay's portrait.
+
+### 7. The hero lockup
+
+Arithmetic, not taste. The copy column is `justify-center` inside a box starting **below** the fixed
+header, so it centred on that band's middle — exactly `--header-h / 2` below the middle of the screen.
+Measured at 1440x900: **before** centre 492 vs screen centre 450 (290px above, 206 below); **after**
+centre 432 (230 above, 266 below), 18px proud, the optical nudge. Correction is
+`lg:pb-[calc(var(--header-h)+2.25rem)]`, twice the lift because `justify-center` splits it, written
+against the token because `SplashHeader` re-measures it at runtime.
+
+## Verify
+
+- Gates green: `npm run typecheck` **0** · `npx vitest run` **330 pass** (was 320) · `npm run build` clean.
+- Live QA in headless Chrome at **1440x900** against the running dev server: **zero console errors,
+  zero failed requests**, all twelve projects walked, both specimens paint, the garlands mount.
+- **Measured, not eyeballed:** hero box vs native aspect per project (0-25% mismatch, was ~50%); band
+  height and hidden-content per project (0 hidden on all twelve); branch points on plates (0 of 1217);
+  lockup centre vs screen centre (432 vs 450).
+- New tests worth knowing: the space-colonization suite (16), incl. "it never grows into a region with
+  no attractors" — the property the page leans on instead of a collision test; the sub-branch contract
+  (0 points on a plate, no attractor on an obstacle, the density ramp is real, determinism); the plate
+  contract that replaced the branch no-overlap contract (no two plates overlap, no plate touches the
+  spine's sampled polyline); and the year-label rule now asserting > 0 at every year.
+
+## Left (open) — for Daniel
+
+1. **"Makes them grow as the timeline continues" is an INTERPRETATION and you have not seen it yet.**
+   Built as a *density ramp* — the ornament's own lushness carries the growth metaphor, sparse at 2021
+   and lush at 2026. It could instead mean **animating growth on scroll**. Deliberately not built: it
+   is a much bigger commitment and the wrong thing to guess at. Look, then tell me which you meant.
+2. **The sub-branch density is the thing most likely to want your eye.** It is one constant
+   (`SUB_ATTRACTOR_STEP`, currently 60). Three passes: 46 was wallpaper, 82 was too sparse. If you want
+   "substantially more" still, drop it toward 50 and the cost is CPU, not correctness.
+3. **Colour-law call, flagged not decided:** CLAUDE.md permits pigment on "the botanical specimens
+   only" and lists them. The founder vines are a painted botanical in the specimens' own register but
+   are not on that list. This is an extension of the law. Say the word and they go ink/sepia.
+4. **`Project.discipline` is now inert** — authored, validated by a test, drawn nowhere, since the
+   index went flat. Kept because deleting authored content is your call. Say and it goes.
+5. **The blue tripwire lost a half.** It asserted both that `engine/botanical` hands this page blue AND
+   that the render register neutralises it, via `calyxSprig` then `sprigPathStyle`. Both are deleted,
+   and FanPainting (now the page's only botanical borrower) re-colours inline in JSX with no pure
+   function to call. The first half now tests `growWild` directly; **the render half is covered only by
+   the live computed-style sweep.** If a third borrower ever appears, give it a pure style function.
+6. **Archipedia's hero cover-crops its left panel** (native 1.83 in a 1.51 box). That is content
+   tuning, not layout — `fit: 'contain'` on that one image would letterbox it instead.
+7. **`SeamBridge` now lands on nothing.** It carried the spine's line down to the founders' convergence
+   node, which was part of the deleted leader-line scaffolding, and Clay's founders are left-aligned
+   rather than centred. It is a plumb line to a left-aligned block. Needs a composition call.
+8. Mobile / Firefox / WebKit unverified, as in round 1.
+
+## Files
+
+**New:** `src/pages/about/spaceColonization.ts` (+ test).
+
+**Modified:** `src/pages/AboutPage.tsx` (Clay's founders, rows, flat index, FounderBower),
+`src/pages/about/CrossPathsTimeline.tsx` (decoupling, fade, sub-branches, `YEAR_TICKS`, lockup lift),
+`src/pages/about/CrossPathsTimeline.test.ts`, `src/pages/about/paintings.ts` (+ test) (ledger trimmed
+to two, `groupProjects` deleted), `src/engine/gongbi/garland.ts` (`vines`),
+`src/engine/gongbi/painter.ts` (`geoHash` keys `vines`), `.gitignore`.
+
+**Contested files touched:** `src/engine/gongbi/*` (garland + painter, for `vines`; not on the parallel
+session's Eden list). `src/engine/botanical/*` **not** touched. None of the Eden geometry, scene, or
+engine-page files touched.
