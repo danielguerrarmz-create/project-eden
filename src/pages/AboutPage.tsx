@@ -852,6 +852,140 @@ function ListView({ reduced }: { reduced: boolean }) {
  */
 
 /**
+ * THE CODA — the timeline's floral ending (2026-07-16, round 3). Daniel: "On the bottom part, the
+ * cross paths and 'the obsession is real and it is old' — I really like some of the flowers that
+ * Clay had in the background in his version and the big spacing in between... I want you to bring
+ * back the flowers and the beautiful ornamentation as the ending of the timeline, and at the bottom
+ * to have all the projects."
+ *
+ * Clay's `Colophon()` (`git show about-v2-nonflowers:src/pages/scroll/ScrollPage.tsx`) is the source
+ * of the look: a painting, then the payoff label, then the payoff in large italic, all centred with
+ * a lot of air. Two things do not port:
+ *   - His `PAINTINGS.eden` commission was deleted with the drafts, so the painting here is a GARLAND
+ *     (vines arcing across a band) rather than a single mounted plant — which is also the right
+ *     register: this is the end of a timeline that has been growing the whole way down, not a new
+ *     specimen introduced at the last moment.
+ *   - He overlaid the BowerMark on the painting at `bottom-[5%]`. That is the one thing CLAUDE.md
+ *     forbids outright: `matRect` base-anchors every plant so its densest region sits on the mat's
+ *     bottom pixel row, so a mark at the frame's base collides by construction, for every seed. No
+ *     mark here.
+ */
+const CODA_BAND = { w: 1000, h: 300 };
+
+/**
+ * Four arcs across the band, composed by eye — the same "it just has to look pretty" register as the
+ * founder bower. They sweep in from both edges and meet near the centre, so the band reads as a bower
+ * closing over the line the timeline has been drawing all the way down.
+ *
+ * SAMPLED SMOOTH, not authored as corners. The first cut was five hand-placed points per vine and it
+ * painted a hard grey ZIGZAG: the composer resamples a path at 4px and interpolates it LINEARLY, so
+ * every authored point is a corner it drives straight through, and a vine with five points is five
+ * corners. The founder bower gets away with ten gentle points; a wide arc cannot. So each vine here
+ * is sampled off a smooth curve at ~1 point per 12px — the shape is still chosen by eye (the sweep,
+ * the sag, where it meets), the SMOOTHNESS is just not left to luck.
+ */
+function codaArc(
+  x0: number,
+  x1: number,
+  y0: number,
+  sag: number,
+  wobble: number,
+  phase: number,
+): Array<[number, number]> {
+  const n = Math.max(8, Math.round(Math.abs(x1 - x0) / 12));
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const t = i / n;
+    const x = x0 + (x1 - x0) * t;
+    // a single smooth swag, plus one slow undulation along it
+    const y = y0 + sag * Math.sin(Math.PI * t) + wobble * Math.sin(Math.PI * (t * 2 + phase));
+    return [x, y] as [number, number];
+  });
+}
+
+const CODA_VINES: Array<Array<[number, number]>> = [
+  codaArc(-40, 520, 74, 46, 12, 0.15), // in from the left, swagging low, meeting near centre
+  codaArc(1040, 480, 66, 52, 10, 0.6), // its answer from the right, a touch higher
+  codaArc(-30, 470, 232, -38, 9, 0.35), // a lower pair, arcing the other way
+  codaArc(1030, 540, 244, -44, 11, 0.8),
+];
+
+function CodaBower() {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    let objectUrl: string | null = null;
+    requestGarland({
+      seed: 'bower/spine-2/coda',
+      voice: 'pigment',
+      width: CODA_BAND.w,
+      height: CODA_BAND.h,
+      vines: CODA_VINES.map((path) => ({
+        path,
+        stations: [0.12, 0.28, 0.44, 0.6, 0.76, 0.9].map((t, i) => ({
+          t,
+          organ: (['leaf', 'bloom', 'leaf', 'bloom', 'bud', 'leaf'] as const)[i],
+        })),
+      })),
+      scale: 1.5,
+      rootWidth: 3,
+      tube: true,
+    })
+      .then(async (bitmap) => {
+        const c = document.createElement('canvas');
+        c.width = bitmap.width;
+        c.height = bitmap.height;
+        c.getContext('2d')?.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob || !live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch((err: unknown) => {
+        console.error('gongbi coda bower failed:', err);
+      });
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, []);
+  if (!url) return null;
+  return (
+    <img
+      aria-hidden
+      src={url}
+      alt=""
+      className="pointer-events-none mx-auto block w-full max-w-[1000px]"
+      style={{ aspectRatio: CODA_BAND.w / CODA_BAND.h }}
+    />
+  );
+}
+
+/** The coda: the flowers, then the crossing, then the payoff. "The big spacing in between" is the
+ *  brief, so the air here is deliberate and generous — this is the beat the whole timeline lands on. */
+function TeamCoda({ reduced }: { reduced: boolean }) {
+  return (
+    <section aria-label="Crossed paths" className="mx-auto w-full max-w-page px-gutter">
+      <div className={reduced ? 'h-12' : 'min-h-[12svh]'} aria-hidden />
+      <CodaBower />
+      <div className="mx-auto mt-14 max-w-[640px] text-center">
+        <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
+        <p className="mt-3 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
+      </div>
+      <div className="mx-auto mt-16 max-w-[640px] text-center">
+        <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-accentOlive">
+          {TEAM_CODA.payoffLabel}
+        </p>
+        {/* Clay's own treatment for this line: large, italic, centred. */}
+        <p className="mt-3 font-serifDisplay text-[clamp(1.35rem,2.6vw,1.9rem)] italic leading-snug text-inkBlack">
+          {TEAM_CODA.payoff}
+        </p>
+      </div>
+      <div aria-hidden className={reduced ? 'h-16' : 'min-h-[18svh]'} />
+    </section>
+  );
+}
+
+/**
  * FOUNDER BOWER — flowers growing around the two of them.
  *
  * NOTE THE BRIEF, because it is the OPPOSITE of the sub-branch engine's and the difference is
@@ -1024,7 +1158,7 @@ const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
  */
 function FounderNode({ person }: { person: TeamMember }) {
   return (
-    <div className="grid gap-10 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,5fr)] md:items-start">
+    <div className="grid gap-8 md:grid-cols-[minmax(0,3.7fr)_minmax(0,7fr)_minmax(0,4fr)] md:items-start">
       <figure>
         {person.image ? (
           <img
@@ -1035,27 +1169,35 @@ function FounderNode({ person }: { person: TeamMember }) {
           />
         ) : (
           <div className="flex aspect-[4/5] w-full items-center justify-center border border-dashed border-inkBlack/20">
-            <OculusMark size={44} className="h-auto w-11 text-inkBlack/20" />
+            <OculusMark size={36} className="h-auto w-9 text-inkBlack/20" />
           </div>
         )}
-        <figcaption className="mt-3">
+        <figcaption className="mt-2.5">
           <span className={`${MONO_SMALL} block text-inkBlack`}>{person.name}</span>
           <span className={`${MONO_SMALL} block text-inkBlack/60`}>{person.role}</span>
         </figcaption>
       </figure>
 
-      <dl className="space-y-6">
+      {/* THE FACTS ARE WHAT SET THE ROW'S HEIGHT — not the pictures, which is the counter-intuitive
+          half of Daniel's "I would just minimize everything smaller, mostly the pictures and the big
+          picture on the side." Measured before touching anything: the rows were 444 and 472 tall
+          against a 375px portrait, so the `dl` was the tallest column in both. Shrinking only the
+          images would have moved the row height by nothing. So the type comes down with them: 17 ->
+          15px on a wider measure (the 4/7/4 split gives the facts more room, which costs LINES, which
+          is what actually costs height), and the stack tightens 6 -> 4. */}
+      <dl className="space-y-4">
         {person.facts.map((fact) => (
           <div key={fact.label}>
             <dt className={`${MONO_SMALL} text-inkBlack/60`}>{fact.label}</dt>
-            <dd className="mt-1.5 max-w-[52ch] text-[17px] leading-relaxed opacity-90">{fact.value}</dd>
+            <dd className="mt-1 max-w-[62ch] text-[15px] leading-snug opacity-90">{fact.value}</dd>
           </div>
         ))}
       </dl>
 
       {/* The specimen, signed with the seed it grew from — the provenance is the point: type the
-          printed seed into #/lab/gongbi and this exact plant grows back. */}
-      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={340} className="md:justify-self-end" />
+          printed seed into #/lab/gongbi and this exact plant grows back. 340 -> 250: "the big picture
+          on the side" is the one he named. */}
+      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={250} className="md:justify-self-end" />
     </div>
   );
 }
@@ -1127,29 +1269,25 @@ export function AboutPage() {
           <div className="relative z-10">
             <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
 
-            <div className="mt-12 flex flex-col gap-16">
+            <div className="mt-5 flex flex-col gap-8">
               {TEAM.map((person) => (
                 <FounderNode key={person.id} person={person} />
               ))}
             </div>
 
-            <div className="mx-auto mt-24 max-w-[640px] text-center">
-              <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
-              <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
-            </div>
-
-            <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">
-                {TEAM_CODA.payoffLabel}
-              </p>
-              <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
-                {TEAM_CODA.payoff}
-              </p>
-            </div>
           </div>
-
-          <div aria-hidden className={reduced ? 'h-16' : 'min-h-[20svh]'} />
         </section>
+
+        {/* THE CODA — moved OUT of the founders section on 2026-07-16 (round 3). Two of Daniel's notes
+            meet here and pull the same way:
+              G: "I want the entire founder page to appear on one frame within the screen."
+              H: "the cross paths and 'the obsession is real and it is old' — I really like some of the
+                  flowers that Clay had in the background in his version and the big spacing in
+                  between... I want you to bring back the flowers and the beautiful ornamentation as
+                  the ending of the timeline, and at the bottom to have all the projects."
+            So the coda is not the founders' tail; it is the timeline's ENDING, and it wants its own
+            air. Lifting it out is also 291px of the 585 the founders had to lose. */}
+        <TeamCoda reduced={reduced} />
 
         {/* PORTION TWO — the work, most recent first. The founders → work line arrives at the page
             centre right here. The section owns a viewport's height, the header takes what it needs, and
