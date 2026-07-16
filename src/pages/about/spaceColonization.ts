@@ -150,16 +150,31 @@ export function colonize(opts: ColonizeOpts): ColonyNode[] {
   return nodes;
 }
 
+/** One drawable run of the tree, with its place in the hierarchy. */
+export interface Branch {
+  /** Root-first polyline. */
+  pts: Vec2[];
+  /**
+   * BRANCH ORDER, in the botanical sense: 0 is a run leaving a source (the trunk), 1 is a branch off
+   * the trunk, 2 a sub-branch off that, and so on. Order increments at each FORK, not per segment —
+   * a long run that never forks is still the same branch, however far it travels.
+   */
+  order: number;
+  /** True when this run ends at a tip rather than at another fork. */
+  terminal: boolean;
+}
+
 /**
- * Split the tree into drawable polylines: one per unbroken run from a source or a fork down to a
- * tip or the next fork. Each is root-first, which is the direction the garland composer walks (it
- * tapers a vine from root to tip).
+ * Split the tree into drawable runs: one per unbroken stretch from a source or a fork down to a tip
+ * or the next fork. Each is root-first, which is the direction the garland composer walks (it tapers
+ * a vine from root to tip).
  *
  * Runs are cut at forks rather than traced whole-tip-to-root so that no segment is emitted twice —
  * a shared trunk drawn once per tip would paint over itself and read heavier than the branches it
- * carries.
+ * carries. Cutting at forks is also what makes `order` available: a fork is exactly where one branch
+ * becomes two, so the hierarchy is a property of this split rather than something measured after.
  */
-export function branchPolylines(nodes: readonly ColonyNode[]): Vec2[][] {
+export function branches(nodes: readonly ColonyNode[]): Branch[] {
   const children = new Map<number, number[]>();
   for (let i = 0; i < nodes.length; i++) {
     const p = nodes[i].parent;
@@ -169,16 +184,22 @@ export function branchPolylines(nodes: readonly ColonyNode[]): Vec2[][] {
     else children.set(p, [i]);
   }
 
-  const out: Vec2[][] = [];
+  const out: Branch[] = [];
   // Each run starts at a source or at the child of a fork, and walks down while the path is
-  // single-file. A node with 2+ children ends the current run and starts one per child.
-  const starts: number[] = [];
+  // single-file. A node with 2+ children ends the current run and starts one per child. Walking the
+  // starts breadth-first from the sources means a run's order is always known before its children's.
+  const orderOf = new Map<number, number>();
+  const queue: number[] = [];
   for (let i = 0; i < nodes.length; i++) {
-    if (nodes[i].parent < 0) starts.push(i);
-    else if ((children.get(nodes[i].parent)?.length ?? 0) > 1) starts.push(i);
+    if (nodes[i].parent < 0) {
+      orderOf.set(i, 0);
+      queue.push(i);
+    }
   }
 
-  for (const s of starts) {
+  while (queue.length > 0) {
+    const s = queue.shift()!;
+    const order = orderOf.get(s)!;
     const run: Vec2[] = [];
     // Anchor the run at its parent so consecutive runs meet on the paper rather than leaving a
     // `segment`-long gap at every fork.
@@ -187,10 +208,21 @@ export function branchPolylines(nodes: readonly ColonyNode[]): Vec2[][] {
     for (;;) {
       run.push({ ...nodes[cur].pos });
       const kids = children.get(cur);
-      if (!kids || kids.length !== 1) break;
+      if (!kids || kids.length !== 1) {
+        // A run of one point is a node that forked the instant it started (a source whose first step
+        // already split). Nothing is drawn for it, so it is not a branch, and its children must NOT
+        // count it as their parent tier — otherwise they claim an order whose parent run does not
+        // exist, and the hierarchy is a lie from the root down. Only an EMITTED run deepens the order.
+        const drawn = run.length >= 2;
+        if (drawn) out.push({ pts: run, order, terminal: !kids || kids.length === 0 });
+        for (const k of kids ?? []) {
+          orderOf.set(k, drawn ? order + 1 : order);
+          queue.push(k);
+        }
+        break;
+      }
       cur = kids[0];
     }
-    if (run.length >= 2) out.push(run);
   }
   return out;
 }

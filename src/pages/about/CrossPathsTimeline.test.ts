@@ -30,7 +30,7 @@ import {
   VELLUM,
 } from './CrossPathsTimeline';
 import { growWild } from '../../engine/botanical';
-import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines, plateBox } from './CrossPathsTimeline';
+import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines, subBranchWidth, plateBox } from './CrossPathsTimeline';
 import { PROJECTS } from './projects';
 import { seededRandom } from './spaceColonization';
 
@@ -567,7 +567,7 @@ describe('the sub-branches are ORNAMENT: they read the layout and lose every arg
 
   it('grows a real tree into the drawing, not a token sprig', () => {
     expect(runs.length).toBeGreaterThan(40);
-    for (const run of runs) expect(run.length).toBeGreaterThanOrEqual(2);
+    for (const run of runs) expect(run.pts.length).toBeGreaterThanOrEqual(2);
   });
 
   it('THE CONTRACT: not one branch point lands on a project plate', () => {
@@ -578,7 +578,7 @@ describe('the sub-branches are ORNAMENT: they read the layout and lose every arg
     // to put a point down inside the attractor-free pad to get across, and it has no reason to.
     // If either constant moves, this is the test that notices.
     for (const run of runs) {
-      for (const p of run) {
+      for (const p of run.pts) {
         for (const pl of plates) {
           const r = pl.rect;
           const hit = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
@@ -606,7 +606,7 @@ describe('the sub-branches are ORNAMENT: they read the layout and lose every arg
     // at its midpoint and the second half must be meaningfully busier than the first.
     const mid = (CONV_JUNCTION_Y + CONVERGE_Y) / 2;
     const count = (lo: number, hi: number) =>
-      runs.flat().filter((p) => p.y >= lo && p.y < hi).length;
+      runs.flatMap((b) => b.pts).filter((p) => p.y >= lo && p.y < hi).length;
     const early = count(CONV_JUNCTION_Y, mid);
     const late = count(mid, CONVERGE_Y);
     expect(late).toBeGreaterThan(early * 1.5);
@@ -616,16 +616,42 @@ describe('the sub-branches are ORNAMENT: they read the layout and lose every arg
     expect(subBranchPolylines()).toEqual(runs);
   });
 
-  it('hangs organs on every branch, and keeps them off the root end', () => {
+  it('ORGANS GROW ON TWIGS, NOT ON THE TRUNK', () => {
+    // Daniel: "Currently the leaves and flowers are immediately on the branch... they lack more depth
+    // and texture that I feel like sub-branches would give it a lot of strength." This used to assert
+    // the opposite ("organs on EVERY branch") — that assertion WAS the bug, so it is inverted rather
+    // than relaxed: a run that leaves the spine carries nothing, and only what forks off it blooms.
     const vines = subBranchVines(runs);
-    expect(vines).toHaveLength(runs.length);
-    for (const v of vines) {
-      expect(v.stations.length).toBeGreaterThanOrEqual(1);
+    expect(vines).toHaveLength(runs.length); // 1:1 with the runs; a bare trunk is a vine with no stations
+    let trunks = 0;
+    let twigs = 0;
+    runs.forEach((b, i) => {
+      if (b.order === 0) {
+        expect(vines[i].stations, 'a trunk must carry nothing').toHaveLength(0);
+        trunks += 1;
+      } else {
+        expect(vines[i].stations.length).toBeGreaterThanOrEqual(1);
+        twigs += 1;
+      }
+    });
+    expect(trunks).toBeGreaterThan(0);
+    expect(twigs).toBeGreaterThan(trunks); // the plant is mostly twig, which is why this reads as depth
+  });
+
+  it('rides the organs out toward the tips, never at the root end of a run', () => {
+    for (const v of subBranchVines(runs)) {
       for (const st of v.stations) {
-        expect(st.t).toBeGreaterThanOrEqual(0.25); // organs ride the tips, as on a real branch
+        expect(st.t).toBeGreaterThanOrEqual(0.25);
         expect(st.t).toBeLessThanOrEqual(1);
       }
     }
+  });
+
+  it('thins the stroke with every order, so trunk -> branch -> twig reads at a glance', () => {
+    expect(subBranchWidth(0)).toBeGreaterThan(subBranchWidth(1));
+    expect(subBranchWidth(1)).toBeGreaterThan(subBranchWidth(2));
+    expect(subBranchWidth(2)).toBeGreaterThan(subBranchWidth(3));
+    expect(subBranchWidth(99)).toBeGreaterThan(0); // a floor, so a deep twig never vanishes
   });
 });
 

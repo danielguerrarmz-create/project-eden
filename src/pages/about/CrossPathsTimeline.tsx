@@ -45,7 +45,7 @@ import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 import { requestGarland } from '../../engine/gongbi/painter';
 import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
-import { colonize, branchPolylines, seededRandom, type Vec2 } from './spaceColonization';
+import { colonize, branches, seededRandom, type Vec2, type Branch } from './spaceColonization';
 
 /**
  * The practice's ink: a warm sepia/timber, drawn from the splash hero's own structure.
@@ -1050,7 +1050,7 @@ const SUB_KILL = 26;
 const SUB_WOBBLE = 0.34;
 /** How coarse the attractor scatter is. This is the ornament's density dial: smaller = more, and
  *  the cost is quadratic-ish in the colonize loop, so it is not free. */
-const SUB_ATTRACTOR_STEP = 60;
+const SUB_ATTRACTOR_STEP = 52;
 /** Keep attractors (and so growth) off the spine's own band, which the SpineGarland already dresses,
  *  and off the drawn line itself. */
 const SUB_SPINE_CLEAR = 30;
@@ -1143,15 +1143,15 @@ export function subBranchAttractors(rand: () => number, obstacles: readonly WRec
  *  produce sparse branching at the top without needing a second rule to say so. */
 export function subBranchSources(): Vec2[] {
   const out: Vec2[] = [];
-  const step = 150;
+  const step = 130;
   for (let y = CONV_JUNCTION_Y + step; y < CONVERGE_Y; y += step) {
     out.push({ x: CX, y });
   }
   return out;
 }
 
-/** The grown sub-branches as world-space polylines. Deterministic under SUB_SEED. */
-export function subBranchPolylines(): Vec2[][] {
+/** The grown sub-branches, with their hierarchy, in world space. Deterministic under SUB_SEED. */
+export function subBranchPolylines(): Branch[] {
   const rand = seededRandom(`${SUB_SEED}/colonize`);
   const nodes = colonize({
     attractors: subBranchAttractors(seededRandom(`${SUB_SEED}/scatter`)),
@@ -1163,7 +1163,7 @@ export function subBranchPolylines(): Vec2[][] {
     rand,
     maxNodes: 3000,
   });
-  return branchPolylines(nodes);
+  return branches(nodes);
 }
 
 /** The sub-branch canvas: the whole plumb run, full width. Unlike the spine's narrow strip this has
@@ -1182,19 +1182,42 @@ export const SUB_BOX = { x: 0, y: CONV_JUNCTION_Y, w: W, h: CONVERGE_Y - CONV_JU
  * tube was painted by the composer would put the genome's own branchColor on the page as structure,
  * which is the one thing the colour law forbids.
  */
-export function subBranchVines(runs: Vec2[][]): GarlandVine[] {
+/**
+ * ORGANS GROW ON TWIGS, NOT ON THE TRUNK (2026-07-16, round 3). Daniel: "Currently the leaves and
+ * flowers are immediately on the branch, although realistic, are lacking and they lack more depth
+ * and texture that I feel like sub-branches would give it a lot of strength."
+ *
+ * He is right and it was nearly free: space colonization already grows a hierarchy, and the organs
+ * were simply being hung on every tier of it including the trunk. `branches()` now reports each run's
+ * `order`, so a run only carries foliage once it is at least `SUB_ORGAN_MIN_ORDER` deep. The trunk
+ * runs bare out of the spine, forks, and only the twigs bloom — which is what reads as depth, because
+ * it is the structure a real branch has.
+ */
+const SUB_ORGAN_MIN_ORDER = 1;
+
+export function subBranchVines(runs: readonly Branch[]): GarlandVine[] {
   const rand = seededRandom(`${SUB_SEED}/organs`);
   const ORGANS: GarlandOrgan[] = ['leaf', 'bloom', 'leaf', 'bud', 'leaf', 'leaf', 'bloom'];
   let n = 0;
   const vines: GarlandVine[] = [];
-  for (const run of runs) {
-    const path = run.map((p) => [p.x - SUB_BOX.x, p.y - SUB_BOX.y] as [number, number]);
-    // Length in world units decides how much a branch can carry: a two-segment twig gets one organ,
-    // a long arc gets several. Tips are favoured (t biased late) because that is where a real branch
-    // carries its growth.
+  for (const b of runs) {
+    const path = b.pts.map((p) => [p.x - SUB_BOX.x, p.y - SUB_BOX.y] as [number, number]);
+    if (b.order < SUB_ORGAN_MIN_ORDER) {
+      // The trunk is drawn (its stem is in the SVG) but carries nothing. A vine with no stations
+      // paints nothing at all, which is exactly right — and it keeps the vine list aligned 1:1 with
+      // the runs, so the caller does not have to reason about which ones were dropped.
+      vines.push({ path, stations: [] });
+      continue;
+    }
+    // Length in world units decides how much a twig can carry: a two-segment twig gets one organ, a
+    // long arc gets several. Deeper orders carry MORE per unit length — the outermost growth is the
+    // youngest and the busiest, which is the other half of what makes a plant read as a plant.
     let length = 0;
-    for (let i = 1; i < run.length; i++) length += Math.hypot(run[i].x - run[i - 1].x, run[i].y - run[i - 1].y);
-    const count = Math.max(1, Math.round(length / 78));
+    for (let i = 1; i < b.pts.length; i++) {
+      length += Math.hypot(b.pts[i].x - b.pts[i - 1].x, b.pts[i].y - b.pts[i - 1].y);
+    }
+    const per = b.order >= 3 ? 52 : b.order === 2 ? 64 : 84;
+    const count = Math.max(1, Math.round(length / per));
     const stations: GarlandStation[] = [];
     for (let i = 0; i < count; i++) {
       const t = clamp01(0.25 + (0.75 * (i + rand())) / count);
@@ -1204,6 +1227,13 @@ export function subBranchVines(runs: Vec2[][]): GarlandVine[] {
     vines.push({ path, stations });
   }
   return vines;
+}
+
+/** A branch's stroke, thinning with order: the trunk carries the weight and a twig is a hair. This
+ *  taper is what lets the eye read trunk -> branch -> twig at a glance, and it is why the organs
+ *  sitting only on the twigs reads as depth rather than as randomness. */
+export function subBranchWidth(order: number): number {
+  return Math.max(0.9, SUB_BRANCH_W * Math.pow(0.72, order));
 }
 
 /**
@@ -1249,14 +1279,14 @@ function SubBranches({ reduced }: { reduced: boolean }) {
 
   return (
     <g pointerEvents="none">
-      {runs.map((run, i) => (
+      {runs.map((b, i) => (
         <path
           key={i}
-          d={lineGen(run) ?? ''}
+          d={lineGen(b.pts) ?? ''}
           fill="none"
           stroke={INK_SEPIA}
           strokeOpacity={0.62}
-          strokeWidth={SUB_BRANCH_W}
+          strokeWidth={subBranchWidth(b.order)}
           strokeLinecap="round"
           strokeLinejoin="round"
         />

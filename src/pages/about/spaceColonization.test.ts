@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { colonize, branchPolylines, seededRandom, type Vec2, type ColonyNode } from './spaceColonization';
+import { colonize, branches, seededRandom, type Vec2, type ColonyNode } from './spaceColonization';
 
 const d = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -180,7 +180,7 @@ describe('colonize: growth reaches into the space it is given', () => {
   });
 });
 
-describe('branchPolylines: the tree, as drawable runs', () => {
+describe('branches: the tree, as drawable runs with a hierarchy', () => {
   const nodes = colonize({
     ...base,
     attractors: scatter(100, 0, 340, 220, 15, seededRandom('att')),
@@ -189,7 +189,7 @@ describe('branchPolylines: the tree, as drawable runs', () => {
   });
 
   it('emits runs of at least two points, all finite', () => {
-    const runs = branchPolylines(nodes);
+    const runs = branches(nodes).map((b) => b.pts);
     expect(runs.length).toBeGreaterThan(0);
     for (const run of runs) {
       expect(run.length).toBeGreaterThanOrEqual(2);
@@ -206,7 +206,8 @@ describe('branchPolylines: the tree, as drawable runs', () => {
     const key = (a: Vec2, b: Vec2) =>
       [a.x.toFixed(4), a.y.toFixed(4), b.x.toFixed(4), b.y.toFixed(4)].join('|');
     const seen = new Map<string, number>();
-    for (const run of branchPolylines(nodes)) {
+    for (const b of branches(nodes)) {
+      const run = b.pts;
       for (let i = 1; i < run.length; i++) {
         const k = key(run[i - 1], run[i]);
         seen.set(k, (seen.get(k) ?? 0) + 1);
@@ -218,15 +219,46 @@ describe('branchPolylines: the tree, as drawable runs', () => {
   });
 
   it('leaves no gap at a fork: each run is anchored on its parent node', () => {
-    for (const run of branchPolylines(nodes)) {
+    for (const { pts: run } of branches(nodes)) {
       for (let i = 1; i < run.length; i++) {
         expect(d(run[i - 1], run[i])).toBeCloseTo(base.segment, 6);
       }
     }
   });
 
+  it('THE HIERARCHY: order 0 leaves a source, and every child run is exactly one deeper', () => {
+    // Daniel: "the leaves and flowers are immediately on the branch, although realistic, are lacking
+    // and they lack more depth and texture that I feel like sub-branches would give it a lot of
+    // strength." The tree already branches; what was missing was knowing WHICH tier a run is, so the
+    // organs could be put on the twigs instead of the trunk. Order increments at a FORK.
+    const bs = branches(nodes);
+    const byStart = new Map(bs.map((b) => [`${b.pts[0].x.toFixed(4)},${b.pts[0].y.toFixed(4)}`, b]));
+    for (const b of bs) {
+      if (b.order === 0) continue;
+      // a child run starts at its parent run's fork point, so some run must END where this one starts
+      const parent = bs.find((o) => o !== b && o.pts[o.pts.length - 1].x === b.pts[0].x && o.pts[o.pts.length - 1].y === b.pts[0].y);
+      expect(parent, `order ${b.order} run has no parent run`).toBeDefined();
+      expect(b.order).toBe(parent!.order + 1);
+    }
+    expect(byStart.size).toBeGreaterThan(0);
+    expect(bs.some((b) => b.order === 0)).toBe(true);
+    expect(Math.max(...bs.map((b) => b.order))).toBeGreaterThanOrEqual(2);
+  });
+
+  it('marks a run terminal iff it ends at a tip', () => {
+    const bs = branches(nodes);
+    const tips = bs.filter((b) => b.terminal);
+    expect(tips.length).toBeGreaterThan(0);
+    // A terminal run's end point must not be the start of any other run (nothing continues past it).
+    for (const t of tips) {
+      const end = t.pts[t.pts.length - 1];
+      const continues = bs.some((o) => o !== t && o.pts[0].x === end.x && o.pts[0].y === end.y);
+      expect(continues).toBe(false);
+    }
+  });
+
   it('handles a bare source with nothing grown', () => {
     const lone: ColonyNode[] = [{ pos: { x: 0, y: 0 }, parent: -1 }];
-    expect(branchPolylines(lone)).toEqual([]);
+    expect(branches(lone)).toEqual([]);
   });
 });
