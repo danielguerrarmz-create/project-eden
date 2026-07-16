@@ -1820,6 +1820,7 @@ export function CrossPathsTimeline({
        wearing its everyday clothes. */
     <div
       ref={trackRef}
+      data-timeline-track
       className={reduced ? 'relative' : 'relative -mt-8'}
       style={{ height: reduced ? 'auto' : '1080vh' }}
     >
@@ -1827,26 +1828,41 @@ export function CrossPathsTimeline({
         className={
           reduced
             ? 'flex flex-col gap-12'
-            : 'sticky top-[var(--header-h)] flex h-[calc(100svh-var(--header-h))] flex-col gap-8 py-4 lg:flex-row lg:items-stretch lg:gap-12 xl:gap-16'
+            : // THE LIFT LIVES ON THE ROW, NOT ON ONE COLUMN (2026-07-16, round 4). `items-stretch`
+              // is what makes this work: padding here shrinks BOTH columns, so the words and the
+              // mark move together. See the copy column below, `pinCamY`, and qa/hero-lockup.mjs.
+              'sticky top-[var(--header-h)] flex h-[calc(100svh-var(--header-h))] flex-col gap-8 py-4 lg:flex-row lg:items-stretch lg:gap-12 lg:pb-[calc(var(--header-h)+3.25rem)] xl:gap-16'
         }
       >
-        {/* THE HERO LOCKUP'S HEIGHT (2026-07-16, round 2). Daniel: "it is not where it should be on
-            centre... the entire thing should be lifted up slightly to be on centre on my screen."
-            He was right, and it was arithmetic rather than taste: this column is `justify-center`
-            inside a box that starts BELOW the fixed header (`h-[calc(100svh-var(--header-h))]`), so
-            the lockup centred on that band's middle, which is exactly `--header-h / 2` below the
-            middle of the SCREEN — the thing he is actually looking at. Measured at 1440x900: lockup
-            centre 492 against a screen centre of 450, with 290px of air above it and 206 below.
+        {/* THE HERO LOCKUP'S HEIGHT — round 2, corrected in round 4.
+            Round 2, Daniel: "the entire thing should be lifted up slightly to be on centre on my
+            screen." Arithmetic, not taste: this column is `justify-center` inside a box that starts
+            BELOW the fixed header, so it centred on that band's middle — exactly `--header-h / 2`
+            below the middle of the SCREEN. Measured then at 1440x900: centre 492 vs screen centre
+            450. The correction buys back `--header-h` plus an optical nudge, doubled because
+            `justify-center` splits padding, and written against the token because SplashHeader
+            re-measures --header-h at runtime.
 
-            The padding is the correction, and it is TWICE the lift because `justify-center` splits it:
-            `--header-h` buys back the 42px of header, and the 2.25rem buys 18px more — the optical
-            nudge, ~2% of the viewport, because a block parked on the mathematical centre reads low.
-            Written in terms of the token, not as a magic 120px, so it stays true if the header
-            re-measures itself (SplashHeader does, at runtime).
+            ROUND 4: THE PADDING MOVED TO THE ROW, and that is the actual fix, not a tidy-up. Round 2
+            put it on this column ALONE, which lifted the words and left the mark where it was —
+            Daniel, round 4: "The text 'we've been chasing it for five years' is now on center,
+            perfectly aligned, but the bower is still slightly below." Measured at the pin: the words
+            at 432, the mark at 492, 60px adrift. The mark sits at the SVG frame's centre, and
+            padding on this column moves only this column's CONTENT — the frame never heard about it.
 
-            `lg:` only: the reduced-motion and narrow layouts drop the sticky viewport-height box, so
-            there is no band to correct for and the padding would just add dead space. */}
-        <div className="flex shrink-0 flex-col justify-center gap-10 lg:w-[clamp(19rem,26vw,24rem)] lg:pb-[calc(var(--header-h)+2.25rem)]">
+            The `pinCamY` comment had ASSERTED the thing round 2 broke — "the mark's centre is at the
+            frame's vertical centre, which is where the left text block is centred too, so the mark
+            and the words compose as one still." On the ROW, `items-stretch` shrinks both columns, so
+            the frame's centre and this column's centre move as one and that sentence is true again.
+
+            WHY 3.25rem AND NOT ROUND 2's 2.25: the lift is pb/2, and moving the padding from the
+            column to the row changes what it acts on, so the same value is no longer the same nudge
+            — at 2.25rem the words came to rest 10px proud of the screen centre, not the 18 they had
+            been. But 18 is the position Daniel called "perfectly aligned", so it is a FIXED POINT,
+            not a leftover: the mark had to come up to the words, not the words down to the mark.
+            +1rem of padding buys the missing 8px (measured 2.25 -> 10 proud, 2.75 -> 14, 3.25 -> 18).
+            Both halves are pinned by qa/hero-lockup.mjs, which drives a real scroll to the pin. */}
+        <div className="flex shrink-0 flex-col justify-center gap-10 lg:w-[clamp(19rem,26vw,24rem)]">
           {title}
           <dl className="flex flex-col gap-8">
             {questions.map((q, i) => {
@@ -1989,6 +2005,19 @@ export function CrossPathsTimeline({
                 </g>
               );
             })}
+
+            {/* THE DATUM Daniel named, made measurable. Round 4: "the center of the middle circle
+                and the bower is exactly at the middle point between the top of that 'we've been
+                chasing it' and the bottom of the reshape that we can make."
+
+                The Oculus is eight circles ringing (50,50), and the lens they overlap into at that
+                centre is his "middle circle" — so its centre is exactly (MARK_CENTER_X,
+                MARK_CENTER_Y), the ring's own centre. There is no element there to measure, and the
+                spec is geometric, so this zero-radius, unstroked point is one: it draws nothing and
+                lets qa/hero-lockup.mjs read the datum's real screen position instead of inferring it
+                from the mark's bounding box (which is NOT the same point, and is what "not the mark's
+                bbox" in his spec rules out). */}
+            <circle data-mark-center cx={MARK_CENTER_X} cy={MARK_CENTER_Y} r={0} fill="none" stroke="none" />
 
             {/* THE UNRAVEL. The other seven circles bloom outward from the wound one as the tail
                 closes; circle 0 is NOT drawn here because the winding tail below IS circle 0. */}
