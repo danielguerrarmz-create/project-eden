@@ -30,7 +30,8 @@ import {
   VELLUM,
 } from './CrossPathsTimeline';
 import { growWild } from '../../engine/botanical';
-import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines } from './CrossPathsTimeline';
+import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines, plateBox } from './CrossPathsTimeline';
+import { PROJECTS } from './projects';
 import { seededRandom } from './spaceColonization';
 
 const GAP = 40;
@@ -474,6 +475,56 @@ describe('the spine garland: Clay organs on Daniel geometry', () => {
       expect(y).toBeGreaterThanOrEqual(0);
       expect(y).toBeLessThanOrEqual(GARLAND_BOX.h);
     }
+  });
+});
+
+describe('a plate is a box built to its image, never an image squeezed into a box', () => {
+  it('THE CONTRACT: every plate box has EXACTLY the aspect ratio of its image', () => {
+    // Daniel: "the one testing the Plentify prototype has white spaces on the left and right side...
+    // scale to fit the image properly so it shows in full without getting rid of the context."
+    // The plates used to take their tier's literal 3:2 box, so a square image (Plentify's compression
+    // test is 976x975) letterboxed inside it. Keep this true and no plate can ever pillarbox again —
+    // and note it is what lets PlateMedia ask for `meet` unconditionally, which cannot crop.
+    for (const c of CLUSTERS) {
+      for (const n of c.nodes) {
+        const box = plateBox(n.tier, n.media.ratio);
+        expect(box.w / box.h, `${c.id}: ${n.media.src || 'pending'}`).toBeCloseTo(n.media.ratio, 6);
+      }
+    }
+  });
+
+  it('gives every plate in a tier the same AREA, whatever its shape', () => {
+    // The point of an area budget: a square and a 16:9 in one tier read as equally important. A
+    // fixed box cannot do that — it either shrinks one or crops it.
+    const area = (t: 'standard' | 'hero' | 'showcase') => plateBox(t, 1.5).w * plateBox(t, 1.5).h;
+    for (const t of ['standard', 'hero', 'showcase'] as const) {
+      for (const ratio of [0.5637, 1.001, 1.5, 1.7778, 1.9375]) {
+        const b = plateBox(t, ratio);
+        expect(b.w * b.h, `${t} @ ${ratio}`).toBeCloseTo(area(t), 4);
+      }
+    }
+  });
+
+  it('sizes a 3:2 plate exactly as the old fixed box did — nothing that already looked right moved', () => {
+    expect(plateBox('hero', 320 / 213).w).toBeCloseTo(320, 1);
+    expect(plateBox('hero', 320 / 213).h).toBeCloseTo(213, 1);
+    expect(plateBox('standard', 264 / 176).w).toBeCloseTo(264, 1);
+  });
+
+  it('agrees with projects.ts wherever the two files name the same asset', () => {
+    // Both files carry measured ratios for an overlapping set of assets. They were measured together
+    // on 2026-07-16 and agreed exactly; this is what stops them drifting apart later.
+    const authored = new Map(PROJECTS.flatMap((p) => p.images.map((im) => [im.src, im.ratio] as const)));
+    let checked = 0;
+    for (const c of CLUSTERS) {
+      for (const n of c.nodes) {
+        const a = authored.get(n.media.src);
+        if (a == null) continue;
+        expect(n.media.ratio, `${n.media.src}`).toBeCloseTo(a, 3);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(8);
   });
 });
 

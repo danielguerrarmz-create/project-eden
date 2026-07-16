@@ -88,6 +88,16 @@ type PlateTier = 'floor' | 'standard' | 'hero' | 'showcase';
 interface Plate {
   /** Public path to the image, or the POSTER still for a video. */
   src: string;
+  /**
+   * Intrinsic aspect ratio (width / height), MEASURED from the file — never guessed, and never the
+   * shape you wish it were. The plate's box is derived from THIS (see TIER), which is the whole
+   * point: an image is never asked to fit a box, the box is built to fit the image.
+   *
+   * Measured 2026-07-16 by loading every asset and reading naturalWidth/naturalHeight; the twelve
+   * that also appear in projects.ts agreed with its authored ratios exactly, and a test pins that
+   * they keep agreeing. If an asset is swapped, re-measure.
+   */
+  ratio: number;
   alt: string;
   /** Renders and photos crop with 'cover'; figures, logos, UI and line drawings use 'contain'
    *  so nothing with baked-in text ever gets cropped. */
@@ -440,14 +450,44 @@ export function spineLeanPtsTo(targetX: number): Array<{ x: number; y: number }>
  * Recover any of it from git: `git show fa87d33 -- src/pages/about/CrossPathsTimeline.tsx`.
  */
 
-/** Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
- *  drawn is STANDARD. Images dominate. */
+/**
+ * Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
+ * drawn is STANDARD. Images dominate.
+ *
+ * A TIER IS AN AREA BUDGET, NOT A BOX (2026-07-16, round 3). Daniel: "Some of the timeline images
+ * are not displayed properly. For example the one testing the Plentify prototype has white spaces on
+ * the left and right side. I want you to scale to fit the image properly so it shows in full without
+ * getting rid of the context."
+ *
+ * These used to be literal `{ w, h }` boxes at 3:2, and EVERY plate was forced into its tier's shape:
+ * `fit:'contain'` letterboxed the image inside the box against a white rect (Plentify's compression
+ * test is 976x975 — square — in a 320x213 box, hence his white bars), and `fit:'cover'` sliced the
+ * image to fill (which is the fix he explicitly ruled out: "without getting rid of the context").
+ * Same disease as the detail hero's old 505x557 portrait box, in a different organ.
+ *
+ * So the box is now DERIVED from the plate's own measured ratio, and the tier only says how much
+ * PAPER that plate is worth: `plateBox` gives every plate in a tier the same area at its own shape.
+ * A square and a 16:9 in the same tier read as equally important, which a fixed box cannot do — it
+ * makes one of them small or crops it. The w/h below are kept as the reference box the area is taken
+ * from (they are the old values, so 3:2 plates are sized exactly as before and nothing that already
+ * looked right moved).
+ */
 const TIER: Record<PlateTier, { w: number; h: number }> = {
   floor: { w: 240, h: 150 }, // reference size only — the hard minimum, never instantiated
   standard: { w: 264, h: 176 },
   hero: { w: 320, h: 213 },
   showcase: { w: 400, h: 267 }, // reserved for the two bookends: ut-austin and the NYC door
 };
+
+/**
+ * A plate's real box: its tier's AREA, at the image's own ratio. Pure and exported for the contract
+ * test, which is the one that matters here — every plate's box ratio equals its image's ratio, so
+ * nothing is ever letterboxed or cropped again.
+ */
+export function plateBox(tier: PlateTier, ratio: number): { w: number; h: number } {
+  const area = TIER[tier].w * TIER[tier].h;
+  return { w: Math.sqrt(area * ratio), h: Math.sqrt(area / ratio) };
+}
 
 /** The fixed perpendicular gap from the spine to a plate's near (inner) edge. */
 export const OFFSET_X = 110;
@@ -573,7 +613,7 @@ export const CLUSTERS: Cluster[] = [
     nodes: [
       {
         tier: 'standard',
-        media: { src: '', alt: 'A 2021 beginning, image to come', pending: true },
+        media: { src: '', ratio: 1.5, alt: 'A 2021 beginning, image to come', pending: true },
       },
     ],
   },
@@ -586,7 +626,7 @@ export const CLUSTERS: Cluster[] = [
     nodes: [
       {
         tier: 'standard',
-        media: { src: '', alt: 'A 2022 moment, image to come', pending: true },
+        media: { src: '', ratio: 1.5, alt: 'A 2022 moment, image to come', pending: true },
       },
     ],
   },
@@ -600,6 +640,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp`,
+          ratio: 1.2795,
           alt: 'The origami-inspired cardboard wedge prototype, a low-cost wound-prevention device, staged for photography',
         },
       },
@@ -607,6 +648,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'standard',
         media: {
           src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
+          ratio: 1.2125,
           alt: 'The device tested in hospital at Moi Teaching Hospital, Kenya',
         },
       },
@@ -622,6 +664,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/15-testfit/testfit-backlit-logo-sign-late-night.webp`,
+          ratio: 0.5637,
           alt: 'The backlit TestFit logo sign on an office wall at 12:56 in the morning, the late nights of a startup',
         },
       },
@@ -637,6 +680,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/01-synergy/synergy-cosmos-growth-loop-poster.webp`,
+          ratio: 1.7778,
           alt: 'The Plentify building growing from bare structure to fully planted',
           video: {
             webm: `${A}/01-synergy/synergy-cosmos-growth-loop.webm`,
@@ -657,6 +701,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/08-synthetic-vision/synthetic-vision-patch-probe-saliency-heatmaps.webp`,
+          ratio: 1.2344,
           alt: 'Saliency heatmaps over architectural fragments, warm colour marking each geometric primitive the model reads',
           fit: 'contain',
         },
@@ -673,6 +718,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/01-synergy/synergy-cosmos-compression-test.webp`,
+          ratio: 1.001,
           alt: 'A Plentify sample under compression on the MTS Insight testing machine, tested +30% stronger than hempcrete',
           fit: 'contain',
         },
@@ -691,6 +737,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/06-kuka-robotics/kuka-robotics-robot-loop-poster.webp`,
+          ratio: 1.7778,
           alt: 'A KUKA robot arm sanding an aluminium sheet, tooling an ornamented surface',
           video: {
             webm: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.webm`,
@@ -703,6 +750,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'standard',
         media: {
           src: `${A}/13-texas-robotics/texas-robotics-robot-device-loop-poster.webp`,
+          ratio: 1.7937,
           alt: 'A Texas Robotics mock-up robot device in motion',
           video: {
             webm: `${A}/13-texas-robotics/texas-robotics-robot-device-loop.webm`,
@@ -723,6 +771,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/14-large-language-object/large-language-object-lamp.webp`,
+          ratio: 1.3389,
           alt: 'The Large Language Object, a plywood articulated desk lamp on a wooden base with pulleys and a control box',
         },
       },
@@ -738,6 +787,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/12-resia/resia-product-screenshot-1.webp`,
+          ratio: 1.8397,
           alt: 'The Resia landing page, a one-stop remodeling solution to generate, estimate, contract, and manage a renovation',
         },
       },
@@ -753,6 +803,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/05-dougherty/dougherty-arts-center-catenary-entrance-skyline-money-shot.webp`,
+          ratio: 1.7778,
           alt: 'The catenary arch entrances of the Dougherty Arts Center, the Austin skyline behind',
         },
       },
@@ -760,6 +811,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'standard',
         media: {
           src: `${A}/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp`,
+          ratio: 1.4997,
           alt: 'The cardboard physical model of the Dougherty Arts Center, its white catenary arches standing in the round',
         },
       },
@@ -775,6 +827,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'hero',
         media: {
           src: `${A}/10-robotic-factory/robotic-factory-section-assembly-poster.webp`,
+          ratio: 1.9375,
           alt: 'The robotic factory long section assembling itself, vaulted halls, chimneys and planted terraces building up in sequence',
           video: {
             webm: `${A}/10-robotic-factory/robotic-factory-section-assembly-loop.webm`,
@@ -795,6 +848,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'showcase',
         media: {
           src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-door-elevation-drawing.webp`,
+          ratio: 1.597,
           alt: 'A Rogers Partners door elevation drawing, an arched double door with ironwork tracery, dimensioned',
           fit: 'contain',
         },
@@ -803,6 +857,7 @@ export const CLUSTERS: Cluster[] = [
         tier: 'standard',
         media: {
           src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-office-desk-selfie.webp`,
+          ratio: 1.7778,
           alt: 'Daniel at his dual-monitor desk in the Rogers Partners office in New York',
         },
       },
@@ -1331,7 +1386,15 @@ function layoutClusters(spine: Strand): LaidCluster[] {
   const tops = new Map<string, number>();
   (['left', 'right'] as Side[]).forEach((side) => {
     const items = CLUSTERS.filter((c) => c.side === side)
-      .map((c) => ({ id: c.id, anchorY: yearToY(c.year), heights: c.nodes.map((n) => TIER[n.tier].h) }))
+      // The heights fed to packSide MUST be the DERIVED ones, not the tier's reference box — that is
+      // what a plate actually occupies now that the box comes from the image (see plateBox). Reading
+      // `TIER[n.tier].h` here left the packer modelling 3:2 plates that no longer exist, and the
+      // no-overlap test caught it immediately: a square plate is far taller than its tier's box says.
+      .map((c) => ({
+        id: c.id,
+        anchorY: yearToY(c.year),
+        heights: c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h),
+      }))
       .sort((a, b) => a.anchorY - b.anchorY);
     packSide(items, CLUSTER_GAP_Y, CROSS_GAP).forEach((v, k) => tops.set(k, v));
   });
@@ -1343,7 +1406,7 @@ function layoutClusters(spine: Strand): LaidCluster[] {
     const edgeX = spineX + dir * OFFSET_X; // the plates' near edge: the lane beside the spine
     let y = tops.get(c.id)! + (c.dy ?? 0);
     const plates = c.nodes.map((n) => {
-      const { w, h } = TIER[n.tier];
+      const { w, h } = plateBox(n.tier, n.media.ratio);
       const x = dir === 1 ? edgeX : edgeX - w;
       const box = { x, y, w, h, media: n.media };
       y += h + CLUSTER_GAP_Y;
@@ -1974,7 +2037,6 @@ function VineVideo({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y:
 
 /** One plate: a still image (clipped, cover or contain) or a video, with a hairline border. */
 function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y: number; w: number; h: number; reduced: boolean }) {
-  const clip = `cptl-c-${plate.src.replace(/[^a-z0-9]/gi, '')}-${Math.round(x)}-${Math.round(y)}`;
   if (plate.pending) {
     return (
       <g>
@@ -1985,21 +2047,22 @@ function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y
       </g>
     );
   }
-  const contain = plate.fit === 'contain';
+  // `meet`, ALWAYS, and it costs nothing: the box IS the image's ratio (see plateBox), so meet and
+  // slice resolve to the same pixels and neither letterboxes nor crops. `meet` is the honest one to
+  // ask for — it can only ever fail safe, by showing the whole picture.
+  //
+  // `fit` no longer chooses between them (a box built to the image has nothing to fit); it now only
+  // says whether the plate wants a white ground under it, which paper figures and line drawings do
+  // where photographs do not. The clipPath is gone with the crop it existed to make.
   return (
     <g>
-      {contain && <rect x={x} y={y} width={w} height={h} fill="#fff" />}
+      {plate.fit === 'contain' && <rect x={x} y={y} width={w} height={h} fill="#fff" />}
       {plate.video ? (
         <VineVideo plate={plate} x={x} y={y} w={w} h={h} reduced={reduced} />
       ) : (
-        <>
-          <clipPath id={clip}>
-            <rect x={x} y={y} width={w} height={h} />
-          </clipPath>
-          <image href={plate.src} x={x} y={y} width={w} height={h} preserveAspectRatio={contain ? 'xMidYMid meet' : 'xMidYMid slice'} clipPath={`url(#${clip})`}>
-            <title>{plate.alt}</title>
-          </image>
-        </>
+        <image href={plate.src} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid meet">
+          <title>{plate.alt}</title>
+        </image>
       )}
       <rect x={x} y={y} width={w} height={h} fill="none" stroke={INK_SEPIA} strokeOpacity={0.25} strokeWidth={1} />
     </g>
