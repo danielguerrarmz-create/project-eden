@@ -44,6 +44,7 @@ import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 import { requestGarland } from '../../engine/gongbi/painter';
+import { PAGE_SPECIES } from './species';
 import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
 import { colonize, branches, seededRandom, type Vec2, type Branch } from './spaceColonization';
 
@@ -1342,7 +1343,11 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
     let live = true;
     let objectUrl: string | null = null;
     requestGarland({
-      seed: SUB_SEED,
+      // ONLY THE SPECIES ROLLS. SUB_SEED still seeds the colonization, the scatter and the
+      // stations, so the structure and every growth station are identical on every load — that is
+      // the half of the note that says "specific spots". This is the other half: which leaf and
+      // which flower grow on those spots. See about/species.ts.
+      seed: PAGE_SPECIES,
       voice: 'pigment',
       width: SUB_BOX.w,
       height: SUB_BOX.h,
@@ -1475,7 +1480,10 @@ function SpineGarland({ reduced }: { reduced: boolean }) {
     let live = true;
     let objectUrl: string | null = null;
     requestGarland({
-      seed: GARLAND_SEED,
+      // THE SPECIES VARIES PER LOAD; the stations do not. GARLAND_SEED still pins WHERE the
+      // foliage sits (garlandStations is seeded off it) — only which plant grows there is rolled.
+      // See about/species.ts.
+      seed: PAGE_SPECIES,
       voice: 'pigment',
       width: GARLAND_BOX.w,
       height: GARLAND_BOX.h,

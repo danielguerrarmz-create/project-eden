@@ -45,7 +45,6 @@ import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
 import {
   CrossPathsTimeline,
   DESCENT_EXIT_FRAC,
-  GARLAND_SEED,
   INK_SEPIA,
   INK_SEPIA_TEXT,
   SPINE_W,
@@ -55,6 +54,7 @@ import { FanPainting } from './about/FanPainting';
 import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
 import { armPts, polyD, taperRuns, trunkPts, type ParenLayout } from './about/parenthesis';
+import { PAGE_SPECIES } from './about/species';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
@@ -924,7 +924,9 @@ function CodaBower() {
     let live = true;
     let objectUrl: string | null = null;
     requestGarland({
-      seed: 'bower/spine-2/coda',
+      // The coda grows the page's plant too. It used to pin `bower/spine-2/coda` — a suffix, so a
+      // THIRD species — while the page's comments claimed it grew one plant. See about/species.ts.
+      seed: PAGE_SPECIES,
       voice: 'pigment',
       width: CODA_BAND.w,
       height: CODA_BAND.h,
@@ -1163,15 +1165,15 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
     let live = true;
     let objectUrl: string | null = null;
     requestGarland({
-      // THE PAGE'S PINNED SPINE SEED, BARE — not `${GARLAND_SEED}/founders`, and the difference is
-      // not cosmetic. `createFlora(seed)` derives the SPECIES from the seed, so a suffix does not
-      // give you another take of the same plant, it gives you a different plant. The retired
-      // FounderBower's `/founders` suffix therefore grew a species nobody ever curated, and it drew
-      // the lottery the brief warns about: washed-out cream blooms and curled, edge-on leaves, next
-      // to a spine of clean pink blossom. Measured on a sweep of the arm's own geometry, the bare
-      // seed is also simply the better take (see the handoff's contact sheet). The comments that
-      // said "the page grows one plant" only become true here.
-      seed: GARLAND_SEED,
+      // THE PAGE'S SPECIES FOR THIS VISIT — the same plant the spine and the sub-branches grow.
+      //
+      // NOT `${GARLAND_SEED}/founders`, which is what FounderBower used, and the difference is not
+      // cosmetic: `createFlora(seed)` derives the SPECIES from the seed, so a suffix does not give
+      // you another take of the same plant, it gives you a different plant. That suffix grew a
+      // species nobody ever curated and it drew exactly the lottery the pool exists to stop —
+      // washed-out cream blooms and curled, edge-on leaves, beside a spine of clean pink blossom.
+      // See about/species.ts.
+      seed: PAGE_SPECIES,
       voice: 'pigment',
       width: w,
       height: h,
