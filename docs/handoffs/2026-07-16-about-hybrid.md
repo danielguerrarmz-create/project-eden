@@ -549,3 +549,135 @@ wrapper, PAGE_SPECIES), `src/pages/about/CrossPathsTimeline.tsx` (the lockup lif
 
 **Contested files touched:** `src/engine/gongbi/*` **not** touched this round. None of the Eden
 geometry, scene or engine-page files touched. `src/routing.ts` / `src/Root.tsx` untouched.
+
+---
+
+# ROUND 5 — same day. Collisions, the founder frame, the bio, the media regions, the coda
+
+**Branch:** `about-hybrid-sepia`. **`main` untouched, nothing pushed.** **Author:** Edward (round 5).
+Rounds 1–4 are preserved above, unedited.
+
+Five commits: `38d6784` the frame + the collisions · `ef11345` the media regions ·
+`e2e92a6` the coda · `f4c4a5a` the bio.
+
+## What
+
+### 1 + 2. The founders fit one frame, and the vines are off the text (`38d6784`)
+
+**THE BUDGET IS 816, NOT 900**, and that is why this fix had landed twice and not worked. The header
+is `position: fixed` and 84px tall, so it covers the top of the viewport at every scroll position.
+`814 <= 816` is TRUE — and it is also 2px of air, which is not "one frame" on a real screen.
+`qa/founder-frame.mjs` now demands 90px to spare, so passing means what Daniel means. **814 → 647.**
+
+**What sets the row's height keeps swapping, and that is the actual trap:**
+
+| | portrait | dl | tallest |
+|---|---|---|---|
+| round 3 | 375 | 444/472 | the **DL** — so shrinking the pictures alone would have moved nothing, and the type came down (17→15) |
+| round 5 | 372 | 301/322 | the **PORTRAIT** — and shrinking it alone stops dead at ~322, where the dl takes over again |
+
+So this pass takes both down together. The columns are also **re-proportioned rather than scaled**:
+3.7/7/4 → 2.6/9.1/3. The portrait and the specimen give their width to the FACTS, because a wider
+measure costs fewer LINES and lines are the height — the one move here that makes the row shorter
+without making anything smaller. Daniel's dl went 322 → 251 on that alone.
+
+**Cost, accepted:** the role caption now wraps to two lines in the narrower portrait column (+18px).
+Un-wrapping it needs the column back at ~233px, which costs 81px of frame. He has asked three times
+for smaller.
+
+**THE COLLISION WAS THE TAIL, NOT THE BOW.** Every arm anchor is a fraction of `reach` — the whole
+trip from the trunk, ~620px — so the "small" 22% inward curl came back 137px and landed at x=235 with
+the content column starting at 170: straight through "Cofounder · engine & systems". **A fraction of
+a big number is a big number.** The arms now KEEP OUT: while alongside the founders they live outboard
+of the rows' real measured edge, clamped, whatever the anchor arithmetic wanted. The fork also rises
+(0.22 → 0.10 of the band) so the arms open above the kicker rather than grazing it. Clamping the
+arrival anchors closed a hole nobody had hit: they sit inside the rows' y-span and missed the text by
+luck of the current numbers rather than by rule.
+
+**THE PROBE MEASURES GLYPHS, NOT BOXES.** "The founders." is a `<p>` in a full-width column — its box
+is 1100px wide for a ~110px string, so a box test reports the arm "crossing text" while it sails
+through empty paper a foot away, and would fail forever wherever the arms went. **The kicker crossing
+was a false positive; there was exactly ONE real collision.** Clearance is 16px, not 0: "does not sit
+extremely close" means a stroke that merely misses still reads as a collision.
+
+**The nav pill** is resolved by the framing, not by a special case: the specimen column sits under the
+pill's x-range, so it passes beneath it while scrolling — inherent to a fixed header over scrolling
+content. What matters is that it does not REST there, and with the founders framed the captions sit at
+y=346 and y=664. Measured.
+
+### 5. The hero alone in region 1, everything supporting in region 2 (`ef11345`)
+
+Daniel overriding his own earlier note ("below AND to the right"): the bottom strip stranded a lone
+thumbnail at the bottom-left of the hero's region. Strip gone, one rail, everything on it.
+`dealSupporting` went with it.
+
+**THE HERO WAS BEING CROPPED.** Every hero is `fit: 'cover'`, and `fill` mode hands a picture a box of
+someone else's shape and resolves the disagreement with object-fit — cover CROPS, contain LETTERBOXES.
+Removing the strip made it worse: the region grew taller, its ratio fell to 1.40 against a 1.78 hero,
+and **Plentify lost 21% of its width off the sides.** Measured across all twelve now: **0%**. The fix
+is to stop giving the picture a box at all — a replaced element sizes itself from its own intrinsic
+ratio under max-width/max-height, so the element IS the picture, as large as fits, cropped nowhere.
+That is what "fit WITHIN square 1" says.
+
+The hero also loads **eagerly** now: an auto-sized replaced element has no size until its bytes land,
+and the default project's hero measured **0x0**.
+
+Region 2 keeps `stackRatio`, which is what makes it a designed column and not a pile: the rail's WIDTH
+derives from the stack it must hold, so cells share one width, keep exact heights, and land flush.
+Measured across twelve: **no slivers, narrowest cell 148px**. The trade is real and commented — the
+rail narrows as a project gains images, because the height is fixed. Full-width cells do not fit
+(Archipedia's three would stack 745px into a 510px rail).
+
+### 3. The bio (`f4c4a5a`)
+
+**The ledger was already right; only the sentence was wrong** — `LLO` (n:06) has carried `by: 'clay'`
+since 2026-07-15. Nothing authored was rewritten.
+
+**The real defect: the bios RESTATE project facts by hand and nothing links them to the project set**,
+so a re-attribution updates one place and not the other. Flagged at the site, not fixed structurally.
+
+### 4. The coda (`e2e92a6`)
+
+`kicker` and `line` deleted from `TEAM_CODA` (quoted at the site with a recovery ref). The `line` was
+an inventory of the project set, which is immediately below it in full — it said, worse, what the work
+says itself. **"In between" is measured:** from the flowers' bottom the kicker sat at +56 and the
+payoff at +199; halfway is +128 = `mt-32` exactly. Verified live at +128.
+
+## Verify
+
+- Gates: `npm run typecheck` **0** · `npx vitest run` **352** (+2 keep-out tests) · `npm run build` clean.
+- **New:** `qa/founder-frame.mjs` — the frame budget AND every vine against every glyph run.
+- Whole suite green: founder-frame · founder-parenthesis (+`--motion`) · species-pool · hero-lockup ·
+  growth-frames (still 0 orphans, stems 18 → 219).
+- Full-page live sweep at 1440x900, all 12 projects clicked: **0 console errors, 0 failed requests**.
+- Measured: section 647 ≤ 726 · 0 vine/text crossings over 29 text runs · hero crop 0% across all 12
+  (was 21%) · rails no slivers, min cell 148px · coda payoff at +128.
+
+## Left (open) — for Daniel
+
+1. **THE HERO "WHITE MARGINS" ARE THE ASSET, NOT THE LAYOUT, and this one needs you.** Measured on the
+   real pixels: Plentify's 1920x1080 poster has 451 fully-white columns left and 478 right — **48.4% of
+   the picture is white paper.** Resia's hero is **34.6%**, Patterns 9.2%. No box can remove white that
+   is inside the image, and cropping it out is the one thing "do not lose context" forbids doing
+   silently. **It wants a re-export of those assets.** Not touched.
+2. **The composite is `Plentify` (n:10) = `clay+daniel`, not `daniel`.** You said "the biogenic
+   composite I made", so it is in your bio — worded as a thing you built rather than sole authorship,
+   because the quiet opposite is the same error class as the desk lamp. Say if you want it stronger.
+3. **CONFIRM THE FORSITE CLAUSE.** "Forsite" appears nowhere in this repo. Nothing is invented beyond
+   your own words — no dates, no scale, no client detail. Correct "an AI operations layer for an
+   architecture studio" if it is wrong or says too much.
+4. **The founder role caption wraps to two lines** — the price of the smaller frame (see above). Say
+   the word and it un-wraps for 81px.
+5. **The cold paint is still ~30s** (round 4, item 1). Unchanged and still the biggest thing here.
+6. Year labels still untouched, still awaiting your ruling. Mobile / Firefox / WebKit unverified.
+
+## Files
+
+**New:** `qa/founder-frame.mjs`.
+**Modified:** `src/pages/AboutPage.tsx` (founder frame, FIT_FRAME + the `fit` mode, the two regions,
+the coda), `src/pages/about/parenthesis.ts` (`rowLeft`/`rowRight`, `TEXT_CLEARANCE`, `keepOut`),
+`src/pages/about/parenthesis.test.ts`, `src/pages/about/projects.ts` (the bio, `TEAM_CODA`).
+**Deleted:** `dealSupporting`, `TEAM_CODA.kicker`, `TEAM_CODA.line`.
+
+**Contested files touched:** none. `src/engine/*`, `src/scene/*`, `src/routing.ts`, `src/Root.tsx`
+untouched this round.
