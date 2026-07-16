@@ -4,14 +4,30 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Open task list — surface this at the start of a session
 
-**LATEST (2026-07-16): the About HYBRID, on branch `about-hybrid-sepia`** (handoff:
-`docs/handoffs/2026-07-16-about-hybrid.md`). Daniel's ruling after a design critique: his shipped
-About stays the shell; Clay's `#/about/scroll` + `#/about/ascent` drafts lose as PAGES but their
-generative engine is harvested as ORNAMENT. Both draft routes and their directories are deleted;
-`src/engine/gongbi/*`, `src/vendor/nonflowers/*` and `#/lab/gongbi` are kept. The page re-keyed
-from INK_BLUE to sepia (see the colour law below), gained founder specimens + discipline
-frontispieces + a garland grown along the spine's own polyline, and the year-label/plate collision
-was root-caused and fixed. Nothing committed to main; read the handoff before continuing.
+**LATEST (2026-07-16): the About HYBRID, ROUND 2, on branch `about-hybrid-sepia`** (handoff:
+`docs/handoffs/2026-07-16-about-hybrid.md` — round 2 is the second half of that file; read it before
+continuing). Seven commits, nothing on main, nothing pushed. Round 1's ruling stands (Daniel's About
+is the shell; Clay's retired drafts are harvested as ORNAMENT; the page is sepia; the pigment
+specimens are keepers). Round 2 is his next pass of notes:
+
+- **The founders are Clay's page, ported wholesale** from `about-v2-nonflowers:src/pages/ascent/AscentPage.tsx`.
+- **The work index is ROWS, not columns, and FLAT.** The hero was in a 505x557 PORTRAIT box against
+  natively-landscape images; it is now 735x414..509. The discipline headers and their frontispieces
+  are deleted (with `groupProjects` and three commissions).
+- **THE PROJECTS ARE DECOUPLED FROM THE TIMELINE.** Nothing holds them: the branches, the calyx
+  holders, and `unfurl()` are all gone (-298 lines). The entrance is a fade. The 2025 label collision
+  round 1 flagged is gone with the branch that caused it.
+- **The ornament is now an ENGINE**: space colonization (`src/pages/about/spaceColonization.ts`,
+  Runions et al. 2007) grows sub-branches into the negative space. **Read the direction rule below.**
+
+**THE ORNAMENT READS THE LAYOUT; THE LAYOUT NEVER READS THE ORNAMENT.** This is the load-bearing
+lesson of round 1 and the thing most likely to be undone by accident. The old branches were
+STRUCTURE — they carried the plates, so the layout depended on them, and every collision round 1
+fought existed because ornament was allowed to dictate layout. The sub-branches are ORNAMENT: they
+read `computePlates()` and nothing reads them back, they are painted before the clusters, and no
+attractor is ever scattered on an occupied rect. If a branch and a plate disagree, the branch loses
+by construction. Filling the whitespace and avoiding the plates are the SAME mechanism (a plate has
+no attractors on it), which is why there is no collision test in the engine and must not become one.
 
 The About page was reworked to **round 3** on 2026-07-13 (spec:
 `docs/2026-07-13-about-refinement-spec.md`; handoff: `docs/handoffs/2026-07-13-about-round3-*.md`).
@@ -77,9 +93,13 @@ reviews before any commit.
   `INK_SEPIA` does not clear AA on the selected list row's own 8% tint. Amended 2026-07-16: the
   page was `INK_BLUE` (`#3E7CA8`), which appears nowhere in the splash hero (warm gold Austin
   light, timber, green foliage, wisteria purple). **Nothing blue survives on About.**
-  - **PIGMENT is permitted on the BOTANICAL SPECIMENS ONLY** — the founder specimens, the
-    discipline frontispieces, and the spine garland's organs (the gongbi genome's own palette).
-    Structure — spine, branches, holders, the mark, rules, labels — is always sepia.
+  - **PIGMENT is permitted on the BOTANICAL SPECIMENS ONLY** — the founder specimens, the spine
+    garland's organs, and (2026-07-16 round 2) the sub-branches' organs and the founder vines (the
+    gongbi genome's own palette). Structure — spine, sub-branch stems, the mark, rules, labels — is
+    always sepia. The discipline frontispieces were deleted in round 2.
+    - **TODO(Daniel): the founder vines are an EXTENSION of this law, not an application of it.** A
+      painted vine is a botanical in the specimens' own register, but it is a vine, not a specimen on
+      a mount. Flagged in the handoff; say the word and they go sepia.
   - The old Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — **do not
     reintroduce colour-coding by person.** That prohibition stands unchanged.
 - **A seed is a design review, not a constant.** Every commission in `about/paintings.ts` and the
@@ -90,6 +110,15 @@ reviews before any commit.
   `CrossPathsTimeline.tsx` (there is a test). When it didn't, every year with a plate on the
   label's side put the numerals on the photograph and the label's vellum halo cut the branch
   underneath in half. No choice of side can save a label wider than the space it lives in.
+- **An image in a box the wrong shape is this page's recurring bug.** It has now shipped three ways:
+  the hero in a 505x557 portrait box (Daniel: "natively landscape but displayed in portrait mode"),
+  `unfurl()` opening every plate from `scale(0.92, 0.64)`, and a founder vine upscaled 1.8x by
+  `object-cover`. Before sizing any image region, check the aspect against the real asset — the
+  ratios are authored in `projects.ts` and there are QA probes in the round-2 handoff.
+- **A grid row is as tall as its tallest column, and in the work detail that height comes out of the
+  hero.** So `ProjectInfoBand`'s column split is a height budget, not a style choice — and MORE
+  columns makes it taller, not shorter (narrower columns wrap more). Measured: 3 cols stacked wrong
+  = 319px, 4 cols = 465px, 3 cols balanced = ~195px.
 - **Do not overlay the BowerMark on a painting.** `matRect` (`engine/gongbi/quality.ts`)
   base-anchors every plant so its densest region sits on the mat's bottom pixel row; anything
   placed at the frame's bottom collides with it by construction, for every seed.
