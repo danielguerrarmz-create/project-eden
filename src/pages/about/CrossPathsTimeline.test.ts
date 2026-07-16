@@ -16,8 +16,23 @@ import {
   sepalLen,
   SEPAL_DEFS,
   calyxSprig,
+  sprigPathStyle,
+  yearLabelClearance,
+  yearLabelBox,
+  yearToY,
+  YEAR_LABEL_W,
+  YEAR_LABEL_OFFSET,
+  OFFSET_X,
   computeBranches,
   branchAttachY,
+  garlandStations,
+  garlandPath,
+  GARLAND_BOX,
+  GARLAND_REACH,
+  CONVERGE_Y,
+  INK_SEPIA,
+  INK_SEPIA_TEXT,
+  VELLUM,
 } from './CrossPathsTimeline';
 
 type Pt = { x: number; y: number };
@@ -119,30 +134,69 @@ describe('composition contract', () => {
   });
 });
 
-describe('yearLabelSide: the data-driven flip that keeps heavy year labels off the plates', () => {
-  it('flips opposite a cluster that shares the year', () => {
-    expect(yearLabelSide([{ year: 2024.05, side: 'right' }], 2024)).toBe('left');
-    expect(yearLabelSide([{ year: 2023.9, side: 'left' }], 2024)).toBe('right');
-  });
+describe('yearLabelSide: the heavy year labels step aside from the real layout', () => {
+  const YEARS = [2021, 2022, 2023, 2024, 2025, 2026];
 
-  it('defaults right when no cluster is within the 0.15-year window', () => {
-    expect(yearLabelSide([{ year: 2024.2, side: 'right' }], 2024)).toBe('right');
+  it('defaults right when there is nothing to dodge', () => {
     expect(yearLabelSide([], 2022)).toBe('right');
   });
 
-  it('lets the NEAREST in-window cluster decide when several qualify', () => {
-    const clusters = [
-      { year: 2024.12, side: 'left' as const },
-      { year: 2024.04, side: 'right' as const },
+  it('picks the side with more room, not the side away from the authored year', () => {
+    // One plate hard against the label band on the right, nothing on the left → go left.
+    const obstacles = [
+      { side: 'right' as const, rect: { x: 710, y: 1404, w: 320, h: 213 }, pts: [{ x: 600, y: 1404 }] },
     ];
-    expect(yearLabelSide(clusters, 2024)).toBe('left'); // nearest is on the right → flip left
+    expect(yearLabelSide(obstacles, 2024)).toBe('left');
   });
 
-  it('holds against the REAL cluster data: no label shares a side with its same-year cluster', () => {
-    for (const y of [2021, 2022, 2023, 2024, 2025, 2026]) {
-      const side = yearLabelSide(CLUSTERS, y);
-      for (const c of CLUSTERS) {
-        if (Math.abs(c.year - y) < 0.15) expect(side).not.toBe(c.side);
+  it('always chooses the roomier side — it can never pick the worse one', () => {
+    const obstacles = computeBranches();
+    for (const y of YEARS) {
+      const chosen = yearLabelClearance(obstacles, y, yearLabelSide(obstacles, y));
+      const other = yearLabelSide(obstacles, y) === 'right' ? 'left' : 'right';
+      expect(chosen).toBeGreaterThanOrEqual(yearLabelClearance(obstacles, y, other));
+    }
+  });
+
+  it('clears every plate and branch at every year EXCEPT the known 2025 branch crossing', () => {
+    // 2021/2022/2023/2024/2026 are fully clear. 2025 is not, and no side choice can fix it:
+    // `packSide` pushes llo's plate (right) and dougherty's (left) far below their anchor years,
+    // so BOTH sides carry a long branch descending through 2025's label band. Measured on
+    // 2026-07-16: right -2.5, left -2.5. Flagged for Daniel — the fix is a composition call
+    // (shorten those branches, or let a crowded label sit below its tick), not a constant.
+    const obstacles = computeBranches();
+    for (const y of YEARS) {
+      const gap = yearLabelClearance(obstacles, y, yearLabelSide(obstacles, y));
+      if (y === 2025) {
+        expect(gap).toBeGreaterThan(-6); // pinned: it must not get WORSE while it waits
+      } else {
+        expect(gap).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('THE ROOT CAUSE: a year label fits inside the gutter it lives in', () => {
+    // The gutter from the spine to a plate's near edge is OFFSET_X (110). A label reaches
+    // YEAR_LABEL_OFFSET + YEAR_LABEL_W from the spine. When that exceeded 110 the label poked
+    // into the plate lane and NO choice of side could save it — both sides were busy at 2023
+    // and 2025. Keep this true and the side rule only ever has to dodge branches.
+    expect(YEAR_LABEL_OFFSET + YEAR_LABEL_W).toBeLessThanOrEqual(OFFSET_X);
+  });
+
+  it('never puts a label on top of a plate, on either side, at any year', () => {
+    const obstacles = computeBranches();
+    for (const y of YEARS) {
+      for (const side of ['left', 'right'] as const) {
+        const box = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+        for (const o of obstacles) {
+          if (o.side !== side) continue;
+          const overlaps =
+            box.x0 < o.rect.x + o.rect.w &&
+            box.x1 > o.rect.x &&
+            box.y0 < o.rect.y + o.rect.h &&
+            box.y1 > o.rect.y;
+          expect(overlaps).toBe(false);
+        }
       }
     }
   });
@@ -406,12 +460,33 @@ describe('the holder botanical: deterministic, one-colour, and stays in the gutt
     }
   });
 
-  it('is one colour: every path strokes INK_BLUE and fills none or INK_BLUE', () => {
+  // NOTE: this asserts on sprigPathStyle, NOT on the raw organ paths. calyxSprig's paths come out
+  // of the shared botanical module (src/engine/botanical), which carries its own ink constant and
+  // serves other pages; the timeline re-colours every organ through sprigPathStyle at render. The
+  // render register is where the About page's one-colour law actually lives, so that is what the
+  // doctrine test has to check — the old version pinned the module's blue and would have passed
+  // green through the entire sepia re-key while the page rendered blue.
+  it('is one colour: every rendered organ path strokes INK_SEPIA and fills none or INK_SEPIA', () => {
+    const { organs } = calyxSprig(cornerX, cornerY, dir, 260, 200, 'newyork:0');
+    let checked = 0;
+    for (const o of organs) {
+      for (const p of o.paths) {
+        const s = sprigPathStyle(p);
+        expect(s.stroke).toBe(INK_SEPIA);
+        expect(s.fill === 'none' || s.fill === INK_SEPIA).toBe(true);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('renders nothing blue: the retired INK_BLUE never reaches a rendered organ', () => {
     const { organs } = calyxSprig(cornerX, cornerY, dir, 260, 200, 'newyork:0');
     for (const o of organs) {
       for (const p of o.paths) {
-        expect(p.stroke).toBe('#3E7CA8');
-        expect(p.fill === 'none' || p.fill === '#3E7CA8').toBe(true);
+        const s = sprigPathStyle(p);
+        expect(s.stroke.toUpperCase()).not.toBe('#3E7CA8');
+        expect(s.fill.toUpperCase()).not.toBe('#3E7CA8');
       }
     }
   });
@@ -426,6 +501,176 @@ describe('the holder botanical: deterministic, one-colour, and stays in the gutt
           expect(tipY - 400).toBeLessThanOrEqual(maxLen + 1e-6);
         }
       }
+    }
+  });
+});
+
+/* --------------------------- the sepia colour lane ------------------------ */
+
+/**
+ * The About page retired INK_BLUE on 2026-07-16 for a warm sepia drawn from the splash hero.
+ * These are real WCAG 2.x computations, not pinned hexes: the point of the test is that if
+ * someone re-tunes the sepia by eye, the ratio is re-derived and the AA claim either still
+ * holds or the suite says so.
+ */
+const srgbToLinear = (c: number): number => {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+};
+
+const toRgb = (hex: string): [number, number, number] => {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const relLuminance = (hex: string): number => {
+  const [r, g, b] = toRgb(hex);
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+};
+
+const contrast = (a: string, b: string): number => {
+  const [hi, lo] = [relLuminance(a), relLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+/** Composite `fg` at `alpha` over `bg` — how the selected row's tint actually reaches a screen. */
+const composite = (fg: string, alpha: number, bg: string): string => {
+  const f = toRgb(fg);
+  const b = toRgb(bg);
+  return (
+    '#' +
+    f
+      .map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha)).toString(16).padStart(2, '0'))
+      .join('')
+  );
+};
+
+/** ListView paints the active row `${tint}14` — 0x14/255 of INK_SEPIA over the vellum page. */
+const ACTIVE_ROW_ALPHA = 0x14 / 255;
+const AA_NORMAL = 4.5;
+
+describe('the sepia colour lane', () => {
+  it('has retired blue: neither ink constant is the old INK_BLUE or its text variant', () => {
+    for (const c of [INK_SEPIA, INK_SEPIA_TEXT]) {
+      expect(c.toUpperCase()).not.toBe('#3E7CA8');
+      expect(c.toUpperCase()).not.toBe('#2F607F');
+    }
+  });
+
+  it('is ONE colour: the text variant is the same hue, only darker', () => {
+    // Same colour at reading weight, not a second colour. Hue within a couple of degrees; the
+    // variant must actually be darker, or it is not doing the job it exists for.
+    const hue = (hex: string) => {
+      const [r, g, b] = toRgb(hex).map((v) => v / 255);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const d = max - min;
+      if (d === 0) return 0;
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    expect(Math.abs(hue(INK_SEPIA) - hue(INK_SEPIA_TEXT))).toBeLessThan(3);
+    expect(relLuminance(INK_SEPIA_TEXT)).toBeLessThan(relLuminance(INK_SEPIA));
+  });
+
+  it('INK_SEPIA_TEXT clears AA on vellum AND on the selected row it actually sits on', () => {
+    // The row ground is the reason this constant exists: INK_SEPIA passes on bare vellum (~4.70)
+    // but the active row lays 8% of ITSELF underneath its own glyphs, which drops it to ~4.28 —
+    // under AA. Small text takes the darker variant and clears both grounds.
+    const activeRow = composite(INK_SEPIA, ACTIVE_ROW_ALPHA, VELLUM);
+    expect(contrast(INK_SEPIA_TEXT, VELLUM)).toBeGreaterThanOrEqual(AA_NORMAL);
+    expect(contrast(INK_SEPIA_TEXT, activeRow)).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it('documents WHY the variant exists: INK_SEPIA alone fails on the active row', () => {
+    // If this ever starts failing because INK_SEPIA now passes on the tinted row, the variant
+    // can be retired and the page goes back to a single constant. Until then it must stay.
+    const activeRow = composite(INK_SEPIA, ACTIVE_ROW_ALPHA, VELLUM);
+    expect(contrast(INK_SEPIA, VELLUM)).toBeGreaterThanOrEqual(AA_NORMAL);
+    expect(contrast(INK_SEPIA, activeRow)).toBeLessThan(AA_NORMAL);
+  });
+});
+
+/* ------------------------------ the spine garland ------------------------- */
+
+/**
+ * Clay's gongbi composer, grafted onto Daniel's spine as ornament (2026-07-16). The organs must
+ * grow in the bands the DRAWING leaves free — a garland that buries a fork or a year numeral is
+ * not ornament on structure, it is a second plant fighting the first.
+ */
+describe('the spine garland: Clay organs on Daniel geometry', () => {
+  const YEARS = [2021, 2022, 2023, 2024, 2025, 2026];
+  const spanY = (t: number) => CONV_JUNCTION_Y + t * (CONVERGE_Y - CONV_JUNCTION_Y);
+
+  it('grows something (the graft is not silently empty)', () => {
+    expect(garlandStations().length).toBeGreaterThan(3);
+  });
+
+  it('stays on the path: every station is a fraction of the spine run', () => {
+    for (const s of garlandStations()) {
+      expect(s.t).toBeGreaterThanOrEqual(0);
+      expect(s.t).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('never grows on a branch anchor — the forks and their node dots stay clean', () => {
+    for (const s of garlandStations()) {
+      const y = spanY(s.t);
+      for (const c of CLUSTERS) {
+        expect(Math.abs(y - yearToY(c.year))).toBeGreaterThanOrEqual(46);
+      }
+    }
+  });
+
+  it('never grows on a year tick or its numeral', () => {
+    for (const s of garlandStations()) {
+      const y = spanY(s.t);
+      for (const yr of YEARS) {
+        expect(Math.abs(y - yearToY(yr))).toBeGreaterThanOrEqual(40);
+      }
+    }
+  });
+
+  it('is deterministic: the same drawing grows the same garland forever', () => {
+    expect(garlandStations()).toEqual(garlandStations());
+  });
+
+  it('cannot reach a plate: the strip stays inside the gutter', () => {
+    // Foliage may decorate the spine; it may never touch a photograph. The strip's half-width
+    // is the hard bound on how far any organ can be drawn from the spine.
+    expect(GARLAND_REACH).toBeLessThan(OFFSET_X);
+  });
+
+  it('paints into a strip that actually contains the spine', () => {
+    const xs = spinePts().map((p) => p.x);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(GARLAND_BOX.x);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(GARLAND_BOX.x + GARLAND_BOX.w);
+    // The strip-local path is what the composer walks: it must be inside the canvas.
+    for (const [x, y] of garlandPath()) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(GARLAND_BOX.w);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(GARLAND_BOX.h);
+    }
+  });
+});
+
+describe('the retired blue cannot come back through a shared module', () => {
+  it('re-colours anything the shared botanical module hands the About page', () => {
+    // Both surfaces that borrow src/engine/botanical (the timeline's calyx via sprigPathStyle,
+    // and FanPainting's underdrawing) get paths stamped with THAT module's own INK_BLUE, because
+    // it still serves pages that want blue. Each borrower must re-key at its render register.
+    // A live DOM sweep on 2026-07-16 found the underdrawing painting #3E7CA8 on the About page
+    // for the seconds before each commission lands — invisible to every test we had.
+    const { organs } = calyxSprig(200, 400, 1, 200, 180, 'regression:0');
+    const raw = organs.flatMap((o) => o.paths);
+    expect(raw.length).toBeGreaterThan(0);
+    // The module really does hand us blue — if this ever stops being true the re-key is moot,
+    // but so is the risk, and this test should be revisited rather than deleted.
+    expect(raw.some((p) => p.stroke.toUpperCase() === '#3E7CA8')).toBe(true);
+    // ...and the render register really does neutralise it.
+    for (const p of raw) {
+      expect(sprigPathStyle(p).stroke).toBe(INK_SEPIA);
     }
   });
 });

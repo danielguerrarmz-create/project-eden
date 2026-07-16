@@ -42,12 +42,9 @@ export const routes = {
   sculpt: '#/sculpt',
   /** Isolated Phase-1 preview of the procedural botanical generator (not wired in). */
   botanicalLab: '#/lab/botanical',
-  /** The hanging-scroll About rehaul draft (painterly nonflowers). The shipped About
-   *  stays at #/about; this hangs beside it until the studio picks one. */
-  aboutScroll: '#/about/scroll',
-  /** The ascent About draft: the scroll draft's successor — one climbing page, read
-   *  bottom-to-top (Clay's direction, 2026-07-16). Supersedes #/about/scroll. */
-  aboutAscent: '#/about/ascent',
+  /* The two About drafts (#/about/scroll, #/about/ascent) were retired on 2026-07-16.
+     Daniel's page at #/about stayed the shell and their generative engine was harvested
+     into it as ornament — see docs/handoffs/2026-07-16-about-hybrid.md. */
   /** Curation room for the painterly gongbi engine (pin commission seeds here). */
   gongbiLab: '#/lab/gongbi',
 } as const;

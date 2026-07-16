@@ -57,6 +57,17 @@ export interface GarlandOpts {
   scale?: number;
   /** Vine half-width at the root, px (default 7; tapers toward the tip). */
   rootWidth?: number;
+  /**
+   * Paint the vine tube along `path` (default true). Set FALSE to grow the organs only —
+   * leaves and blossom clusters posed along a line that something else already draws.
+   *
+   * This is how the About page grafts a garland onto its own spine: the spine is Daniel's
+   * drawn SVG line and must stay the drawn line, so the composer contributes foliage and
+   * nothing else. Organ placement, sizing and the rng sequence are unchanged either way —
+   * the tube is simply not stroked, so the ornament lands on the same points it would have
+   * grown on if the composer had drawn the stem itself.
+   */
+  tube?: boolean;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -254,7 +265,10 @@ export function paintGarland(opts: GarlandOpts): HTMLCanvasElement | OffscreenCa
   const ctx = Layer.empty(width, height);
   const pts = resample(path, 4);
 
-  drawTube(flora, ctx, pts, rootWidth, stemCol);
+  // The tube is drawn FIRST so organs sit on top of the vine, exactly as upstream's woody()
+  // lays flowers over its own stems. Skipping it leaves the organs posed on a line the page
+  // draws itself (see GarlandOpts.tube).
+  if (opts.tube !== false) drawTube(flora, ctx, pts, rootWidth, stemCol);
 
   // Stations are painted in ledger order; every draw comes from the instance
   // rng, so the whole arrangement is one deterministic sequence.

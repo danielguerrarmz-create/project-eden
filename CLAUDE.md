@@ -4,7 +4,16 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Open task list — surface this at the start of a session
 
-The About page was reworked again to **round 3** on 2026-07-13 (spec:
+**LATEST (2026-07-16): the About HYBRID, on branch `about-hybrid-sepia`** (handoff:
+`docs/handoffs/2026-07-16-about-hybrid.md`). Daniel's ruling after a design critique: his shipped
+About stays the shell; Clay's `#/about/scroll` + `#/about/ascent` drafts lose as PAGES but their
+generative engine is harvested as ORNAMENT. Both draft routes and their directories are deleted;
+`src/engine/gongbi/*`, `src/vendor/nonflowers/*` and `#/lab/gongbi` are kept. The page re-keyed
+from INK_BLUE to sepia (see the colour law below), gained founder specimens + discipline
+frontispieces + a garland grown along the spine's own polyline, and the year-label/plate collision
+was root-caused and fixed. Nothing committed to main; read the handoff before continuing.
+
+The About page was reworked to **round 3** on 2026-07-13 (spec:
 `docs/2026-07-13-about-refinement-spec.md`; handoff: `docs/handoffs/2026-07-13-about-round3-*.md`).
 It builds on v2 (`docs/2026-07-13-timeline-v2-composition-spec.md`), keeping the one-spine + short
 branch-edges node graph, piecewise axis, seam fix, plate tiers, `packSide`, one-colour INK_BLUE.
@@ -63,9 +72,27 @@ reviews before any commit.
 
 - **This repo is PUBLIC.** Candid internal material (audits, stress tests, accelerator drafts,
   reviews of Clay's work) belongs in the private `bower-docs` repo. See `.gitignore`.
-- **The About page is one colour.** Blue, `INK_BLUE` in `CrossPathsTimeline.tsx`. The old
-  Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — do not reintroduce
-  colour-coding by person.
+- **The About page is one colour: SEPIA.** `INK_SEPIA` (`#8A6A4A`) in `CrossPathsTimeline.tsx`,
+  with `INK_SEPIA_TEXT` (`#6F5439`) for small text — the same colour at reading weight, because
+  `INK_SEPIA` does not clear AA on the selected list row's own 8% tint. Amended 2026-07-16: the
+  page was `INK_BLUE` (`#3E7CA8`), which appears nowhere in the splash hero (warm gold Austin
+  light, timber, green foliage, wisteria purple). **Nothing blue survives on About.**
+  - **PIGMENT is permitted on the BOTANICAL SPECIMENS ONLY** — the founder specimens, the
+    discipline frontispieces, and the spine garland's organs (the gongbi genome's own palette).
+    Structure — spine, branches, holders, the mark, rules, labels — is always sepia.
+  - The old Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — **do not
+    reintroduce colour-coding by person.** That prohibition stands unchanged.
+- **A seed is a design review, not a constant.** Every commission in `about/paintings.ts` and the
+  spine garland's `GARLAND_SEED` was curated by sweeping takes and comparing them, because
+  `passesGate` (`engine/gongbi/quality.ts`) is a FLOOR, not a parity check: two seeds can both
+  "pass" and still hang as a full plant next to a weed. Curate in `#/lab/gongbi` before pinning.
+- **A year label must fit its gutter.** `YEAR_LABEL_OFFSET + YEAR_LABEL_W <= OFFSET_X` in
+  `CrossPathsTimeline.tsx` (there is a test). When it didn't, every year with a plate on the
+  label's side put the numerals on the photograph and the label's vellum halo cut the branch
+  underneath in half. No choice of side can save a label wider than the space it lives in.
+- **Do not overlay the BowerMark on a painting.** `matRect` (`engine/gongbi/quality.ts`)
+  base-anchors every plant so its densest region sits on the mat's bottom pixel row; anything
+  placed at the frame's bottom collides with it by construction, for every seed.
 - **Do not wrap the project detail panel in `AnimatePresence mode="wait"`.** It deadlocks against
   the `layoutId` shared-element images inside it: the exit never completes, the incoming panel
   never mounts, and the detail silently freezes on whichever project rendered first while the list

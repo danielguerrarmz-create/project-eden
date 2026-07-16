@@ -24,7 +24,8 @@
  * plate height (clamped), so the showcase tier fills out and the floor tier stays modest. The old
  * leaf ornament is gone.
  *
- * ONE COLOUR (INK_BLUE). TIME IS PIECEWISE (2021 to 2023 compressed, then open). Unchanged.
+ * ONE COLOUR (INK_SEPIA — re-keyed from INK_BLUE on 2026-07-16; see the constant). TIME IS
+ * PIECEWISE (2021 to 2023 compressed, then open). Unchanged.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useReducedMotion } from '../../ui/useReducedMotion';
@@ -33,9 +34,35 @@ import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 import { leafSprite, flowerSprite, type PlantPath } from '../../engine/botanical';
+import { requestGarland } from '../../engine/gongbi/painter';
+import type { GarlandOrgan, GarlandStation } from '../../engine/gongbi/garland';
 
-/** The practice's blue. There is no second colour in this drawing, on purpose. */
-export const INK_BLUE = '#3E7CA8';
+/**
+ * The practice's ink: a warm sepia/timber, drawn from the splash hero's own structure.
+ *
+ * This REPLACED the old INK_BLUE (#3E7CA8) on 2026-07-16. The rationale is the hero: it is warm gold
+ * Austin light, timber, green foliage and wisteria purple, and blue appears nowhere in it — so
+ * the About page's one colour was the one colour the practice does not actually own. Nothing
+ * blue survives on this page.
+ *
+ * Structure (the spine, branches, the mark, holders, rules) takes INK_SEPIA. SMALL TEXT takes
+ * INK_SEPIA_TEXT, exactly as small blue text used to take #2F607F: INK_SEPIA measures 4.70:1 on
+ * bare vellum — which passes AA — but the selected list row lays an 8% INK_SEPIA tint under its
+ * own sepia glyphs, and on THAT ground it drops to 4.28:1 and fails. The variant is not a
+ * second colour; it is the same colour at reading weight. See the contrast test in
+ * CrossPathsTimeline.test.ts, which pins both ratios against the real composited grounds.
+ *
+ * Pigment (Clay's genome palette) is permitted on the BOTANICAL SPECIMENS only — the founder
+ * specimens, the discipline frontispieces, and the spine garland's organs. Never on structure,
+ * and never to colour-code by person.
+ */
+export const INK_SEPIA = '#8A6A4A';
+
+/** INK_SEPIA at reading weight: AA on vellum AND on the selected row's tinted ground. */
+export const INK_SEPIA_TEXT = '#6F5439';
+
+/** The vellum ground (tailwind `paperVellum`), literal here because SVG halos need a real value. */
+export const VELLUM = '#FBF9F3';
 
 /**
  * The checkable ceiling on how many stroked paths may be visible at once: the spine, plus at most
@@ -97,23 +124,75 @@ const Y_2023 = 750;
 const SLOPE_EARLY = 300; // units per year, 2021 to 2023
 const SLOPE_LATE = 760; // units per year, 2023 to 2026
 /** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
-const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
+export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
 
-const yearToY = (y: number) =>
+export const yearToY = (y: number) =>
   y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
 
-/**
- * Which side of the spine a year label sits on: OPPOSITE the nearest cluster within 0.15 of a
- * year (so the heavy numerals structurally clear that cluster's plates), defaulting right when no
- * cluster is near. Pure and exported so the flip rule is unit-testable against CLUSTERS.
- */
-export function yearLabelSide(clusters: ReadonlyArray<{ year: number; side: Side }>, y: number): Side {
-  let near: { d: number; side: Side } | null = null;
-  for (const c of clusters) {
-    const d = Math.abs(c.year - y);
-    if (d < 0.15 && (!near || d < near.d)) near = { d, side: c.side };
+/** An obstacle a year label must stay clear of: one plate and the branch that carries it.
+ *  `computeBranches()` already returns exactly this shape, so the rule below scores the REAL
+ *  layout rather than a parallel model of it. */
+export interface LabelObstacle {
+  side: Side;
+  rect: { x: number; y: number; w: number; h: number };
+  pts: Array<{ x: number; y: number }>;
+}
+
+/** The label's glyph box on side `dir` at tick-y `ty`. The box sits ABOVE the tick
+ *  (YEAR_LABEL_CLEAR), which is why a label and its own tick can share an x and not collide. */
+export function yearLabelBox(dir: number, ty: number) {
+  const x0 = dir === 1 ? CX + YEAR_LABEL_OFFSET : CX - YEAR_LABEL_OFFSET - YEAR_LABEL_W;
+  // Glyph box measured live: top = ty - 51, height 40, for baseline ty - YEAR_LABEL_CLEAR.
+  return { x0, x1: x0 + YEAR_LABEL_W, y0: ty - YEAR_LABEL_CLEAR - 31, y1: ty - YEAR_LABEL_CLEAR + 9 };
+}
+
+/** Clearance from the label box to a rect: 0 or less means they overlap. */
+function boxGapToRect(b: ReturnType<typeof yearLabelBox>, r: LabelObstacle['rect']): number {
+  const dx = Math.max(r.x - b.x1, b.x0 - (r.x + r.w), 0);
+  const dy = Math.max(r.y - b.y1, b.y0 - (r.y + r.h), 0);
+  return dx === 0 && dy === 0 ? -1 : Math.hypot(dx, dy);
+}
+
+/** Clearance from the label box to a stroked polyline, accounting for the stroke's own width. */
+function boxGapToPoly(b: ReturnType<typeof yearLabelBox>, pts: LabelObstacle['pts'], sw: number): number {
+  let best = Infinity;
+  for (const p of pts) {
+    const dx = p.x < b.x0 ? b.x0 - p.x : p.x > b.x1 ? p.x - b.x1 : 0;
+    const dy = p.y < b.y0 ? b.y0 - p.y : p.y > b.y1 ? p.y - b.y1 : 0;
+    best = Math.min(best, Math.hypot(dx, dy) - sw / 2);
   }
-  return near ? (near.side === 'right' ? 'left' : 'right') : 'right';
+  return best;
+}
+
+/** How much room a year label has on one side: the tightest clearance to anything on that side. */
+export function yearLabelClearance(obstacles: readonly LabelObstacle[], y: number, side: Side): number {
+  const box = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+  let best = Infinity;
+  for (const o of obstacles) {
+    if (o.side !== side) continue;
+    best = Math.min(best, boxGapToRect(box, o.rect), boxGapToPoly(box, o.pts, BRANCH_W));
+  }
+  return best;
+}
+
+/**
+ * Which side of the spine a year label sits on: THE SIDE WITH MORE ROOM, measured against the
+ * laid-out plates and branches. Ties (and an empty layout) default right.
+ *
+ * This used to flip "opposite the nearest cluster within 0.15 of a year", reading the AUTHORED
+ * cluster years. That model and the page disagreed, because `packSide` moves plates: a cluster
+ * authored at 2022.6 has its plates packed down into 2023's label band, and a rule that only
+ * looks at same-year clusters cannot see it. It sent 2023's label right, into the medical
+ * cluster's branch, and 2025's left, into dougherty's — both measured live on 2026-07-16.
+ *
+ * The concept is unchanged (the label steps aside to stay clear); it now derives "clear" from
+ * where the plates and branches ACTUALLY are, which is the only model that cannot drift from
+ * the drawing. See the contract test, which asserts the chosen side against the real layout.
+ */
+export function yearLabelSide(obstacles: readonly LabelObstacle[], y: number): Side {
+  const right = yearLabelClearance(obstacles, y, 'right');
+  const left = yearLabelClearance(obstacles, y, 'left');
+  return left > right ? 'left' : 'right';
 }
 
 /* ----------------------------- the twist-fuse ----------------------------- */
@@ -416,7 +495,7 @@ const CALYX_LEAF_PROFILES = ['lanceolate', 'ovate', 'lanceolate'] as const;
  * small barely-open BUD at the corner. It reuses the sepal axis skeleton and the height-scaled length
  * law (sepalLen), each length still capped by the room actually below (maxLen), so the ornament stays
  * in the gutter under the plate EXACTLY like the sepals did: the leaf tips never reach the plate
- * beneath and never cross an image. Deterministic per plate via `seed`; one colour (INK_BLUE).
+ * beneath and never cross an image. Deterministic per plate via `seed`; one colour (INK_SEPIA).
  * `tipY` is the lowest point reached (for the gutter-containment contract test).
  */
 export function calyxSprig(
@@ -476,9 +555,9 @@ export function sprigPathStyle(p: PlantPath): {
 } {
   const isBlade = p.role === 'leaf' || p.role === 'petal';
   return {
-    fill: p.fill === 'none' || p.role === 'vein' ? 'none' : INK_BLUE,
+    fill: p.fill === 'none' || p.role === 'vein' ? 'none' : INK_SEPIA,
     fillOpacity: p.role === 'center' ? 0.5 : 0.05,
-    stroke: INK_BLUE,
+    stroke: INK_SEPIA,
     strokeOpacity: 0.55,
     strokeWidth: isBlade ? 1 : 0.8,
   };
@@ -494,7 +573,7 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
 };
 
 /** The fixed perpendicular gap from the spine to a plate's near (inner) edge. */
-const OFFSET_X = 110;
+export const OFFSET_X = 110;
 /** The branch is an ORNATE root, not a stiff arc: it leaves the spine on a near-horizontal tangent (a
  *  big interior angle), then sweeps down the gutter beside the plate and arrives under it, wandering
  *  gently so it reads as drawn and alive. The wander is a sine enveloped to vanish (value + slope) at
@@ -516,7 +595,26 @@ const CROSS_GAP = 48;
 /** Year-label treatment: heavy, larger, and never occluded. The side each label sits on is chosen
  *  from the data (opposite whichever cluster shares that year). */
 const YEAR_LABEL_FONT = 30;
-const YEAR_LABEL_OFFSET = 56; // spine to label baseline
+/**
+ * Spine to the label's INNER edge. This is a gutter budget, not a taste value, and it is the
+ * constant that decides whether a year label can touch a photograph.
+ *
+ * The gutter between the spine and a plate's near edge is OFFSET_X (110). A year label is
+ * YEAR_LABEL_W wide. At the old 56 the label reached 56+78 = 134 from the spine — 24 units INTO
+ * the plate lane — so at every year that had a plate on the label's side (2021/2022/2023/2024/
+ * 2025), the numerals sat on the photograph and the label's vellum halo punched a hole through
+ * the branch running underneath. It was not a 2021 problem and it was not the twist-fuse: it was
+ * arithmetic, and it fired on whichever years happened to have a plate packed into the band.
+ *
+ * At 24 the label reaches 102 and lives entirely inside the gutter, clearing every plate on every
+ * side by 8 units. It also lines the label's inner edge up with YEAR_TICK_INNER, so the numeral
+ * and its tick now read as one lockup. The label sits ABOVE its tick (YEAR_LABEL_CLEAR), so the
+ * two never share a y band despite sharing an x.
+ */
+export const YEAR_LABEL_OFFSET = 24;
+/** Measured glyph width of a four-digit year at YEAR_LABEL_FONT/700 (live getBBox, 2026-07-16).
+ *  Exported so the gutter contract can be asserted rather than eyeballed. */
+export const YEAR_LABEL_W = 78;
 const YEAR_TICK_INNER = 24; // spine to tick inner end
 const YEAR_TICK_LEN = 22;
 const YEAR_LABEL_CLEAR = 20; // label baseline sits this far above the tick
@@ -864,6 +962,195 @@ export function spinePts(): Array<{ x: number; y: number }> {
   return pts;
 }
 
+/* ----------------------------- the spine garland -------------------------- */
+
+/**
+ * THE GARLAND (2026-07-16). Clay's gongbi growth composer, grafted onto Daniel's spine.
+ *
+ * The composer in engine/gongbi/garland.ts grows a plant along an ARBITRARY polyline — that is
+ * its whole point — so it is fed `spinePts()`, THIS page's own geometry. His organs, Daniel's
+ * line. The composer's own vine is switched off (`tube: false`): the spine stays the drawn SVG
+ * line it has always been, at SPINE_W, and the garland contributes leaves and blossom clusters
+ * along it and nothing else. This is ornament ON structure, not a replacement for it.
+ *
+ * Pigment, not ink: the botanicals are the one place on the page where the genome's own palette
+ * is allowed (see INK_SEPIA). The structure underneath stays one colour.
+ *
+ * The strip is a narrow band centred on the spine and drawn 1:1 in world units. It covers only
+ * the plumb run (junction → converge); the lean and the winding tail are re-solved every scroll
+ * frame, and a raster cannot follow them.
+ */
+/**
+ * The garland's commission. PINNED to take 2 after a seed sweep on 2026-07-16 (six takes grown
+ * onto the real spine and compared side by side) — and the seed is the difference between
+ * ornament and a stain, so this is a design review, not a constant:
+ *   bower/spine    — the genome aims its organs with a random 3D rotation, and this take lands
+ *                    its leaves EDGE-ON: they render as curled grey-green slivers that read as
+ *                    a smudge on the line. Rejected.
+ *   bower/spine-2  — PINNED. A broad sage leaf with a legible midrib arching off the spine, and
+ *                    a small pink blossom below. Reads as botany on structure.
+ *   bower/spine-5  — a BLUE bell flower. The page just retired blue; pigment on a botanical is
+ *                    not a licence to walk it back in. Rejected.
+ * Re-curate with the seed sweep, not by eye on one take.
+ */
+const GARLAND_SEED = 'bower/spine-2';
+/** Half-width of the garland strip in world units: how far an organ may reach off the spine.
+ *  Kept inside the gutter (OFFSET_X = 110) so foliage can never touch a plate — and comfortably
+ *  wider than the organs actually reach (measured 63 at GARLAND_SCALE), because an organ that
+ *  runs off the strip is CLIPPED, and a clipped leaf reads as a broken drawing rather than as
+ *  restraint. At 64 the foliage was cut flat against the strip edge. */
+export const GARLAND_REACH = 90;
+/**
+ * Organ scale. NOT 1:1 — the genome's organ sizes are tuned for a whole plant composed on a
+ * 1200px canvas, and dropped onto the spine at that scale they measure ~12px: specks. Measured
+ * on 2026-07-16 (paintGarland into the real strip, counting visible pixels):
+ *   0.62 → reach 26 from the spine, coverage 0.003. Invisible.
+ *   1.5  → reach 63,  coverage 0.013. Foliage that reads at the spine's weight.
+ *   3+   → reach 64+, clipped by the strip.
+ * 1.5 puts the leaves at roughly eight times the spine's width — ornament ON the structure,
+ * which is Sai's weight budget, rather than a second plant competing with it.
+ */
+const GARLAND_SCALE = 1.5;
+/** A station must clear this much y from a branch anchor, so foliage never fouls a fork or the
+ *  node dot drawn there. */
+const GARLAND_ANCHOR_CLEAR = 46;
+/** ...and this much from a year tick, so foliage never crowds a numeral. */
+const GARLAND_TICK_CLEAR = 40;
+
+/**
+ * Where the garland's organs may grow: the y bands of the spine that the DRAWING itself leaves
+ * free. Every branch anchor (a fork, plus its node dot) and every year tick claims a band; the
+ * garland takes what is left. Pure and exported — the contract test asserts that no station
+ * lands on a fork or a numeral, which is the whole reason the placement is computed rather
+ * than sprinkled at even intervals.
+ *
+ * Returns stations in path-fraction space (0 = the fuse, 1 = the converge point), because that
+ * is the coordinate the composer walks.
+ */
+export function garlandStations(
+  clusters: ReadonlyArray<{ year: number }> = CLUSTERS,
+  years: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026],
+): GarlandStation[] {
+  const busy: Array<[number, number]> = [];
+  for (const c of clusters) {
+    const y = yearToY(c.year);
+    busy.push([y - GARLAND_ANCHOR_CLEAR, y + GARLAND_ANCHOR_CLEAR]);
+  }
+  for (const y of years) {
+    const ty = yearToY(y);
+    // The tick sits at ty and the numeral rides above it; claim both.
+    busy.push([ty - GARLAND_TICK_CLEAR - YEAR_LABEL_CLEAR, ty + GARLAND_TICK_CLEAR]);
+  }
+  busy.sort((a, b) => a[0] - b[0]);
+
+  // Merge the claimed bands, then walk the gaps between them.
+  const merged: Array<[number, number]> = [];
+  for (const b of busy) {
+    const last = merged[merged.length - 1];
+    if (last && b[0] <= last[1]) last[1] = Math.max(last[1], b[1]);
+    else merged.push([b[0], b[1]]);
+  }
+
+  const span = CONVERGE_Y - CONV_JUNCTION_Y;
+  const stations: GarlandStation[] = [];
+  let cursor = CONV_JUNCTION_Y;
+  const ORGANS: GarlandOrgan[] = ['leaf', 'bloom', 'leaf', 'bud', 'leaf', 'bloom'];
+  let n = 0;
+  const place = (from: number, to: number) => {
+    // One organ per ~150 units of free run, centred in its share of the gap, so foliage is
+    // spaced by the drawing's own rhythm rather than by a fixed count.
+    const room = to - from;
+    if (room < 90) return;
+    const count = Math.max(1, Math.floor(room / 150));
+    for (let i = 0; i < count; i++) {
+      const y = from + (room * (i + 0.5)) / count;
+      stations.push({ t: (y - CONV_JUNCTION_Y) / span, organ: ORGANS[n % ORGANS.length] });
+      n += 1;
+    }
+  };
+  for (const [b0, b1] of merged) {
+    if (b0 > cursor) place(cursor, Math.min(b0, CONVERGE_Y));
+    cursor = Math.max(cursor, b1);
+    if (cursor >= CONVERGE_Y) break;
+  }
+  if (cursor < CONVERGE_Y) place(cursor, CONVERGE_Y);
+  return stations.filter((s) => s.t >= 0 && s.t <= 1);
+}
+
+/** The garland strip's world-space box: a band hugging the spine over its plumb run. */
+export const GARLAND_BOX = {
+  x: CX - GARLAND_REACH,
+  y: CONV_JUNCTION_Y,
+  w: GARLAND_REACH * 2,
+  h: CONVERGE_Y - CONV_JUNCTION_Y,
+};
+
+/** The spine's polyline in STRIP-local pixels (the composer paints into its own canvas). */
+export function garlandPath(): Array<[number, number]> {
+  return spinePts().map((p) => [p.x - GARLAND_BOX.x, p.y - GARLAND_BOX.y] as [number, number]);
+}
+
+/**
+ * The garland, painted once off-thread and hung on the spine as an <image>. It is deliberately
+ * NOT part of the scroll-reveal choreography: the reveal gates the STRUCTURE (the spine draws
+ * itself as you descend), and a raster cannot be dash-offset. It fades in when it arrives.
+ */
+function SpineGarland({ reduced }: { reduced: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    let objectUrl: string | null = null;
+    requestGarland({
+      seed: GARLAND_SEED,
+      voice: 'pigment',
+      width: GARLAND_BOX.w,
+      height: GARLAND_BOX.h,
+      path: garlandPath(),
+      stations: garlandStations(),
+      scale: GARLAND_SCALE,
+      tube: false, // Daniel's spine is the stem; the composer only brings foliage.
+    })
+      .then(async (bitmap) => {
+        // The worker hands back an ImageBitmap; SVG <image> needs a URL, so draw it once to a
+        // canvas and keep the blob. Bitmaps are cached in painter.ts, so a remount is cheap.
+        const c = document.createElement('canvas');
+        c.width = bitmap.width;
+        c.height = bitmap.height;
+        c.getContext('2d')?.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob || !live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch((err: unknown) => {
+        // A failed garland must leave the page intact — the spine is the load-bearing thing and
+        // it is drawn in SVG — but a broken painting room must not look like a design choice.
+        console.error('gongbi spine garland failed:', err);
+      });
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, []);
+
+  if (!url) return null;
+  return (
+    <image
+      href={url}
+      x={GARLAND_BOX.x}
+      y={GARLAND_BOX.y}
+      width={GARLAND_BOX.w}
+      height={GARLAND_BOX.h}
+      style={{
+        opacity: url ? 1 : 0,
+        transition: reduced ? undefined : 'opacity 900ms ease-out',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
 /* ------------------------------- the layout ------------------------------- */
 
 /** Per-cluster layout result: the shared branch anchor on the spine, and each plate's box. */
@@ -1163,6 +1450,9 @@ export function CrossPathsTimeline({
   // The spine, sampled once. Everything else anchors onto it.
   const spine = useMemo(() => sample('spine', spinePts()), []);
   const laid = useMemo(() => layoutClusters(spine), [spine]);
+  /** What the year labels must dodge: every plate and every branch, as actually laid out.
+   *  The layout is static, so this is computed once per mount, not per scroll frame. */
+  const labelObstacles = useMemo(() => computeBranches(), []);
 
   // The two convergence strands (the twist-fuse). Sampled for a smooth over-under lay-up; drawn
   // solid because they ARE the structure, not a whisper. The viewBox pan clips their off-frame tops.
@@ -1301,7 +1591,7 @@ export function CrossPathsTimeline({
               <path
                 d={conv.left.d}
                 fill="none"
-                stroke={INK_BLUE}
+                stroke={INK_SEPIA}
                 strokeWidth={CONV_WEIGHT}
                 strokeLinecap="butt"
                 strokeLinejoin="round"
@@ -1309,14 +1599,14 @@ export function CrossPathsTimeline({
               <path
                 d={conv.right.d}
                 fill="none"
-                stroke="#FBF9F3"
+                stroke={VELLUM}
                 strokeWidth={CONV_WEIGHT + 6}
                 strokeLinecap="butt"
               />
               <path
                 d={conv.right.d}
                 fill="none"
-                stroke={INK_BLUE}
+                stroke={INK_SEPIA}
                 strokeWidth={CONV_WEIGHT}
                 strokeLinecap="butt"
                 strokeLinejoin="round"
@@ -1331,7 +1621,7 @@ export function CrossPathsTimeline({
                 <path
                   d={spine.d}
                   fill="none"
-                  stroke={INK_BLUE}
+                  stroke={INK_SEPIA}
                   strokeWidth={SPINE_W}
                   strokeLinecap="round"
                   pathLength={1}
@@ -1342,6 +1632,11 @@ export function CrossPathsTimeline({
               );
             })()}
 
+            {/* THE GARLAND. Clay's gongbi organs grown along the spine's own polyline, in full
+                pigment. Painted after the spine so foliage sits ON the line, and before the
+                clusters so a plate's calyx and its branch stay on top of it. */}
+            <SpineGarland reduced={reduced} />
+
             {/* Every cluster: a pedicel off the spine to one or more plates, each cupped by a calyx. */}
             {laid.map((c) => (
               <ClusterGroup key={c.id} cluster={c} cardLineY={cardLineY} reduced={reduced} />
@@ -1349,12 +1644,13 @@ export function CrossPathsTimeline({
 
             {/* Year labels: heavy, painted AFTER the clusters (numerals never blocked), with a vellum
                 halo (paint-order stroke) so they stay legible over any adjacent-year plate. The side
-                flip (yearLabelSide, unit-tested) clears the same-year cluster structurally. */}
+                flip (yearLabelSide, unit-tested) puts each label on whichever side the laid-out
+                plates and branches actually leave room on. */}
             {[2021, 2022, 2023, 2024, 2025, 2026].map((y) => {
               const ty = yearToY(y);
               const vis = reduced ? 1 : clamp01((camY + viewH + 40 - ty) / 60) * clamp01((ty - camY + 120) / 80);
               if (vis <= 0.01) return null;
-              const drawSide = yearLabelSide(CLUSTERS, y);
+              const drawSide = yearLabelSide(labelObstacles, y);
               const dir = drawSide === 'right' ? 1 : -1;
               return (
                 <g key={y} opacity={vis}>
@@ -1379,7 +1675,7 @@ export function CrossPathsTimeline({
                       letterSpacing: '0.05em',
                       fontVariantNumeric: 'tabular-nums',
                       paintOrder: 'stroke',
-                      stroke: '#FBF9F3',
+                      stroke: VELLUM,
                       strokeWidth: 8,
                       strokeLinejoin: 'round',
                       strokeLinecap: 'round',
@@ -1407,7 +1703,7 @@ export function CrossPathsTimeline({
                   cy={MARK_CENTER_Y + (my - 50) * g.k}
                   r={g.r}
                   fill="none"
-                  stroke={INK_BLUE}
+                  stroke={INK_SEPIA}
                   strokeWidth={MARK_STROKE * g.k}
                   strokeLinecap="round"
                   opacity={o}
@@ -1423,7 +1719,7 @@ export function CrossPathsTimeline({
               <path
                 d={poly(leanPts)}
                 fill="none"
-                stroke={INK_BLUE}
+                stroke={INK_SEPIA}
                 strokeWidth={SPINE_W}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1431,7 +1727,7 @@ export function CrossPathsTimeline({
               <path
                 d={poly(tail)}
                 fill="none"
-                stroke={INK_BLUE}
+                stroke={INK_SEPIA}
                 strokeWidth={SPINE_W}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1443,7 +1739,7 @@ export function CrossPathsTimeline({
               <path
                 d={descD}
                 fill="none"
-                stroke={INK_BLUE}
+                stroke={INK_SEPIA}
                 strokeWidth={SPINE_W}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1461,7 +1757,7 @@ export function CrossPathsTimeline({
                 fontSize: WORDMARK_FONT,
                 fontWeight: 600,
                 letterSpacing: '0.1em',
-                fill: INK_BLUE,
+                fill: INK_SEPIA,
                 opacity: wordmarkOpacity,
               }}
             >
@@ -1520,7 +1816,7 @@ function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y
   if (plate.pending) {
     return (
       <g>
-        <rect x={x} y={y} width={w} height={h} fill={INK_BLUE} fillOpacity={0.04} stroke={INK_BLUE} strokeOpacity={0.3} strokeWidth={1} strokeDasharray="6 6" />
+        <rect x={x} y={y} width={w} height={h} fill={INK_SEPIA} fillOpacity={0.04} stroke={INK_SEPIA} strokeOpacity={0.3} strokeWidth={1} strokeDasharray="6 6" />
         <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" className="fill-inkBlack/35 font-mono" style={{ fontSize: 11, letterSpacing: '0.18em' }}>
           IMAGE TO COME
         </text>
@@ -1543,7 +1839,7 @@ function PlateMedia({ plate, x, y, w, h, reduced }: { plate: Plate; x: number; y
           </image>
         </>
       )}
-      <rect x={x} y={y} width={w} height={h} fill="none" stroke={INK_BLUE} strokeOpacity={0.25} strokeWidth={1} />
+      <rect x={x} y={y} width={w} height={h} fill="none" stroke={INK_SEPIA} strokeOpacity={0.25} strokeWidth={1} />
     </g>
   );
 }
@@ -1589,7 +1885,7 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
 
   return (
     <g>
-      <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_BLUE} opacity={uStem > 0 ? 1 : 0} />
+      <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_SEPIA} opacity={uStem > 0 ? 1 : 0} />
 
       {plates.map((pl, i) => {
         const branchD = branchPath(spineX, anchorY, edgeX, pl.attachY);
@@ -1608,7 +1904,7 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
             <path
               d={branchD}
               fill="none"
-              stroke={INK_BLUE}
+              stroke={INK_SEPIA}
               strokeOpacity={0.7}
               strokeWidth={BRANCH_W}
               strokeLinecap="round"

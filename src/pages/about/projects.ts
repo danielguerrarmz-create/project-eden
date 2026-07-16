@@ -113,7 +113,12 @@ export interface TeamFact {
   value: string;
 }
 
+/** A founder's stable key. `name` is display copy — it can be reworded, and matching on it
+ *  (`name.startsWith('Clay')`) silently grows the wrong specimen. Key on this instead. */
+export type FounderId = 'clay' | 'daniel';
+
 export interface TeamMember {
+  id: FounderId;
   name: string;
   role: string;
   /** The facts that hang off this founder's stem. Every one is sourced, none inferred — see the
@@ -145,6 +150,7 @@ export interface TeamMember {
  * "taught a robot arm to draw with light" line to his stem only once you confirm you want it public. */
 export const TEAM: TeamMember[] = [
   {
+    id: 'clay',
     name: 'Clay Seifert',
     role: 'Cofounder · design & research',
     // Comment 5 (2026-07-15): real headshot staged at public/assets/about/clay-seifert.jpg.
@@ -169,6 +175,7 @@ export const TEAM: TeamMember[] = [
     ],
   },
   {
+    id: 'daniel',
     name: 'Daniel Guerra',
     role: 'Cofounder · engine & systems',
     image: '/assets/about/daniel-headshot.jpg',

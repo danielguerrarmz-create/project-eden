@@ -25,19 +25,28 @@ import {
   TEAM,
   TEAM_CODA,
   AUTHOR_LABEL,
-  DISCIPLINE_ORDER,
   type Project,
   type ProjectImage,
   type TeamMember,
 } from './about/projects';
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
-import { CrossPathsTimeline, INK_BLUE } from './about/CrossPathsTimeline';
+import { CrossPathsTimeline, INK_SEPIA, INK_SEPIA_TEXT } from './about/CrossPathsTimeline';
+import { FanPainting } from './about/FanPainting';
+import { FOUNDER_SPECIMENS, PAINTINGS, groupProjects } from './about/paintings';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
- *  fragmented the page. Blue is the practice's colour and everything selected takes it. */
+ *  fragmented the page. Sepia is the practice's colour and everything selected takes it.
+ *
+ *  Two entry points, one colour: STRUCTURE (tint bars, row grounds, stems, leaders) takes
+ *  `authorColor`, and GLYPHS take `authorTextColor` — the selected row lays an 8% sepia tint
+ *  under its own sepia text, and INK_SEPIA does not clear AA on that ground. See the constants. */
 function authorColor(_by: Project['by']): string {
-  return INK_BLUE;
+  return INK_SEPIA;
+}
+
+function authorTextColor(_by: Project['by']): string {
+  return INK_SEPIA_TEXT;
 }
 
 /** The page title, shared verbatim between the header and the intro's flying title so they
@@ -67,7 +76,7 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
   return (
     <span
       className={`font-mono text-[11px] uppercase tracking-[0.14em] ${className}`}
-      style={{ color: authorColor(project.by) }}
+      style={{ color: authorTextColor(project.by) }}
     >
       {AUTHOR_LABEL[project.by]} · {project.year}
     </span>
@@ -549,11 +558,9 @@ function ListView({ reduced }: { reduced: boolean }) {
   // so sorting by it and sorting by year agree — the number the reader sees is the position.
   const items = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
   // The menu is GROUPED BY DISCIPLINE (Architecture, Product Design, Software); reverse-chronological
-  // within each group (items is already sorted by `n`), and only non-empty groups render.
-  const groups = DISCIPLINE_ORDER.map((discipline) => ({
-    discipline,
-    projects: items.filter((p) => p.discipline === discipline),
-  })).filter((g) => g.projects.length > 0);
+  // within each group, and only non-empty groups render. `groupProjects` is the shared, tested
+  // grouping (paintings.ts) — this used to re-implement it inline, and the two could drift.
+  const groups = groupProjects(items).filter((g) => g.projects.length > 0);
   // Active selection is tracked by project `n` — stable across the grouped layout — defaulting to the
   // first project of the first group (top of the menu). The right-hand detail follows it exactly as before.
   const [activeN, setActiveN] = useState(() => groups[0]?.projects[0]?.n ?? items[0].n);
@@ -594,13 +601,27 @@ function ListView({ reduced }: { reduced: boolean }) {
         <nav className="min-h-0 min-w-0 self-stretch overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((group) => (
             <div key={group.discipline} className="mb-3 last:mb-0">
-              <p className="px-4 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-                {group.discipline}
-              </p>
+              {/* The discipline FRONTISPIECE: a small painted chapter-break mark beside the
+                  heading — one of Clay's three commissioned specimens, in full pigment.
+                  Deliberately NO BowerMark over it: matRect (quality.ts) base-anchors every
+                  plant so its densest region sits on the mat's bottom row, and the retired
+                  drafts then placed the mark at bottom-[5%] of the same frame — they collide
+                  by construction, for every seed. A frontispiece stands alone. */}
+              <div className="flex items-center gap-3 px-4 pb-1.5 pt-2">
+                {/* 44px, not 28: below ~40 the aged-paper mount swallows the plant and the
+                    frontispiece reads as a beige swatch rather than a painting. */}
+                <FanPainting commission={PAINTINGS[group.discipline]} size={44} caption={false} />
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+                  {group.discipline}
+                </p>
+              </div>
               <ol>
                 {group.projects.map((p) => {
                   const on = p.n === activeN;
+                  // `tint` is the STRUCTURE colour (the bar + the row's ground); `ink` is the same
+                  // colour at reading weight for the glyphs that sit ON that tinted ground.
                   const tint = authorColor(p.by);
+                  const ink = authorTextColor(p.by);
                   return (
                     <li key={p.n} className="border-t border-inkBlack/10 last:border-b">
                       <button
@@ -622,13 +643,13 @@ function ListView({ reduced }: { reduced: boolean }) {
                           className={`font-serifDisplay text-[clamp(0.9rem,1.25vw,1.1rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
                             on && !reduced ? 'translate-x-1' : ''
                           }`}
-                          style={on ? { color: tint } : undefined}
+                          style={on ? { color: ink } : undefined}
                         >
                           {p.title}
                         </span>
                         <span
                           className="ml-auto shrink-0 font-mono text-[10px] tracking-[0.14em] text-inkBlack/40 transition-colors"
-                          style={on ? { color: tint } : undefined}
+                          style={on ? { color: ink } : undefined}
                         >
                           {p.year}
                         </span>
@@ -694,7 +715,7 @@ function ListView({ reduced }: { reduced: boolean }) {
  *  the top of the founders block it settles on a convergence node, then two roots sweep OUT and DOWN
  *  each side, wrapping gracefully around the OUTSIDE of a founder column (Clay left, Daniel right) and
  *  framing the two of them, with soft botanical curls and tendril loops, then meandering back inward
- *  at the bottom toward The Work. It is a 19th-century root-engraving register: ONE colour INK_BLUE,
+ *  at the bottom toward The Work. It is a 19th-century root-engraving register: ONE colour INK_SEPIA,
  *  one line weight, drawn and alive.
  *
  *  Geometry: an absolutely-positioned layer behind the block. The viewBox is a 1000-wide field mapped
@@ -720,7 +741,7 @@ const ROOT_LEFT = [
 
 function FounderRoots() {
   const rootStroke = {
-    stroke: INK_BLUE,
+    stroke: INK_SEPIA,
     strokeWidth: 2.4,
     fill: 'none' as const,
     strokeLinecap: 'round' as const,
@@ -735,8 +756,8 @@ function FounderRoots() {
       className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
     >
       {/* the line arrives and settles on the convergence node */}
-      <path d="M500 0 V40" stroke={INK_BLUE} strokeWidth={2.8} fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-      <circle cx={500} cy={40} r={3.4} fill={INK_BLUE} />
+      <path d="M500 0 V40" stroke={INK_SEPIA} strokeWidth={2.8} fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+      <circle cx={500} cy={40} r={3.4} fill={INK_SEPIA} />
       {ROOT_LEFT.map((d, i) => (
         <path key={`l${i}`} d={d} {...rootStroke} />
       ))}
@@ -760,15 +781,15 @@ function FounderRootStem() {
       viewBox="0 0 60 60"
       className="pointer-events-none absolute left-1/2 top-0 block h-14 w-14 -translate-x-1/2 overflow-visible lg:hidden"
     >
-      <path d="M30 0 C 30 22, 27 38, 30 52" stroke={INK_BLUE} strokeWidth={2.4} fill="none" strokeLinecap="round" />
-      <path d="M30 36 C 22 42, 19 50, 25 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <path d="M30 36 C 38 42, 41 50, 35 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <circle cx={30} cy={52} r={2.6} fill={INK_BLUE} />
+      <path d="M30 0 C 30 22, 27 38, 30 52" stroke={INK_SEPIA} strokeWidth={2.4} fill="none" strokeLinecap="round" />
+      <path d="M30 36 C 22 42, 19 50, 25 56" stroke={INK_SEPIA} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <path d="M30 36 C 38 42, 41 50, 35 56" stroke={INK_SEPIA} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <circle cx={30} cy={52} r={2.6} fill={INK_SEPIA} />
     </svg>
   );
 }
 
-/** The seam connector: a single vertical INK_BLUE line at the PAGE centre that carries the finale's
+/** The seam connector: a single vertical INK_SEPIA line at the PAGE centre that carries the finale's
  *  descending line across a spacer. The timeline's unravel exits its frame at the page centre and the
  *  founders' node sits at the page centre, so a plumb line here reads as the ONE line continuing over
  *  the paper gap between the two (separate) SVGs. `overflow-visible` lets its round cap kiss both ends.
@@ -782,7 +803,7 @@ function SeamBridge() {
       preserveAspectRatio="none"
       className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
     >
-      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_BLUE} strokeWidth={4.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_SEPIA} strokeWidth={4.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
     </svg>
   );
 }
@@ -794,7 +815,7 @@ function SeamBridge() {
  *  with `preserveAspectRatio="none"` over the words+runway block, so x tracks the content column. */
 function FoundersFlow() {
   const stroke = {
-    stroke: INK_BLUE,
+    stroke: INK_SEPIA,
     strokeWidth: 2.6,
     fill: 'none' as const,
     strokeLinecap: 'round' as const,
@@ -827,36 +848,54 @@ function FoundersFlowStem() {
       preserveAspectRatio="none"
       className="pointer-events-none absolute inset-0 block h-full w-full overflow-visible lg:hidden"
     >
-      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_BLUE} strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_SEPIA} strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
     </svg>
   );
 }
 
-/** One founder, borne at the node: the portrait is the node where the fork lands, and the facts hang
- *  off a stem below it on fine leader lines — the botanical-plate register (a specimen hung off a
- *  stem, each part tagged), not a left-aligned bullet list. The stem/node/leader are the page's ink
- *  line, INK_BLUE, continued; they are structural, the drawing arriving at a person. */
+/**
+ * One founder, as a specimen sheet: the PORTRAIT, the FACTS hung off a stem, and the founder's own
+ * BOTANICAL — a gongbi nonflower grown from the seed of their name (`bower/clay-seifert`,
+ * `bower/daniel-guerra-5`). The plant is the one place on this page where full pigment is allowed;
+ * everything structural around it stays INK_SEPIA.
+ *
+ * The pattern is lifted from the retired ascent draft's Founders() (portrait · facts · specimen),
+ * which read better than the centred portrait-over-list this replaced: the specimen gives the
+ * column a second focal point and the facts get a real measure to sit on instead of being squeezed
+ * under a 112px circle.
+ *
+ * The specimen is keyed on `person.id`, not matched out of `person.name` — see FOUNDER_SPECIMENS.
+ */
 function FounderNode({ person }: { person: TeamMember }) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-full border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
-        {person.image ? (
-          <img
-            src={person.image}
-            alt={`Portrait of ${person.name}`}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <OculusMark size={44} className="h-auto w-11 text-inkBlack/20" />
-        )}
+    <div className="flex flex-col">
+      <div className="flex items-start gap-5">
+        <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-full border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
+          {person.image ? (
+            <img
+              src={person.image}
+              alt={`Portrait of ${person.name}`}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <OculusMark size={44} className="h-auto w-11 text-inkBlack/20" />
+          )}
+        </div>
+        <div className="min-w-0 pt-2">
+          <h3 className="font-serifDisplay text-[19px] leading-tight text-inkBlack">{person.name}</h3>
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-accentOlive">{person.role}</p>
+          {/* The specimen, signed with the seed it grew from — the provenance is the point:
+              type the printed seed into #/lab/gongbi and this exact plant grows back. */}
+          <div className="mt-4">
+            <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={168} />
+          </div>
+        </div>
       </div>
-      <h3 className="mt-4 font-serifDisplay text-[19px] leading-tight text-inkBlack">{person.name}</h3>
-      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-accentOlive">{person.role}</p>
 
-      <ul className="relative mt-7 w-full max-w-[360px] text-left">
+      <ul className="relative mt-7 w-full text-left">
         {/* the stem the facts hang from */}
-        <span aria-hidden className="absolute bottom-2 left-[3px] top-2 w-px" style={{ background: INK_BLUE, opacity: 0.4 }} />
+        <span aria-hidden className="absolute bottom-2 left-[3px] top-2 w-px" style={{ background: INK_SEPIA, opacity: 0.4 }} />
         {person.facts.map((f) => (
           <li key={f.label} className="relative border-t border-inkBlack/10 py-3.5 pl-8 first:border-t-0">
             {/* the leader line out from the stem to the label — no terminal dot (Daniel's
@@ -864,7 +903,7 @@ function FounderNode({ person }: { person: TeamMember }) {
             <span
               aria-hidden
               className="absolute left-[3px] top-[1.4rem] h-px w-[22px] -translate-y-1/2"
-              style={{ background: INK_BLUE, opacity: 0.4 }}
+              style={{ background: INK_SEPIA, opacity: 0.4 }}
             />
             <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-inkBlack/45">{f.label}</div>
             <p className="mt-1 font-serifDisplay text-[13.5px] leading-relaxed text-inkBlack/[0.78]">{f.value}</p>

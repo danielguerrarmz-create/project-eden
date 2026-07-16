@@ -3,8 +3,8 @@
  * #/lab/gongbi. Not linked from the nav (like #/lab/botanical): a review surface,
  * not a destination.
  *
- * Purpose: commissions on the scroll About page are PERMANENT seeds (see
- * src/pages/scroll/paintings.ts), so someone has to stand in front of the wall and
+ * Purpose: commissions on the About page are PERMANENT seeds (see
+ * src/pages/about/paintings.ts), so someone has to stand in front of the wall and
  * choose. Type a seed family, browse takes of both archetypes with their measured
  * stats printed underneath (the quality gate's own numbers — coverage/ink/chroma,
  * see src/engine/gongbi/quality.ts), and pin winners by copying the printed seed
@@ -14,8 +14,8 @@
 import { useMemo, useState } from 'react';
 import { SplashHeader } from '../splash/SplashHeader';
 import { Frame } from '../../ui/Frame';
-import { FanPainting } from '../scroll/FanPainting';
-import type { Commission } from '../scroll/paintings';
+import { FanPainting } from '../about/FanPainting';
+import type { Commission } from '../about/paintings';
 
 const COUNTS = [6, 12, 18] as const;
 const KINDS = ['mixed', 'woody', 'herbal'] as const;

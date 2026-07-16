@@ -19,6 +19,7 @@ import { growWild } from '../../engine/botanical';
 import { requestPainting, requestPaperTile, type Painting } from '../../engine/gongbi/painter';
 import { matRect } from '../../engine/gongbi/quality';
 import { useReducedMotion } from '../../ui/useReducedMotion';
+import { INK_SEPIA } from './CrossPathsTimeline';
 import type { Commission } from './paintings';
 
 /** Upstream paints plant layers on a 1200px square; one native size, one cache entry per seed. */
@@ -162,9 +163,15 @@ export function FanPainting({
             <path
               key={i}
               d={p.d}
-              stroke={p.stroke}
+              // RE-COLOURED to the page's ink, not `p.stroke`. growWild comes from the shared
+              // botanical module, which carries its own INK_BLUE and serves other pages that
+              // still want it — so the sketch arrives blue and has to be re-keyed here, the
+              // same way the timeline re-keys its calyx through sprigPathStyle. This is not
+              // cosmetic: the underdrawing is FULLY VISIBLE for the seconds before the painting
+              // lands, so leaving it alone put blue back on a page that just retired it.
+              stroke={INK_SEPIA}
               strokeWidth={p.strokeWidth}
-              fill={p.fill}
+              fill={p.fill === 'none' ? 'none' : INK_SEPIA}
               fillOpacity={p.fillOpacity}
               strokeLinecap="round"
               strokeLinejoin="round"
