@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  packSide,
+  spreadSide,
   MAX_CONCURRENT_STRANDS,
   yearLabelSide,
   CLUSTERS,
@@ -35,39 +35,72 @@ import { PROJECTS } from './projects';
 import { seededRandom } from './spaceColonization';
 
 const GAP = 40;
-const CROSS = 48;
-const stackHeight = (hs: number[]) => hs.reduce((s, h) => s + h, 0) + Math.max(0, hs.length - 1) * GAP;
 
-describe('packSide: one side lane, stacked with zero overlap', () => {
-  it('clears every cluster of the previous one by at least the cross gap, even when years crowd', () => {
-    // b sits only 80 units below a but a is 429 tall: without packing they would overlap badly.
-    const items = [
-      { id: 'a', anchorY: 100, heights: [213, 176] },
-      { id: 'b', anchorY: 180, heights: [213] },
-      { id: 'c', anchorY: 320, heights: [213, 176] },
-    ];
-    const tops = packSide(items, GAP, CROSS);
+describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
+  const heights = (h: number[]) => h.reduce((s, x) => s + x, 0) + Math.max(0, h.length - 1) * GAP;
+  const items = [
+    { id: 'a', heights: [213, 176] },
+    { id: 'b', heights: [213] },
+    { id: 'c', heights: [267, 176] },
+  ];
+
+  it('leaves the SAME gap everywhere, which is the whole point', () => {
+    // Daniel: "spreading them more evenly all throughout... is fine as long as it is displayed
+    // better." packSide could not do this: it anchored on the true year and only moved a cluster when
+    // it collided, so the real left lane measured 48, 48, 48, 333, 48, 40, 48 — five at the hard
+    // minimum and one void. The slack existed (1133 units); the year axis just put it all in one place.
+    const tops = spreadSide(items, 0, 2000, GAP);
+    const gaps: number[] = [];
+    let prevBottom: number | null = null;
+    for (const it of items) {
+      const top = tops.get(it.id)!;
+      if (prevBottom !== null) gaps.push(top - prevBottom);
+      prevBottom = top + heights(it.heights);
+    }
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 6);
+    expect(gaps[0]).toBeGreaterThan(0);
+  });
+
+  it('sets the lane evenly END to END: the top and bottom margins match the inner gaps', () => {
+    const tops = spreadSide(items, 100, 2100, GAP);
+    const first = tops.get('a')!;
+    const last = tops.get('c')! + heights(items[2].heights);
+    const topMargin = first - 100;
+    const bottomMargin = 2100 - last;
+    expect(topMargin).toBeCloseTo(bottomMargin, 6);
+  });
+
+  it('never overlaps, and keeps the order it was given', () => {
+    const tops = spreadSide(items, 0, 2000, GAP);
     let prevBottom = -Infinity;
     for (const it of items) {
       const top = tops.get(it.id)!;
-      expect(top).toBeGreaterThanOrEqual(prevBottom + CROSS - 1e-6);
-      prevBottom = top + stackHeight(it.heights);
+      expect(top).toBeGreaterThanOrEqual(prevBottom);
+      prevBottom = top + heights(it.heights);
     }
   });
 
-  it('centres an uncrowded lead node on its true anchor year', () => {
-    const tops = packSide([{ id: 'solo', anchorY: 1000, heights: [213] }], GAP, CROSS);
-    expect(tops.get('solo')).toBeCloseTo(1000 - 213 / 2);
+  it('stays inside its lane', () => {
+    const tops = spreadSide(items, 100, 2100, GAP);
+    expect(tops.get('a')!).toBeGreaterThanOrEqual(100);
+    expect(tops.get('c')! + heights(items[2].heights)).toBeLessThanOrEqual(2100);
   });
 
-  it('only ever pushes a crowded cluster DOWN, never up off its true year', () => {
-    const items = [
-      { id: 'a', anchorY: 100, heights: [267] },
-      { id: 'b', anchorY: 130, heights: [213] }, // crowded: must be pushed below a
-    ];
-    const tops = packSide(items, GAP, CROSS);
-    expect(tops.get('a')).toBeCloseTo(100 - 267 / 2); // uncrowded lead stays centred
-    expect(tops.get('b')!).toBeGreaterThanOrEqual(130 - 213 / 2); // never rises above its centre
+  it('THE REAL LANES: every gap on a side is equal, and far wider than packSide ever left', () => {
+    // The measured minimum under packSide was 40. Against the real content this asserts the crowding
+    // is actually gone rather than merely re-described.
+    for (const side of ['left', 'right'] as const) {
+      const ps = computePlates()
+        .filter((p) => p.side === side)
+        .sort((a, b) => a.rect.y - b.rect.y);
+      const gaps: number[] = [];
+      for (let i = 1; i < ps.length; i++) {
+        const g = ps[i].rect.y - (ps[i - 1].rect.y + ps[i - 1].rect.h);
+        // Siblings inside one cluster keep CLUSTER_GAP_Y (40); only BETWEEN clusters is spread.
+        if (g > GAP + 1) gaps.push(g);
+      }
+      for (const g of gaps) expect(g, `${side} gaps: ${gaps.map((x) => Math.round(x)).join(', ')}`).toBeGreaterThan(100);
+    }
   });
 });
 

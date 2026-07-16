@@ -124,9 +124,6 @@ interface Cluster {
   /** ONE-line hint, from the allowed set only. The specifics live in "The Work" list below. */
   hint: string;
   nodes: Node[];
-  /** Optional extra downward nudge for the plate stack only (the branch anchor stays on the true
-   *  year). Used where a plate would otherwise crowd the merge; safe only where the lane has slack. */
-  dy?: number;
 }
 
 const A = '/assets/projects';
@@ -142,7 +139,17 @@ const SPINE_W = 7.5;
 const Y_2021 = 150;
 const Y_2023 = 750;
 const SLOPE_EARLY = 300; // units per year, 2021 to 2023
-const SLOPE_LATE = 760; // units per year, 2023 to 2026
+/**
+ * Units per year, 2023 to 2026. Raised 760 -> 975 on 2026-07-16 (round 3) to buy the lane the room
+ * Daniel asked for: "add more white space in between project images... it gets really convoluted."
+ *
+ * This is the honest lever. `spreadSide` shares out whatever slack the lane HAS, so the only way to
+ * widen every gap at once is to make the lane longer — and the late stretch is where the projects
+ * actually are (nine of the thirteen clusters are 2023 or later). At 760 the even gap came out 88
+ * (right) and 107 (left); at 975 it is ~180 on both, which is also what gives the sub-branches a gap
+ * worth colonizing. The drawing is taller and the scroll is longer; the track is already 1080vh.
+ */
+const SLOPE_LATE = 975;
 /** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
 export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
 
@@ -494,9 +501,14 @@ export const OFFSET_X = 110;
 /** Minimum vertical gap between two stacked siblings in one cluster (their bounding boxes never
  *  come closer than this — the no-overlap contract). */
 const CLUSTER_GAP_Y = 40;
-/** Minimum vertical gap between two DIFFERENT clusters sharing a side's lane, so dense years do not
- *  collide even though the branch anchors stay on the true year. */
-const CROSS_GAP = 48;
+/** The plate lane. It starts below the fuse (so the twist-fuse reads clean before the first project)
+ *  and ends above the converge point (so the last plate never crowds the spine's lean into the mark).
+ *  `spreadSide` shares whatever is left between the clusters. */
+const LANE_TOP = CONV_JUNCTION_Y + 120;
+const LANE_BOTTOM = CONVERGE_Y - 160;
+/* CROSS_GAP (the minimum clearance between two clusters in one lane) was deleted with `packSide` on
+ * 2026-07-16. It was the floor a year-anchored layout collided against; an evenly spread lane has no
+ * floor to hit, because the gap is what is left over rather than what is fought for. */
 
 /** Year-label treatment: heavy, larger, and never occluded. The side each label sits on is chosen
  *  from the data (opposite whichever cluster shares that year). */
@@ -1353,31 +1365,47 @@ interface LaidCluster {
 }
 
 /**
- * Pack one side's clusters down its offset lane so no two bounding boxes overlap. Pure and
- * deterministic (exported for tests): a cluster sits centred on its true anchor year unless that
- * would collide with the previous cluster on this side, in which case it is pushed just far enough
- * down to clear it by CROSS_GAP.
+ * Spread one side's clusters EVENLY down its lane. Pure and deterministic (exported for tests).
  *
- * STILL NEEDED after the 2026-07-16 decoupling, though most of what it was FOR is gone. Plates no
- * longer hang off branches, so it no longer has to keep a set of branches from crossing each other or
- * each other's images; but two plates in one lane still cannot occupy the same paper, and that is
- * this. What left with the branches is everything that had to reason about where a branch attached.
+ * THE PLATES NO LONGER SIT AT THEIR TRUE YEAR (2026-07-16, round 3), and that is a licence Daniel
+ * gave explicitly: "I would go ahead and add more white space in between project images. At some
+ * point it gets really convoluted and difficult to read. I think just spreading them more evenly all
+ * throughout, even if it distorts our accuracy when it comes to the timeline, is fine as long as it
+ * is displayed better."
+ *
+ * This replaces `packSide`, which anchored each cluster on its true year and only pushed it down when
+ * it collided with the one above. That model produced exactly the complaint, and it measured: on the
+ * left lane the gaps ran 48, 48, 48, 333, 48, 40, 48 — five at the hard minimum and one void of 333.
+ * The lane had 1133 units of slack in it; the year axis just happened to dump all of it in one place,
+ * because the projects are not evenly distributed in TIME (three left clusters sit inside 2023.0 to
+ * 2023.55, and their plates are 200-350 tall each).
+ *
+ * So the axis stops deciding where plates go. What survives is ORDER — clusters are laid out in year
+ * sequence, which is the part that makes it a timeline at all — and the year labels still sit at their
+ * true `yearToY`. What is given up is the metric claim that a plate's y means its date. That is the
+ * distortion he authorised, and it buys roughly 3x the breathing room in the crowded stretches, plus
+ * the negative space the sub-branches then colonize (which is the same lever, not a second one).
+ *
+ * The gap is DERIVED, not a constant: whatever slack the lane has left after the stacks, shared out
+ * evenly — including above the first cluster and below the last, so a lane reads as evenly set rather
+ * than top-aligned with a hole at the bottom.
  */
-export function packSide(
-  items: Array<{ id: string; anchorY: number; heights: number[] }>,
-  gap: number,
-  crossGap: number,
+export function spreadSide(
+  items: Array<{ id: string; heights: number[] }>,
+  laneTop: number,
+  laneBottom: number,
+  gapWithinCluster: number,
 ): Map<string, number> {
   const stackHeight = (heights: number[]) =>
-    heights.reduce((s, h) => s + h, 0) + Math.max(0, heights.length - 1) * gap;
+    heights.reduce((s, h) => s + h, 0) + Math.max(0, heights.length - 1) * gapWithinCluster;
+  const sum = items.reduce((s, it) => s + stackHeight(it.heights), 0);
+  // n + 1 gaps: one above each cluster, and one below the last.
+  const gap = (laneBottom - laneTop - sum) / (items.length + 1);
   const tops = new Map<string, number>();
-  let laneBottom = -Infinity;
+  let y = laneTop + gap;
   for (const it of items) {
-    const firstH = it.heights[0] ?? 0;
-    const desiredTop = it.anchorY - firstH / 2; // centre the lead node on the true year
-    const top = Math.max(desiredTop, laneBottom + crossGap);
-    tops.set(it.id, top);
-    laneBottom = top + stackHeight(it.heights);
+    tops.set(it.id, y);
+    y += stackHeight(it.heights) + gap;
   }
   return tops;
 }
@@ -1386,17 +1414,15 @@ function layoutClusters(spine: Strand): LaidCluster[] {
   const tops = new Map<string, number>();
   (['left', 'right'] as Side[]).forEach((side) => {
     const items = CLUSTERS.filter((c) => c.side === side)
-      // The heights fed to packSide MUST be the DERIVED ones, not the tier's reference box — that is
-      // what a plate actually occupies now that the box comes from the image (see plateBox). Reading
-      // `TIER[n.tier].h` here left the packer modelling 3:2 plates that no longer exist, and the
-      // no-overlap test caught it immediately: a square plate is far taller than its tier's box says.
+      // Sorted by YEAR, then spread evenly: the sequence is the year's, the spacing is not. The
+      // heights are the DERIVED ones, not the tier's reference box — that is what a plate actually
+      // occupies now that the box comes from the image (see plateBox).
+      .sort((a, b) => a.year - b.year)
       .map((c) => ({
         id: c.id,
-        anchorY: yearToY(c.year),
         heights: c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h),
-      }))
-      .sort((a, b) => a.anchorY - b.anchorY);
-    packSide(items, CLUSTER_GAP_Y, CROSS_GAP).forEach((v, k) => tops.set(k, v));
+      }));
+    spreadSide(items, LANE_TOP, LANE_BOTTOM, CLUSTER_GAP_Y).forEach((v, k) => tops.set(k, v));
   });
 
   return CLUSTERS.map((c) => {
@@ -1404,7 +1430,7 @@ function layoutClusters(spine: Strand): LaidCluster[] {
     const spineX = atY(spine, anchorY).x;
     const dir = c.side === 'left' ? -1 : 1;
     const edgeX = spineX + dir * OFFSET_X; // the plates' near edge: the lane beside the spine
-    let y = tops.get(c.id)! + (c.dy ?? 0);
+    let y = tops.get(c.id)!;
     const plates = c.nodes.map((n) => {
       const { w, h } = plateBox(n.tier, n.media.ratio);
       const x = dir === 1 ? edgeX : edgeX - w;
