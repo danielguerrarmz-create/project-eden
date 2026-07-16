@@ -40,4 +40,6 @@ export const routes = {
   shape: '#/shape',
   /** Form-finding spike: sculpt a control lattice, relax onto a buildable gridshell. */
   sculpt: '#/sculpt',
+  /** Isolated Phase-1 preview of the procedural botanical generator (not wired in). */
+  botanicalLab: '#/lab/botanical',
 } as const;

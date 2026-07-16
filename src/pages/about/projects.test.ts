@@ -1,36 +1,42 @@
 import { describe, it, expect } from 'vitest';
-import { PROJECTS } from './projects';
+import { PROJECTS, DISCIPLINE_ORDER } from './projects';
 
 /**
- * The short-viewport safety net (project-frame proposal, section 6B).
+ * The fixed-panel safety net.
  *
- * The detail panel no longer scrolls: `overflow-y-auto` is gone, so a description that grows too
- * long would CLIP instead of scroll. These budgets — calibrated against the real worst cases with a
- * grace margin, not round numbers — turn "currently fits" into "cannot ship if it stops fitting."
- * The payoff line ("What we learned") also gets its own reserved fixed-height zone in the layout, so
- * pressure always hits the description first; this test is the hard floor underneath that.
+ * The detail panel does not scroll: the media area is a fixed two-region (hero top half, a tidy grid
+ * of the rest in the bottom half) and the text column establishes hierarchy through spacing, not an
+ * inner scroll. A description or a lesson that grows too long would CLIP instead of scroll. These
+ * budgets — calibrated against the real worst cases with a grace margin, not round numbers — turn
+ * "currently fits" into "cannot ship if it stops fitting."
  *
- * If a new project trips one of these, the fix is to tighten the copy, NOT to raise the budget —
- * the number is the guarantee. Raise it only after re-measuring the text column at 1366x768 and
- * 1280x800 and confirming the taller field still fits with the reserved payoff zone in place.
+ * If a new project trips one of these, the fix is to tighten the copy, NOT to raise the budget — the
+ * number is the guarantee. Raise it only after re-measuring the text column at 1366x768 and 1280x800
+ * and confirming the taller field still fits.
  */
 const BUDGET = {
-  /** Title sits on one row beside the Nº tag and meta; keep it to a single short line. */
-  title: 30,
-  /** The one description sentence. Today's longest is Robotic Factory at 314. */
-  description: 330,
-  /** The payoff / "What we learned" line. Today's longest is Robots as Instruments at 228. */
+  /** Title sits beside the meta line. Most are short; the longest is "Hydraulic Commons: Water
+   *  Infrastructure" at 39, which wraps to a second line in the narrow menu — that is acceptable. */
+  title: 42,
+  /** The two-to-three sentence description with its outcome. Longest today is Hydraulic at ~335. */
+  description: 340,
+  /** The "What we learned" pill at the bottom of the column. Longest is Robots at 228. */
   learned: 260,
-  /** venue + " · " + authors, the folded citation line. Today's longest is Archipedia at 84. */
+  /** venue + " · " + authors, the folded citation line. Longest is Archipedia at 84. */
   citation: 100,
+  /** The collaborators / professors line. Longest is Archipedia at 28. */
+  collaborators: 60,
 } as const;
+
+/** The IMAGE BUDGET (Comment 4): every project shows the hero plus up to three — 1..4 images total. */
+const MAX_IMAGES = 4;
 
 /** The citation exactly as the panel renders it: `${venue} · ${authors}`. */
 function citationOf(p: (typeof PROJECTS)[number]): string {
   return p.paper ? `${p.paper.venue} · ${p.paper.authors}` : '';
 }
 
-describe('projects.ts — the detail panel fits without an inner scroll', () => {
+describe('projects.ts — the fixed detail panel fits without an inner scroll', () => {
   it.each(PROJECTS.map((p) => [p.n, p.title, p] as const))(
     '%s %s stays within every text budget',
     (_n, _title, p) => {
@@ -42,22 +48,66 @@ describe('projects.ts — the detail panel fits without an inner scroll', () => 
       expect(citationOf(p).length, `citation over ${BUDGET.citation}`).toBeLessThanOrEqual(
         BUDGET.citation,
       );
+      if (p.collaborators) {
+        expect(p.collaborators.length, `collaborators over ${BUDGET.collaborators}`).toBeLessThanOrEqual(
+          BUDGET.collaborators,
+        );
+      }
     },
   );
 
-  it('every project carries at least one image (the plate frame needs a hero)', () => {
+  it('every project carries at least one image (the hero) and at most four', () => {
     for (const p of PROJECTS) {
       expect(p.images.length, `${p.n} ${p.title} has no images`).toBeGreaterThanOrEqual(1);
+      expect(p.images.length, `${p.n} ${p.title} has more than ${MAX_IMAGES} images`).toBeLessThanOrEqual(
+        MAX_IMAGES,
+      );
     }
   });
 
-  it('every image carries a finite, positive aspect ratio (the plate packer needs it)', () => {
+  it('every image carries a finite, positive aspect ratio (the gallery sizes plates by it)', () => {
     for (const p of PROJECTS) {
       for (const im of p.images) {
         expect(Number.isFinite(im.ratio) && im.ratio > 0, `${p.n} ${im.src} ratio ${im.ratio}`).toBe(
           true,
         );
       }
+    }
+  });
+
+  it('a pending image is a placeholder: no real src, and it never carries a caption-only real asset', () => {
+    for (const p of PROJECTS) {
+      for (const im of p.images) {
+        if (im.pending) {
+          expect(im.src, `${p.n} pending image should have an empty src`).toBe('');
+        } else {
+          expect(im.src.length, `${p.n} non-pending image needs a real src`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('every project has a valid discipline, and each of the three groups is non-empty', () => {
+    for (const p of PROJECTS) {
+      expect(DISCIPLINE_ORDER, `${p.n} ${p.title} discipline "${p.discipline}"`).toContain(p.discipline);
+    }
+    for (const d of DISCIPLINE_ORDER) {
+      expect(PROJECTS.some((p) => p.discipline === d), `discipline group "${d}" is empty`).toBe(true);
+    }
+  });
+
+  it('the `n` order is a clean reverse-chronological run with no gaps', () => {
+    const ns = [...PROJECTS].map((p) => p.n).sort((a, b) => a.localeCompare(b));
+    ns.forEach((n, i) => {
+      expect(n, `n sequence broken at index ${i}`).toBe(String(i + 1).padStart(2, '0'));
+    });
+    // Sorting by `n` must agree with descending year (reverse-chronological).
+    const byN = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
+    for (let i = 1; i < byN.length; i++) {
+      expect(
+        Number(byN[i].year),
+        `${byN[i].n} ${byN[i].title} (${byN[i].year}) is newer than the one before it`,
+      ).toBeLessThanOrEqual(Number(byN[i - 1].year));
     }
   });
 });

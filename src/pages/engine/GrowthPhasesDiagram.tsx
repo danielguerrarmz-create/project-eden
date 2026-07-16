@@ -12,7 +12,8 @@ import { computeGrowth } from '../../engine/growth';
 import type { EngineOutputs, GrowthState } from '../../engine/types';
 import type { Year } from '../../data/config';
 import { deDash } from '../../ui/text';
-import { AccentMark, DiagramSvg, LeaderCallout, useInk } from './hairline';
+import { DiagramSvg, LeaderCallout, useInk } from './hairline';
+import { CrownFlower, FoliageLeaves } from './botanicalFoliage';
 
 const YEARS: Year[] = [0, 1, 3];
 
@@ -57,8 +58,10 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
   const outlinePath = outline.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
   const edgeR = Math.max(front[0].radius, back[0].radius);
 
-  const dotCount = Math.round(growth.leafDensity01 * 60);
+  const density = growth.leafDensity01;
+  const dotCount = Math.round(density * 42);
   const dots = foliageDots(dotCount, front, back, cx, baseY, scale);
+  const leafScale = 0.85 + 0.3 * density;
 
   // Crown apex (last sample of the front section) for the flowering leader.
   const crown = front[front.length - 1];
@@ -71,14 +74,14 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
       <line x1={cx - edgeR * scale} y1={baseY} x2={cx + edgeR * scale} y2={baseY} stroke={ink} strokeWidth={0.5} opacity={0.65} />
       {/* Real canopy silhouette */}
       <path d={outlinePath} fill="none" stroke={ink} strokeWidth={0.75} />
-      {/* Foliage scatter, density from leafDensity01 */}
-      {dots.map((d, i) => (
-        <circle key={i} cx={d.x} cy={d.y} r={0.85} fill={ink} opacity={0.5} />
-      ))}
-      {/* Year 3: flowering payoff leader + the single accent mark */}
+      {/* Foliage: procedural single-colour botanicals (src/engine/botanical) at
+          the same deterministic scatter points, count + size from leafDensity01.
+          INK_BLUE botany over the diagram's own structural ink. */}
+      <FoliageLeaves dots={dots} origin={{ x: cx, y: baseY }} sizeScale={leafScale} />
+      {/* Year 3: flowering payoff leader + a generated bloom at the crown */}
       {year === 3 && (
         <>
-          <AccentMark cx={apexX} cy={apexY + 5} r={1.8} />
+          <CrownFlower cx={apexX} cy={apexY + 5} sizeScale={leafScale} />
           <LeaderCallout
             from={[apexX, apexY + 5]}
             to={[cx + edgeR * scale + 4, apexY]}

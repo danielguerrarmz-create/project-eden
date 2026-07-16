@@ -5,17 +5,17 @@
  * co-founders (Clay + Daniel) borne at the node where the finale's ink line forks, then the projects.
  *
  * The projects use a master-detail LIST: a slim numbered SELECTION MENU on the left, and on the
- * right the selected project rendered as a PLATE — a fixed-height CSS-grid frame (one named template
- * per image count, n=1..8) whose cells are sized by the grid, never by the images, so every project
- * fills the identical frame with NO inner scroll. Description sits beside it, cut to three stages
- * (Nº tag + title + folded citation / one description / one payoff), with the payoff pinned so the
- * description is always the field that absorbs any pressure. Captions live only in the lightbox.
+ * right the selected project's IMAGES — a large HERO (image or video) that reads clearly, then the
+ * remaining images in a clean supporting grid below — plus its description and the "What we learned"
+ * takeaway beside them. There is no fixed cramped frame and no inner masonry: the detail panel scrolls
+ * if a project runs long, so every picture is legible. The hero is the first image by default and is
+ * hand-selectable per project (see `hero` in about/projects.ts). On mobile the projects stack, each
+ * with its images and text inline. Captions live only in the lightbox.
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { packBricks } from './about/bricks';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
@@ -25,6 +25,7 @@ import {
   TEAM,
   TEAM_CODA,
   AUTHOR_LABEL,
+  DISCIPLINE_ORDER,
   type Project,
   type ProjectImage,
   type TeamMember,
@@ -73,33 +74,40 @@ function Meta({ project, className = '' }: { project: Project; className?: strin
 
 /* ------------------------------- media tiles ------------------------------ */
 
-/** One framed image on the paper ground. In `plate` mode it fills its grid cell exactly
- *  (h-full w-full, object-fit by the image's own `fit`), with no border of its own — the plate
- *  frame draws the hairline gaps. Otherwise it renders at `className`'s aspect on the mobile stack.
+/** Split a project's images into the hero and the rest. The hero is the image flagged `hero`, or the
+ *  first image when none is flagged (the default). The rest keep their authored order. */
+function heroSplit(images: ProjectImage[]): { hero: ProjectImage; rest: ProjectImage[] } {
+  const idx = images.findIndex((im) => im.hero);
+  const heroIdx = idx >= 0 ? idx : 0;
+  return { hero: images[heroIdx], rest: images.filter((_, i) => i !== heroIdx) };
+}
+
+/** One framed image on the paper ground. Renders crop to a clean tile with object-cover; paper
+ *  figures set fit:'contain' so nothing is cut, on a white ground.
  *
  *  Every interactive copy is a BUTTON: click it and it opens full-bleed in the Lightbox. The image
- *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view. */
+ *  carries a `layoutId` so framer-motion morphs the tile itself up to the large view (a shared-element
+ *  transition) rather than cross-fading a second copy of it. */
 function ProjectVideoEl({
   image,
   className,
   contain,
   reduced,
-  plate = false,
+  fill = false,
 }: {
   image: ProjectImage;
   className: string;
   contain: boolean;
   reduced: boolean;
-  /** Plate mode: fill the grid cell (h-full w-full), no border, object-fit by `contain`. */
-  plate?: boolean;
+  /** Fixed-region mode: fill the parent tile edge-to-edge (h-full w-full) with object-fit, instead of
+   *  taking a width and its own aspect. Used by the fixed two-region gallery. */
+  fill?: boolean;
 }) {
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
-  const frame = plate
-    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'object-cover'}`
-    : `w-full border border-inkBlack/12 ${
-        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
-      } ${className}`;
+  const frame = fill
+    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+    : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
@@ -123,40 +131,53 @@ function ProjectVideoEl({
   );
 }
 
+/** The "image to come" plate for a `pending` asset: an inert dashed frame, never interactive and never
+ *  in the lightbox set. `fill` makes it fill a fixed tile; otherwise it takes `className` for its size. */
+function PendingPlate({ fill, className = '' }: { fill: boolean; className?: string }) {
+  const base = fill ? 'h-full w-full' : `w-full ${className}`;
+  return (
+    <div
+      aria-hidden
+      className={`grid place-items-center border border-dashed border-inkBlack/25 bg-paperDeep/25 ${base}`}
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+        Image to come
+      </span>
+    </div>
+  );
+}
+
 function ProjectImg({
   image,
   className = '',
   onOpen,
   reduced = false,
-  plate = false,
+  fill = false,
 }: {
   image: ProjectImage;
   className?: string;
   onOpen?: (image: ProjectImage) => void;
   reduced?: boolean;
-  /** Plate mode: fill the grid cell (h-full w-full), no border. */
-  plate?: boolean;
+  /** Fixed-region mode: fill the parent tile edge-to-edge (h-full w-full) with object-fit, instead of
+   *  taking a width and its own aspect. Used by the fixed two-region gallery. */
+  fill?: boolean;
 }) {
-  const contain = image.fit === 'contain';
-  const frame = plate
-    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'object-cover'}`
-    : `w-full border border-inkBlack/12 ${
-        contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'
-      } ${className}`;
+  // A pending image has no asset yet: render the inert placeholder plate, never a button.
+  if (image.pending) return <PendingPlate fill={fill} className={className} />;
 
-  const buttonCls = `group relative block cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack ${
-    plate ? 'h-full w-full' : 'w-full'
-  }`;
+  const contain = image.fit === 'contain';
+  const frame = fill
+    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+    : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const btnClass = `group relative block ${fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
   if (image.video) {
-    const el = (
-      <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} plate={plate} />
-    );
+    const el = <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} fill={fill} />;
     if (!onOpen) return el;
     return (
-      <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={buttonCls}>
+      <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={btnClass}>
         {el}
         <span
           aria-hidden
@@ -179,7 +200,7 @@ function ProjectImg({
   if (!onOpen) return img;
 
   return (
-    <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={buttonCls}>
+    <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={btnClass}>
       {img}
       {/* The affordance stays invisible until you're on the image. */}
       <span
@@ -190,161 +211,65 @@ function ProjectImg({
   );
 }
 
-/* ------------------------------- plate frame ------------------------------ */
-
-/** Measure a box with a ResizeObserver. The plate packs into whatever WxH the master-detail row
- *  hands it, and repacks when that changes (breakpoint, window resize), so the fill is always exact
- *  for the real frame rather than a guessed aspect. */
-function useMeasure<T extends HTMLElement>() {
-  const ref = useRef<T | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return { ref, size };
-}
-
-/** True when an element's content is taller than its box (it is being clipped). Used to show the
- *  description's fade ONLY under real overflow pressure, never over a description that fits. */
-function useOverflow<T extends HTMLElement>(deps: unknown[]) {
-  const ref = useRef<T | null>(null);
-  const [overflowing, setOverflowing] = useState(false);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const check = () => setOverflowing(el.scrollHeight > el.clientHeight + 1);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return { ref, overflowing };
-}
-
-/** A small play badge for a video plate cell. */
-function PlayBadge() {
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute left-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-paperVellum/85"
-    >
-      <span className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-inkBlack/70" />
-    </span>
-  );
-}
-
-/** One cell of the plate: the media, a play badge if it's a video, and the Fig. corner tag whose
- *  number matches the "Nº 0N" beside the title so the description's references point at pictures. */
-function PlateCell({
-  image,
-  index,
-  onOpen,
-  reduced,
-  style,
-}: {
-  image: ProjectImage;
-  index: number;
-  onOpen: (image: ProjectImage) => void;
-  reduced: boolean;
-  style: CSSProperties;
-}) {
-  const contain = image.fit === 'contain';
-  return (
-    <div
-      style={style}
-      className={`absolute overflow-hidden ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'}`}
-    >
-      <ProjectImg image={image} onOpen={onOpen} reduced={reduced} plate />
-      {image.video && <PlayBadge />}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute bottom-1.5 right-1.5 bg-paperVellum/85 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.1em] text-inkBlack/55"
-      >
-        Fig. {String(index + 1).padStart(2, '0')}
-      </span>
-    </div>
-  );
-}
-
-/** An even gutter, px — the vellum mortar between bricks AND the inset border around the whole pack,
- *  so the ground shows through consistently on every side (Daniel: "background seeping through"). */
-const GUTTER = 4;
-
-/** The plate: a STACKED-BRICK masonry (Pinterest / CSS multi-column) that FILLS its frame edge to
- *  edge. The frame's WxH is set by the layout it sits in (the master-detail row), never by the images,
- *  so the detail panel needs no inner scroll. The packer (bricks.ts) flows the images into balanced
- *  columns and justifies each column to the frame height, top-aligned, so the bricks butt together
- *  corner to corner with only a thin vellum gutter — no dead band at the top, bottom, or sides. The
- *  small per-column scale is absorbed by object-fit (a cover shot crops a hair; a contain figure keeps
- *  its ratio and shows a thin vellum sliver). The container is paperVellum, so the gutters and any
- *  contain sliver read as the same mortar. */
-function PlateFrame({
+/**
+ * The curated gallery (Comment 4 + the fill fix, 2026-07-15): the media area is the hero on top and a
+ * supporting row beneath, filling the panel with NO dead space.
+ *
+ * The supporting row is a JUSTIFIED ROW, not an equal grid: each cell's width is proportional to its
+ * image's aspect ratio (`flexGrow: ratio`, `flexBasis: 0`) and the row's height is set by the SUM of
+ * those ratios (`aspectRatio: sumRatio` over the full width). That makes every cell's shape match its
+ * image's shape, so BOTH `object-cover` (photos) and `object-contain` (diagrams that must not crop)
+ * fill their cell edge-to-edge — the old equal grid forced a contain image into a tall narrow cell and
+ * left a white band above/below it (the Plentify bug). The row height is capped so the hero always keeps
+ * the larger share. The hero fills the remaining height (`flex-1`) with its own object-fit.
+ *
+ * `variant='stacked'` (mobile) reads the hero at 3:2, then the rest as a justified row below.
+ */
+function Gallery({
   project,
   onOpen,
-  reduced,
+  reduced = false,
+  variant = 'fixed',
 }: {
   project: Project;
-  onOpen: (image: ProjectImage) => void;
-  reduced: boolean;
+  onOpen?: (image: ProjectImage) => void;
+  reduced?: boolean;
+  variant?: 'fixed' | 'stacked';
 }) {
-  const images = project.images;
-  const { ref, size } = useMeasure<HTMLDivElement>();
-  // Inset the pack by one gutter on every side, then pack into the interior, so the border mortar
-  // matches the gutter mortar exactly.
-  const innerW = size.w - GUTTER * 2;
-  const innerH = size.h - GUTTER * 2;
-  const bricks =
-    innerW > 0 && innerH > 0
-      ? packBricks(
-          images.map((im) => ({ ratio: im.ratio })),
-          innerW,
-          innerH,
-          { gap: GUTTER },
-        )
-      : [];
+  const { hero, rest } = heroSplit(project.images);
+  // Sum of the supporting ratios sets the justified row's height: rowHeight = width / sumRatio, so each
+  // cell (width = ratio · rowHeight) has aspect === its image ratio and the images fill exactly.
+  const sumRatio = rest.reduce((s, im) => s + im.ratio, 0);
 
-  return (
-    <figure className="h-full min-h-0 w-full">
-      <div
-        ref={ref}
-        className="relative h-full min-h-0 w-full overflow-hidden border border-inkBlack/10 bg-paperVellum"
-      >
-        {bricks.map((c, i) => (
-          <PlateCell
-            key={images[i].src}
-            image={images[i]}
-            index={i}
-            onOpen={onOpen}
-            reduced={reduced}
-            style={{ left: c.x + GUTTER, top: c.y + GUTTER, width: c.w, height: c.h }}
-          />
-        ))}
-      </div>
-    </figure>
-  );
-}
-
-/** The mobile stack: a hero plus a simple two-column grid of the rest, each at a 3:2 tile
- *  (plans/diagrams `contain` so nothing crops). No captions — captions live only in the lightbox. */
-function MobileGallery({ project, reduced }: { project: Project; reduced: boolean }) {
-  const [hero, ...rest] = project.images;
-  return (
-    <figure className="space-y-3">
-      <ProjectImg image={hero} className="aspect-[3/2]" reduced={reduced} />
-      {rest.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {rest.map((img) => (
-            <ProjectImg key={img.src} image={img} className="aspect-[3/2]" reduced={reduced} />
-          ))}
+  const supportingRow = rest.length > 0 && (
+    <div
+      className="flex w-full shrink-0 gap-2 lg:max-h-[46%]"
+      style={{ aspectRatio: sumRatio > 0 ? sumRatio : undefined }}
+    >
+      {rest.map((img) => (
+        <div key={img.src} className="relative min-h-0" style={{ flexGrow: img.ratio, flexBasis: 0 }}>
+          <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
         </div>
-      )}
+      ))}
+    </div>
+  );
+
+  if (variant === 'stacked') {
+    return (
+      <figure className="space-y-3">
+        <ProjectImg image={hero} className="aspect-[3/2]" onOpen={onOpen} reduced={reduced} />
+        {supportingRow}
+      </figure>
+    );
+  }
+
+  // Desktop: FIXED. Hero fills the remaining height above the justified supporting row.
+  return (
+    <figure className="flex h-full min-h-0 flex-col gap-2">
+      <div className="relative min-h-0 flex-1">
+        <ProjectImg image={hero} onOpen={onOpen} reduced={reduced} fill />
+      </div>
+      {supportingRow}
     </figure>
   );
 }
@@ -397,9 +322,9 @@ function LightboxChevron({ side, onClick }: { side: 'left' | 'right'; onClick: (
  * Lightbox — click any project image and it opens large.
  *
  * The motion is a SHARED ELEMENT: the tile you clicked carries `layoutId`, and the large image
- * claims the same one, so framer-motion morphs the actual thumbnail up to full size. Captions live
- * HERE and only here: a "Fig. 0N" mono prefix (matching the plate's corner tag), the real caption in
- * italic serif, a counter, and visible prev/next chevrons for the mouse.
+ * claims the same one, so framer-motion morphs the actual thumbnail up to full size. The caption
+ * lives HERE and only here: the real caption in serif, a counter, and visible prev/next chevrons
+ * for the mouse. There is no "Fig." prefix — Daniel: no figure text on the photos.
  *
  * Close: Escape, the backdrop, or the button. Arrow keys / chevrons walk the project's other shots.
  */
@@ -480,10 +405,7 @@ function Lightbox({
             transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : 0.12 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="max-w-[70ch] text-center font-serifDisplay text-[14px] italic leading-snug text-inkBlack/70">
-              <span className="mr-2 font-mono text-[11px] not-italic tracking-[0.1em] text-inkBlack/45">
-                Fig. {String(index! + 1).padStart(2, '0')}
-              </span>
+            <p className="max-w-[70ch] text-center font-serifDisplay text-[14px] leading-snug text-inkBlack/70">
               {image.caption ?? image.alt}
             </p>
             <div className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/45">
@@ -511,8 +433,8 @@ function Lightbox({
 function DownloadGlyph() {
   return (
     <svg
-      width="12"
-      height="12"
+      width="13"
+      height="13"
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
@@ -528,74 +450,91 @@ function DownloadGlyph() {
 }
 
 /**
- * The detail text, three stages (project-frame proposal, section 6): Nº tag + title + folded
- * citation, then one description, then the payoff. There is NO "Awards and publications" heading:
- * when a project has a paper, its venue + authors fold into a mono line under the title, and the PDF
- * (if any) is a small inline link under the description.
+ * The detail panel text (Comment 4, 2026-07-15). Hierarchy is established by type size / weight /
+ * colour / spacing — NOT by horizontal divider lines (the old `border-t` rules are gone). Order, top to
+ * bottom: (1) title + the byline credit, (2) a 2–3 sentence description with a clear outcome, (3) awards
+ * and publications, (4) collaborators / professors, (5) at the very bottom, the "What we learned" lesson
+ * rendered as a filled/bordered PILL. Stages 3 and 4 are omitted when a project has no data for them, so
+ * no empty label ever shows.
  *
- * The layout guarantees the fit WITHOUT a dead gap. On a normal frame the description takes its
- * natural height and the payoff flows directly under it (`flex-initial` — the description does not
- * grow to fill slack, which is what used to push the payoff to the bottom and leave dead air). Under
- * real pressure (short viewport / very long copy) the description is the ONLY zone that shrinks
- * (`shrink`, `min-h-0`) and fades at its bottom edge, so the payoff — the one line Daniel's brand
- * voice depends on — is never the thing that clips. The character budgets in projects.test.ts are the
- * hard floor underneath this.
+ * `fixed` pins the pill to the bottom of a full-height column (desktop, side-by-side with the media);
+ * mobile leaves it in normal flow just below the text.
  */
-function ProjectText({ project }: { project: Project }) {
+function ProjectText({ project, fixed = false }: { project: Project; fixed?: boolean }) {
   const paper = project.paper;
-  const citation = paper ? `${paper.venue} · ${paper.authors}` : null;
-  const { ref: descRef, overflowing } = useOverflow<HTMLDivElement>([project.n]);
+  const awards = project.awards;
+  const hasRecognition = (awards && awards.length > 0) || !!paper;
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Stage 1 — Nº tag + meta, title, folded citation. */}
-      <div className="shrink-0">
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="font-mono text-[12px] tracking-[0.06em] tabular-nums text-inkBlack/45">
-            N&ordm; {project.n}
-          </span>
-          <Meta project={project} className="shrink-0" />
-        </div>
-        <h3 className="mt-1.5 font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
-        {citation && (
-          <p className="mt-1.5 font-mono text-[10.5px] leading-relaxed tracking-[0.08em] text-inkBlack/45">
-            {citation}
+    <div
+      className={
+        fixed
+          ? 'flex h-full min-h-0 flex-col overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          : ''
+      }
+    >
+      {/* 1. Title + byline credit. */}
+      <div className="flex items-baseline justify-between gap-4">
+        <h3 className="font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
+        <Meta project={project} className="shrink-0" />
+      </div>
+      {/* 2. Description with its outcome. */}
+      <p className="mt-3 font-serifDisplay text-[15px] leading-snug text-inkBlack/75">
+        {project.description}
+      </p>
+      {/* 3. Awards and publications. No rule above it — the mono label + spacing carry the shift. Olive
+          stays reserved for the one lesson pill below, so it isn't diluted by a second use here. */}
+      {hasRecognition && (
+        <div className="mt-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+            Awards and publications
           </p>
-        )}
-      </div>
-
-      {/* Stage 2 — the one description sentence. `flex-initial` (grow 0, shrink 1) so it hugs its
-          content on a normal frame — no dead gap under it — but is the one zone that gives way under
-          pressure, fading at its bottom edge (reads as "there is more") only when it actually clips. */}
-      <div ref={descRef} className="relative mt-3 min-h-0 flex-initial overflow-hidden">
-        <p className="font-serifDisplay text-[15px] leading-snug text-inkBlack/70 [@media(max-height:820px)]:text-[14px]">
-          {project.description}
-        </p>
-        {paper?.pdf && (
-          <a
-            href={paper.pdf}
-            download
-            className="group mt-3 inline-flex items-center gap-2 border border-inkBlack/25 px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-          >
-            <DownloadGlyph />
-            Read the paper
-            <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
-          </a>
-        )}
-        {overflowing && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-paperVellum to-transparent"
-          />
-        )}
-      </div>
-
-      {/* Stage 3 — the payoff. It flows directly under the description on a normal frame, and is
-          `shrink-0` so under pressure the description gives way first and this line is never clipped. */}
-      <div className="mt-4 shrink-0 border-t border-inkBlack/15 pt-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">What we learned</p>
-        <p className="mt-2 font-serifDisplay text-[clamp(1.15rem,1.5vw,1.5rem)] leading-snug text-inkBlack">
-          {project.learned}
-        </p>
+          {awards && awards.length > 0 && (
+            <ul className="mt-1.5 space-y-0.5">
+              {awards.map((award) => (
+                <li key={award} className="font-serifDisplay text-[14px] leading-snug text-inkBlack/75">
+                  {award}
+                </li>
+              ))}
+            </ul>
+          )}
+          {paper && (
+            <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
+              {paper.venue} · {paper.authors}
+            </p>
+          )}
+          {paper?.pdf && (
+            <a
+              href={paper.pdf}
+              download
+              className="group mt-3 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+            >
+              <DownloadGlyph />
+              Read the paper
+              <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
+            </a>
+          )}
+        </div>
+      )}
+      {/* 4. Collaborators / professors — the people beyond the founders, when there are named ones. */}
+      {project.collaborators && (
+        <div className="mt-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">Collaborators</p>
+          <p className="mt-1.5 font-serifDisplay text-[14px] leading-snug text-inkBlack/75">
+            {project.collaborators}
+          </p>
+        </div>
+      )}
+      {/* 5. The lesson, as a filled/bordered pill at the very bottom (mt-auto pins it there in the
+          fixed column). No divider rule — the chip itself sets it apart. */}
+      <div className={fixed ? 'mt-auto pt-6' : 'mt-6'}>
+        <div className="inline-flex max-w-full flex-col gap-1 rounded-2xl border border-accentOlive/35 bg-accentOlive/[0.07] px-4 py-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accentOlive">
+            What we learned
+          </span>
+          <span className="font-serifDisplay text-[clamp(1.05rem,1.35vw,1.35rem)] leading-snug text-inkBlack">
+            {project.learned}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -607,94 +546,120 @@ function ListView({ reduced }: { reduced: boolean }) {
   // REVERSE CHRONOLOGICAL: the most recent work leads. `n` encodes that order (01 = newest),
   // so sorting by it and sorting by year agree — the number the reader sees is the position.
   const items = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
-  const [active, setActive] = useState(0);
-  const project = items[active];
+  // The menu is GROUPED BY DISCIPLINE (Architecture, Product Design, Software); reverse-chronological
+  // within each group (items is already sorted by `n`), and only non-empty groups render.
+  const groups = DISCIPLINE_ORDER.map((discipline) => ({
+    discipline,
+    projects: items.filter((p) => p.discipline === discipline),
+  })).filter((g) => g.projects.length > 0);
+  // Active selection is tracked by project `n` — stable across the grouped layout — defaulting to the
+  // first project of the first group (top of the menu). The right-hand detail follows it exactly as before.
+  const [activeN, setActiveN] = useState(() => groups[0]?.projects[0]?.n ?? items[0].n);
+  const project = items.find((p) => p.n === activeN) ?? items[0];
 
-  // The lightbox works on the ACTIVE project's image set, so the arrow keys walk that
-  // project's shots and nothing else.
+  // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
+  // they are excluded here and never enter the arrow-key walk.
+  const lightboxImages = project.images.filter((im) => !im.pending);
   const [shot, setShot] = useState<number | null>(null);
   const closeShot = useCallback(() => setShot(null), []);
   const stepShot = useCallback(
     (delta: number) =>
-      setShot((i) => (i === null ? i : (i + delta + project.images.length) % project.images.length)),
-    [project.images.length],
+      setShot((i) =>
+        i === null || lightboxImages.length === 0
+          ? i
+          : (i + delta + lightboxImages.length) % lightboxImages.length,
+      ),
+    [lightboxImages.length],
   );
   const openShot = useCallback(
-    (image: ProjectImage) => setShot(project.images.findIndex((im) => im.src === image.src)),
-    [project.images],
+    (image: ProjectImage) => setShot(lightboxImages.findIndex((im) => im.src === image.src)),
+    [lightboxImages],
   );
   // Changing project while a shot is open would strand the index in the wrong set.
   useEffect(() => setShot(null), [project.n]);
 
   return (
     <div className="min-h-0 flex-1">
-      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the plate + text on the right.
-          The grid ROW is pinned to the frame's own height (`grid-rows-[minmax(0,1fr)]` + `min-h-0` +
-          `overflow-hidden`) so the tall project MENU can never push the row past the viewport and
-          clip the plate — the whole selected project (plate + text) always fits one frame with no
-          page scroll. When the menu is taller than that frame (short viewports, many projects) it
-          scrolls on its own; the images and the description never do. */}
-      <div className="hidden h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-x-16 overflow-hidden lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
-        <ol className="min-h-0 min-w-0 self-stretch overflow-y-auto">
-          {items.map((p, i) => {
-            const on = i === active;
-            const tint = authorColor(p.by);
-            return (
-              <li key={p.n} className="border-t border-inkBlack/12 last:border-b">
-                <button
-                  type="button"
-                  onMouseEnter={() => setActive(i)}
-                  onFocus={() => setActive(i)}
-                  onClick={() => setActive(i)}
-                  aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}
-                  aria-current={on}
-                  className="group relative flex w-full items-baseline gap-3 py-3.5 pl-4 pr-1 text-left transition-colors duration-200"
-                  style={on ? { backgroundColor: `${tint}14` } : undefined}
-                >
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
-                    style={{ background: tint, transform: `scaleY(${on ? 1 : 0})` }}
-                  />
-                  <span
-                    className={`font-serifDisplay text-[clamp(1.05rem,1.9vw,1.55rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
-                      on && !reduced ? 'translate-x-1' : ''
-                    }`}
-                    style={on ? { color: tint } : undefined}
-                  >
-                    {p.title}
-                  </span>
-                  <span
-                    className="ml-auto shrink-0 font-mono text-[11px] tracking-[0.14em] text-inkBlack/40 transition-colors"
-                    style={on ? { color: tint } : undefined}
-                  >
-                    {p.year}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the media + project info on the
+          right, side-by-side from lg up. The detail is FIXED to the frame height — the media area splits
+          into a top-half hero and a bottom-half grid, and nothing scrolls. */}
+      <div className="hidden h-full min-h-0 gap-x-16 gap-y-8 lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
+        {/* The project menu, GROUPED BY DISCIPLINE: a small mono heading, then that group's projects.
+            The item font and vertical padding are tightened so all twelve projects AND the three
+            headings fit at once at normal desktop heights — no inner scroll. `overflow-y-auto` is only a
+            last-resort safety for unusually short viewports. Hover/focus selects; the tint bar rides the
+            active row's left edge. */}
+        <nav className="min-h-0 min-w-0 self-stretch overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {groups.map((group) => (
+            <div key={group.discipline} className="mb-3 last:mb-0">
+              <p className="px-4 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+                {group.discipline}
+              </p>
+              <ol>
+                {group.projects.map((p) => {
+                  const on = p.n === activeN;
+                  const tint = authorColor(p.by);
+                  return (
+                    <li key={p.n} className="border-t border-inkBlack/10 last:border-b">
+                      <button
+                        type="button"
+                        onMouseEnter={() => setActiveN(p.n)}
+                        onFocus={() => setActiveN(p.n)}
+                        onClick={() => setActiveN(p.n)}
+                        aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}
+                        aria-current={on}
+                        className="group relative flex w-full items-baseline gap-3 py-1.5 pl-4 pr-1 text-left transition-colors duration-200"
+                        style={on ? { backgroundColor: `${tint}14` } : undefined}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
+                          style={{ background: tint, transform: `scaleY(${on ? 1 : 0})` }}
+                        />
+                        <span
+                          className={`font-serifDisplay text-[clamp(0.9rem,1.25vw,1.1rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
+                            on && !reduced ? 'translate-x-1' : ''
+                          }`}
+                          style={on ? { color: tint } : undefined}
+                        >
+                          {p.title}
+                        </span>
+                        <span
+                          className="ml-auto shrink-0 font-mono text-[10px] tracking-[0.14em] text-inkBlack/40 transition-colors"
+                          style={on ? { color: tint } : undefined}
+                        >
+                          {p.year}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </nav>
 
-        {/* Detail: the active project's plate + text, cross-fading as the selection changes. On a
-            wide display the words sit BESIDE the plate; below xl they stack (plate above, text below)
-            and both are bounded by the row — no scroll either way. */}
+        {/* Detail: the active project's media BESIDE its text, cross-fading as the selection changes.
+            FIXED height, no inner scroll: the media fills its column (hero top half, rest bottom half)
+            and the text column pins its lesson pill to the bottom. */}
         <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-hidden">
             {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against the
                 `layoutId` images inside this subtree: framer-motion holds the exiting panel open
                 waiting on a shared-layout transition that never resolves, so the exit never
-                completes and the detail FREEZES on whichever project rendered first while the list
-                highlights another. Keying a plain motion.div remounts it and fades the new one in. */}
+                completes, the incoming panel never mounts, and the detail FREEZES on whichever
+                project rendered first while the list happily highlights another. (That is the bug
+                this page shipped with once.) Keying a plain motion.div remounts it on every change
+                and fades the new one in — same read, no exit to get stuck on. */}
             <motion.div
               key={project.n}
-              className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-x-10 gap-y-5 xl:grid-cols-[1.55fr_1fr] xl:grid-rows-1"
+              className="grid h-full min-h-0 grid-cols-[1.55fr_1fr] gap-x-8 xl:gap-x-10"
               initial={reduced ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0 : 0.55, ease: [0.16, 1, 0.3, 1] }}
             >
-              <PlateFrame project={project} onOpen={openShot} reduced={reduced} />
-              <ProjectText project={project} />
+              <Gallery project={project} onOpen={openShot} variant="fixed" reduced={reduced} />
+              <ProjectText project={project} fixed />
             </motion.div>
           </div>
         </div>
@@ -708,7 +673,7 @@ function ListView({ reduced }: { reduced: boolean }) {
               <span aria-hidden className="h-[3px] w-6 rounded-full" style={{ background: authorColor(p.by) }} />
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">{p.year}</span>
             </div>
-            <MobileGallery project={p} reduced={reduced} />
+            <Gallery project={p} variant="stacked" reduced={reduced} />
             <div className="mt-5">
               <ProjectText project={p} />
             </div>
@@ -716,7 +681,7 @@ function ListView({ reduced }: { reduced: boolean }) {
         ))}
       </div>
 
-      <Lightbox images={project.images} index={shot} onClose={closeShot} onStep={stepShot} reduced={reduced} />
+      <Lightbox images={lightboxImages} index={shot} onClose={closeShot} onStep={stepShot} reduced={reduced} />
     </div>
   );
 }
@@ -742,8 +707,9 @@ function ListView({ reduced }: { reduced: boolean }) {
 const ROOT_LEFT = [
   // Main root: settle from the node, sweep left across the top, plunge down the far-left OUTSIDE the
   // Clay column (staying left of his fact leaders the whole descent, x < ~60), and only BELOW the
-  // facts does it meander back inward toward the work below, never crossing a line of text.
-  'M500 40 C 372 62, 244 50, 150 116 C 42 186, -10 300, 22 424 C 44 512, 16 606, 40 702 C 56 766, 44 814, 60 856 C 92 910, 190 950, 300 1014',
+  // facts does it meander back INWARD, rejoining its mirror at the page centre (x=500) in the runway
+  // so the two framing roots close back into ONE line that flows on down to the work.
+  'M500 40 C 372 62, 244 50, 150 116 C 42 186, -10 300, 22 424 C 44 512, 16 606, 40 702 C 56 766, 44 814, 60 856 C 92 916, 320 980, 500 1000',
   // A soft curl looping off the far-left bend, out in the margin.
   'M22 424 C -36 398, -34 482, 30 470 C 66 463, 56 436, 26 446',
   // A small tendril hook in the runway below the facts, pointing toward the work.
@@ -796,6 +762,70 @@ function FounderRootStem() {
       <path d="M30 36 C 22 42, 19 50, 25 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
       <path d="M30 36 C 38 42, 41 50, 35 56" stroke={INK_BLUE} strokeWidth={1.6} fill="none" strokeLinecap="round" />
       <circle cx={30} cy={52} r={2.6} fill={INK_BLUE} />
+    </svg>
+  );
+}
+
+/** The seam connector: a single vertical INK_BLUE line at the PAGE centre that carries the finale's
+ *  descending line across a spacer. The timeline's unravel exits its frame at the page centre and the
+ *  founders' node sits at the page centre, so a plumb line here reads as the ONE line continuing over
+ *  the paper gap between the two (separate) SVGs. `overflow-visible` lets its round cap kiss both ends.
+ *  It is heavier than the founder roots (it is still the spine, not yet the fine root register); the
+ *  weight settles down at the node below. */
+function SeamBridge() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+    >
+      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_BLUE} strokeWidth={4.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Founders → The Work. After the two roots rejoin at the page centre below the portraits, the one
+ *  line flows on DOWN past the founders' words and into the projects. It routes out through the open
+ *  left margin (the words are a narrow centred column, so the line never crosses a glyph), carries a
+ *  small botanical curl for life, and returns to the page centre as it arrives at The Work. Mapped
+ *  with `preserveAspectRatio="none"` over the words+runway block, so x tracks the content column. */
+function FoundersFlow() {
+  const stroke = {
+    stroke: INK_BLUE,
+    strokeWidth: 2.6,
+    fill: 'none' as const,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    vectorEffect: 'non-scaling-stroke' as const,
+  };
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
+    >
+      {/* hold centre to meet the rejoined roots, then out to the left margin, down past the words,
+          and back to centre as it arrives at the work below */}
+      <path d="M50 -2 C 49 6, 30 11, 17 30 C 12 47, 14 65, 22 82 C 30 94, 45 98, 50 102" {...stroke} />
+      {/* a soft curl off the descent, out in the margin */}
+      <path d="M17 30 C 6 27, 7 41, 20 39 C 27 38, 24 30, 15 33" {...stroke} />
+    </svg>
+  );
+}
+
+/** Narrow-screen fallback for the founders → work run: a simple plumb line at centre (no room to
+ *  route around the words), so the continuity still reads on mobile. */
+function FoundersFlowStem() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 block h-full w-full overflow-visible lg:hidden"
+    >
+      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_BLUE} strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
     </svg>
   );
 }
@@ -884,10 +914,13 @@ export function AboutPage() {
           />
         </section>
 
-        {/* Real air above the founders (Daniel, 2026-07-14: loosen back from the round-3 24svh
-            tightening — the founders section now IS the line's continuation, so it can breathe).
-            The seam to the finale's pin/hold/release is owned by CrossPathsTimeline. */}
-        <div aria-hidden className={reduced ? 'h-24' : 'min-h-[42svh]'} />
+        {/* THE SEAM (Task 4). The finale's unravel exits the timeline frame heading straight down at
+            the PAGE centre; this spacer carries that one line over the paper gap to the founders' node
+            just below (both sit on the page centre, so the plumb bridge reads as the same line
+            continuing). Kept short so the hand-off stays continuous. */}
+        <div aria-hidden className={reduced ? 'relative h-20' : 'relative min-h-[22svh]'}>
+          <SeamBridge />
+        </div>
 
         {/* The two of us. AFTER the sequence: by the time you meet them, you already know where they
             came from. The finale's stem forks here and the facts hang off each fork on leader lines. */}
@@ -912,27 +945,36 @@ export function AboutPage() {
             </div>
           </div>
 
-          <div className="mx-auto mt-16 max-w-[640px] text-center">
-            <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
-            <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
-          </div>
+          {/* The two roots rejoin at the page centre below the portraits; from there the ONE line
+              flows on down past the founders' words and into The Work, routed through the open margin
+              so it never crosses the centred text. The words ride above it on their own z-layer. */}
+          <div className="relative">
+            <FoundersFlow />
+            <FoundersFlowStem />
+            <div className="relative z-10">
+              <div className="mx-auto mt-16 max-w-[640px] text-center">
+                <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
+                <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
+              </div>
 
-          <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
-            <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
-              {TEAM_CODA.payoff}
-            </p>
+              <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
+                <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
+                  {TEAM_CODA.payoff}
+                </p>
+              </div>
+            </div>
+            {/* the line's runway down into the work (this replaces the old separate spacer). */}
+            <div aria-hidden className={reduced ? 'h-16' : 'min-h-[26svh]'} />
           </div>
         </section>
 
-        {/* PORTION TWO — the work, most recent first. Real air here too (Daniel: more spacing from the
-            founders' bottom). Sized to ONE page: the section owns a viewport's height, the header
-            takes what it needs, and the master-detail plate fills the rest. */}
-        <div aria-hidden className={reduced ? 'h-24' : 'min-h-[42svh]'} />
-
+        {/* PORTION TWO — the work, most recent first. The founders → work line arrives at the page
+            centre right here. The section owns a viewport's height, the header takes what it needs, and
+            the master-detail fills the rest; the detail panel scrolls if a project runs long. */}
         <section
           aria-label="Projects"
-          className="flex h-[calc(100svh-var(--header-h)-1.5rem)] min-h-[560px] flex-col border-t border-inkBlack/12 pt-6"
+          className="flex h-[calc(100svh-var(--header-h)-1.5rem)] min-h-[640px] flex-col border-t border-inkBlack/12 pt-6"
         >
           <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">The Work</h2>

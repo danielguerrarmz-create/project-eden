@@ -19,10 +19,22 @@ const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
 
+/** How long the settle travel (page centre → header slot) takes, in seconds. Shared by the motion
+ *  transition and the timeline below so `reveal` can wait for the title to actually LAND. */
+const TRAVEL_S = 0.9;
+
 /** Timeline (ms): a brief held veil, then the title enters big, flies onto the header, the
  *  content reveals, done. (The old "we built this in two weeks" setup beat was removed at Daniel's
- *  request; the title entering and settling into the header is the whole narration now.) */
-const T = { title: 350, settle: 1300, reveal: 1950, done: 2450 } as const;
+ *  request; the title entering and settling into the header is the whole narration now.)
+ *  `reveal` waits until the flying title has LANDED (settle + travel), so the veil only clears once
+ *  the flying copy is exactly coincident with the real header title — otherwise the real title fades
+ *  in while the copy is still mid-flight and you see a ghost/double. */
+const T = {
+  title: 350,
+  settle: 1300,
+  reveal: 1300 + TRAVEL_S * 1000 + 60, // 2260: just after the title lands
+  done: 1300 + TRAVEL_S * 1000 + 60 + 600, // 2860: after the 0.55s veil fade
+} as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. */
 export function shouldPlayAboutIntro(prefersReduced: boolean, alreadyPlayed: boolean): boolean {
@@ -85,12 +97,17 @@ export function AboutIntro({
   }, [onReveal, onDone]);
 
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  // Both the setup line and the title share ONE box: the header's exact position + width +
-  // size (titleClassName at scale 1). During the narration they sit vertically centred, via
-  // the `centerY` translate; the title then rises to y=0 to nest onto the header. So the two
-  // lines are pixel-identical in size and placement, and the settle is a pure vertical move.
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  // The title shares the header's exact box (position + width + size at scale 1). During the
+  // narration the whole box is translated to the COMPLETE CENTRE of the page via the
+  // `centerX`/`centerY` translates, then on the settle it travels back to (x:0, y:0) to nest exactly
+  // onto the real header title. Text stays LEFT-aligned the entire flight (matching the header, which
+  // is left-aligned): centring is done by moving the box, never by toggling textAlign — a mid-flight
+  // center→left snap would reflow the wrapped lines and read as a glitch.
   const centerY = rect ? (vh - rect.height) / 2 - rect.top : 0;
+  const centerX = rect ? (vw - rect.width) / 2 - rect.left : 0;
   const showTitle = phase === 'title' || phase === 'settle';
+  const settling = phase === 'settle';
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[80]">
@@ -104,18 +121,21 @@ export function AboutIntro({
 
       {rect && (
         <>
-          {/* Title — appears in the header's exact box at scale 1, vertically centred, then rises
-              (y: centerY -> 0) to nest exactly onto the header. No scale, no re-align. */}
+          {/* Title — appears in the header's exact box at scale 1, translated to the complete centre
+              of the page (x: centerX, y: centerY), then travels back to (0,0) to nest exactly onto the
+              real header title. Text stays LEFT-aligned throughout (matching the header) so the
+              wrapped lines never reflow mid-flight. No scale. */}
           {showTitle && (
             <motion.p
               key="title"
               className={`absolute ${titleClassName}`}
-              style={{ left: rect.left, top: rect.top, width: rect.width }}
-              initial={{ opacity: 0, y: centerY }}
-              animate={{ opacity: 1, y: phase === 'settle' ? 0 : centerY }}
+              style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: 'left' }}
+              initial={{ opacity: 0, x: centerX, y: centerY }}
+              animate={{ opacity: 1, x: settling ? 0 : centerX, y: settling ? 0 : centerY }}
               transition={{
                 opacity: { duration: 0.5, ease: 'easeOut' },
-                y: { duration: phase === 'settle' ? 0.9 : 0, ease: EASE_TRAVEL },
+                x: { duration: settling ? TRAVEL_S : 0, ease: EASE_TRAVEL },
+                y: { duration: settling ? TRAVEL_S : 0, ease: EASE_TRAVEL },
               }}
             >
               {title}

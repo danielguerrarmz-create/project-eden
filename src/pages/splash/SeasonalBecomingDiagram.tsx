@@ -16,7 +16,8 @@ import { useId } from 'react';
 import { canopyProfile } from '../../engine/geometry';
 import { computeGrowth } from '../../engine/growth';
 import type { EngineOutputs, GrowthState, Year } from '../../engine/types';
-import { AccentMark, DiagramSvg, useInk } from '../engine/hairline';
+import { DiagramSvg, useInk } from '../engine/hairline';
+import { CrownFlower, FoliageLeaves } from '../engine/botanicalFoliage';
 
 /** Panels sampled at the same real growth states the Engine page uses, relabeled. */
 const PHASES: { year: Year; caption: string }[] = [
@@ -48,25 +49,6 @@ function foliageDots(
   }
   return dots;
 }
-
-/**
- * Six hand-inked leaf silhouettes in a local ~±1.5 unit box, each with a midrib
- * subpath. Closed bodies so a very light fill reads as coverage in the fuller panels
- * without becoming a wireframe cloud; the midrib is a degenerate sliver to the fill
- * and only shows under the stroke. Picked deterministically off the scatter index
- * (spec §2.1), never at random, matching foliageDots' own discipline.
- */
-const LEAF_VARIANTS: readonly string[] = [
-  'M0,-1.5 C1.0,-0.9 1.0,0.7 0,1.5 C-1.0,0.7 -1.0,-0.9 0,-1.5 Z M0,-1.15 L0,1.15',
-  'M0,-1.6 C0.55,-0.7 0.55,0.9 0,1.6 C-0.55,0.9 -0.55,-0.7 0,-1.6 Z M0,-1.25 L0,1.25',
-  'M0,-1.4 C1.1,-1.0 0.9,0.5 0,1.5 C-0.7,0.6 -0.9,-0.8 0,-1.4 Z M0,-1.05 L-0.05,1.15',
-  'M0,-1.3 C1.15,-0.85 1.15,0.85 0,1.4 C-1.15,0.85 -1.15,-0.85 0,-1.3 Z M0,-1.0 L0,1.05',
-  'M0,-1.55 C0.7,-0.6 0.7,0.8 0,1.55 C-0.7,0.8 -0.7,-0.6 0,-1.55 Z M0,-1.2 L0,1.2',
-  'M0,-1.35 C0.95,-1.05 1.05,0.2 0,1.45 C-1.05,0.2 -0.95,-1.05 0,-1.35 Z M0,-1.0 L0,1.1',
-];
-
-/** Deterministic small rotation (deg) per scatter index — organic variety, not noise. */
-const leafRotation = (i: number) => ((i * 40) % 55) - 27;
 
 /**
  * A cheap sampled lattice hint: a fan of radial ribs from a grounded spread up to the
@@ -131,8 +113,11 @@ function GrowthPanel({
   const outlinePath = outline.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
   const edgeR = Math.max(front[0].radius, back[0].radius);
 
-  const dotCount = Math.round(growth.leafDensity01 * 60);
+  const density = growth.leafDensity01;
+  const dotCount = Math.round(density * 42);
   const dots = foliageDots(dotCount, front, back, cx, baseY, scale);
+  // Leaves grow a touch larger as the canopy fills, so young panels also read sparser.
+  const leafScale = 0.85 + 0.3 * density;
   const lattice = latticeHint(front, cx, baseY, scale);
   // One accent at a flowering position in the fullest panel only: the topmost leaf,
   // read as a bloom at the crown. No leader, no callout (this strip stays numberless).
@@ -163,28 +148,12 @@ function GrowthPanel({
         <path d={lattice} fill="none" stroke={ink} strokeWidth={0.6} opacity={0.35} strokeLinecap="round" />
         {/* Real canopy silhouette */}
         <path d={outlinePath} fill="none" stroke={ink} strokeWidth={0.75} />
-        {/* Foliage: a hand-inked leaf vocabulary at the same deterministic scatter
-            points, density from leafDensity01. Light fill so fuller panels read as
-            coverage; stroke effective ~0.56px after the 0.66 scale (spec §2.1). */}
-        {dots.map((d, i) => (
-          <g
-            key={i}
-            transform={`translate(${d.x.toFixed(2)} ${d.y.toFixed(2)}) rotate(${leafRotation(i)}) scale(0.66)`}
-          >
-            <path
-              d={LEAF_VARIANTS[i % LEAF_VARIANTS.length]}
-              fill={ink}
-              fillOpacity={0.16}
-              stroke={ink}
-              strokeWidth={0.85}
-              strokeOpacity={0.72}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          </g>
-        ))}
-        {/* The single permitted accent, panel 3 only: one bloom where life attaches. */}
-        {bloom && <AccentMark cx={bloom.x} cy={bloom.y} r={1.5} />}
+        {/* Foliage: procedural single-colour botanicals (src/engine/botanical) at
+            the same deterministic scatter points, count + size from leafDensity01.
+            INK_BLUE botany over the structure's own ink (a two-layer read). */}
+        <FoliageLeaves dots={dots} origin={{ x: cx, y: baseY }} sizeScale={leafScale} />
+        {/* The single permitted accent, panel 3 only: one generated bloom at the crown. */}
+        {bloom && <CrownFlower cx={bloom.x} cy={bloom.y} sizeScale={leafScale} />}
       </g>
     </DiagramSvg>
   );

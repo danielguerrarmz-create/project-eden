@@ -32,6 +32,7 @@ import { line as d3line, curveCatmullRom } from 'd3-shape';
 import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
+import { leafSprite, flowerSprite, type PlantPath } from '../../engine/botanical';
 
 /** The practice's blue. There is no second colour in this drawing, on purpose. */
 export const INK_BLUE = '#3E7CA8';
@@ -175,21 +176,48 @@ const MARK_CENTER_X = CX; // variant A: the mark stays on the axis
 const MARK_CENTER_Y = CONVERGE_Y + LEAN_SPAN; // 3650 — the mark's centre
 const WORDMARK_GAP = 92; // from the mark's bottom edge to the wordmark baseline
 const WORDMARK_FONT = 54;
-const H = MARK_CENTER_Y + 45 * MARK_K + WORDMARK_GAP + 70; // total drawing height
+
+/* THE POST-PIN UNRAVEL + DESCENT (Task 4). Once the mark is fully wound (the PIN, the "first full
+ * bower frame"), scrolling on plays a MIRRORED unravel — NOT a rewind of the wind-up. The seven
+ * satellites retract, and the tail opens from the closed circle into a single downward ray that
+ * curls the OPPOSITE rotational way from the ravel (tailPtsMirror reflects the ravel tail across the
+ * mark circle's own vertical axis x=C.x: circle 0 maps to itself so there is no pop at the pin, but
+ * the handedness flips and the ray pays out on the mark's OTHER flank). That ray then keeps flowing
+ * down and sweeps toward the PAGE centre, exiting the bottom of the frame, where it hands the one
+ * line off to the founders' roots below (AboutPage's SeamBridge + FounderRoots). The whole About
+ * page still reads as one continuous ink line: spine -> mark -> mirrored unravel -> founders -> work,
+ * with the unravel a mirrored continuation rather than the wind-up retraced. */
+const TAIL_LEN = 2 * Math.PI * MARK_R; // the winding tail's arc length (~505); the unwound ray's length
+const RAY_END_Y = MARK_CENTER_Y + TAIL_LEN; // where the fully-unwound downward ray ends (P.y + L)
+const DESC_DROP = 420; // the sweep below the ray that carries the line to page-centre and out the bottom
+const DESC_BOTTOM_Y = RAY_END_Y + DESC_DROP; // the exit point's world Y (the frame's bottom at track end)
+const H = DESC_BOTTOM_Y + 80; // total drawing height (now runs past the mark, down through the descent)
+
+/** The fraction of the track that reaches the PIN (mark fully formed). The wind keeps its original
+ *  travel; the unravel + descent are the remaining scroll, added below it. 720vh wind + 360vh past. */
+const PIN_FRAC = 720 / 1080;
 
 /** The finale wind begins when the mark has risen to this fraction of the way down the frame, and
  *  completes at the pin (mark centred). Kept below 1 so the whole ravel is watched INSIDE the frame,
  *  never above it. */
 const WIND_ENTER = 0.82;
 
-/** Autoplay-on-entry timing. A lead-in lets the entry narration settle, then a smooth eased descent
- *  runs from the top of the timeline to the finale; a strong gesture fast-forwards to the reveal. */
+/** Autoplay-on-entry timing. A lead-in lets the entry narration settle, then a slow, CONSTANT-speed
+ *  descent runs from the top of the timeline to the finale (linear, never accelerating — it holds the
+ *  gentle opening pace the whole way down so the timeline stays readable); a strong gesture
+ *  fast-forwards to the reveal. */
 const AUTOPLAY_LEAD_IN_MS = 2500;
-const AUTOPLAY_MS = 12000;
+/** Longer than the old 12000 because the descent is now LINEAR (constant velocity) rather than
+ *  ease-in-out: an eased 12s peaked ~2x its average speed mid-descent, which read as "speeding up".
+ *  A linear 24s holds the slow beginning pace the whole way, so it never accelerates and stays
+ *  observable. Tune by watching #/about; must never feel like it accelerates. */
+const AUTOPLAY_MS = 24000;
 const AUTOPLAY_FF_MS = 650;
 
-/** Resolve the mark + variant A into world geometry: the attach point P on circle 0's far flank
- *  (phi=0), the spine's heading there (psi0, straight down), and the wind direction (sigma). */
+/** Resolve the mark + variant A into world geometry: the attach point P on circle 0's far (right)
+ *  flank (phi=0), the spine's heading there (psi0, straight down), and the RAVEL wind direction
+ *  (sigma). The wound mark is the ORIGINAL bower logo, unchanged. The post-pin UNRAVEL is a MIRROR of
+ *  this ravel (see tailPtsMirror) — a different downward curl — not a flip of the ravel itself. */
 export function solveMark() {
   const k = MARK_K;
   const r = MARK_R;
@@ -226,23 +254,65 @@ export function tailPts(w: number, N = 420): Array<{ x: number; y: number }> {
   return pts;
 }
 
+/**
+ * The mirror of the ravel tail: reflect it across the mark circle's own vertical axis (x = C.x). At
+ * w=1 circle 0 maps onto itself; at w=0 it is the downward ray on the OPPOSITE flank (x = 2*C.x-P.x).
+ * Only x flips (mirror shares the ravel's y). This is the fully-mirrored end state; the actual
+ * unravel MORPHS to it (tailPtsUnravel) so the top stays attached to the lean the whole way.
+ */
+export function tailPtsMirror(w: number, N = 420): Array<{ x: number; y: number }> {
+  const cx = solveMark().C.x;
+  return tailPts(w, N).map((p) => ({ x: 2 * cx - p.x, y: p.y }));
+}
+
+/**
+ * THE UNRAVEL TAIL (continuous, mirrored — not a rewind). A per-point morph between the ravel tail
+ * and its mirror, with the mirror amount tied to how OPEN the tail is (m = 1 - w). Because a tail
+ * that both starts at P and is circle 0 at the pin is FORCED to curl left (it is the ravel), you
+ * cannot keep the top fixed at P AND flip the curl AND keep circle 0 — so instead the top slides
+ * continuously P -> P' as it opens, and the render arrives the lean exactly there each frame.
+ *   w = 1 (pin) -> m=0: exactly the ravel circle 0. Identical to the wound mark and the pre-pin line
+ *                  (no pop). Top at P.
+ *   w -> 0      -> m->1: the mirrored downward ray on the opposite flank. Top at P', bottom at the
+ *                  mirror ray end = the descent's start (mirrorRayEndX). It curls the OPPOSITE way as
+ *                  it pays out — a true mirror, not the wind-up retraced.
+ * Only x morphs (mirror shares the ravel's y), so the line stays a clean downward-flowing curve; at
+ * m=0.5 it passes through the mark's own vertical axis, reading as "unwind to straight, then curl the
+ * other way". Continuity is structural: the lean is pointed at pts[0] and the descent starts at the
+ * w=0 bottom, so spine -> lean -> tail -> descent is one stroke at every w.
+ */
+export function tailPtsUnravel(w: number, N = 420): Array<{ x: number; y: number }> {
+  const a = tailPts(w, N);
+  const b = tailPtsMirror(w, N);
+  const m = 1 - clamp01(w);
+  return a.map((p, i) => ({ x: lerp(p.x, b[i].x, m), y: p.y }));
+}
+
 /** How far the descending root wanders off its drift, and over how many soft waves. Daniel's redlines
  *  want this root to read as DRAWN and alive (organic S-curves), not a stiff mechanical lean. */
 const LEAN_MEANDER_AMP = 40;
 const LEAN_MEANDER_WAVES = 2.25;
 
-/** The spine above the attach point: plumb on the axis, then an organic, gently MEANDERING descent
- *  into P. It still arrives on P's exact (vertical) tangent and leaves the axis vertically, so it
- *  hands off to the winding tail (and up to the plumb spine) with no kink; the wander in between is
- *  what makes it look drawn by hand. */
-function spineLeanPts(): Array<{ x: number; y: number }> {
+/**
+ * The spine above the attach point: plumb on the axis, then an organic, gently MEANDERING descent
+ * onto an attach point at (targetX, P.y). It leaves the axis at (CX, CONVERGE_Y) vertically and
+ * arrives at (targetX, P.y) on a vertical tangent, so it hands off to the plumb spine above and to
+ * the winding tail below with no kink; the wander in between is what makes it look drawn by hand.
+ *
+ * `targetX` is a parameter (not hard-wired to P) so the RENDER can point the lean at the tail's
+ * CURRENT top every frame. During the ravel that top is P (the original right-flank attach); through
+ * the unravel it slides P -> P' as the tail morphs to its mirror. Arriving the lean exactly at the
+ * tail's top is what guarantees the spine -> lean -> tail chain is ONE continuous stroke at every
+ * scroll position (no gap where the line meets the mark).
+ */
+export function spineLeanPtsTo(targetX: number): Array<{ x: number; y: number }> {
   const g = solveMark();
-  const dx = g.P.x - CX;
+  const dx = targetX - CX;
   const y0 = g.P.y - LEAN_SPAN; // = CONVERGE_Y
   const pts = [{ x: CX, y: y0 }];
-  // Base drift is the old smoothstep (leaves the axis and reaches P with zero horizontal slope). The
-  // meander is a sine enveloped by sin^2(pi*u), whose value AND slope vanish at both ends, so the
-  // wander dies exactly at the plumb spine and at P: the handoffs stay tangent-clean.
+  // Base drift is a smoothstep (leaves the axis and reaches the target with zero horizontal slope).
+  // The meander is a sine enveloped by sin^2(pi*u), whose value AND slope vanish at both ends, so the
+  // wander dies exactly at the plumb spine and at the target: the handoffs stay tangent-clean.
   for (let i = 1; i <= 200; i++) {
     const u = i / 200;
     const s = u * u * (3 - 2 * u);
@@ -331,33 +401,87 @@ function branchPath(spineX: number, anchorY: number, edgeX: number, attachY: num
   return lineGen(branchPts(spineX, anchorY, edgeX, attachY)) ?? '';
 }
 
-/* -------------------------------- the calyx ------------------------------- */
+/* ------------------------- the holder (a botanical) ----------------------- */
+
+/** One placed organ of the holder sprig: an SVG transform + the generator's paths. */
+export type SprigOrgan = { transform: string; paths: readonly PlantPath[] };
+
+/** Leaf profile per SEPAL_DEFS axis (toward-spine / straight-down / under-plate). */
+const CALYX_LEAF_PROFILES = ['lanceolate', 'ovate', 'lanceolate'] as const;
 
 /**
- * THE CALYX, cup-from-below (Daniel's chosen holder, restored). Three slim sepals fan DOWN from the
- * plate's inner-bottom corner, cradling the plate from underneath: one toward the spine, one straight
- * down, one under the plate. The plate sits in the cup; the sepal tips stay in the gutter below the
- * plate, never over the image. Lengths follow the height-scaled law (sepalLen), but each is capped by
- * the room actually available below (maxLen), so a stacked plate's cup never reaches the plate under
- * it. `phi` is the SVG angle (180 straight down, 225 toward the spine, 135 under the plate).
+ * THE HOLDER, a generated botanical (replaces the schematic three-sepal calyx). A small real plant
+ * cups each plate from below: three generated LEAVES fan DOWN the same SEPAL_DEFS axes from the
+ * plate's inner-bottom corner (one toward the spine, one straight down, one under the plate), plus a
+ * small barely-open BUD at the corner. It reuses the sepal axis skeleton and the height-scaled length
+ * law (sepalLen), each length still capped by the room actually below (maxLen), so the ornament stays
+ * in the gutter under the plate EXACTLY like the sepals did: the leaf tips never reach the plate
+ * beneath and never cross an image. Deterministic per plate via `seed`; one colour (INK_BLUE).
+ * `tipY` is the lowest point reached (for the gutter-containment contract test).
  */
-function calyxSepals(cornerX: number, cornerY: number, dir: number, h: number, maxLen: number): string[] {
-  return SEPAL_DEFS.map((def) => {
+export function calyxSprig(
+  cornerX: number,
+  cornerY: number,
+  dir: number,
+  h: number,
+  maxLen: number,
+  seed: string,
+): { organs: SprigOrgan[]; tipY: number } {
+  const organs: SprigOrgan[] = [];
+  let tipY = cornerY;
+  SEPAL_DEFS.forEach((def, ai) => {
     const dev = ((def.phi - 180) * Math.PI) / 180; // deviation from straight down
-    const len = Math.min(sepalLen(def, h), maxLen);
-    const shw = Math.max(0.11 * len, 8); // sepal half-width
+    // Kept clearly SHORTER than the full sepal envelope so the holder stays small + delicate.
+    const len = Math.min(sepalLen(def, h), maxLen) * 0.82;
     const ux = -dir * Math.sin(dev); // axis: down, splayed with the plate's side
     const uy = Math.cos(dev);
-    const px = -uy;
-    const py = ux;
-    const tipx = cornerX + len * ux;
-    const tipy = cornerY + len * uy;
-    const c1x = cornerX + 0.55 * len * ux + shw * px;
-    const c1y = cornerY + 0.55 * len * uy + shw * py;
-    const c2x = cornerX + 0.55 * len * ux - shw * px;
-    const c2y = cornerY + 0.55 * len * uy - shw * py;
-    return `M ${cornerX} ${cornerY} Q ${c1x} ${c1y} ${tipx} ${tipy} Q ${c2x} ${c2y} ${cornerX} ${cornerY} Z`;
+    const rot = (Math.atan2(ux, -uy) * 180) / Math.PI; // rotate the up-growing leaf onto the axis
+    const sprite = leafSprite(`${seed}:leaf:${ai}`, {
+      profile: CALYX_LEAF_PROFILES[ai],
+      veins: ai === 0 ? 1 : 0,
+      length: len,
+      halfWidth: Math.max(0.12 * len, 5),
+    });
+    organs.push({
+      transform: `translate(${cornerX.toFixed(2)} ${cornerY.toFixed(2)}) rotate(${rot.toFixed(2)})`,
+      paths: sprite.paths,
+    });
+    tipY = Math.max(tipY, cornerY + len * uy); // the blade tip is the lowest point on this axis
   });
+  // A small bud at the corner, splaying DOWN into the gutter (rotate 180 so the rosette faces down).
+  // Short and barely open, so it stays delicate at the base and never fills the gutter.
+  const budLen = Math.min(20, 0.32 * maxLen);
+  const bud = flowerSprite(`${seed}:bud`, {
+    petals: 5,
+    length: budLen,
+    width: Math.max(4, 0.3 * budLen),
+    profile: 'ovate',
+    open: 0.45,
+  });
+  organs.push({
+    transform: `translate(${cornerX.toFixed(2)} ${(cornerY + 2).toFixed(2)}) rotate(180)`,
+    paths: bud.paths,
+  });
+  tipY = Math.max(tipY, cornerY + 2 + budLen);
+  return { organs, tipY };
+}
+
+/** Per-role render style for a holder organ, in the timeline's delicate calyx register. */
+export function sprigPathStyle(p: PlantPath): {
+  fill: string;
+  fillOpacity: number;
+  stroke: string;
+  strokeOpacity: number;
+  strokeWidth: number;
+} {
+  const isBlade = p.role === 'leaf' || p.role === 'petal';
+  return {
+    fill: p.fill === 'none' || p.role === 'vein' ? 'none' : INK_BLUE,
+    fillOpacity: p.role === 'center' ? 0.5 : 0.05,
+    stroke: INK_BLUE,
+    strokeOpacity: 0.55,
+    strokeWidth: isBlade ? 1 : 0.8,
+  };
 }
 
 /** Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
@@ -462,6 +586,13 @@ function atY(s: Strand, Y: number): { x: number; frac: number } {
 
 /** A gentle slow-out settle (cubic ease-out): reads as a leaf opening, not a UI pop. */
 const easeUnfurl = (u: number) => 1 - Math.pow(1 - clamp01(u), 3);
+
+/** Symmetric ease-in-out (cubic): weight at both ends. Used by the post-pin camera pan and the
+ *  unravel so neither snaps. (The autoplay effect keeps its own local copy for the entry descent.) */
+const easeInOutCubic = (t: number) => {
+  const c = clamp01(t);
+  return c < 0.5 ? 4 * c * c * c : 1 - Math.pow(-2 * c + 2, 3) / 2;
+};
 
 /* --------------------------------- the graph ------------------------------ */
 
@@ -594,7 +725,21 @@ export const CLUSTERS: Cluster[] = [
     hint: '',
     nodes: [
       {
+        // The KUKA robot (Daniel's freshly-shot loop) leads the robotics moment; Clay's Texas robot
+        // is its companion below. Both are the mains of the "Robots as Instruments" project.
         tier: 'hero',
+        media: {
+          src: `${A}/06-kuka-robotics/kuka-robotics-robot-loop-poster.webp`,
+          alt: 'A KUKA robot arm sanding an aluminium sheet, tooling an ornamented surface',
+          video: {
+            webm: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.webm`,
+            mp4: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.mp4`,
+            rate: 1,
+          },
+        },
+      },
+      {
+        tier: 'standard',
         media: {
           src: `${A}/13-texas-robotics/texas-robotics-robot-device-loop-poster.webp`,
           alt: 'A Texas Robotics mock-up robot device in motion',
@@ -850,6 +995,28 @@ export function CrossPathsTimeline({
   const frameRef = useRef<HTMLDivElement>(null);
   const [p, setP] = useState(0); // 0 to 1, the SMOOTHED camera progress
   const aspect = useFrameAspect(frameRef);
+  // Page-centre expressed in the frame's viewBox-x (see the descD comment). The frame sits in the
+  // right column, so its axis (CX=600) is NOT the page centre; this measures the gap so the finale's
+  // descending line can exit exactly above the founders' node below.
+  const [pageCenterVX, setPageCenterVX] = useState(305);
+  useEffect(() => {
+    const measure = () => {
+      const f = frameRef.current;
+      const main = f?.closest('main');
+      if (!f || !main) return;
+      const fr = f.getBoundingClientRect();
+      if (fr.width <= 0) return;
+      const mr = main.getBoundingClientRect();
+      const cs = getComputedStyle(main);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const padR = parseFloat(cs.paddingRight) || 0;
+      const contentCenter = mr.left + padL + (mr.width - padL - padR) / 2;
+      setPageCenterVX(((contentCenter - fr.left) / fr.width) * W);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
   // Persists across effect re-runs (StrictMode double-invoke, a reduced-motion media change) so the
   // entry autoplay fires AT MOST ONCE per page load and can never snap the finished descent back up.
   const autoplayedRef = useRef(false);
@@ -920,8 +1087,6 @@ export function CrossPathsTimeline({
     let endY = 0;
     let duration = AUTOPLAY_MS;
 
-    const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-
     const playInputs = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
     const detachPlayInputs = () => playInputs.forEach((e) => window.removeEventListener(e, onGesture));
     const detachEarlyInputs = () => playInputs.forEach((e) => window.removeEventListener(e, onEarly));
@@ -936,7 +1101,9 @@ export function CrossPathsTimeline({
       if (phase !== 'playing') return;
       if (!startTs) startTs = ts;
       const t = clamp01((ts - startTs) / duration);
-      window.scrollTo(0, Math.round(lerp(startY, endY, easeInOut(t))));
+      // LINEAR: constant scroll velocity, so the descent never accelerates (Daniel: "it should not
+      // increase in speed"). The old easeInOut sped up through the middle; this holds one slow pace.
+      window.scrollTo(0, Math.round(lerp(startY, endY, t)));
       if (t >= 1) return finish();
       raf = requestAnimationFrame(frame);
     };
@@ -971,7 +1138,9 @@ export function CrossPathsTimeline({
       // Snap to the very top of the timeline so the descent always starts from the beginning, even if
       // the narration ran a touch long, then ease down to the pin.
       startY = window.scrollY + rect.top;
-      endY = startY + travel;
+      // Land the entry descent at the PIN (the full bower frame), not the end of the track: the
+      // post-pin unravel + descent is the user's to drive by scrolling on.
+      endY = startY + travel * PIN_FRAC;
       window.scrollTo(0, Math.round(startY));
       phase = 'playing';
       playInputs.forEach((e) =>
@@ -1001,30 +1170,24 @@ export function CrossPathsTimeline({
     () => ({ left: sample('conv-clay', convArmPts(-1)), right: sample('conv-daniel', convArmPts(1)) }),
     [],
   );
-  const convNames = useMemo(() => {
-    // Name each strand at the very top of the frame, pushed OUTBOARD of its own strand and lifted well
-    // clear of the over-under crossing below (which sits ~90 units down), so a label never lands on a
-    // line. A vellum halo in the render keeps them legible over anything that pans behind them.
-    const pick = (s: Strand, dir: number) => {
-      const nameY = 12;
-      let best = 0;
-      for (let i = 0; i < s.ys.length; i++)
-        if (Math.abs(s.ys[i] - nameY) < Math.abs(s.ys[best] - nameY)) best = i;
-      return { x: s.xs[best] + dir * 20, y: s.ys[best] + 4, dir };
-    };
-    return [
-      { name: 'Clay', ...pick(conv.left, -1) },
-      { name: 'Daniel', ...pick(conv.right, 1) },
-    ];
-  }, [conv]);
-
   const viewH = clamp(W / aspect, 480, H);
   // THE PIN. At full progress (p=1, the end of the track) the camera sits so the mark's centre is at
   // the frame's vertical centre, which is where the left text block is centred too, so the mark and
   // the words compose as one still. The natural un-sticky past the track then carries that still up
   // and out as the user scrolls on. (Reduced motion shows the whole drawing at once instead.)
   const pinCamY = Math.max(MARK_CENTER_Y - viewH / 2, 0);
-  const camY = reduced ? 0 : lerp(0, pinCamY, p);
+  // TWO PHASES along the track. p in [0, PIN_FRAC]: the wind into the mark (camera 0 -> pin), exactly
+  // as before, just remapped onto the first two-thirds of the (now longer) track. p past PIN_FRAC:
+  // the unravel + descent — the camera HOLDS on the pin while the mark opens (so the user watches it
+  // ravel out in place), then follows the descending line down and out the bottom of the frame.
+  const p1 = clamp01(p / PIN_FRAC); // wind-phase progress (0..1), preserving the original pacing
+  const q = clamp01((p - PIN_FRAC) / (1 - PIN_FRAC)); // unravel-phase progress (0..1)
+  const camYEnd = Math.max(DESC_BOTTOM_Y - viewH, pinCamY); // exit lands at the frame's bottom edge
+  const camY = reduced
+    ? 0
+    : p <= PIN_FRAC
+      ? lerp(0, pinCamY, p1)
+      : lerp(pinCamY, camYEnd, easeInOutCubic(clamp01((q - 0.4) / 0.6)));
   const frontY = camY + viewH * (1 + DRAW_AHEAD);
   const topY = camY - TOP_CLIP;
   const cardLineY = reduced ? H : camY + viewH * CARD_LINE;
@@ -1047,18 +1210,49 @@ export function CrossPathsTimeline({
   // the pin, with the mark centred. The user watches the line wind itself up, never a pre-assembled
   // mark sliding in from below.
   const windStartCamY = MARK_CENTER_Y - WIND_ENTER * viewH;
-  const windW = reduced ? 1 : clamp01((camY - windStartCamY) / (pinCamY - windStartCamY || 1));
+  // Wind phase: driven by the camera as before. Unravel phase: play the wind backwards over the first
+  // 40% of q (so the mark is fully open BEFORE the camera starts descending past it), then hold at 0.
+  const windW = reduced
+    ? 1
+    : p <= PIN_FRAC
+      ? clamp01((camY - windStartCamY) / (pinCamY - windStartCamY || 1))
+      : 1 - easeInOutCubic(clamp01(q / 0.4));
   const g = useMemo(() => solveMark(), []);
-  const leanPts = useMemo(() => spineLeanPts(), []);
-  const tail = useMemo(() => tailPts(windW), [windW]);
-  const wordmarkOpacity = clamp01((windW - 0.86) / 0.14);
-
-  // The two convergence names sit at the top of the piece, present from the first frame; the viewBox
-  // pan carries them out of view as you descend past the fuse.
-  const nameOpacity = 0.85;
+  // The RAVEL (wind, p <= PIN_FRAC) uses the original right-flank tail; the UNRAVEL (post-pin) uses
+  // the morphing tail so it opens with the OPPOSITE curl rather than retracing the wind-up. Both are
+  // the identical circle 0 at windW=1, so the swap at the pin is seamless (no pop).
+  const unraveling = !reduced && p > PIN_FRAC;
+  const tail = useMemo(
+    () => (unraveling ? tailPtsUnravel(windW) : tailPts(windW)),
+    [windW, unraveling],
+  );
+  // CONTINUITY GUARANTEE: point the lean at the tail's CURRENT top point every frame. Pre-pin that is
+  // P (the original right-flank ravel lean); through the unravel it slides P -> P' as the tail morphs
+  // to its mirror, and the lean follows, so the plumb spine -> lean -> tail is one unbroken stroke and
+  // the line never detaches from the mark. (This is the fix for the circled gap: the tail top used to
+  // jump to P' while the lean stayed at P.)
+  const leanPts = useMemo(() => spineLeanPtsTo(tail[0].x), [tail]);
+  // Where the mirrored unwound ray ends: the opposite flank of circle 0 (reflection of P across C.x).
+  // At windW=0 the morph is fully mirrored, so the tail's bottom lands exactly here — the descent's
+  // start — closing the spine -> mark -> descent -> founders line with no gap at the bottom either.
+  const mirrorRayEndX = 2 * g.C.x - g.P.x;
+  // The wordmark fades IN with the wind, and back OUT as the unravel begins: it belongs to the held
+  // pin, not to the line flowing on past it (and it clears the descending line's path).
+  const wordmarkOpacity = reduced ? 1 : clamp01((windW - 0.86) / 0.14) * (1 - clamp01((q - 0.05) / 0.25));
+  // Where the PAGE centre falls in the frame's viewBox-x. The mark/spine sit on the frame-column axis
+  // (CX=600), but the founders below are centred on the PAGE; the descending line sweeps from the mark
+  // to this x so it exits directly above the founders' node. Measured (see the effect) so the seam is
+  // pixel-accurate at any width; the ~305 default is a sane pre-measurement estimate.
+  const descD = reduced
+    ? // static: from the attach point on the mark, straight down and over to page-centre, exiting.
+      `M ${g.P.x.toFixed(2)} ${g.P.y.toFixed(2)} C ${g.P.x.toFixed(2)} ${(g.P.y + (DESC_BOTTOM_Y - g.P.y) * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${(DESC_BOTTOM_Y - (DESC_BOTTOM_Y - g.P.y) * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${DESC_BOTTOM_Y.toFixed(2)}`
+    : // animated: continues the MIRRORED unwound ray (which ends at RAY_END_Y on the mark's opposite
+      // flank, x = mirrorRayEndX) straight down, then sweeps over to page centre. The exit (page
+      // centre, DESC_BOTTOM_Y) is unchanged; only the start flank mirrors with the unravel.
+      `M ${mirrorRayEndX.toFixed(2)} ${RAY_END_Y.toFixed(2)} C ${mirrorRayEndX.toFixed(2)} ${(RAY_END_Y + DESC_DROP * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${(DESC_BOTTOM_Y - DESC_DROP * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${DESC_BOTTOM_Y.toFixed(2)}`;
 
   return (
-    <div ref={trackRef} className="relative" style={{ height: reduced ? 'auto' : '720vh' }}>
+    <div ref={trackRef} className="relative" style={{ height: reduced ? 'auto' : '1080vh' }}>
       <div
         className={
           reduced
@@ -1070,7 +1264,7 @@ export function CrossPathsTimeline({
           {title}
           <dl className="flex flex-col gap-8">
             {questions.map((q, i) => {
-              const at = reduced ? 1 : clamp01((p - (i === 0 ? 0.04 : 0.42)) / 0.12);
+              const at = reduced ? 1 : clamp01((p1 - (i === 0 ? 0.04 : 0.42)) / 0.12);
               return (
                 <div
                   key={q.label}
@@ -1127,26 +1321,6 @@ export function CrossPathsTimeline({
                 strokeLinecap="butt"
                 strokeLinejoin="round"
               />
-              {convNames.map((n) => (
-                <text
-                  key={n.name}
-                  x={n.x}
-                  y={n.y}
-                  textAnchor={n.dir === 1 ? 'start' : 'end'}
-                  className="fill-inkBlack font-serifDisplay"
-                  style={{
-                    fontSize: 22,
-                    fontStyle: 'italic',
-                    opacity: nameOpacity,
-                    paintOrder: 'stroke',
-                    stroke: '#FBF9F3',
-                    strokeWidth: 6,
-                    strokeLinejoin: 'round',
-                  }}
-                >
-                  {n.name}
-                </text>
-              ))}
             </g>
 
             {/* THE SPINE. The only long line: heavy, full opacity, born at the fuse and running edge
@@ -1261,6 +1435,19 @@ export function CrossPathsTimeline({
                 strokeWidth={SPINE_W}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+              />
+              {/* THE UNRAVEL EXIT (Task 4). Below the unwound ray, the one line keeps flowing down and
+                  sweeps to the page centre, exiting the bottom of the frame to hand off to the
+                  founders' roots. It sits below the frame during the wind (the camera only reveals it
+                  as it descends past the pin), so it is safe to draw always. */}
+              <path
+                d={descD}
+                fill="none"
+                stroke={INK_BLUE}
+                strokeWidth={SPINE_W}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={reduced ? 1 : clamp01((0.08 - windW) / 0.08)}
               />
             </g>
 
@@ -1386,17 +1573,28 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
   const { dir, spineX, anchorY, edgeX, plates, hint } = cluster;
   const uStem = reduced ? 1 : clamp01((cardLineY - anchorY) / (UNFURL_SPAN * 0.4));
 
+  // The holder botanical is generated ONCE per plate (deterministic off cluster id + node index),
+  // memoized so the scroll animation (which re-renders every frame) never regenerates it.
+  const sprigs = useMemo(
+    () =>
+      plates.map((pl, i) => {
+        // Length is capped by the room actually below this plate (the next stacked sibling, or a
+        // generous default when it is the lowest), so the sprig never reaches the plate beneath it.
+        const spaceBelow = i + 1 < plates.length ? plates[i + 1].y - pl.attachY : 240;
+        const maxLen = Math.max(20, spaceBelow - 12);
+        return calyxSprig(edgeX, pl.attachY, dir, pl.h, maxLen, `${cluster.id}:${i}`);
+      }),
+    [plates, edgeX, dir, cluster.id],
+  );
+
   return (
     <g>
       <circle cx={spineX} cy={anchorY} r={4.5} fill={INK_BLUE} opacity={uStem > 0 ? 1 : 0} />
 
       {plates.map((pl, i) => {
         const branchD = branchPath(spineX, anchorY, edgeX, pl.attachY);
-        // Sepal length is capped by the room actually below this plate (the next stacked sibling, or
-        // a generous default when it is the lowest), so a cup never reaches the plate beneath it.
-        const spaceBelow = i + 1 < plates.length ? plates[i + 1].y - pl.attachY : 240;
-        const sepals = calyxSepals(edgeX, pl.attachY, dir, pl.h, Math.max(20, spaceBelow - 12));
-        // The calyx buds in as the last beat of the branch's growth, right before the plate unfurls.
+        const sprig = sprigs[i];
+        // The holder buds in as the last beat of the branch's growth, right before the plate unfurls.
         const calyxOpacity = reduced ? 1 : clamp01((uStem - 0.7) / 0.3);
 
         const u = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
@@ -1419,14 +1617,24 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
               strokeDasharray={1}
               strokeDashoffset={reduced ? 0 : 1 - uStem}
             />
-            {/* The calyx: three slim sepals fanning DOWN from the plate's inner-bottom corner, cupping
-                the plate from below where the branch arrives under it. Delicate, height-scaled. */}
+            {/* The holder: a small generated botanical (src/engine/botanical) cupping the plate from
+                below, where the branch arrives under it. Real leaves fan down the calyx axes plus a
+                delicate bud at the corner; height-scaled and gutter-capped like the sepals it replaced. */}
             {calyxOpacity > 0.001 && (
               <g style={{ opacity: calyxOpacity }} pointerEvents="none">
-                {sepals.map((d, si) => (
-                  <path key={si} d={d} fill={INK_BLUE} fillOpacity={0.05} stroke={INK_BLUE} strokeOpacity={0.55} strokeWidth={1} strokeLinejoin="round" />
+                {sprig.organs.map((org, oi) => (
+                  <g key={oi} transform={org.transform}>
+                    {org.paths.map((p, pi) => (
+                      <path
+                        key={pi}
+                        d={p.d}
+                        {...sprigPathStyle(p)}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    ))}
+                  </g>
                 ))}
-                <circle cx={edgeX} cy={pl.attachY} r={3.5} fill={INK_BLUE} />
               </g>
             )}
             {t.opacity > 0.001 && (

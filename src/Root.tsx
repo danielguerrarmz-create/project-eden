@@ -19,6 +19,7 @@ import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
 import { ShapePage } from './pages/ShapePage';
 import { SculptPage } from './pages/SculptPage';
+import { BotanicalLab } from './pages/lab/BotanicalLab';
 import { useRoute } from './routing';
 
 export function Root() {
@@ -28,5 +29,6 @@ export function Root() {
   if (route === '/about') return <AboutPage />;
   if (route === '/shape') return <ShapePage />;
   if (route === '/sculpt') return <SculptPage />;
+  if (route === '/lab/botanical') return <BotanicalLab />;
   return <SplashPage />;
 }
