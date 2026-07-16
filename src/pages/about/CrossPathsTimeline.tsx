@@ -1689,7 +1689,23 @@ export function CrossPathsTimeline({
             : 'sticky top-[var(--header-h)] flex h-[calc(100svh-var(--header-h))] flex-col gap-8 py-4 lg:flex-row lg:items-stretch lg:gap-12 xl:gap-16'
         }
       >
-        <div className="flex shrink-0 flex-col justify-center gap-10 lg:w-[clamp(19rem,26vw,24rem)]">
+        {/* THE HERO LOCKUP'S HEIGHT (2026-07-16, round 2). Daniel: "it is not where it should be on
+            centre... the entire thing should be lifted up slightly to be on centre on my screen."
+            He was right, and it was arithmetic rather than taste: this column is `justify-center`
+            inside a box that starts BELOW the fixed header (`h-[calc(100svh-var(--header-h))]`), so
+            the lockup centred on that band's middle, which is exactly `--header-h / 2` below the
+            middle of the SCREEN — the thing he is actually looking at. Measured at 1440x900: lockup
+            centre 492 against a screen centre of 450, with 290px of air above it and 206 below.
+
+            The padding is the correction, and it is TWICE the lift because `justify-center` splits it:
+            `--header-h` buys back the 42px of header, and the 2.25rem buys 18px more — the optical
+            nudge, ~2% of the viewport, because a block parked on the mathematical centre reads low.
+            Written in terms of the token, not as a magic 120px, so it stays true if the header
+            re-measures itself (SplashHeader does, at runtime).
+
+            `lg:` only: the reduced-motion and narrow layouts drop the sticky viewport-height box, so
+            there is no band to correct for and the padding would just add dead space. */}
+        <div className="flex shrink-0 flex-col justify-center gap-10 lg:w-[clamp(19rem,26vw,24rem)] lg:pb-[calc(var(--header-h)+2.25rem)]">
           {title}
           <dl className="flex flex-col gap-8">
             {questions.map((q, i) => {
