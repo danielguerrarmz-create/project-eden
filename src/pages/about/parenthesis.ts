@@ -71,6 +71,18 @@ export interface ParenLayout {
   /** The outboard turn lines: clear of the founder rows' real left/right edges. */
   leftX: number;
   rightX: number;
+  /**
+   * THE ROWS' REAL OUTER EDGES — the line the arms must never cross back over while they are
+   * alongside the founders. Measured, like everything else here.
+   *
+   * This exists because the bow was not enough. An arm can turn outboard, clear the portraits, and
+   * still cross the text on its way BACK: the tail's inward curl was authored as a fraction of
+   * `reach` (the whole trip from the trunk), which is ~620px, so a "small" 22% curl came back 137px
+   * and landed at x=235 with the content column starting at 170. It ran straight through
+   * "Cofounder · engine & systems". A fraction of a big number is a big number.
+   */
+  rowLeft: number;
+  rowRight: number;
   /** The founder rows, top to bottom. */
   rows: RowBox[];
   /**
@@ -159,6 +171,13 @@ function mix(a: Pt, b: Pt, wa: number, wb: number): Pt {
 
 /* -------------------------------- the arms -------------------------------- */
 
+/**
+ * How far an arm stays off the founders' text, px. Not zero: Daniel's note is "it does not sit
+ * extremely close to the founder texts", so a stroke that merely misses the glyphs still reads as a
+ * collision. qa/founder-frame.mjs asserts the same number against the real laid-out glyph runs.
+ */
+export const TEXT_CLEARANCE = 16;
+
 /** The trunk: the timeline's line, continuing. Straight down the content centre to the fork. */
 export function trunkPts(L: ParenLayout): Pt[] {
   // Starts where the timeline's line STOPS (`trunkY0`, measured, normally above this overlay) and
@@ -191,6 +210,20 @@ export function armPts(L: ParenLayout, side: -1 | 1): Pt[] {
   const span = Math.max(1, bottom - top);
   /** The only vertical room the crossing gets. See the swag note below. */
   const band = Math.max(1, top - L.forkY);
+
+  /**
+   * KEEP THE ARM OFF THE FOUNDERS' TEXT. Daniel: "Make sure none of the vines are overlapping the
+   * text", and "so it does not sit extremely close to the founder texts" — so this is a CLEARANCE,
+   * not a non-overlap: grazing a caption reads as a collision even when the pixels miss.
+   *
+   * The rule is one line and it is absolute: while an arm is alongside the founders it lives
+   * outboard of their real measured edge, whatever the anchor arithmetic wanted. Expressed as a
+   * clamp rather than as tuned constants because the constants were what got this wrong — every
+   * anchor is a fraction of `reach`, and `reach` is ~620px, so every "small" fraction is tens of
+   * pixels and the margin here is only ~70.
+   */
+  const limit = side < 0 ? L.rowLeft - TEXT_CLEARANCE : L.rowRight + TEXT_CLEARANCE;
+  const keepOut = (x: number) => (side < 0 ? Math.min(x, limit) : Math.max(x, limit));
 
   // THE BOW'S BELLY sits at the founders' vertical middle — the gap between the two rows, not the
   // middle of the overlay, which also carries the seam above and the tails below.
@@ -231,18 +264,25 @@ export function armPts(L: ParenLayout, side: -1 | 1): Pt[] {
     { x: L.trunkX + reach * 0.28, y: L.forkY + band * 0.62 },
     // The swag's low point, out across the page.
     { x: L.trunkX + reach * 0.72, y: L.forkY + band * 0.93 },
-    // Arriving on the turn line, still above the founders.
-    { x: turnX, y: top + span * 0.02 },
+    // Arriving on the turn line, still above the founders. Clamped like the rest: these two sit
+    // INSIDE the rows' y-span, so if the measured turn line ever lands inboard of the text (a
+    // narrower page, a wider founders block) they would put the arm straight through a portrait.
+    // Today's numbers happen to miss; that is luck, not a rule.
+    { x: keepOut(turnX), y: top + span * 0.02 },
     // Directly below the arrival, so the curve is already heading straight down when it gets there
     // and the swag becomes the descent without a corner.
-    { x: turnX, y: top + span * 0.16 },
+    { x: keepOut(turnX), y: top + span * 0.16 },
     // The bow's belly, easing outward around the two of them.
-    { x: turnX - reach * 0.06, y: bellyY },
-    // Tucking back in, the way a parenthesis closes.
-    { x: turnX - reach * 0.02, y: bottom - span * 0.12 },
-    // The tail, curling back toward the centre and running out below the founders. Ends inboard of
-    // the turn line so the pair reads as a closing bracket rather than two parallel rails.
-    { x: turnX - reach * 0.22, y: bottom + span * 0.06 },
+    { x: keepOut(turnX - reach * 0.06), y: bellyY },
+    // Tucking back in, the way a parenthesis closes — but STILL OUTBOARD, and held there until the
+    // founders are behind us. This anchor used to sit at `bottom - span * 0.12`, which put the start
+    // of the inward curl a tenth of a row ABOVE the last caption, so the curve was already heading
+    // back across the text by the time it reached it.
+    { x: keepOut(turnX - reach * 0.02), y: bottom + 8 },
+    // The tail, curling back toward the centre and running out BELOW the founders. This is the only
+    // anchor allowed inboard, because there is nothing down here to cross. It ends inboard of the
+    // turn line so the pair reads as a closing bracket rather than two parallel rails.
+    { x: turnX - reach * 0.22, y: bottom + span * 0.16 },
   ];
   return sampleCatmullRom(anchors, 6);
 }

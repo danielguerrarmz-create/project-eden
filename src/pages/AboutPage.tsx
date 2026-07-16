@@ -1007,8 +1007,13 @@ const PAREN_TURN_FRAC = 0.58;
 /** Where the arms leave the trunk, as a fraction of the band between the timeline's exit and the
  *  first founder. That band is ALL the room the crossing gets (see armPts), so this is the split
  *  between trunk and swag: lower and the swag has no room and kinks, higher and the line does not
- *  read as arriving before it opens. Tuned by looking. */
-const PAREN_FORK_FRAC = 0.22;
+ *  read as arriving before it opens.
+ *
+ *  0.22 -> 0.10 (round 5). Daniel: "Bring back the beginning of the parenthesis of the founder up so
+ *  it does not sit extremely close to the founder texts." Forking higher spends more of the band on
+ *  the swag, which is the half that has to get clear of the kicker — at 0.22 the arms were still
+ *  crossing the founders' own headline height as they went out. */
+const PAREN_FORK_FRAC = 0.1;
 /** Organ size along the arms. The spine garland pins 1.5 and the sub-branches 0.95; the arms sit in
  *  open margin with the most air on the page, so they carry the largest foliage. Tuned by looking. */
 const PAREN_ORGAN_SCALE = 2.0;
@@ -1135,6 +1140,9 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
         // so an arm can never be asked to grow off its own canvas.
         leftX: Math.max(6, rowLeft * PAREN_TURN_FRAC),
         rightX: Math.min(hr.width - 6, rowRight + (hr.width - rowRight) * PAREN_TURN_FRAC),
+        // The rows' REAL edges, so the arms can be held off the text rather than trusted to miss it.
+        rowLeft,
+        rowRight,
         rows: boxes,
       });
     };
@@ -1315,7 +1323,7 @@ function FounderNode({ person }: { person: TeamMember }) {
     // one way: nothing here reads the parenthesis back.
     <div
       data-founder-row
-      className="grid gap-8 md:grid-cols-[minmax(0,3.7fr)_minmax(0,7fr)_minmax(0,4fr)] md:items-start"
+      className="grid gap-6 md:grid-cols-[minmax(0,2.6fr)_minmax(0,9.1fr)_minmax(0,3fr)] md:items-start"
     >
       <figure>
         {person.image ? (
@@ -1330,32 +1338,39 @@ function FounderNode({ person }: { person: TeamMember }) {
             <OculusMark size={36} className="h-auto w-9 text-inkBlack/20" />
           </div>
         )}
-        <figcaption className="mt-2.5">
+        <figcaption className="mt-2">
           <span className={`${MONO_SMALL} block text-inkBlack`}>{person.name}</span>
           <span className={`${MONO_SMALL} block text-inkBlack/60`}>{person.role}</span>
         </figcaption>
       </figure>
 
-      {/* THE FACTS ARE WHAT SET THE ROW'S HEIGHT — not the pictures, which is the counter-intuitive
-          half of Daniel's "I would just minimize everything smaller, mostly the pictures and the big
-          picture on the side." Measured before touching anything: the rows were 444 and 472 tall
-          against a 375px portrait, so the `dl` was the tallest column in both. Shrinking only the
-          images would have moved the row height by nothing. So the type comes down with them: 17 ->
-          15px on a wider measure (the 4/7/4 split gives the facts more room, which costs LINES, which
-          is what actually costs height), and the stack tightens 6 -> 4. */}
-      <dl className="space-y-4">
+      {/* WHAT SETS THIS ROW'S HEIGHT KEEPS SWAPPING, AND THAT IS WHY THIS FIX HAS LANDED TWICE AND
+          NOT WORKED. A grid row is as tall as its tallest column (CLAUDE.md), and the tallest column
+          here is not stable:
+            round 3  portrait 375, dl 444/472  -> the DL was tallest; shrinking the pictures alone
+                     would have moved nothing, so the type came down (17 -> 15) and the row hit 372.
+            round 5  portrait 372, dl 301/322  -> the PORTRAIT is tallest now, and shrinking IT alone
+                     stops at ~322, where the dl takes over again.
+          So this pass takes both down together, and there is no point taking either below the other.
+
+          The columns are re-proportioned rather than just scaled: 3.7/7/4 -> 2.6/9.1/3. The portrait
+          and the specimen give their width to the FACTS, which is what actually buys height — a wider
+          measure costs fewer LINES, and lines are the height. Widening the measure is the one move
+          here that makes the row shorter without making anything smaller. */}
+      <dl className="space-y-3">
         {person.facts.map((fact) => (
           <div key={fact.label}>
             <dt className={`${MONO_SMALL} text-inkBlack/60`}>{fact.label}</dt>
-            <dd className="mt-1 max-w-[62ch] text-[15px] leading-snug opacity-90">{fact.value}</dd>
+            <dd className="mt-0.5 max-w-[82ch] text-[14px] leading-snug opacity-90">{fact.value}</dd>
           </div>
         ))}
       </dl>
 
       {/* The specimen, signed with the seed it grew from — the provenance is the point: type the
-          printed seed into #/lab/gongbi and this exact plant grows back. 340 -> 250: "the big picture
-          on the side" is the one he named. */}
-      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={250} className="md:justify-self-end" />
+          printed seed into #/lab/gongbi and this exact plant grows back. 340 -> 250 (round 3) -> 210:
+          "the big picture on the side" is the one he named, and it must not become the tallest
+          column in its turn. */}
+      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={210} className="md:justify-self-end" />
     </div>
   );
 }
@@ -1432,7 +1447,7 @@ export function AboutPage() {
             <div className="relative z-10">
               <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
 
-              <div className="mt-5 flex flex-col gap-8">
+              <div className="mt-4 flex flex-col gap-6">
                 {TEAM.map((person) => (
                   <FounderNode key={person.id} person={person} />
                 ))}

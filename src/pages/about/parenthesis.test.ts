@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armPts, sampleCatmullRom, trunkPts, type ParenLayout, type Pt } from './parenthesis';
+import { armPts, sampleCatmullRom, TEXT_CLEARANCE, trunkPts, type ParenLayout, type Pt } from './parenthesis';
 
 /** A layout in the shape of the real one, measured at 1440x900 (see qa/founder-parenthesis.mjs).
  *  The overlay is the full page width, so trunkX is the page's content centre (720) and the rows'
@@ -14,6 +14,8 @@ const LAYOUT: ParenLayout = {
   forkY: -40,
   leftX: 85,
   rightX: 1355,
+  rowLeft: 170,
+  rowRight: 1270,
   rows: [
     { y0: 118, y1: 490 },
     { y0: 522, y1: 894 },
@@ -115,15 +117,53 @@ describe('the founders parenthesis', () => {
     }
   });
 
+  it('an arm never crosses onto the founders while it is alongside them', () => {
+    // Daniel: "Make sure none of the vines are overlapping the text." The bow going OUT was never
+    // the problem — the tail coming BACK was. Every anchor is a fraction of `reach` (~620px here),
+    // so a "small" 22% inward curl came back 137px and landed at x=235 with the content column
+    // starting at 170, straight through "Cofounder · engine & systems". A fraction of a big number
+    // is a big number, which is why this is a clamp and not a tuned constant.
+    const top = LAYOUT.rows[0].y0;
+    const bottom = LAYOUT.rows[LAYOUT.rows.length - 1].y1;
+    for (const side of [-1, 1] as const) {
+      for (const p of armPts(LAYOUT, side)) {
+        if (p.y < top || p.y > bottom) continue; // below the founders the tail may curl in freely
+        if (side < 0) {
+          expect(p.x, `left arm is on the founders at y=${p.y.toFixed(0)}`).toBeLessThanOrEqual(
+            LAYOUT.rowLeft - TEXT_CLEARANCE + 0.5,
+          );
+        } else {
+          expect(p.x, `right arm is on the founders at y=${p.y.toFixed(0)}`).toBeGreaterThanOrEqual(
+            LAYOUT.rowRight + TEXT_CLEARANCE - 0.5,
+          );
+        }
+      }
+    }
+  });
+
+  it('the keep-out follows the measured rows, not a constant', () => {
+    // Widen the founders and the arms must give way — they read the layout, the layout never reads
+    // them. If this ever fails, the clearance has been re-authored against a page constant.
+    const wider: ParenLayout = { ...LAYOUT, rowLeft: 260 };
+    const top = wider.rows[0].y0;
+    const bottom = wider.rows[wider.rows.length - 1].y1;
+    for (const p of armPts(wider, -1)) {
+      if (p.y < top || p.y > bottom) continue;
+      expect(p.x).toBeLessThanOrEqual(wider.rowLeft - TEXT_CLEARANCE + 0.5);
+    }
+  });
+
   it('reads the layout it is given rather than assuming a centred block — the SeamBridge bug', () => {
     // The retired SeamBridge drew a plumb line to the PAGE centre and landed on nothing, because
     // the founders' content is left-aligned. Move the measured turn lines and the arms must move;
     // if they do not, something is authored against a constant again.
-    const shifted: ParenLayout = { ...LAYOUT, leftX: LAYOUT.leftX + 120 };
+    // Moved OUTWARD (away from the text), so the keep-out clamp is not the thing under test — it
+    // binds on the inboard side only, and an assertion it can satisfy on its own proves nothing.
+    const shifted: ParenLayout = { ...LAYOUT, leftX: LAYOUT.leftX - 60 };
     const base = armPts(LAYOUT, -1);
     const moved = armPts(shifted, -1);
     const bellyOf = (pts: Pt[]) => Math.min(...pts.map((p) => p.x));
-    expect(bellyOf(moved) - bellyOf(base)).toBeGreaterThan(100);
+    expect(bellyOf(base) - bellyOf(moved)).toBeGreaterThan(50);
     // ...and the RIGHT arm must not have heard about it.
     expect(armPts(shifted, 1)).toEqual(armPts(LAYOUT, 1));
   });
