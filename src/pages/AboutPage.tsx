@@ -127,6 +127,7 @@ function ProjectVideoEl({
   contain,
   reduced,
   fill = false,
+  fit = false,
 }: {
   image: ProjectImage;
   className: string;
@@ -135,12 +136,16 @@ function ProjectVideoEl({
   /** Fixed-region mode: fill the parent tile edge-to-edge (h-full w-full) with object-fit, instead of
    *  taking a width and its own aspect. Used by the fixed two-region gallery. */
   fill?: boolean;
+  /** Hero mode — see FIT_FRAME. */
+  fit?: boolean;
 }) {
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
-  const frame = fill
-    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-    : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const frame = fit
+    ? `${FIT_FRAME} ${className}`
+    : fill
+      ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+      : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
@@ -186,6 +191,7 @@ function ProjectImg({
   onOpen,
   reduced = false,
   fill = false,
+  fit = false,
 }: {
   image: ProjectImage;
   className?: string;
@@ -194,20 +200,24 @@ function ProjectImg({
   /** Fixed-region mode: fill the parent tile edge-to-edge (h-full w-full) with object-fit, instead of
    *  taking a width and its own aspect. Used by the fixed two-region gallery. */
   fill?: boolean;
+  /** Hero mode — see FIT_FRAME. */
+  fit?: boolean;
 }) {
   // A pending image has no asset yet: render the inert placeholder plate, never a button.
   if (image.pending) return <PendingPlate fill={fill} className={className} />;
 
   const contain = image.fit === 'contain';
-  const frame = fill
-    ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-    : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
-  const btnClass = `group relative block ${fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
+  const frame = fit
+    ? `${FIT_FRAME} ${className}`
+    : fill
+      ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+      : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const btnClass = `group relative block ${fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
   if (image.video) {
-    const el = <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} fill={fill} />;
+    const el = <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} fill={fill} fit={fit} />;
     if (!onOpen) return el;
     return (
       <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={btnClass}>
@@ -224,10 +234,16 @@ function ProjectImg({
   // merely `lg:hidden`), so tagging both trees would put the SAME layoutId in the DOM twice,
   // framer-motion would pair the visible desktop image with the hidden mobile one, and the
   // detail panel would silently render blank. It did. Do not tag the non-interactive copy.
+  // THE HERO LOADS EAGERLY, and in `fit` mode that is correctness, not tuning: an auto-sized
+  // replaced element takes its size from its INTRINSIC dimensions, and an image that has not
+  // arrived has none — it lays out at 0x0 and the region is empty until the bytes land. (Measured:
+  // the default project's hero rendered 0x0.) The hero is also the one image guaranteed to be on
+  // screen, so `lazy` was never right for it.
+  const loading = fit ? 'eager' : 'lazy';
   const img = onOpen ? (
-    <motion.img layoutId={`shot-${image.src}`} src={image.src} alt={image.alt} loading="lazy" className={frame} />
+    <motion.img layoutId={`shot-${image.src}`} src={image.src} alt={image.alt} loading={loading} className={frame} />
   ) : (
-    <img src={image.src} alt={image.alt} loading="lazy" className={frame} />
+    <img src={image.src} alt={image.alt} loading={loading} className={frame} />
   );
 
   if (!onOpen) return img;
@@ -276,47 +292,56 @@ function SupportingRow({
 }
 
 /**
- * THE MEDIA AREA (2026-07-16, round 3). Daniel: "I would like the hero image to be slightly smaller
- * and to be more adaptable so that smaller images can exist below it and to the right, not just
- * merely to the right... the main hero image/video takes 60% of the entire area dedicated to photos.
- * The other 40% is delegated between the rest of the images."
+ * THE MEDIA AREA — TWO REGIONS (2026-07-16, round 5). Daniel annotated a screenshot with two boxes:
+ * "Make the hero image of every project fit within square 1, and organize all the side images into
+ * square 2. Make the images in square two really nice."
  *
- * 60/40 with the remainder BOTH beside and below is an L, and the L is what these two numbers are:
- * a hero at 74% x 81% of the area is 60% of it, and what is left is a right column (26 x 81 = 21%)
- * plus a full-width bottom strip (100 x 19 = 19%) — 40%, in two places. So the supporting images are
- * dealt into both rather than locked to a right-hand rail.
+ *   REGION 1 (~66%)  the hero, ALONE.
+ *   REGION 2 (~31%)  EVERY supporting image, stacked.
  *
- * The previous cut was a vertical filmstrip only, which existed to stop a horizontal strip eating the
- * hero's height (it had measured 2.2:1 to 2.9:1 against images natively 1.2:1 to 1.9:1). That reason
- * still holds and the bottom strip is why: it is 19% of the area, not a full row of thumbnails at
- * their natural height, so it costs the hero far less than the old row did.
+ * THIS REVISES ROUND 3's L-SHAPE, and it is Daniel overriding his own earlier note. That note asked
+ * for the remainder "below AND to the right", which became a right column plus a full-width bottom
+ * strip. He has now seen it: the strip put a lone thumbnail orphaned at the bottom-left of the hero's
+ * region at a fraction of its size, which is what he is reacting to. The strip is gone; there is one
+ * rail and everything supporting is on it.
  *
- * EVERY CELL TAKES ITS IMAGE'S OWN ASPECT (`aspectRatio: img.ratio`), never a fixed shape — Daniel
- * said the right-side supporting images "are not displayed properly", which is the same
- * wrong-shaped-box disease as the timeline plates and the old portrait hero. Right-column cells take
- * the column's width and derive their height; bottom-strip cells take the strip's height and derive
- * their width. Both are exact, so nothing letterboxes and nothing crops.
+ * `dealSupporting` went with it — it existed only to choose which images went to which of the two
+ * regions, and there is one region now. (Its rule was sound and is worth remembering if a second
+ * region ever comes back: deal by SHAPE, never by position. Dealing by array order put Archipedia's
+ * 0.46-ratio image — a very tall UI screenshot — into the wide strip, where a cell sized by the
+ * strip's height came out 38px wide. A sliver.)
+ *
+ * EVERY CELL STILL TAKES ITS IMAGE'S OWN ASPECT (`aspectRatio: img.ratio`), never a fixed shape —
+ * the wrong-shaped-box disease is this page's recurring bug (CLAUDE.md).
  */
-const MEDIA = { heroW: 74, heroH: 81 };
+const MEDIA = { supportW: 31 };
 
 /**
- * How the supporting images are dealt between the two regions — BY SHAPE, not by count.
+ * THE HERO'S FRAME — the element IS the picture, at the largest size its region allows.
  *
- * The two regions have opposite proportions, and that is the whole rule: the right column is narrow
- * and tall, so it suits TALL images; the bottom strip is short and wide, so it suits WIDE ones. The
- * first cut dealt by position in the array and it was immediately visible why that is wrong — it put
- * Archipedia's 0.46-ratio image (a very tall UI screenshot) in the bottom strip, where a cell sized
- * by the strip's height comes out 38px wide. A sliver. The same image in the right column is fine.
+ * Daniel: "Make the hero image of every project fit WITHIN square 1", and the standing rule, "no
+ * cropping, do not lose context."
  *
- * So: sort by ratio, the tallest half goes right, the widest half goes bottom. Nothing is cropped and
- * nothing is a sliver — each image lands in the region shaped like it.
+ * `fill` cannot do that, and the difference is not cosmetic. `fill` gives the picture a box of
+ * someone else's shape and then resolves the disagreement with object-fit: `cover` CROPS and
+ * `contain` LETTERBOXES. Every hero on this page is `cover`, so every hero was being cropped to a
+ * box it never agreed with, and it got worse when the bottom strip came out — the region grew taller,
+ * its ratio fell to 1.40 against a 1.78 hero, and Plentify lost 21% of its width off the sides.
+ * Silently. That is precisely "losing context".
+ *
+ * A replaced element (img/video) sizes itself from its own intrinsic ratio, clamped by max-width and
+ * max-height, so `max-h-full max-w-full` + auto sizing makes the element EXACTLY the picture, as
+ * large as fits, cropped nowhere. object-fit then has nothing to resolve, because the box and the
+ * image are the same shape. The slack is vellum, in one direction only, and it is the region's air
+ * rather than a margin inside the frame.
+ *
+ * NOTE what this does NOT fix, because layout cannot: Daniel's "the hero floats with large white
+ * margins left and right" on Plentify is the ASSET'S OWN BACKDROP. Measured: its 1920x1080 poster
+ * has 451 fully-white columns on the left and 478 on the right — 48.4% of the picture is white
+ * paper. Resia's hero is 34.6%. No box can remove white that is inside the image, and cropping it
+ * out is the one thing the rule forbids doing silently. Flagged for Daniel; it wants a re-export.
  */
-export function dealSupporting<T extends { ratio: number }>(rest: T[]): { right: T[]; bottom: T[] } {
-  if (rest.length <= 1) return { right: rest, bottom: [] };
-  const byShape = [...rest].sort((a, b) => a.ratio - b.ratio); // tallest first
-  const rightCount = Math.ceil(rest.length / 2);
-  return { right: byShape.slice(0, rightCount), bottom: byShape.slice(rightCount) };
-}
+const FIT_FRAME = 'block h-auto w-auto max-h-full max-w-full object-contain';
 
 /** The right column's own aspect: stacking images of full column width gives a total height of
  *  `width * sum(1/ratio)`, so the column that exactly holds them has this ratio. Feeding it as the
@@ -681,7 +706,7 @@ function ListView({ reduced }: { reduced: boolean }) {
   const [activeN, setActiveN] = useState(() => items[0].n);
   const project = items.find((p) => p.n === activeN) ?? items[0];
   const { hero, rest } = heroSplit(project.images);
-  const { right, bottom } = dealSupporting(rest);
+
 
   // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
   // they are excluded here and never enter the arrow-key walk.
@@ -785,34 +810,33 @@ function ListView({ reduced }: { reduced: boolean }) {
             animate={{ opacity: 1 }}
             transition={{ duration: reduced ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* ROW 1 — the pictures: the hero at ~60% of the area, the rest dealt to the right
-                column and the bottom strip. See the MEDIA comment for why those two regions are
-                what "60%, below and to the right" actually means. */}
-            <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="flex min-h-0 flex-1 gap-2">
-                <div data-project-hero className="relative min-h-0 flex-1">
-                  <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fill />
-                </div>
-                {right.length > 0 && (
-                  <div
-                    className="flex h-full shrink-0 flex-col justify-start gap-2"
-                    style={{ aspectRatio: stackRatio(right), maxWidth: `${100 - MEDIA.heroW}%` }}
-                  >
-                    {right.map((img) => (
-                      <div key={img.src} className="relative w-full" style={{ aspectRatio: img.ratio }}>
-                        <ProjectImg image={img} onOpen={openShot} reduced={reduced} fill />
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {/* ROW 1 — the pictures. REGION 1: the hero, alone. REGION 2: every supporting image.
+                See the MEDIA comment. */}
+            <div className="flex min-h-0 flex-1 gap-3">
+              {/* REGION 1 — the hero, alone, as large as the region allows and never cropped. The
+                  flex box is the REGION; the picture inside is its own size (see FIT_FRAME). */}
+              <div data-project-hero className="flex min-h-0 flex-1 items-start justify-start">
+                <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fit />
               </div>
-              {bottom.length > 0 && (
+              {rest.length > 0 && (
+                /* REGION 2, and `stackRatio` is what makes it read as a designed column rather than
+                   a pile. The rail's WIDTH is derived from the stack it has to hold, so the cells
+                   share one width, each keeps its own exact height, and the stack lands flush with
+                   the hero's bottom edge — no sliver, no crop, no ragged rail. `max-w` caps it at
+                   its share; when that bites the cells just get shorter (still exact).
+
+                   It is a real trade and worth knowing: the rail gets NARROWER the more images a
+                   project has, because it is the height that is fixed. Three supporting images make
+                   a narrower rail than two. The alternative — full-width cells at their own heights
+                   — does not fit: Archipedia's three would stack 745px in a 510px rail, so
+                   something would have to be cropped or hidden behind a scrollbar nobody finds. */
                 <div
-                  className="flex shrink-0 gap-2 overflow-hidden"
-                  style={{ height: `${100 - MEDIA.heroH}%` }}
+                  data-project-rail
+                  className="flex h-full shrink-0 flex-col justify-start gap-3"
+                  style={{ aspectRatio: stackRatio(rest), maxWidth: `${MEDIA.supportW}%` }}
                 >
-                  {bottom.map((img) => (
-                    <div key={img.src} className="relative h-full" style={{ aspectRatio: img.ratio }}>
+                  {rest.map((img) => (
+                    <div key={img.src} className="relative w-full" style={{ aspectRatio: img.ratio }}>
                       <ProjectImg image={img} onOpen={openShot} reduced={reduced} fill />
                     </div>
                   ))}
