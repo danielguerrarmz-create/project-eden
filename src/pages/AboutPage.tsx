@@ -995,18 +995,26 @@ function CodaBower() {
   );
 }
 
-/** The coda: the flowers, then the crossing, then the payoff. "The big spacing in between" is the
- *  brief, so the air here is deliberate and generous — this is the beat the whole timeline lands on. */
+/**
+ * The coda: the flowers, then the payoff. "The big spacing in between" is the brief, so the air here
+ * is deliberate and generous — this is the beat the whole timeline lands on.
+ *
+ * ROUND 5 — TWO LINES CUT. Daniel: "Go ahead and remove the 'Crossed paths, 2021' and the 'Since
+ * then...' keep only the 'Why bet on us..' and place it in between the crossed paths and the current
+ * placement." So the kicker and the inventory line are gone (deleted from TEAM_CODA, not left
+ * unrendered — an unused constant is a comment with extra steps), and one line lands here alone.
+ *
+ * `mt-32` IS "in between", measured rather than eyeballed: from the flowers' bottom edge, the kicker
+ * used to sit at +56 and the payoff at +199. Halfway is +128, which is mt-32 exactly. The label now
+ * carries the whole beat on its own, so it gets the air the two of them used to share.
+ */
 function TeamCoda({ reduced }: { reduced: boolean }) {
   return (
-    <section aria-label="Crossed paths" className="mx-auto w-full max-w-page px-gutter">
+    // Labelled for what is actually in it now. It was "Crossed paths" after the kicker that is gone.
+    <section aria-label="Why bet on us" className="mx-auto w-full max-w-page px-gutter">
       <div className={reduced ? 'h-12' : 'min-h-[12svh]'} aria-hidden />
       <CodaBower />
-      <div className="mx-auto mt-14 max-w-[640px] text-center">
-        <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
-        <p className="mt-3 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
-      </div>
-      <div className="mx-auto mt-16 max-w-[640px] text-center">
+      <div className="mx-auto mt-32 max-w-[640px] text-center">
         <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-accentOlive">
           {TEAM_CODA.payoffLabel}
         </p>

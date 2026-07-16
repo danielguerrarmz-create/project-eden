@@ -200,11 +200,22 @@ export const TEAM: TeamMember[] = [
   },
 ];
 
-/** The line under the two stems: what the crossing produced. Sourced from the project set below,
- *  no counts invented. */
+/**
+ * The coda: the one line the whole timeline lands on.
+ *
+ * ROUND 5 (2026-07-16) — `kicker` and `line` are DELETED, on Daniel's instruction: "Go ahead and
+ * remove the 'Crossed paths, 2021' and the 'Since then...' keep only the 'Why bet on us..'".
+ * Recover with: git show ef11345 -- src/pages/about/projects.ts
+ *
+ *   kicker: 'Crossed paths, 2021'
+ *   line:   'Since then: an ecodistrict, an arts center on a floodplain, a composite grown from
+ *            bamboo and hemp, and the papers above.'
+ *
+ * Deleted rather than left unrendered, because a constant nothing reads is a comment with extra
+ * steps. The `line` was an inventory of the project set, and the project set is now right below it
+ * in full — it was saying, worse, what the work says itself.
+ */
 export const TEAM_CODA = {
-  kicker: 'Crossed paths, 2021',
-  line: 'Since then: an ecodistrict, an arts center on a floodplain, a composite grown from bamboo and hemp, and the papers above.',
   payoffLabel: 'Why bet on us',
   payoff: 'The obsession is real, and it is old.',
 };
