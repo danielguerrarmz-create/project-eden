@@ -711,83 +711,17 @@ function ListView({ reduced }: { reduced: boolean }) {
 
 /* -------------------------------- founders -------------------------------- */
 
-/** The framing roots: the finale's ink line, continued and made ORNATE. Where the line arrives at
- *  the top of the founders block it settles on a convergence node, then two roots sweep OUT and DOWN
- *  each side, wrapping gracefully around the OUTSIDE of a founder column (Clay left, Daniel right) and
- *  framing the two of them, with soft botanical curls and tendril loops, then meandering back inward
- *  at the bottom toward The Work. It is a 19th-century root-engraving register: ONE colour INK_SEPIA,
- *  one line weight, drawn and alive.
+/*
+ * THE LEADER LINES ARE GONE (2026-07-16, round 2). `FounderRoots` / `FounderRootStem` /
+ * `FoundersFlow` / `FoundersFlowStem` drew hand-authored bezier "roots" wrapping the founder
+ * columns and a plumb line running on down to the work. Daniel, on the sketch they came from:
+ * "When I had initially sketched out those lines to go around us, I just wanted you to create a
+ * level of flower ornamentation around the text... Right now it is extremely choppy because it is
+ * just random lines on top of it." The lines were a PLACEHOLDER for flowers, and they were read as
+ * a literal spec. `FounderBower` below is what they were standing in for.
  *
- *  Geometry: an absolutely-positioned layer behind the block. The viewBox is a 1000-wide field mapped
- *  onto the 1000px content column with `preserveAspectRatio="none"`, so x 0..1000 tracks the column
- *  and the roots wrap in the open OUTER margins of each half (never across a portrait, name, or fact).
- *  `vectorEffect="non-scaling-stroke"` keeps the line weight constant under the vertical fill-stretch,
- *  and `overflow-visible` lets the bottom sweeps trail past the block toward the work below.
- *
- *  Only the left root is authored; the right is its mirror (`scale(-1,1)`), so the frame stays
- *  symmetric. The wrapping form needs the desktop margins, so it is gated to `lg`; narrower screens
- *  get the simple descending stem below. */
-const ROOT_LEFT = [
-  // Main root: settle from the node, sweep left across the top, plunge down the far-left OUTSIDE the
-  // Clay column (staying left of his fact leaders the whole descent, x < ~60), and only BELOW the
-  // facts does it meander back INWARD, rejoining its mirror at the page centre (x=500) in the runway
-  // so the two framing roots close back into ONE line that flows on down to the work.
-  'M500 40 C 372 62, 244 50, 150 116 C 42 186, -10 300, 22 424 C 44 512, 16 606, 40 702 C 56 766, 44 814, 60 856 C 92 916, 320 980, 500 1000',
-  // A soft curl looping off the far-left bend, out in the margin.
-  'M22 424 C -36 398, -34 482, 30 470 C 66 463, 56 436, 26 446',
-  // A small tendril hook in the runway below the facts, pointing toward the work.
-  'M60 856 C 28 880, 42 928, 104 908',
-];
-
-function FounderRoots() {
-  const rootStroke = {
-    stroke: INK_SEPIA,
-    strokeWidth: 2.4,
-    fill: 'none' as const,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    vectorEffect: 'non-scaling-stroke' as const,
-  };
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 1000 1000"
-      preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
-    >
-      {/* the line arrives and settles on the convergence node */}
-      <path d="M500 0 V40" stroke={INK_SEPIA} strokeWidth={2.8} fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-      <circle cx={500} cy={40} r={3.4} fill={INK_SEPIA} />
-      {ROOT_LEFT.map((d, i) => (
-        <path key={`l${i}`} d={d} {...rootStroke} />
-      ))}
-      <g transform="translate(1000,0) scale(-1,1)">
-        {ROOT_LEFT.map((d, i) => (
-          <path key={`r${i}`} d={d} {...rootStroke} />
-        ))}
-      </g>
-    </svg>
-  );
-}
-
-/** Narrow-screen fallback: a single graceful root descending from the arriving line to a node, with
- *  two tight tendrils hugging the stem. It continues the line without the desktop wrap (no room to
- *  frame) and stays ENTIRELY in the space above the label, so it never crosses the "The two of us"
- *  text or the columns below. */
-function FounderRootStem() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 60 60"
-      className="pointer-events-none absolute left-1/2 top-0 block h-14 w-14 -translate-x-1/2 overflow-visible lg:hidden"
-    >
-      <path d="M30 0 C 30 22, 27 38, 30 52" stroke={INK_SEPIA} strokeWidth={2.4} fill="none" strokeLinecap="round" />
-      <path d="M30 36 C 22 42, 19 50, 25 56" stroke={INK_SEPIA} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <path d="M30 36 C 38 42, 41 50, 35 56" stroke={INK_SEPIA} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <circle cx={30} cy={52} r={2.6} fill={INK_SEPIA} />
-    </svg>
-  );
-}
+ * Recover them from git if ever needed: `git show fa87d33 -- src/pages/AboutPage.tsx`.
+ */
 
 /** The seam connector: a single vertical INK_SEPIA line at the PAGE centre that carries the finale's
  *  descending line across a spacer. The timeline's unravel exits its frame at the page centre and the
@@ -808,108 +742,66 @@ function SeamBridge() {
   );
 }
 
-/** Founders → The Work. After the two roots rejoin at the page centre below the portraits, the one
- *  line flows on DOWN past the founders' words and into the projects. It routes out through the open
- *  left margin (the words are a narrow centred column, so the line never crosses a glyph), carries a
- *  small botanical curl for life, and returns to the page centre as it arrives at The Work. Mapped
- *  with `preserveAspectRatio="none"` over the words+runway block, so x tracks the content column. */
-function FoundersFlow() {
-  const stroke = {
-    stroke: INK_SEPIA,
-    strokeWidth: 2.6,
-    fill: 'none' as const,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    vectorEffect: 'non-scaling-stroke' as const,
-  };
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
-    >
-      {/* hold centre to meet the rejoined roots, then out to the left margin, down past the words,
-          and back to centre as it arrives at the work below */}
-      <path d="M50 -2 C 49 6, 30 11, 17 30 C 12 47, 14 65, 22 82 C 30 94, 45 98, 50 102" {...stroke} />
-      {/* a soft curl off the descent, out in the margin */}
-      <path d="M17 30 C 6 27, 7 41, 20 39 C 27 38, 24 30, 15 33" {...stroke} />
-    </svg>
-  );
-}
-
-/** Narrow-screen fallback for the founders → work run: a simple plumb line at centre (no room to
- *  route around the words), so the continuity still reads on mobile. */
-function FoundersFlowStem() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 block h-full w-full overflow-visible lg:hidden"
-    >
-      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_SEPIA} strokeWidth={2.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-    </svg>
-  );
-}
+/** The founders' small-caps voice, lifted verbatim from the retired ascent draft. */
+const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
 
 /**
- * One founder, as a specimen sheet: the PORTRAIT, the FACTS hung off a stem, and the founder's own
- * BOTANICAL — a gongbi nonflower grown from the seed of their name (`bower/clay-seifert`,
- * `bower/daniel-guerra-5`). The plant is the one place on this page where full pigment is allowed;
- * everything structural around it stays INK_SEPIA.
+ * One founder, as a three-band specimen sheet: PORTRAIT · FACTS · SPECIMEN, read across.
  *
- * The pattern is lifted from the retired ascent draft's Founders() (portrait · facts · specimen),
- * which read better than the centred portrait-over-list this replaced: the specimen gives the
- * column a second focal point and the facts get a real measure to sit on instead of being squeezed
- * under a 112px circle.
+ * This IS the retired ascent draft's `Founders()` (`git show
+ * about-v2-nonflowers:src/pages/ascent/AscentPage.tsx`), ported wholesale on Daniel's ruling —
+ * "I much preferred Clay's founder page... the entirety of it is a lot better than my current
+ * ones." Kept exactly: the 5/7/5 measure, the bordered 4:5 portrait with its caption UNDER it
+ * (name over role, both mono), the facts as a real `<dl>` on a 52ch measure at 17px, and the
+ * specimen hung large at the outer edge. What the old node did — a 112px circular crop, the role
+ * in olive, the facts squeezed into a 13.5px list on leader lines — is all gone.
  *
- * The specimen is keyed on `person.id`, not matched out of `person.name` — see FOUNDER_SPECIMENS.
+ * TWO DELIBERATE DEPARTURES from the source, both required by where it now lives:
+ *  1. Clay's draft was INK_BLUE and forced `voice: 'ink'` on the specimen, because his page
+ *     rationed pigment to two events. This page's law is the opposite (CLAUDE.md): structure is
+ *     INK_SEPIA and the botanical specimens are the one place FULL PIGMENT is allowed. Daniel on
+ *     round 1: "the colors are amazing". So the commission hangs unmodified, in pigment.
+ *  2. The specimen is keyed on `person.id`, NOT `member.name.startsWith('Clay')` as the draft did
+ *     — that grows the wrong plant the day someone rewords a name. See FOUNDER_SPECIMENS.
+ *
+ * The draft's `flex-col-reverse` wrappers are also dropped: they existed only to invert DOM order
+ * for the ascent's column-reverse scroller. This page reads downward, so reading order already IS
+ * visual order, and the source's intended sequence (kicker, then Clay, then Daniel) survives.
  */
 function FounderNode({ person }: { person: TeamMember }) {
   return (
-    <div className="flex flex-col">
-      <div className="flex items-start gap-5">
-        <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-full border-[1.5px] border-inkBlack/20 bg-paperDeep/50">
-          {person.image ? (
-            <img
-              src={person.image}
-              alt={`Portrait of ${person.name}`}
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          ) : (
+    <div className="grid gap-10 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,5fr)] md:items-start">
+      <figure>
+        {person.image ? (
+          <img
+            src={person.image}
+            alt={`Portrait of ${person.name}`}
+            loading="lazy"
+            className="aspect-[4/5] w-full border border-inkBlack/12 object-cover"
+          />
+        ) : (
+          <div className="flex aspect-[4/5] w-full items-center justify-center border border-dashed border-inkBlack/20">
             <OculusMark size={44} className="h-auto w-11 text-inkBlack/20" />
-          )}
-        </div>
-        <div className="min-w-0 pt-2">
-          <h3 className="font-serifDisplay text-[19px] leading-tight text-inkBlack">{person.name}</h3>
-          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-accentOlive">{person.role}</p>
-          {/* The specimen, signed with the seed it grew from — the provenance is the point:
-              type the printed seed into #/lab/gongbi and this exact plant grows back. */}
-          <div className="mt-4">
-            <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={168} />
           </div>
-        </div>
-      </div>
+        )}
+        <figcaption className="mt-3">
+          <span className={`${MONO_SMALL} block text-inkBlack`}>{person.name}</span>
+          <span className={`${MONO_SMALL} block text-inkBlack/60`}>{person.role}</span>
+        </figcaption>
+      </figure>
 
-      <ul className="relative mt-7 w-full text-left">
-        {/* the stem the facts hang from */}
-        <span aria-hidden className="absolute bottom-2 left-[3px] top-2 w-px" style={{ background: INK_SEPIA, opacity: 0.4 }} />
-        {person.facts.map((f) => (
-          <li key={f.label} className="relative border-t border-inkBlack/10 py-3.5 pl-8 first:border-t-0">
-            {/* the leader line out from the stem to the label — no terminal dot (Daniel's
-                "no decorative blue marks" rule; the connector is structural and stays). */}
-            <span
-              aria-hidden
-              className="absolute left-[3px] top-[1.4rem] h-px w-[22px] -translate-y-1/2"
-              style={{ background: INK_SEPIA, opacity: 0.4 }}
-            />
-            <div className="font-mono text-[10px] uppercase tracking-[0.13em] text-inkBlack/45">{f.label}</div>
-            <p className="mt-1 font-serifDisplay text-[13.5px] leading-relaxed text-inkBlack/[0.78]">{f.value}</p>
-          </li>
+      <dl className="space-y-6">
+        {person.facts.map((fact) => (
+          <div key={fact.label}>
+            <dt className={`${MONO_SMALL} text-inkBlack/60`}>{fact.label}</dt>
+            <dd className="mt-1.5 max-w-[52ch] text-[17px] leading-relaxed opacity-90">{fact.value}</dd>
+          </div>
         ))}
-      </ul>
+      </dl>
+
+      {/* The specimen, signed with the seed it grew from — the provenance is the point: type the
+          printed seed into #/lab/gongbi and this exact plant grows back. */}
+      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={340} className="md:justify-self-end" />
     </div>
   );
 }
@@ -963,51 +855,37 @@ export function AboutPage() {
           <SeamBridge />
         </div>
 
-        {/* The two of us. AFTER the sequence: by the time you meet them, you already know where they
-            came from. The finale's stem forks here and the facts hang off each fork on leader lines. */}
-        <section aria-label="The two of us">
-          {/* The roots FRAME the two of them: an ink layer behind the label + portraits, wrapping down
-              the open outer margins of each column. The content rides above it on its own z-layer. */}
-          <div className="relative mx-auto max-w-[1000px] px-4">
-            <FounderRoots />
-            <FounderRootStem />
-            {/* pt drops the label clear of the top arcs; pb gives the roots a runway BELOW the facts
-                to meander inward toward The Work. */}
-            <div className="relative z-10 pt-16 pb-28">
-              <p className="text-center font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">
-                The two of us
-              </p>
+        {/* The founders. AFTER the sequence: by the time you meet them, you already know where they
+            came from. The composition is the retired ascent draft's, ported wholesale — see
+            FounderNode. `max-w-page` is that draft's own measure (Frame measure="page"), which the
+            5/7/5 band needs; the old block was clamped to 1000px for roots that no longer exist.
 
-              <div className="mt-10 grid gap-x-16 gap-y-14 sm:grid-cols-2">
-                {TEAM.map((person) => (
-                  <FounderNode key={person.name} person={person} />
-                ))}
-              </div>
-            </div>
+            NOTE on the header: the draft's <main> had NO pt-header — only its Summit() added one
+            locally — so its founders slid under the fixed SplashHeader (position:fixed, top-0,
+            z-50). Ported here the bug cannot recur: this page's <main> carries
+            pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
+        <section aria-label="The founders" className="mx-auto w-full max-w-page px-gutter">
+          <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
+
+          <div className="mt-12 flex flex-col gap-16">
+            {TEAM.map((person) => (
+              <FounderNode key={person.id} person={person} />
+            ))}
           </div>
 
-          {/* The two roots rejoin at the page centre below the portraits; from there the ONE line
-              flows on down past the founders' words and into The Work, routed through the open margin
-              so it never crosses the centred text. The words ride above it on their own z-layer. */}
-          <div className="relative">
-            <FoundersFlow />
-            <FoundersFlowStem />
-            <div className="relative z-10">
-              <div className="mx-auto mt-16 max-w-[640px] text-center">
-                <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
-                <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
-              </div>
-
-              <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
-                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
-                <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
-                  {TEAM_CODA.payoff}
-                </p>
-              </div>
-            </div>
-            {/* the line's runway down into the work (this replaces the old separate spacer). */}
-            <div aria-hidden className={reduced ? 'h-16' : 'min-h-[26svh]'} />
+          <div className="mx-auto mt-24 max-w-[640px] text-center">
+            <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-inkBlack/40">{TEAM_CODA.kicker}</p>
+            <p className="mt-2 font-serifDisplay text-[15px] leading-relaxed text-inkBlack/70">{TEAM_CODA.line}</p>
           </div>
+
+          <div className="mx-auto mt-10 max-w-[640px] border-t border-inkBlack/12 pt-6 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">{TEAM_CODA.payoffLabel}</p>
+            <p className="mt-2 font-serifDisplay text-[clamp(1.05rem,1.4vw,1.35rem)] text-inkBlack">
+              {TEAM_CODA.payoff}
+            </p>
+          </div>
+
+          <div aria-hidden className={reduced ? 'h-16' : 'min-h-[20svh]'} />
         </section>
 
         {/* PORTION TWO — the work, most recent first. The founders → work line arrives at the page
