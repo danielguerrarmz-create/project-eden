@@ -1258,12 +1258,84 @@ export function subBranchWidth(order: number): number {
   return Math.max(0.9, SUB_BRANCH_W * Math.pow(0.72, order));
 }
 
+/** Arc length of a polyline. The dash reveal needs it, and `getTotalLength()` would mean reading
+ *  layout back out of the DOM for geometry we already have in hand. */
+function polyLen(pts: Array<{ x: number; y: number }>): number {
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return d;
+}
+
+/** How far behind its parent a branch waits before it starts drawing, in world units of card-line
+ *  travel, per order. Trunk -> branch -> twig, in that order, rather than a tree that fades in
+ *  uniformly (which is just a fade). Tuned by looking. */
+const SUB_GROW_ORDER_LAG = 55;
+/** How far behind its own stem an organ follows, as a fraction of the branch's draw. "A beat behind
+ *  the segment carrying them" — the twig reaches the station, then the leaf opens on it. */
+const SUB_ORGAN_LAG = 0.12;
+/** How long an organ takes to fade in, in the same units. */
+const SUB_ORGAN_FADE = 0.22;
+/** The reveal disc's radius, world units — comfortably larger than the biggest organ at
+ *  SUB_ORGAN_SCALE, because a disc that clips its own organ is just a differently-shaped bug. */
+const SUB_ORGAN_R = 85;
+
+/** One organ's reveal disc: where it sits, and which branch's growth it waits on. */
+interface OrganMark {
+  x: number;
+  y: number;
+  branch: number;
+  t: number;
+}
+
+/** Every station's world position, resolved once. Pure, and it reads the SAME vine list the painter
+ *  is given, so a disc cannot drift from the organ it uncovers. */
+function subOrganMarks(runs: readonly Branch[]): OrganMark[] {
+  const out: OrganMark[] = [];
+  subBranchVines(runs).forEach((vine, bi) => {
+    const pts = vine.path;
+    for (const s of vine.stations) {
+      // The painter's own index arithmetic (see paintGarland's station loop), so the disc lands on
+      // the organ rather than near it. It resamples at 4px first; over a 9px-segment polyline the
+      // difference is under a segment and far under SUB_ORGAN_R.
+      const idx = Math.max(1, Math.min(pts.length - 1, Math.round(s.t * (pts.length - 1))));
+      out.push({ x: pts[idx][0] + SUB_BOX.x, y: pts[idx][1] + SUB_BOX.y, branch: bi, t: s.t });
+    }
+  });
+  return out;
+}
+
 /**
  * The sub-branches: sepia stems drawn in SVG, with the gongbi organs painted once off-thread and
  * hung over them. Ornament only — nothing on this page reads its geometry back.
+ *
+ * THEY GROW (2026-07-16, round 4). Daniel: "I think it would be very beautiful if... we could
+ * actually see the plants and the branches being assembled as it is coming down. Currently
+ * everything will appear all at once and it's already existing there, which feels cheap and it
+ * doesn't feel like the growing that our projects have done. It kind of fades in or generates
+ * alongside our projects and BOTH OF THOSE EMISSIONS SHOULD MATCH EACH OTHER."
+ *
+ * THE SYNC IS THE REQUIREMENT, and it is what chooses the mechanism. The plates fade on
+ * `clamp01((cardLineY - y - 10) / UNFURL_SPAN)` — the camera's own card line, sweeping down the
+ * drawing. So the branches reveal on the SAME LINE, with the same span and the same linear ramp,
+ * evaluated at their own y. A plate arriving and the branch beside it growing are then not two
+ * animations that agree; they are one expression read at two places, and they cannot drift.
+ *
+ * (An entry-triggered IntersectionObserver was the other candidate and it is the wrong one HERE:
+ * the plates are scroll-driven, so an observer would make the branch a DIFFERENT event from the
+ * plate beside it, which is the one thing the note rules out. Nor is this the expensive kind of
+ * scroll-scrubbing: the camera already re-renders every frame and the plates already do exactly
+ * this, so it costs nothing new. Nothing about PAINTING is deferred — the bitmap is still painted
+ * once on mount.)
+ *
+ * THIS DOES NOT REGRESS "fade, don't grow". That rule governs the PLATES, whose objection was a
+ * layout-affecting transform distorting the image (`unfurl`'s scale(0.92, 0.64)). A stroke revealing
+ * along its own path distorts nothing: the geometry is final before the first frame, and only how
+ * much of it is inked changes.
  */
-function SubBranches({ reduced }: { reduced: boolean }) {
+function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: number }) {
   const runs = useMemo(() => subBranchPolylines(), []);
+  const lens = useMemo(() => runs.map((b) => polyLen(b.pts)), [runs]);
+  const marks = useMemo(() => subOrganMarks(runs), [runs]);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1299,23 +1371,74 @@ function SubBranches({ reduced }: { reduced: boolean }) {
     };
   }, [runs]);
 
+  // THE SAME expression the plates fade on, read at each branch's ROOT — so a branch starts growing
+  // exactly when the card line reaches where it leaves its parent, on the plates' own line, span and
+  // ramp. The order lag is what keeps the traversal botanical: a twig cannot draw before the branch
+  // carrying it.
+  const growOf = (b: Branch) =>
+    reduced ? 1 : clamp01((cardLineY - b.pts[0].y - 10 - b.order * SUB_GROW_ORDER_LAG) / UNFURL_SPAN);
+  const grows = runs.map(growOf);
+
+  /*
+   * THE ORGANS' REVEAL — a disc per station, each waiting on ITS OWN BRANCH's draw.
+   *
+   * The composer paints every organ of a garland into ONE bitmap (one canvas, one genome — see
+   * GarlandOpts.vines), so there is no per-organ element to fade and the reveal has to be a mask.
+   *
+   * The first cut made that mask a soft horizontal WIPE trailing the card line — one rect, cheap,
+   * and wrong. It assumed foliage sits below the root it grows from. Space colonization grows in
+   * every direction: MEASURED, 195 of 332 organs sit ABOVE their own branch's root, by up to 278
+   * world units. So the wipe uncovered blossoms whose twig had not been drawn yet, and the page
+   * showed flowers floating on bare paper. No lag value fixes that — a lag big enough to cover 278
+   * units detaches the foliage from the growth entirely.
+   *
+   * A disc per station keyed to its branch's `grow` cannot have that bug by construction: the organ
+   * is uncovered by the same number that inks the twig under it. 332 discs, resolved once; only
+   * their opacity moves.
+   */
   return (
     <g pointerEvents="none">
-      {runs.map((b, i) => (
-        <path
-          key={i}
-          d={lineGen(b.pts) ?? ''}
-          fill="none"
-          stroke={INK_SEPIA}
-          strokeOpacity={0.62}
-          strokeWidth={subBranchWidth(b.order)}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
+      <defs>
+        {/* Soft-edged, so an organ blooms out of the paper instead of arriving inside a circle. */}
+        <radialGradient id="sub-organ-disc">
+          <stop offset="0.45" stopColor="#fff" />
+          <stop offset="1" stopColor="#000" />
+        </radialGradient>
+        <mask id="sub-organ-mask" maskUnits="userSpaceOnUse" x={SUB_BOX.x} y={SUB_BOX.y} width={SUB_BOX.w} height={SUB_BOX.h}>
+          {marks.map((m, i) => {
+            // The twig reaches the station at grow == t; the organ opens a beat after that.
+            const o = clamp01((grows[m.branch] - m.t - SUB_ORGAN_LAG) / SUB_ORGAN_FADE);
+            if (o <= 0.001) return null;
+            return (
+              <circle key={i} cx={m.x} cy={m.y} r={SUB_ORGAN_R} fill="url(#sub-organ-disc)" opacity={o} />
+            );
+          })}
+        </mask>
+      </defs>
+      {runs.map((b, i) => {
+        const grow = grows[i];
+        if (grow <= 0.001) return null;
+        return (
+          <path
+            key={i}
+            d={lineGen(b.pts) ?? ''}
+            fill="none"
+            stroke={INK_SEPIA}
+            strokeOpacity={0.62}
+            strokeWidth={subBranchWidth(b.order)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            // Root-first pts (see Branch.pts) mean the dash pays out root -> tip: the branch grows
+            // OUT of its parent rather than materialising along its whole length.
+            strokeDasharray={grow < 1 ? lens[i] : undefined}
+            strokeDashoffset={grow < 1 ? lens[i] * (1 - grow) : undefined}
+          />
+        );
+      })}
       {url && (
         <image
           href={url}
+          mask={reduced ? undefined : 'url(#sub-organ-mask)'}
           x={SUB_BOX.x}
           y={SUB_BOX.y}
           width={SUB_BOX.w}
@@ -1976,7 +2099,7 @@ export function CrossPathsTimeline({
                 and never feeds back into it. Painted BEFORE the clusters, so that if the ornament and
                 a project ever do disagree, the project is simply drawn on top — the paint order is
                 the last expression of "the branch loses". */}
-            <SubBranches reduced={reduced} />
+            <SubBranches reduced={reduced} cardLineY={cardLineY} />
 
             {/* THE GARLAND. Clay's gongbi organs grown along the spine's own polyline, in full
                 pigment. Painted after the spine so foliage sits ON the line, and before the
