@@ -5,9 +5,10 @@ import {
   bearingDeg,
   apertureFromFeet,
   centroid,
+  convexHull,
   type Drawing,
 } from './fromDrawing';
-import { ENVELOPE, GRAMMAR } from '../data/config';
+import { ENVELOPE } from '../data/config';
 import { generateGeometry } from './geometry';
 
 /** A rough square blob of a given side, centred on the origin. */
@@ -135,7 +136,7 @@ describe('readDrawing: dumb linework -> buildable params', () => {
     expect(r.nudges.some((n) => n.kind === 'held' && /planning/.test(n.text))).toBe(true);
   });
 
-  it('flags too many ground contacts against the certified 3-4 feet', () => {
+  it('flags too many ground contacts against what the grammar will root', () => {
     const r = readDrawing({
       ...twoSpines,
       spines: [
@@ -145,9 +146,26 @@ describe('readDrawing: dumb linework -> buildable params', () => {
       ],
     });
     expect(r.footBearingsDeg).toHaveLength(6);
-    expect(
-      r.nudges.some((n) => n.kind === 'held' && n.text.includes(String(GRAMMAR.maxFeet))),
-    ).toBe(true);
+    expect(r.nudges.some((n) => n.kind === 'held' && /roots on/.test(n.text))).toBe(true);
+  });
+
+  it('NEVER contradicts the readout beside it: the feet it names are the feet it roots', () => {
+    // "4 ground contacts" printed next to a 3-footed structure reads as a bug.
+    // Whatever the nudge claims must be what generateGeometry actually does.
+    for (const outline of [blob(3.6), blob(4), blob(4.6)]) {
+      const r = readDrawing({ ...twoSpines, outline });
+      const g = generateGeometry(r.params);
+      expect(r.engineFeetCount).toBe(g.feetCount);
+
+      const claim = r.nudges.find((n) => /ground contacts|roots on/.test(n.text))!;
+      if (r.engineFeetCount !== r.footBearingsDeg.length) {
+        // It must own the difference, not paper over it.
+        expect(claim.kind).toBe('held');
+        expect(claim.text).toContain(`roots on ${g.feetCount}`);
+      } else {
+        expect(claim.kind).toBe('read');
+      }
+    }
   });
 
   it('OFFERS the sun rotation without applying it — the user stays in charge', () => {
@@ -177,6 +195,58 @@ describe('readDrawing: dumb linework -> buildable params', () => {
     const r = readDrawing({ outline: [], spines: [] });
     expect(r.params.footprintM2).toBe(ENVELOPE.footprintM2.default);
     expect(() => generateGeometry(r.params)).not.toThrow();
+  });
+});
+
+describe('convexHull: the feet ARE the plan', () => {
+  it('hulls a square and ignores an interior point', () => {
+    const h = convexHull([...blob(4), { x: 0, y: 0 }]);
+    expect(h).toHaveLength(4);
+    expect(polygonAreaM2(h)).toBeCloseTo(16, 6);
+  });
+
+  it('is safe on degenerate input', () => {
+    expect(convexHull([])).toEqual([]);
+    expect(convexHull([{ x: 1, y: 1 }])).toHaveLength(1);
+  });
+});
+
+describe('readDrawing: spines ALONE are enough (the 3D flow traces no blob)', () => {
+  // Two crossing strokes, endpoints 4m apart on the diagonals.
+  const spinesOnly: Drawing = {
+    spines: [
+      { a: { x: -2, y: -2 }, b: { x: 2, y: 2 } },
+      { a: { x: 2, y: -2 }, b: { x: -2, y: 2 } },
+    ],
+  };
+
+  it('reads the footprint from the ground contacts with no outline at all', () => {
+    const r = readDrawing(spinesOnly);
+    // The 4 endpoints hull to a 4x4 square rotated 45° -> 16 m².
+    expect(r.drawnAreaM2).toBeCloseTo(16, 1);
+    expect(r.params.footprintM2).toBeCloseTo(16, 1);
+    expect(r.footBearingsDeg).toHaveLength(4);
+  });
+
+  it('still builds a real, costed structure', () => {
+    const r = readDrawing(spinesOnly);
+    const g = generateGeometry(r.params);
+    expect(g.members.length).toBeGreaterThan(0);
+    expect([3, 4]).toContain(g.feetCount);
+  });
+
+  it('a single line still reads as something buildable', () => {
+    const r = readDrawing({ spines: [{ a: { x: -2, y: 0 }, b: { x: 2, y: 0 } }] });
+    expect(r.footBearingsDeg).toHaveLength(2);
+    expect(() => generateGeometry(r.params)).not.toThrow();
+    expect(r.params.footprintM2).toBeGreaterThanOrEqual(ENVELOPE.footprintM2.min);
+  });
+
+  it('an outline, when traced, still wins over the hull', () => {
+    const r = readDrawing({ ...spinesOnly, outline: blob(4) }); // 16 either way
+    expect(r.drawnAreaM2).toBeCloseTo(16, 1);
+    const big = readDrawing({ ...spinesOnly, outline: blob(8) }); // 64 -> outline wins
+    expect(big.drawnAreaM2).toBeCloseTo(64, 1);
   });
 });
 

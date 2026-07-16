@@ -17,7 +17,8 @@
  *
  * Pure. No React, no three.js. Testable in a plain node repl.
  */
-import { ENVELOPE, GRAMMAR, SITE } from '../data/config';
+import { ENVELOPE, SITE } from '../data/config';
+import { feetCountFor } from './grammar';
 import type { DesignParams, JointSystem } from './types';
 
 /** A point in PLAN metres. Origin = the placement centre; +x east, +y north. */
@@ -32,10 +33,14 @@ export interface Spine {
   b: Pt;
 }
 
-/** Everything the drawing surface collects. All of it is optional but outline. */
+/** Everything the drawing surface collects. Spines alone are enough. */
 export interface Drawing {
-  /** The loose, not-necessarily-closed outline scribbled for the plan extent. */
-  outline: Pt[];
+  /**
+   * OPTIONAL loose outline. The 3D flow doesn't collect one — the footprint is
+   * read from the ground contacts instead, which removes a whole step. Kept
+   * because a plan trace is still a legitimate way to say "about this big".
+   */
+  outline?: Pt[];
   /** Spine strokes. Each contributes TWO ground contacts (its endpoints). */
   spines: Spine[];
   /** How far the user pulled the crown up, in metres above the default rise. */
@@ -56,6 +61,8 @@ export interface ReadDrawing {
   params: DesignParams;
   /** Ground contacts the engine read out of the spines, as compass bearings. */
   footBearingsDeg: number[];
+  /** How many feet the GRAMMAR will actually root — not always what you drew. */
+  engineFeetCount: number;
   /** Plan area the outline actually enclosed, BEFORE grammar clamping (m²). */
   drawnAreaM2: number;
   /** What the engine decided and why — the "it has an opinion" surface. */
@@ -74,6 +81,28 @@ export function polygonAreaM2(pts: Pt[]): number {
     a += p.x * q.y - q.x * p.y;
   }
   return Math.abs(a) / 2;
+}
+
+/**
+ * Convex hull (Andrew's monotone chain). Used to turn the ground contacts into
+ * a plan: the feet you drew ARE the footprint, so the "how big is it" step
+ * stops existing. Fewer steps, and the size is a consequence of the lines
+ * rather than a second thing to state.
+ */
+export function convexHull(pts: Pt[]): Pt[] {
+  if (pts.length < 3) return [...pts];
+  const p = [...pts].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const half = (src: Pt[]) => {
+    const h: Pt[] = [];
+    for (const q of src) {
+      while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop();
+      h.push(q);
+    }
+    h.pop();
+    return h;
+  };
+  return [...half(p), ...half([...p].reverse())];
 }
 
 /** Centroid of a point cloud — the placement centre the structure sits on. */
@@ -141,8 +170,16 @@ function angularDistance(a: number, b: number): number {
 export function readDrawing(d: Drawing): ReadDrawing {
   const nudges: Nudge[] = [];
 
-  // --- Footprint: the blob's enclosed area, eased into the validated family.
-  const drawnAreaM2 = polygonAreaM2(d.outline);
+  // --- Footprint: whatever the drawing enclosed.
+  //
+  // Prefer an explicit outline if one was traced; otherwise the ground contacts
+  // ARE the plan — the hull through the feet. That is what lets the 3D flow
+  // drop the "how big is it" step entirely: you drew where it lands, so you
+  // already said how big it is. Asking again would be asking twice.
+  const outline = d.outline ?? [];
+  const feetPts = d.spines.flatMap((s) => [s.a, s.b]);
+  const drawnAreaM2 =
+    outline.length >= 3 ? polygonAreaM2(outline) : polygonAreaM2(convexHull(feetPts));
   const footprintM2 = clamp(
     drawnAreaM2 > 0 ? drawnAreaM2 : ENVELOPE.footprintM2.default,
     ENVELOPE.footprintM2.min,
@@ -162,30 +199,35 @@ export function readDrawing(d: Drawing): ReadDrawing {
     // line and took it — that's the thing worth showing.
     nudges.push({
       kind: 'read',
-      text: `Your outline encloses ${drawnAreaM2.toFixed(1)} m². That's inside the validated family, so it stands exactly as drawn.`,
+      text: `Your lines enclose ${drawnAreaM2.toFixed(1)} m². Inside the validated family, so it stands exactly as drawn.`,
     });
   }
 
   // --- Feet: every spine endpoint is a ground contact.
-  const centre = centroid(d.spines.length > 0 ? d.spines.flatMap((s) => [s.a, s.b]) : d.outline);
-  const footBearingsDeg = d.spines
-    .flatMap((s) => [s.a, s.b])
+  const centre = centroid(feetPts.length > 0 ? feetPts : outline);
+  const footBearingsDeg = feetPts
     .map((p) => Math.round(bearingDeg(centre, p)))
     .sort((a, b) => a - b);
 
-  if (d.spines.length > 0) {
-    nudges.push({
-      kind: 'read',
-      text: `${d.spines.length} ${d.spines.length === 1 ? 'spine' : 'spines'} → ${footBearingsDeg.length} ground contacts. The lattice is generated between them; each contact lands on a driven screw.`,
-    });
-  }
+  // What the ENGINE will actually root on, which is not always what you drew.
+  // Say the true number here or the panel contradicts the readout beside it —
+  // "4 ground contacts" next to "3 feet" reads as a bug, and the honest version
+  // is more interesting anyway: the grammar has a view about how many legs a
+  // canopy this size needs, and it is willing to say so.
+  const engineFeet = feetCountFor(footprintM2);
 
-  // The grammar only certifies 3 or 4 feet. More strokes = a held decision.
-  if (footBearingsDeg.length > GRAMMAR.maxFeet) {
-    nudges.push({
-      kind: 'held',
-      text: `${footBearingsDeg.length} contacts drawn; the validated family roots on ${GRAMMAR.minFeet}–${GRAMMAR.maxFeet}. The extra contacts are read as shaping intent, not legs.`,
-    });
+  if (d.spines.length > 0) {
+    if (engineFeet === footBearingsDeg.length) {
+      nudges.push({
+        kind: 'read',
+        text: `${d.spines.length} ${d.spines.length === 1 ? 'line' : 'lines'} → ${footBearingsDeg.length} ground contacts. The lattice is interpolated between them; each lands on a driven screw.`,
+      });
+    } else {
+      nudges.push({
+        kind: 'held',
+        text: `You marked ${footBearingsDeg.length} contacts. At ${footprintM2.toFixed(1)} m² the validated family roots on ${engineFeet} — so it rooted ${engineFeet}, and read your lines for where it opens.`,
+      });
+    }
   }
 
   // --- Opening: the widest gap between legs. The user never states this.
@@ -232,7 +274,7 @@ export function readDrawing(d: Drawing): ReadDrawing {
     year: 0,
   };
 
-  return { params, footBearingsDeg, drawnAreaM2, nudges };
+  return { params, footBearingsDeg, engineFeetCount: engineFeet, drawnAreaM2, nudges };
 }
 
 /** Re-exported so the drawing surface and the site step agree on north. */
