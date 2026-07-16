@@ -26,7 +26,7 @@
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
@@ -42,10 +42,19 @@ import {
   type TeamMember,
 } from './about/projects';
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
-import { CrossPathsTimeline, INK_SEPIA, INK_SEPIA_TEXT } from './about/CrossPathsTimeline';
+import {
+  CrossPathsTimeline,
+  DESCENT_EXIT_FRAC,
+  GARLAND_SEED,
+  INK_SEPIA,
+  INK_SEPIA_TEXT,
+  SPINE_W,
+  TIMELINE_W,
+} from './about/CrossPathsTimeline';
 import { FanPainting } from './about/FanPainting';
 import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
+import { armPts, polyD, taperRuns, trunkPts, type ParenLayout } from './about/parenthesis';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
@@ -985,89 +994,198 @@ function TeamCoda({ reduced }: { reduced: boolean }) {
   );
 }
 
+/* --------------------- the founders' parenthesis (task F) -------------------- */
+
+/** Where the arms turn outboard, as a FRACTION of the real margin between the founder rows' edge and
+ *  the paper's edge — not a px constant, because that margin is a `max-w-page` remainder and changes
+ *  with the viewport. 0.5 hangs the arms down the middle of the air: any further in and they crowd
+ *  the portraits, any further out and the organs paint off the edge of their own canvas, which reads
+ *  as a broken drawing rather than as a vine running off the page. */
+const PAREN_TURN_FRAC = 0.58;
+/** Where the arms leave the trunk, as a fraction of the band between the timeline's exit and the
+ *  first founder. That band is ALL the room the crossing gets (see armPts), so this is the split
+ *  between trunk and swag: lower and the swag has no room and kinks, higher and the line does not
+ *  read as arriving before it opens. Tuned by looking. */
+const PAREN_FORK_FRAC = 0.22;
+/** Organ size along the arms. The spine garland pins 1.5 and the sub-branches 0.95; the arms sit in
+ *  open margin with the most air on the page, so they carry the largest foliage. Tuned by looking. */
+const PAREN_ORGAN_SCALE = 2.0;
+/** The arms' stroke at the fork, as a FRACTION of the trunk's measured width. Lighter than the
+ *  trunk: this is the line thinning as it opens and grows out, the way a branch is thinner than the
+ *  trunk it left. A fraction rather than a px constant because the trunk's own width is measured off
+ *  the timeline's rendered scale and changes with the viewport. */
+const PAREN_STEM_FRAC = 0.78;
+/** The arm's width at the very tip, as a fraction of the trunk's. Not 0: a stem that vanishes reads
+ *  as a fading line rather than a thin one, and the organs still have to hang off something. */
+const PAREN_TIP_FRAC = 0.25;
+
 /**
- * FOUNDER BOWER — flowers growing around the two of them.
+ * THE FOUNDERS' PARENTHESIS — the one line arrives, and opens around the two of them.
  *
- * NOTE THE BRIEF, because it is the OPPOSITE of the sub-branch engine's and the difference is
- * deliberate. There, Daniel asked for "an engine or an algorithm" and got space colonization. Here:
+ * Daniel: "I'd like the main branch... to actually kind of go into some parentheses and go right and
+ * left from Clay, and on the right side and left side to start generating those beautiful flowers
+ * and sub-branches", and "The flowers on the left and right side of the founder are quite beautiful
+ * but they must connect. The stems at the top must connect with the stem that's unraveling from the
+ * bower logo at the top."
  *
- *   "It doesn't have to be a specific mathematical pattern. It just has to look pretty."
+ * This REPLACES `FounderBower` (the four vines drawn down the margins). Those were the right
+ * flowers in the right place and Daniel liked them — they just grew out of nothing. Recover with:
+ *     git show b0150ce -- src/pages/AboutPage.tsx
  *
- * So there is no derived geometry in this component and there should not be one. These are four
- * curves drawn by hand, by eye, in a 160x1100 strip — two down the left margin, two down the right —
- * and they are tuned by looking at the page, not by computing anything. Growing them from an
- * algorithm would be answering a question he did not ask, and the last algorithm that got pointed at
- * a "make it pretty" problem is what produced the choppy lines this replaces.
+ * WHY THE STEMS ARE SEPIA SVG AND THE ORGANS ARE PIGMENT, when FounderBower painted the whole vine
+ * (`tube: true`): the connection REQUIRES it. A painted gongbi vine and a drawn sepia spine are two
+ * different registers — a painterly, semi-transparent, tapering brush against a hard constant-width
+ * line — and they cannot meet without a visible seam, whatever the geometry does. The join is the
+ * entire ask, so the arms must be the same kind of mark as the thing they join. This is also the
+ * graft the spine garland and the sub-branches already use (`tube: false`: the page draws the line,
+ * the composer grows the foliage), so the page now does one thing everywhere instead of two.
  *
- * They are VINES, not lines: `tube: true`, so the gongbi composer paints the stem in its own
- * painterly hand along with the foliage, rather than the page stroking a hard sepia bezier and
- * hanging leaves on it. That is the whole correction — "choppy... just random lines on top of it"
- * was a description of a bare drawn line with nothing growing on it.
+ * It also settles the colour-law flag round 2 raised, in the conservative direction and without
+ * needing a ruling: CLAUDE.md says structure is sepia and pigment is for the botanical specimens.
+ * The stems are structure and are sepia; the flowers are botanical and stay in full pigment. Nothing
+ * is extended. Daniel's "quite beautiful" was about the flowers, and the flowers are untouched.
  *
- * PIGMENT, and this is a colour-law call worth flagging: CLAUDE.md permits pigment on "the botanical
- * specimens only" and lists them. A painted vine is a botanical in exactly the register of the
- * founder specimens it hangs beside — but it is not on that list, so it is an extension of the law
- * rather than an application of it. Flagged in the handoff for Daniel.
- *
- * Desktop only: the margins it lives in do not exist below `lg`, and ornament that overlaps the
- * reading column is worse than no ornament.
+ * THE ORNAMENT READS THE LAYOUT AND THE LAYOUT NEVER READS IT BACK. Every number here is measured
+ * off the real DOM — the wrapper, the page's content centre, the founder rows' own rects — and
+ * nothing reads this component back. See parenthesis.ts for why that is load-bearing, and for the
+ * SeamBridge tombstone: it assumed a centred founders block, and the founders are left-aligned.
  */
-/** The strip the vines are painted into, in CSS px, drawn 1:1 on the page — never scaled to fit.
- *  Measured at 1440x900: the founders section is 1181x1401 with a 1100px content column, so each
- *  margin is ~169px of real air. 160 fits it with room, and 1500 overruns the section's height on
- *  purpose: the wrapper clips it, so a taller section (narrower viewport, more text wrapping) simply
- *  reveals more vine instead of stretching what is there.
- *
- *  The first cut stretched a 1100-tall strip to `h-full object-cover` and it upscaled and cropped
- *  the painting — a painted vine has a real hand and a real scale, and blowing it up 1.8x to fill a
- *  box is exactly the "image at the wrong size" mistake this whole round is about. */
-const BOWER_STRIP = { w: 160, h: 1500 };
-
-/** Four curves, drawn by eye. Root-first (the composer tapers a vine root → tip). Left pair first,
- *  then right; the right is authored separately rather than mirrored, because a mirrored vine reads
- *  as a mirrored vine. */
-const BOWER_VINES: Array<Array<[number, number]>> = [
-  // left, long: enters at the top and falls the length of the block, leaning in and out of the margin
-  [[96, -30], [78, 90], [104, 210], [72, 330], [40, 450], [58, 580], [96, 700], [70, 830], [34, 950], [52, 1080]],
-  // left, short: a lower spur that curls back up and out, so the left side is not one lonely stem
-  [[58, 580], [22, 640], [8, 720], [30, 780], [64, 812]],
-  // right, long: a different rhythm and a later start — it arrives beside Daniel rather than Clay
-  [[64, 120], [96, 240], [70, 370], [34, 500], [56, 620], [98, 740], [76, 870], [40, 990], [58, 1100]],
-  // right, short: a high spur near the kicker
-  [[96, 240], [130, 300], [146, 372], [118, 424], [86, 448]],
-];
-
-function FounderBower({ side }: { side: 'left' | 'right' }) {
+function FounderParenthesis({ reduced }: { reduced: boolean }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<ParenLayout | null>(null);
   const [url, setUrl] = useState<string | null>(null);
 
+  // MEASURE. Re-measured on resize and on any layout change inside the founders (a ResizeObserver on
+  // the rows, not just the window: the rows' height moves with text wrapping at a fixed width too).
   useEffect(() => {
+    const host = hostRef.current;
+    const wrap = host?.parentElement;
+    if (!host || !wrap) return;
+    const measure = () => {
+      // The ROWS ARE SIBLINGS' CHILDREN, not this element's. `host` is an absolutely-positioned
+      // overlay covering the wrapper; the founders live in the wrapper's normal flow next to it.
+      const rows = [...wrap.querySelectorAll('[data-founder-row]')];
+      const main = host.closest('main');
+      if (!rows.length || !main) return;
+      const hr = host.getBoundingClientRect();
+      if (hr.width <= 0) return; // below `lg` this overlay is display:none and has no box
+
+      // The page's CONTENT centre, exactly as the timeline computes the x its descent exits on
+      // (see `pageCenterVX`). Read the same way from the same element, so the two agree by
+      // construction rather than by two constants that have to be kept level with each other.
+      const mr = main.getBoundingClientRect();
+      const cs = getComputedStyle(main);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const padR = parseFloat(cs.paddingRight) || 0;
+      const contentCenter = mr.left + padL + (mr.width - padL - padR) / 2;
+
+      const boxes = rows.map((r) => {
+        const b = r.getBoundingClientRect();
+        return { y0: b.top - hr.top, y1: b.bottom - hr.top };
+      });
+      // The rows' real edges — NOT the page centre, and not the section's box.
+      const edges = rows.map((r) => r.getBoundingClientRect());
+      const rowLeft = Math.min(...edges.map((e) => e.left)) - hr.left;
+      const rowRight = Math.max(...edges.map((e) => e.right)) - hr.left;
+
+      // WHERE THE TIMELINE'S LINE ACTUALLY STOPS. The two modes are genuinely different geometry and
+      // assuming either one leaves a visible gap in the other. Both are MEASURED off the real
+      // elements rather than derived from constants, because both were got wrong by reasoning.
+      const tlSvg = document.querySelector('[data-timeline-track] svg');
+      const tlFrame = document.querySelector('[data-timeline-frame]');
+      const tr = tlSvg?.getBoundingClientRect();
+      let trunkY0 = 0;
+      if (reduced && tr) {
+        // REDUCED: one static full-height SVG. Its drawing runs 80 world units PAST its own exit
+        // (see `H`), so the line stops ~85px ABOVE this overlay's top edge.
+        trunkY0 = tr.top + DESCENT_EXIT_FRAC * tr.height - hr.top;
+      } else if (tr && tlFrame) {
+        // MOTION: a sticky viewport-height row inside a 1080vh track. The row bottoms out at the
+        // track's bottom, which IS this overlay's top, and the descent exits on the frame's bottom
+        // edge at the end of the track.
+        //
+        // BUT THE FRAME'S BOTTOM IS NOT THE ROW'S BOTTOM. The row carries a bottom padding — the
+        // hero lockup's centring lift — so the drawing stops that far short of the track's end, and
+        // a trunk starting at 0 starts BELOW the line it continues. Measured at 1440x900: a 134px
+        // gap, put there by the lockup fix in this same session. The two changes interact, which is
+        // exactly why this is measured and not reasoned about.
+        //
+        // `padBelow` is pure CSS and scroll-invariant, so it reads correctly at any scroll position
+        // — which matters, because at mount the track is at p=0 and the exit is nowhere near here.
+        const fr = tlFrame.getBoundingClientRect();
+        trunkY0 = -(fr.bottom - tr.bottom);
+      }
+
+      // THE LINE'S WEIGHT, measured. See ParenLayout.trunkW: the timeline scales world units into
+      // its frame, so the spine's rendered width is a function of the viewport and copying its
+      // constant puts a 44% step at the join.
+      const trunkW = tr ? SPINE_W * (tr.width / TIMELINE_W) : 2.8;
+
+      const bandTop = Math.min(trunkY0, 0);
+      setLayout({
+        w: hr.width,
+        h: hr.height,
+        trunkX: contentCenter - hr.left,
+        trunkY0,
+        forkY: bandTop + (boxes[0].y0 - bandTop) * PAREN_FORK_FRAC,
+        trunkW,
+        // The turn lines hang in the REAL air outside the rows, measured. Clamped into the overlay
+        // so an arm can never be asked to grow off its own canvas.
+        leftX: Math.max(6, rowLeft * PAREN_TURN_FRAC),
+        rightX: Math.min(hr.width - 6, rowRight + (hr.width - rowRight) * PAREN_TURN_FRAC),
+        rows: boxes,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    wrap.querySelectorAll('[data-founder-row]').forEach((r) => ro.observe(r));
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  const arms = useMemo(
+    () => (layout ? { trunk: trunkPts(layout), left: armPts(layout, -1), right: armPts(layout, 1) } : null),
+    [layout],
+  );
+
+  // PAINT. The organs only; the stems are the SVG below. One request for both arms, because
+  // `createFlora` derives the species from the seed: two requests would grow two species, and two
+  // requests at one seed would restart the same rng and stamp identical organs (see GarlandOpts.vines).
+  const w = layout ? Math.round(layout.w) : 0;
+  const h = layout ? Math.round(layout.h) : 0;
+  const armsKey = arms ? `${w}x${h}` : '';
+  useEffect(() => {
+    if (!arms || !w || !h) return;
     let live = true;
     let objectUrl: string | null = null;
-    // Sliced INSIDE the effect on purpose. As a component-body `const` this is a fresh array every
-    // render, so as an effect dependency it never compares equal: the effect re-ran forever, each
-    // pass minting a blob URL and revoking the last. It painted, so it looked fine — the live QA
-    // caught it as 1233 failed requests for revoked blobs.
-    const vines = side === 'left' ? BOWER_VINES.slice(0, 2) : BOWER_VINES.slice(2);
     requestGarland({
-      // One seed per side, so the two sides are the same species with different takes — the same
-      // reason the sub-branches batch their vines into one request. Shares the page's pinned
-      // spine seed (see GARLAND_SEED): the page grows one plant.
-      seed: `bower/spine-2/founders-${side}`,
+      // THE PAGE'S PINNED SPINE SEED, BARE — not `${GARLAND_SEED}/founders`, and the difference is
+      // not cosmetic. `createFlora(seed)` derives the SPECIES from the seed, so a suffix does not
+      // give you another take of the same plant, it gives you a different plant. The retired
+      // FounderBower's `/founders` suffix therefore grew a species nobody ever curated, and it drew
+      // the lottery the brief warns about: washed-out cream blooms and curled, edge-on leaves, next
+      // to a spine of clean pink blossom. Measured on a sweep of the arm's own geometry, the bare
+      // seed is also simply the better take (see the handoff's contact sheet). The comments that
+      // said "the page grows one plant" only become true here.
+      seed: GARLAND_SEED,
       voice: 'pigment',
-      width: BOWER_STRIP.w,
-      height: BOWER_STRIP.h,
-      vines: vines.map((path) => ({
-        path,
-        // Stations by eye too: a handful per vine, biased down the length, alternating so no two
-        // blossoms sit adjacent.
-        stations: [0.16, 0.3, 0.45, 0.58, 0.72, 0.86].map((t, i) => ({
+      width: w,
+      height: h,
+      vines: ([arms.left, arms.right] as const).map((pts) => ({
+        path: pts.map((p) => [p.x, p.y] as [number, number]),
+        // Stations by eye, and none before t=0.34: before that the arm is still sweeping out of the
+        // fork and across the page, where a blossom would land on the founders' own column.
+        stations: [0.36, 0.46, 0.56, 0.65, 0.74, 0.83, 0.92].map((t, i) => ({
           t,
-          organ: (['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf'] as const)[i],
+          organ: (['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf', 'bud'] as const)[i],
         })),
       })),
-      scale: 1.35,
-      rootWidth: 3.2,
-      tube: true,
+      scale: PAREN_ORGAN_SCALE,
+      tube: false,
     })
       .then(async (bitmap) => {
         const c = document.createElement('canvas');
@@ -1080,33 +1198,69 @@ function FounderBower({ side }: { side: 'left' | 'right' }) {
         setUrl(objectUrl);
       })
       .catch((err: unknown) => {
-        // The founders read fine with no vine; a broken painting room must not look like taste.
-        console.error(`gongbi founder bower (${side}) failed:`, err);
+        // The founders read fine with stems and no flowers; a broken painting room must not look
+        // like taste.
+        console.error('gongbi founder parenthesis failed:', err);
       });
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [side]);
+    // `arms` is a fresh object every render; key the effect on the measured size instead, or it
+    // re-runs forever, each pass minting a blob URL and revoking the last. That bug shipped once
+    // here already — it painted, so it looked fine, and the live QA caught it as 1233 failed
+    // requests for revoked blobs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armsKey]);
 
-  if (!url) return null;
-  // The wrapper reaches OUT past the section (into the page's own margin, where the air is) and
-  // clips there, so the vine is drawn at its native size and simply runs off the page edge like a
-  // vine does. `-left/-right-[150px]` puts the strip's inner edge ~30px clear of the 1100px content
-  // column at 1440 — measured, because at -64px it grew straight across Clay's portrait.
+  // The overlay ALWAYS renders, even with nothing to draw in it yet. It is what `measure` measures
+  // and what the ResizeObserver watches, so returning null until there is a layout is a deadlock:
+  // no element, no ref, no measurement, no layout, no element. (It shipped that way for one build.)
+  // THE OVERLAY REACHES OUT PAST `main` INTO THE PAGE'S OWN MARGINS (`w-screen`, centred), because
+  // that is where the flowers live. `main` is a 1354px content box on a 1440px page, and the founder
+  // rows fill it to within ~86px a side — so an overlay clipped to `main` gives the arms 86px of air
+  // and paints half of every organ off the edge of its own canvas. A clipped leaf reads as a broken
+  // drawing (round 1 learned this on the spine garland). The page's real margin is ~170px a side,
+  // which is what FounderBower's 160px strips used, and it is enough.
   return (
     <div
+      ref={hostRef}
       aria-hidden
-      className={`pointer-events-none absolute inset-y-0 hidden overflow-hidden lg:block ${
-        side === 'left' ? '-left-[150px] w-[150px]' : '-right-[150px] w-[150px]'
-      }`}
+      className="pointer-events-none absolute inset-y-0 left-1/2 z-0 hidden w-screen -translate-x-1/2 lg:block"
     >
-      <img
-        src={url}
-        alt=""
-        className="absolute top-0 left-0"
-        style={{ width: BOWER_STRIP.w, height: BOWER_STRIP.h }}
-      />
+      {/* The painted organs, 1:1 over the same coordinates the stems are drawn in — never scaled.
+          An upscaled painting is this page's recurring bug (CLAUDE.md). */}
+      {url && <img src={url} alt="" className="absolute left-0 top-0" style={{ width: w, height: h }} />}
+      {/* `overflow-visible` lets the trunk's overshoot and its round cap kiss the timeline's frame
+          above rather than stopping at this box's edge. */}
+      {arms && layout && (
+        <svg
+          className="absolute inset-0 h-full w-full overflow-visible"
+          viewBox={`0 0 ${layout.w} ${layout.h}`}
+          fill="none"
+          stroke={INK_SEPIA}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {/* The trunk is the spine still, so it keeps the spine's weight, constant.
+              `data-paren-trunk` is qa/founder-parenthesis.mjs's handle on the join. */}
+          <path data-paren-trunk d={polyD(arms.trunk)} strokeWidth={layout.trunkW} />
+          {/* The arms TAPER root → tip. They are not a constant-width rail: they are the line
+              thinning as it grows away from the trunk, and without this each one ends in a blunt
+              round cap of full width, hanging in open paper — a cut line. See taperRuns. */}
+          {([arms.left, arms.right] as const).map((pts, i) =>
+            taperRuns(pts).map((run, j) => (
+              <path
+                key={`${i}-${j}`}
+                d={run.d}
+                strokeWidth={
+                  layout.trunkW * (PAREN_STEM_FRAC + (PAREN_TIP_FRAC - PAREN_STEM_FRAC) * run.t)
+                }
+              />
+            )),
+          )}
+        </svg>
+      )}
     </div>
   );
 }
@@ -1154,7 +1308,13 @@ const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
  */
 function FounderNode({ person }: { person: TeamMember }) {
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,3.7fr)_minmax(0,7fr)_minmax(0,4fr)] md:items-start">
+    // `data-founder-row` is what the parenthesis measures itself against — the row's REAL laid-out
+    // rect, read at runtime. It is the ornament's only handle on the layout, and the arrow points
+    // one way: nothing here reads the parenthesis back.
+    <div
+      data-founder-row
+      className="grid gap-8 md:grid-cols-[minmax(0,3.7fr)_minmax(0,7fr)_minmax(0,4fr)] md:items-start"
+    >
       <figure>
         {person.image ? (
           <img
@@ -1239,42 +1399,45 @@ export function AboutPage() {
           />
         </section>
 
-        {/* THE SEAM. The spacer stays — it is the paper gap between the timeline and the founders,
-            and it is real layout. The LINE that used to cross it is deleted (see the SeamBridge note).
-            TODO(F): Daniel's answer is better than the plumb line ever was — "I'd like the main
-            branch... to actually kind of go into some parentheses and go right and left from Clay,
-            and on the right side and left side to start generating those beautiful flowers and
-            sub-branches." The line gets a destination: it arrives here and OPENS into a parenthesis
-            around each founder, which grows its own flowers. Restore the connector as part of that,
-            not before it. */}
-        <div aria-hidden className={reduced ? 'relative h-20' : 'relative min-h-[22svh]'} />
+        {/* THE ARRIVAL (task F). The seam and the founders are ONE positioning context, because the
+            line that crosses the seam and the parenthesis that opens around the founders are one
+            gesture and must be measured in one coordinate system. The parenthesis is painted over
+            the whole of it; the seam spacer inside is still just the paper gap.
 
-        {/* The founders. AFTER the sequence: by the time you meet them, you already know where they
-            came from. The composition is the retired ascent draft's, ported wholesale — see
-            FounderNode. `max-w-page` is that draft's own measure (Frame measure="page"), which the
-            5/7/5 band needs; the old block was clamped to 1000px for roots that no longer exist.
+            WHY THIS WRAPPER'S TOP IS THE RIGHT PLACE TO ARRIVE, in both modes. Reduced: the timeline
+            is a static full-height SVG and its bottom edge is this wrapper's top edge. Motion: the
+            timeline is a sticky viewport-height frame inside a 1080vh track, and a sticky box BOTTOMS
+            OUT at its track's bottom — so from p=1 onward the frame's bottom edge sits exactly at the
+            track's bottom, in PAGE coordinates, and stays there however far you scroll. The descent
+            exits at that edge on the page's content centre. So there is one fixed point where the
+            line hands over, and it is (content centre, this wrapper's top) either way. */}
+        <div className="relative">
+          <FounderParenthesis reduced={reduced} />
 
-            NOTE on the header: the draft's <main> had NO pt-header — only its Summit() added one
-            locally — so its founders slid under the fixed SplashHeader (position:fixed, top-0,
-            z-50). Ported here the bug cannot recur: this page's <main> carries
-            pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
-        <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
-          {/* The flowers grow around the two of them, down the open margins either side. Behind the
-              content on its own layer; the columns ride above it. */}
-          <FounderBower side="left" />
-          <FounderBower side="right" />
+          {/* The seam: the paper gap between the timeline and the founders. Real layout. */}
+          <div aria-hidden className={reduced ? 'h-20' : 'min-h-[22svh]'} />
 
-          <div className="relative z-10">
-            <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
+          {/* The founders. AFTER the sequence: by the time you meet them, you already know where they
+              came from. The composition is the retired ascent draft's, ported wholesale — see
+              FounderNode. `max-w-page` is that draft's own measure (Frame measure="page"), which the
+              5/7/5 band needs; the old block was clamped to 1000px for roots that no longer exist.
 
-            <div className="mt-5 flex flex-col gap-8">
-              {TEAM.map((person) => (
-                <FounderNode key={person.id} person={person} />
-              ))}
+              NOTE on the header: the draft's <main> had NO pt-header — only its Summit() added one
+              locally — so its founders slid under the fixed SplashHeader (position:fixed, top-0,
+              z-50). Ported here the bug cannot recur: this page's <main> carries
+              pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
+          <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
+            <div className="relative z-10">
+              <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
+
+              <div className="mt-5 flex flex-col gap-8">
+                {TEAM.map((person) => (
+                  <FounderNode key={person.id} person={person} />
+                ))}
+              </div>
             </div>
-
-          </div>
-        </section>
+          </section>
+        </div>
 
         {/* THE CODA — moved OUT of the founders section on 2026-07-16 (round 3). Two of Daniel's notes
             meet here and pull the same way:

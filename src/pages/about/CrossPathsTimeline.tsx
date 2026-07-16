@@ -130,10 +130,16 @@ const A = '/assets/projects';
 
 /* --------------------------------- geometry ------------------------------- */
 
-const W = 1200;
+/** The drawing's world width. Exported because the founders' parenthesis below has to convert this
+ *  drawing's world units into CSS px to match its line weight to the spine's — see TIMELINE_W's use
+ *  in FounderParenthesis. */
+export const TIMELINE_W = 1200;
+const W = TIMELINE_W;
 const CX = 600;
 const MAX_YEAR = 2026;
-const SPINE_W = 7.5;
+/** The spine's stroke, in WORLD units — not CSS px. What it renders at depends on the frame's
+ *  scale, which is why the parenthesis measures rather than copies the number. */
+export const SPINE_W = 7.5;
 
 /** Piecewise time axis: 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1. */
 const Y_2021 = 150;
@@ -293,6 +299,22 @@ const RAY_END_Y = MARK_CENTER_Y + TAIL_LEN; // where the fully-unwound downward 
 const DESC_DROP = 420; // the sweep below the ray that carries the line to page-centre and out the bottom
 const DESC_BOTTOM_Y = RAY_END_Y + DESC_DROP; // the exit point's world Y (the frame's bottom at track end)
 const H = DESC_BOTTOM_Y + 80; // total drawing height (now runs past the mark, down through the descent)
+
+/**
+ * WHERE THE ONE LINE LEAVES THIS DRAWING, as a fraction of the drawing's height — so the founders'
+ * parenthesis below can start exactly where the descent stops, instead of guessing.
+ *
+ * It is NOT 1. The drawing runs 80 world units PAST the exit (see `H`), so in reduced motion — where
+ * the SVG is static and full-height — the line ends ~85 CSS px above the SVG's bottom edge. A trunk
+ * that starts at the top of the founders' wrapper therefore starts 85px below the line it is
+ * supposed to continue, and the page shows a floating stub over a gap. (It did.)
+ *
+ * In MOTION this fraction is not needed and must not be used: the SVG is a sticky viewport-height
+ * frame with a panning camera, the exit sits on the frame's bottom edge at the end of the track, and
+ * a sticky box bottoms out at its track's bottom — so the exit lands exactly on the wrapper's top in
+ * page coordinates, and stays there however far you scroll on. See FounderParenthesis.
+ */
+export const DESCENT_EXIT_FRAC = DESC_BOTTOM_Y / H;
 
 /** The fraction of the track that reaches the PIN (mark fully formed). The wind keeps its original
  *  travel; the unravel + descent are the remaining scroll, added below it. 720vh wind + 360vh past. */
@@ -923,7 +945,7 @@ export function spinePts(): Array<{ x: number; y: number }> {
  *                    not a licence to walk it back in. Rejected.
  * Re-curate with the seed sweep, not by eye on one take.
  */
-const GARLAND_SEED = 'bower/spine-2';
+export const GARLAND_SEED = 'bower/spine-2';
 /** Half-width of the garland strip in world units: how far an organ may reach off the spine.
  *  Kept inside the gutter (OFFSET_X = 110) so foliage can never touch a plate — and comfortably
  *  wider than the organs actually reach (measured 63 at GARLAND_SCALE), because an organ that
@@ -1824,7 +1846,12 @@ export function CrossPathsTimeline({
       className={reduced ? 'relative' : 'relative -mt-8'}
       style={{ height: reduced ? 'auto' : '1080vh' }}
     >
+      {/* `data-timeline-frame` is the founders' parenthesis's handle on this row. It needs the row's
+          bottom edge to find where the descent's exit lands on the page — see FounderParenthesis's
+          `padBelow`, and note that this row's own bottom padding is what puts the exit above the
+          track's bottom rather than on it. */}
       <div
+        data-timeline-frame
         className={
           reduced
             ? 'flex flex-col gap-12'
@@ -2077,6 +2104,12 @@ export function CrossPathsTimeline({
                 strokeLinejoin="round"
                 opacity={reduced ? 1 : clamp01((0.08 - windW) / 0.08)}
               />
+              {/* WHERE THE ONE LINE LEAVES THIS DRAWING, as a zero-radius datum on the exact point
+                  `descD` ends on. The founders' parenthesis below has to start precisely here or the
+                  page shows a floating stub over a gap — which it did — and this lets
+                  qa/founder-parenthesis.mjs measure the join instead of recomputing it from
+                  constants and agreeing with itself. Draws nothing. */}
+              <circle data-descent-exit cx={pageCenterVX} cy={DESC_BOTTOM_Y} r={0} fill="none" stroke="none" />
             </g>
 
             {/* The wordmark, under the mark, once the ring has closed. Nothing else at the end. */}
