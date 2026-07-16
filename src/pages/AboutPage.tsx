@@ -1111,24 +1111,20 @@ function FounderBower({ side }: { side: 'left' | 'right' }) {
   );
 }
 
-/** The seam connector: a single vertical INK_SEPIA line at the PAGE centre that carries the finale's
- *  descending line across a spacer. The timeline's unravel exits its frame at the page centre and the
- *  founders' node sits at the page centre, so a plumb line here reads as the ONE line continuing over
- *  the paper gap between the two (separate) SVGs. `overflow-visible` lets its round cap kiss both ends.
- *  It is heavier than the founder roots (it is still the spine, not yet the fine root register); the
- *  weight settles down at the node below. */
-function SeamBridge() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-    >
-      <line x1="50" y1="-1" x2="50" y2="101" stroke={INK_SEPIA} strokeWidth={4.4} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-    </svg>
-  );
-}
+/*
+ * SeamBridge — DELETED 2026-07-16 (round 3). Recover with:
+ *     git show fd3cbcb -- src/pages/AboutPage.tsx
+ *
+ * It drew a plumb INK_SEPIA line down the page centre, across the seam, to the founders'
+ * CONVERGENCE NODE. That node was part of the leader-line scaffolding deleted in round 2, and Clay's
+ * founders (ported the same round) are left-aligned rather than centred — so the line had been
+ * descending to the page centre and stopping on nothing. A line that arrives nowhere reads as broken,
+ * correctly, and it should not sit on the page waiting for its fix.
+ *
+ * Deleted rather than left unmounted because dead code does not compile here, and an unmounted
+ * component is a comment with extra steps. See the TODO(F) at the seam for where the line is going —
+ * Daniel's own answer gives it a better destination than the plumb line ever had.
+ */
 
 /** The founders' small-caps voice, lifted verbatim from the retired ascent draft. */
 const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
@@ -1243,13 +1239,15 @@ export function AboutPage() {
           />
         </section>
 
-        {/* THE SEAM (Task 4). The finale's unravel exits the timeline frame heading straight down at
-            the PAGE centre; this spacer carries that one line over the paper gap to the founders' node
-            just below (both sit on the page centre, so the plumb bridge reads as the same line
-            continuing). Kept short so the hand-off stays continuous. */}
-        <div aria-hidden className={reduced ? 'relative h-20' : 'relative min-h-[22svh]'}>
-          <SeamBridge />
-        </div>
+        {/* THE SEAM. The spacer stays — it is the paper gap between the timeline and the founders,
+            and it is real layout. The LINE that used to cross it is deleted (see the SeamBridge note).
+            TODO(F): Daniel's answer is better than the plumb line ever was — "I'd like the main
+            branch... to actually kind of go into some parentheses and go right and left from Clay,
+            and on the right side and left side to start generating those beautiful flowers and
+            sub-branches." The line gets a destination: it arrives here and OPENS into a parenthesis
+            around each founder, which grows its own flowers. Restore the connector as part of that,
+            not before it. */}
+        <div aria-hidden className={reduced ? 'relative h-20' : 'relative min-h-[22svh]'} />
 
         {/* The founders. AFTER the sequence: by the time you meet them, you already know where they
             came from. The composition is the retired ascent draft's, ported wholesale — see
