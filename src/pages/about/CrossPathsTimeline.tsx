@@ -44,7 +44,8 @@ import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 import { requestGarland } from '../../engine/gongbi/painter';
-import type { GarlandOrgan, GarlandStation } from '../../engine/gongbi/garland';
+import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
+import { colonize, branchPolylines, seededRandom, type Vec2 } from './spaceColonization';
 
 /**
  * The practice's ink: a warm sepia/timber, drawn from the splash hero's own structure.
@@ -134,6 +135,11 @@ const SLOPE_EARLY = 300; // units per year, 2021 to 2023
 const SLOPE_LATE = 760; // units per year, 2023 to 2026
 /** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
 export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
+
+/** The years the drawing ticks and labels. Was written out at three separate call sites (the
+ *  garland's station bands, the year rail's render, and now the sub-branch obstacles); a fourth
+ *  copy is how a year quietly gets ornamented but never labelled. */
+export const YEAR_TICKS: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026];
 
 export const yearToY = (y: number) =>
   y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
@@ -886,7 +892,7 @@ const GARLAND_TICK_CLEAR = 40;
  */
 export function garlandStations(
   clusters: ReadonlyArray<{ year: number }> = CLUSTERS,
-  years: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026],
+  years: readonly number[] = YEAR_TICKS,
 ): GarlandStation[] {
   const busy: Array<[number, number]> = [];
   for (const c of clusters) {
@@ -932,6 +938,274 @@ export function garlandStations(
   }
   if (cursor < CONVERGE_Y) place(cursor, CONVERGE_Y);
   return stations.filter((s) => s.t >= 0 && s.t <= 1);
+}
+
+/* ---------------------- the sub-branches (the ornament) ------------------- */
+
+/**
+ * THE SUB-BRANCH ENGINE (2026-07-16, round 2). Daniel:
+ *
+ *   "Now I would like you to make sub-branches to the main timeline. There's a main vertical
+ *    timeline that goes from start to finish and then there are leaves and flowers popping out of
+ *    the main one. I would like for you to actually create branches that continue and take up the
+ *    empty white space that the project images don't fill. These branches will have their own
+ *    leaves and flowers... I'd like for you to actually create an engine or an algorithm that
+ *    creates the flowers and makes them grow as the timeline continues."
+ *
+ * THIS DOES NOT REVERSE THE DECOUPLING, and the difference is the whole design. The branches that
+ * were deleted were STRUCTURE: they carried the plates, the layout depended on where they went, and
+ * `packSide` plus a pile of clearance rules existed to stop them colliding with the things they were
+ * holding. These are ORNAMENT: they carry nothing, and they are computed from a layout that is
+ * already final. If a branch and a plate ever disagree, the branch loses — not by a rule, but
+ * because the plate was placed before `colonize` was called and cannot hear the answer.
+ *
+ * The growth is space colonization (Runions et al. 2007; see spaceColonization.ts for why that
+ * algorithm and not a hand-tuned layout). The short version: attractor points are scattered ONLY in
+ * the negative space, and growth is pulled toward them and consumes them as it arrives. Filling the
+ * whitespace and avoiding the plates are therefore the same mechanism, not two systems fighting —
+ * a plate has no attractors on it, so nothing grows there. There is no collision test in any of this.
+ *
+ * NOTE on the copy column: the title and the two questions are NOT obstacles here. They render in a
+ * sibling flex column OUTSIDE this SVG (see the component's JSX), so they occupy no world-space at
+ * all. Modelling them as a rect would carve a hole in the ornament for something that isn't there.
+ */
+
+/** The sub-branches' commission. Shares the spine garland's species deliberately — one plant. */
+const SUB_SEED = 'bower/spine-2';
+/** The colonization parameters. See spaceColonization.ts for what each one means; these are tuned
+ *  against the real layout, and the ratios matter more than the values:
+ *   - `influence` must exceed the widest attractor-free band a source has to reach across, or growth
+ *     never starts. The year-label gutter is the binding one.
+ *   - `kill` below ~2*segment makes growth overshoot an attractor and curl back on itself. */
+const SUB_SEGMENT = 9;
+const SUB_INFLUENCE = 130;
+const SUB_KILL = 26;
+const SUB_WOBBLE = 0.34;
+/** How coarse the attractor scatter is. This is the ornament's density dial: smaller = more, and
+ *  the cost is quadratic-ish in the colonize loop, so it is not free. */
+const SUB_ATTRACTOR_STEP = 60;
+/** Keep attractors (and so growth) off the spine's own band, which the SpineGarland already dresses,
+ *  and off the drawn line itself. */
+const SUB_SPINE_CLEAR = 30;
+/** Breathing room around a plate or a numeral. The ornament grows up to this and stops. */
+const SUB_PLATE_PAD = 18;
+/** The sub-branch stroke. Thin against SPINE_W (7.5): these read as growth OFF the main line,
+ *  never as a second spine competing with it. */
+const SUB_BRANCH_W = 2.2;
+/** The hint line's claimed band: 12px mono, and it overhangs its plate on the outer side. */
+const HINT_H = 22;
+const HINT_W = 90;
+/** Organ scale, below the spine garland's 1.5 — foliage out on a thin twig should not outweigh the
+ *  foliage on the trunk. */
+const SUB_ORGAN_SCALE = 0.95;
+
+interface WRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const padRect = (r: WRect, p: number): WRect => ({ x: r.x - p, y: r.y - p, w: r.w + 2 * p, h: r.h + 2 * p });
+const inRect = (p: Vec2, r: WRect) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+
+/**
+ * Everything the ornament must not grow into, in world units: every project plate, and every year
+ * label that is actually drawn (only the chosen side of each year carries one). This IS the layout —
+ * it is read, never written, which is the invariant the whole decoupling rests on.
+ */
+export function subBranchObstacles(): WRect[] {
+  const plates = computePlates();
+  const out: WRect[] = [];
+  for (const p of plates) {
+    out.push(padRect(p.rect, SUB_PLATE_PAD));
+    // The HINT line rides just above its cluster's lead plate, in 12px mono at 45% ink. It is the
+    // one obstacle here that is neither a plate nor a numeral, and it is easy to miss precisely
+    // because it has no box of its own — measured live, foliage grew straight through "LLO: DREAM
+    // MACHINE" and "NYC: ROGERS PARTNERS" and left them unreadable. Claim the band it sits in.
+    if (p.plateIndex === 0) {
+      out.push(
+        padRect({ x: p.rect.x - HINT_W, y: p.rect.y - HINT_H - 10, w: p.rect.w + HINT_W * 2, h: HINT_H }, 6),
+      );
+    }
+  }
+  for (const y of YEAR_TICKS) {
+    const side = yearLabelSide(plates, y);
+    const b = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+    out.push(padRect({ x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 }, SUB_PLATE_PAD));
+  }
+  return out;
+}
+
+/**
+ * The attractors: a jittered scatter over the drawing's plumb run, minus everything occupied.
+ *
+ * "MAKES THEM GROW AS THE TIMELINE CONTINUES" is this function's density ramp, and it is an
+ * INTERPRETATION of Daniel's phrase that he has not seen yet. Read as: the ornament's own density
+ * carries the growth metaphor — sparse at 2021, increasingly lush toward 2026 — so the drawing gets
+ * visibly more alive as the practice does. It could instead mean animating the growth on scroll;
+ * that is deliberately NOT built (it is a much bigger commitment, and the wrong one to guess at).
+ * Show him this, then ask. See the handoff.
+ *
+ * The scatter is jittered rather than gridded because a grid colonizes into a lattice: growth finds
+ * evenly-spaced attractors and lays down evenly-spaced branches that read as a mesh, not a plant.
+ */
+export function subBranchAttractors(rand: () => number, obstacles: readonly WRect[] = subBranchObstacles()): Vec2[] {
+  const out: Vec2[] = [];
+  const top = CONV_JUNCTION_Y;
+  const bottom = CONVERGE_Y;
+  for (let y = top; y < bottom; y += SUB_ATTRACTOR_STEP) {
+    for (let x = 0; x < W; x += SUB_ATTRACTOR_STEP) {
+      const p = { x: x + rand() * SUB_ATTRACTOR_STEP, y: y + rand() * SUB_ATTRACTOR_STEP };
+      if (p.x < 0 || p.x > W || p.y > bottom) continue;
+      // The density ramp: 2021 keeps roughly a quarter of its candidates, 2026 keeps all of them.
+      const t = clamp01((p.y - top) / (bottom - top));
+      if (rand() > lerp(0.18, 0.92, t)) continue;
+      // Off the spine's own band — the SpineGarland already dresses that, and growth started there
+      // would just crowd the drawn line.
+      if (Math.abs(p.x - CX) < SUB_SPINE_CLEAR) continue;
+      if (obstacles.some((r) => inRect(p, r))) continue;
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/** Where the sub-branches leave the spine. Regularly spaced down the plumb run; a source with no
+ *  attractors within `influence` simply never grows, which is what makes the density ramp above
+ *  produce sparse branching at the top without needing a second rule to say so. */
+export function subBranchSources(): Vec2[] {
+  const out: Vec2[] = [];
+  const step = 150;
+  for (let y = CONV_JUNCTION_Y + step; y < CONVERGE_Y; y += step) {
+    out.push({ x: CX, y });
+  }
+  return out;
+}
+
+/** The grown sub-branches as world-space polylines. Deterministic under SUB_SEED. */
+export function subBranchPolylines(): Vec2[][] {
+  const rand = seededRandom(`${SUB_SEED}/colonize`);
+  const nodes = colonize({
+    attractors: subBranchAttractors(seededRandom(`${SUB_SEED}/scatter`)),
+    sources: subBranchSources(),
+    segment: SUB_SEGMENT,
+    influence: SUB_INFLUENCE,
+    kill: SUB_KILL,
+    wobble: SUB_WOBBLE,
+    rand,
+    maxNodes: 3000,
+  });
+  return branchPolylines(nodes);
+}
+
+/** The sub-branch canvas: the whole plumb run, full width. Unlike the spine's narrow strip this has
+ *  to cover everywhere growth can reach, which is everywhere the plates are not. */
+export const SUB_BOX = { x: 0, y: CONV_JUNCTION_Y, w: W, h: CONVERGE_Y - CONV_JUNCTION_Y };
+
+/**
+ * The organs on the sub-branches, as vines for the garland composer, in STRIP-local px.
+ *
+ * One request, one canvas, one genome — see GarlandOpts.vines for why this is batched rather than a
+ * request per branch (short version: per-branch requests either grow a different species per branch,
+ * or restart the same rng and stamp identical organs on every one).
+ *
+ * `tube: false`, exactly like the spine's graft: the STEMS are drawn in SVG in INK_SEPIA (structure
+ * is one colour — see CLAUDE.md), and the composer contributes only pigment foliage. A vine whose
+ * tube was painted by the composer would put the genome's own branchColor on the page as structure,
+ * which is the one thing the colour law forbids.
+ */
+export function subBranchVines(runs: Vec2[][]): GarlandVine[] {
+  const rand = seededRandom(`${SUB_SEED}/organs`);
+  const ORGANS: GarlandOrgan[] = ['leaf', 'bloom', 'leaf', 'bud', 'leaf', 'leaf', 'bloom'];
+  let n = 0;
+  const vines: GarlandVine[] = [];
+  for (const run of runs) {
+    const path = run.map((p) => [p.x - SUB_BOX.x, p.y - SUB_BOX.y] as [number, number]);
+    // Length in world units decides how much a branch can carry: a two-segment twig gets one organ,
+    // a long arc gets several. Tips are favoured (t biased late) because that is where a real branch
+    // carries its growth.
+    let length = 0;
+    for (let i = 1; i < run.length; i++) length += Math.hypot(run[i].x - run[i - 1].x, run[i].y - run[i - 1].y);
+    const count = Math.max(1, Math.round(length / 78));
+    const stations: GarlandStation[] = [];
+    for (let i = 0; i < count; i++) {
+      const t = clamp01(0.25 + (0.75 * (i + rand())) / count);
+      stations.push({ t, organ: ORGANS[n % ORGANS.length] });
+      n += 1;
+    }
+    vines.push({ path, stations });
+  }
+  return vines;
+}
+
+/**
+ * The sub-branches: sepia stems drawn in SVG, with the gongbi organs painted once off-thread and
+ * hung over them. Ornament only — nothing on this page reads its geometry back.
+ */
+function SubBranches({ reduced }: { reduced: boolean }) {
+  const runs = useMemo(() => subBranchPolylines(), []);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    let objectUrl: string | null = null;
+    requestGarland({
+      seed: SUB_SEED,
+      voice: 'pigment',
+      width: SUB_BOX.w,
+      height: SUB_BOX.h,
+      vines: subBranchVines(runs),
+      scale: SUB_ORGAN_SCALE,
+      tube: false, // the stems are drawn below, in sepia; the composer only brings foliage.
+    })
+      .then(async (bitmap) => {
+        const c = document.createElement('canvas');
+        c.width = bitmap.width;
+        c.height = bitmap.height;
+        c.getContext('2d')?.drawImage(bitmap, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob || !live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch((err: unknown) => {
+        // The stems still draw: a failed garland costs the page its flowers, not its drawing. But a
+        // broken painting room must never look like a design choice.
+        console.error('gongbi sub-branch garland failed:', err);
+      });
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [runs]);
+
+  return (
+    <g pointerEvents="none">
+      {runs.map((run, i) => (
+        <path
+          key={i}
+          d={lineGen(run) ?? ''}
+          fill="none"
+          stroke={INK_SEPIA}
+          strokeOpacity={0.62}
+          strokeWidth={SUB_BRANCH_W}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+      {url && (
+        <image
+          href={url}
+          x={SUB_BOX.x}
+          y={SUB_BOX.y}
+          width={SUB_BOX.w}
+          height={SUB_BOX.h}
+          style={{ transition: reduced ? undefined : 'opacity 900ms ease-out' }}
+        />
+      )}
+    </g>
+  );
 }
 
 /** The garland strip's world-space box: a band hugging the spine over its plumb run. */
@@ -1497,12 +1771,19 @@ export function CrossPathsTimeline({
               );
             })()}
 
+            {/* THE SUB-BRANCHES. Sepia stems grown into the drawing's negative space by space
+                colonization, carrying their own gongbi foliage. Ornament: it reads the plate layout
+                and never feeds back into it. Painted BEFORE the clusters, so that if the ornament and
+                a project ever do disagree, the project is simply drawn on top — the paint order is
+                the last expression of "the branch loses". */}
+            <SubBranches reduced={reduced} />
+
             {/* THE GARLAND. Clay's gongbi organs grown along the spine's own polyline, in full
                 pigment. Painted after the spine so foliage sits ON the line, and before the
-                clusters so a plate's calyx and its branch stay on top of it. */}
+                clusters so a plate stays on top of it. */}
             <SpineGarland reduced={reduced} />
 
-            {/* Every cluster: a pedicel off the spine to one or more plates, each cupped by a calyx. */}
+            {/* Every cluster: its plates, standing alongside the line at their year. */}
             {laid.map((c) => (
               <ClusterGroup key={c.id} cluster={c} cardLineY={cardLineY} reduced={reduced} />
             ))}
@@ -1511,7 +1792,7 @@ export function CrossPathsTimeline({
                 halo (paint-order stroke) so they stay legible over any adjacent-year plate. The side
                 flip (yearLabelSide, unit-tested) puts each label on whichever side the laid-out
                 plates and branches actually leave room on. */}
-            {[2021, 2022, 2023, 2024, 2025, 2026].map((y) => {
+            {YEAR_TICKS.map((y) => {
               const ty = yearToY(y);
               const vis = reduced ? 1 : clamp01((camY + viewH + 40 - ty) / 60) * clamp01((ty - camY + 120) / 80);
               if (vis <= 0.01) return null;

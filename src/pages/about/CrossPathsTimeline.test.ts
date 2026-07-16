@@ -30,6 +30,8 @@ import {
   VELLUM,
 } from './CrossPathsTimeline';
 import { growWild } from '../../engine/botanical';
+import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines } from './CrossPathsTimeline';
+import { seededRandom } from './spaceColonization';
 
 const GAP = 40;
 const CROSS = 48;
@@ -471,6 +473,74 @@ describe('the spine garland: Clay organs on Daniel geometry', () => {
       expect(x).toBeLessThanOrEqual(GARLAND_BOX.w);
       expect(y).toBeGreaterThanOrEqual(0);
       expect(y).toBeLessThanOrEqual(GARLAND_BOX.h);
+    }
+  });
+});
+
+describe('the sub-branches are ORNAMENT: they read the layout and lose every argument with it', () => {
+  const runs = subBranchPolylines();
+  const plates = computePlates();
+
+  it('grows a real tree into the drawing, not a token sprig', () => {
+    expect(runs.length).toBeGreaterThan(40);
+    for (const run of runs) expect(run.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('THE CONTRACT: not one branch point lands on a project plate', () => {
+    // Measured 0 of 1217 points on 2026-07-16. Worth understanding WHY, because the algorithm does
+    // not promise this on its own: space colonization declines to grow TOWARD a region with no
+    // attractors, but nothing in it stops a branch crossing a plate to reach an attractor beyond.
+    // What holds the line is SUB_PLATE_PAD (18) being wider than SUB_SEGMENT (9): growth would have
+    // to put a point down inside the attractor-free pad to get across, and it has no reason to.
+    // If either constant moves, this is the test that notices.
+    for (const run of runs) {
+      for (const p of run) {
+        for (const pl of plates) {
+          const r = pl.rect;
+          const hit = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+          expect(hit, `branch point ${p.x.toFixed(1)},${p.y.toFixed(1)} on ${pl.clusterId}[${pl.plateIndex}]`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('scatters no attractor on anything the layout occupies', () => {
+    // The upstream half of the contract above: the ornament stays off the plates because the space
+    // it is told to fill never included them in the first place.
+    const obstacles = subBranchObstacles();
+    for (const a of subBranchAttractors(seededRandom('test/scatter'), obstacles)) {
+      for (const r of obstacles) {
+        const hit = a.x >= r.x && a.x <= r.x + r.w && a.y >= r.y && a.y <= r.y + r.h;
+        expect(hit).toBe(false);
+      }
+    }
+  });
+
+  it('GROWS AS THE TIMELINE CONTINUES: the late years carry more ornament than the early ones', () => {
+    // Daniel: "makes them grow as the timeline continues". Read here as a density ramp in the
+    // attractor seeding, so the ornament's own lushness carries the growth metaphor. Halve the run
+    // at its midpoint and the second half must be meaningfully busier than the first.
+    const mid = (CONV_JUNCTION_Y + CONVERGE_Y) / 2;
+    const count = (lo: number, hi: number) =>
+      runs.flat().filter((p) => p.y >= lo && p.y < hi).length;
+    const early = count(CONV_JUNCTION_Y, mid);
+    const late = count(mid, CONVERGE_Y);
+    expect(late).toBeGreaterThan(early * 1.5);
+  });
+
+  it('is deterministic: the ornament is cacheable and curatable like every other seed here', () => {
+    expect(subBranchPolylines()).toEqual(runs);
+  });
+
+  it('hangs organs on every branch, and keeps them off the root end', () => {
+    const vines = subBranchVines(runs);
+    expect(vines).toHaveLength(runs.length);
+    for (const v of vines) {
+      expect(v.stations.length).toBeGreaterThanOrEqual(1);
+      for (const st of v.stations) {
+        expect(st.t).toBeGreaterThanOrEqual(0.25); // organs ride the tips, as on a real branch
+        expect(st.t).toBeLessThanOrEqual(1);
+      }
     }
   });
 });

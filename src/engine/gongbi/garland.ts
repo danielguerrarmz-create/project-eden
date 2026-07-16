@@ -44,15 +44,35 @@ export interface GarlandStation {
   organ: GarlandOrgan;
 }
 
+/** One vine: a path to walk, and where its organs sit along it. */
+export interface GarlandVine {
+  /** Root-first polyline in strip px. The vine is drawn root → tip. */
+  path: Array<[number, number]>;
+  stations: GarlandStation[];
+}
+
 export interface GarlandOpts {
   seed: string;
   voice: GarlandVoice;
   /** Strip canvas size, px. */
   width: number;
   height: number;
-  /** Root-first polyline in strip px. The vine is drawn root → tip. */
-  path: Array<[number, number]>;
-  stations: GarlandStation[];
+  /** Root-first polyline in strip px. Sugar for a single-vine `vines`. */
+  path?: Array<[number, number]>;
+  stations?: GarlandStation[];
+  /**
+   * MANY vines in one canvas, painted from ONE genome and ONE rng sequence.
+   *
+   * This exists because the alternative — a request per vine — cannot produce a garland.
+   * `createFlora(seed)` derives the SPECIES from the seed, so N requests with N seeds grow N
+   * different species in one drawing, and N requests sharing one seed is worse: each restarts the
+   * same rng sequence and stamps out identical organs in identical poses. Batching is the only way
+   * to get one species' hand with varied organs, which is what "one genome per garland" (see the
+   * module header) actually means.
+   *
+   * The About page's sub-branches are the caller: a whole grown tree, one canvas, one plant.
+   */
+  vines?: GarlandVine[];
   /** Organ size multiplier (default 1). */
   scale?: number;
   /** Vine half-width at the root, px (default 7; tapers toward the tip). */
@@ -248,8 +268,14 @@ function wispy(flora: FloraInstance, ctx: Ctx2D): void {
   c.putImageData(imgd, 0, 0);
 }
 
+/** The vines to paint, however the caller expressed them: `vines`, or the single-vine sugar. */
+export function garlandVines(opts: GarlandOpts): GarlandVine[] {
+  if (opts.vines) return opts.vines;
+  return opts.path ? [{ path: opts.path, stations: opts.stations ?? [] }] : [];
+}
+
 export function paintGarland(opts: GarlandOpts): HTMLCanvasElement | OffscreenCanvas {
-  const { seed, voice, width, height, path, stations } = opts;
+  const { seed, voice, width, height } = opts;
   const scale = opts.scale ?? 1;
   const rootWidth = opts.rootWidth ?? 7;
 
@@ -263,16 +289,23 @@ export function paintGarland(opts: GarlandOpts): HTMLCanvasElement | OffscreenCa
   const innerCol = voice === 'ink' ? INK_RANGES.inner : PAR.innerColor;
 
   const ctx = Layer.empty(width, height);
-  const pts = resample(path, 4);
 
-  // The tube is drawn FIRST so organs sit on top of the vine, exactly as upstream's woody()
-  // lays flowers over its own stems. Skipping it leaves the organs posed on a line the page
+  // Every vine walks the SAME flora instance, in order, so a multi-vine garland is one plant
+  // rather than a crowd (see GarlandOpts.vines).
+  //
+  // The tubes are drawn FIRST so organs sit on top of the vines, exactly as upstream's woody()
+  // lays flowers over its own stems. Skipping them leaves the organs posed on lines the page
   // draws itself (see GarlandOpts.tube).
-  if (opts.tube !== false) drawTube(flora, ctx, pts, rootWidth, stemCol);
+  const organs: Array<{ pts: Vec[]; station: GarlandStation }> = [];
+  for (const vine of garlandVines(opts)) {
+    const vpts = resample(vine.path, 4);
+    if (opts.tube !== false) drawTube(flora, ctx, vpts, rootWidth, stemCol);
+    for (const station of vine.stations) organs.push({ pts: vpts, station });
+  }
 
   // Stations are painted in ledger order; every draw comes from the instance
   // rng, so the whole arrangement is one deterministic sequence.
-  for (const station of stations) {
+  for (const { pts, station } of organs) {
     const idx = max(1, min(pts.length - 1, Math.round(station.t * (pts.length - 1))));
     const [x, y] = pts[idx];
 

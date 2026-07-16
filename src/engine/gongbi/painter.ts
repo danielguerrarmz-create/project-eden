@@ -126,10 +126,11 @@ export function requestPainting(
 }
 
 /** djb2 over the geometry so layout changes re-key the cache. Every field that changes the
- *  PIXELS has to be in here, `tube` included — otherwise an organs-only garland and a vined
- *  one at the same seed and size collide in the cache and whichever painted first wins. */
+ *  PIXELS has to be in here — `tube` included, otherwise an organs-only garland and a vined one at
+ *  the same seed and size collide in the cache and whichever painted first wins, and `vines`
+ *  included, or every re-grown tree would serve the first tree's pixels. */
 function geoHash(opts: GarlandOpts): string {
-  const s = JSON.stringify([opts.path, opts.stations, opts.scale, opts.rootWidth, opts.tube]);
+  const s = JSON.stringify([opts.path, opts.stations, opts.vines, opts.scale, opts.rootWidth, opts.tube]);
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
