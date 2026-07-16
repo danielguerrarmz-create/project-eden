@@ -1800,7 +1800,29 @@ export function CrossPathsTimeline({
       `M ${mirrorRayEndX.toFixed(2)} ${RAY_END_Y.toFixed(2)} C ${mirrorRayEndX.toFixed(2)} ${(RAY_END_Y + DESC_DROP * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${(DESC_BOTTOM_Y - DESC_DROP * 0.5).toFixed(2)}, ${pageCenterVX.toFixed(2)} ${DESC_BOTTOM_Y.toFixed(2)}`;
 
   return (
-    <div ref={trackRef} className="relative" style={{ height: reduced ? 'auto' : '1080vh' }}>
+    /* `-mt-8` CANCELS the 2rem of `main`'s pt-[calc(var(--header-h)+2rem)], and it is a bug fix, not
+       a spacing tweak (2026-07-16, round 4).
+
+       Daniel: "when the 'we've been chasing it for five years' positions itself on its right-left
+       placements, it actually glitches out because there's already an existing 'we've been chasing it
+       for five years' that is slightly not aligned to the brother one."
+
+       Measured: the intro's flying title landed at y=262.2 while the persistent title sat at y=230.2
+       — dx 0, dw 0, dy EXACTLY 32. The 32 is this padding. The sticky child below pins at
+       `top-[var(--header-h)]`, but the track started 2rem BELOW that pin point, so at scrollY=0 the
+       column sat unpinned 32px low, and the moment anything scrolled (the autoplay starts on mount,
+       behind the veil) the sticky engaged and the whole copy column jumped up by 2rem. The intro had
+       measured the title before that, so it flew to a position the title had already left.
+
+       Starting the track AT the pin point means the sticky is engaged from scrollY=0 and the title
+       never moves. The two titles then agree by construction rather than by two measurements racing a
+       scroll — and the copy column stops popping when the camera starts, which was the same bug
+       wearing its everyday clothes. */
+    <div
+      ref={trackRef}
+      className={reduced ? 'relative' : 'relative -mt-8'}
+      style={{ height: reduced ? 'auto' : '1080vh' }}
+    >
       <div
         className={
           reduced
