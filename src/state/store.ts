@@ -56,17 +56,34 @@ export function paramsFromURL(): DesignParams {
   };
 }
 
+export function queryFor(params: DesignParams): string {
+  return String(
+    new URLSearchParams({
+      a: params.footprintM2.toFixed(1),
+      r: params.riseM.toFixed(2),
+      s: params.strutSpacingM.toFixed(2),
+      ap: String(Math.round(params.apertureDeg)),
+      j: params.jointSystem,
+      sp: params.speciesId,
+      y: String(params.year),
+    }),
+  );
+}
+
+/**
+ * Compose the design URL. Pure, so the hash rule below is actually testable.
+ *
+ * The HASH MUST SURVIVE: routing is hash-based (`#/studio`, `#/draw`), so
+ * dropping it silently navigates the user to the splash the instant they touch
+ * a param. That shipped once — clicking a year on the studio threw you back to
+ * `/?a=15.0&…` with no route at all, and any link you copied went with it.
+ */
+export function composeDesignUrl(pathname: string, params: DesignParams, hash: string): string {
+  return `${pathname}?${queryFor(params)}${hash}`;
+}
+
 function urlFor(params: DesignParams): string {
-  const q = new URLSearchParams({
-    a: params.footprintM2.toFixed(1),
-    r: params.riseM.toFixed(2),
-    s: params.strutSpacingM.toFixed(2),
-    ap: String(Math.round(params.apertureDeg)),
-    j: params.jointSystem,
-    sp: params.speciesId,
-    y: String(params.year),
-  });
-  return `${window.location.pathname}?${q}`;
+  return composeDesignUrl(window.location.pathname, params, window.location.hash);
 }
 
 let urlTimer: ReturnType<typeof setTimeout> | undefined;
@@ -95,6 +112,12 @@ interface DesignState {
   reserved: boolean;
 
   setParam: (key: SliderKey, value: number) => void;
+  /**
+   * Set several params at once. The drawing flow (`#/draw`) derives a whole
+   * DesignParams from linework in one go, so patching key-by-key would run the
+   * engine four times and briefly render states the user never drew.
+   */
+  setParams: (patch: Partial<DesignParams>) => void;
   setJointSystem: (system: JointSystem) => void;
   setSpecies: (id: string) => void;
   setYear: (year: Year) => void;
@@ -128,6 +151,8 @@ export const useDesign = create<DesignState>((set, get) => {
     reserved: false,
 
     setParam: (key, value) => set(recompute({ [key]: value })),
+
+    setParams: (patch) => set(recompute(patch)),
 
     setJointSystem: (jointSystem) => set(recompute({ jointSystem })),
 
