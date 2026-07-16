@@ -190,10 +190,33 @@ export const TEAM: TeamMember[] = [
         value:
           'A $0.25 folded medical device for a teaching hospital in Kenya, transferred for clinical deployment, directing a team of fourteen students to get it there.',
       },
+      /*
+       * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
+       * Clay's, not mine." It read: "A desk lamp that gives a language model a body, and a
+       * load-bearing composite grown from bamboo and hemp, tested 30% stronger than hempcrete."
+       *
+       * THE LEDGER WAS ALREADY RIGHT; ONLY THIS SENTENCE WAS WRONG. `LLO: Dream Machine` (n:06) has
+       * carried `by: 'clay'` since it was re-attributed on 2026-07-15. Nothing propagated the change
+       * to here, because these bios RESTATE project facts by hand and nothing links them to the
+       * project set. That is the actual defect, and it will happen again on the next re-attribution:
+       * a fact about a project lives in two places and only one of them has an owner. Flagged rather
+       * than fixed structurally — worth doing if a third founder or a third re-attribution arrives.
+       *
+       * TODO(Daniel): the composite is `Plentify` (n:10), which the ledger attributes `clay+daniel`,
+       * not `daniel`. You said "the biogenic composite I made", so it belongs in your bio — it is
+       * worded here as a thing you built rather than as sole authorship, and the work index credits
+       * "CLAY + DANIEL" on the project itself, so the page does not contradict itself. Say the word
+       * if you want it stated more strongly, or dropped.
+       *
+       * TODO(Daniel): CONFIRM THE FORSITE CLAUSE. "Forsite" appears nowhere in this repo, so there
+       * was no fact to source and nothing here is invented beyond your own words ("the recent
+       * automation work for Forsite"): no dates, no scale, no client detail. Correct the description
+       * if "an AI operations layer for an architecture studio" is wrong or says too much.
+       */
       {
         label: 'Also',
         value:
-          'A desk lamp that gives a language model a body, and a load-bearing composite grown from bamboo and hemp, tested 30% stronger than hempcrete.',
+          'A biogenic composite of bamboo and hemp, tested 30% stronger than hempcrete, and an AI operations layer for Forsite, an architecture studio.',
       },
       { label: 'This round', value: 'The engine, the demo, the numbers.' },
     ],
