@@ -46,8 +46,10 @@ const TITLE = "We've been chasing it for five years.";
 const TITLE_CLASS =
   'font-serifDisplay text-[clamp(1.6rem,4.4vw,3rem)] font-medium leading-[1.12] tracking-[-0.01em] text-inkBlack';
 
-/** The two questions the whole practice chases, presented apart and large. */
-const QUESTIONS = [
+/** The two questions the whole practice chases, presented apart and large.
+ *  (Exported: the scroll About draft at #/about/scroll sets the same two questions,
+ *  and sharing the const keeps the copy from drifting between the two pages.) */
+export const QUESTIONS = [
   { label: 'Question one', text: 'How can architecture be grown, not only built?' },
   { label: 'Question two', text: 'How does designing alongside AI reshape what we can make?' },
 ];
