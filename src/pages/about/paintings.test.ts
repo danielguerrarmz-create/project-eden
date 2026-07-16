@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DISCIPLINE_ORDER, PROJECTS } from './projects';
-import { ALL_COMMISSIONS, PAINTINGS, FOUNDER_SPECIMENS, groupProjects } from './paintings';
+import { TEAM } from './projects';
+import { ALL_COMMISSIONS, PAINTINGS, FOUNDER_SPECIMENS } from './paintings';
 
 describe('the commission ledger', () => {
-  it('hangs exactly five paintings — the flower economy is a design rule', () => {
-    // Was seven under the retired scroll/ascent drafts; `hero` and `eden` went with them
-    // (see the ledger header). Five = three frontispieces + two founder specimens.
-    expect(ALL_COMMISSIONS).toHaveLength(5);
+  it('hangs exactly two paintings — the flower economy is a design rule', () => {
+    // Seven under the retired scroll/ascent drafts (`hero` and `eden` went with them), then five
+    // once the frontispieces landed. Two = the founder specimens, which is now the whole ledger:
+    // the three discipline frontispieces were deleted on 2026-07-16 (see the ledger header).
+    expect(ALL_COMMISSIONS).toHaveLength(2);
   });
 
   it('gives every commission a unique seed in the bower/ namespace', () => {
@@ -19,12 +20,6 @@ describe('the commission ledger', () => {
     // The two `transparent` commissions were the drafts' bookends. On Daniel's page every
     // specimen is a mounted plate, so pigment never touches the page ground directly.
     for (const c of ALL_COMMISSIONS) expect(c.mode).toBe('mounted');
-  });
-
-  it('carries a discipline frontispiece for every discipline in the menu order', () => {
-    for (const d of DISCIPLINE_ORDER) {
-      expect(PAINTINGS[d]).toBeDefined();
-    }
   });
 
   it('requires alt text on every painting', () => {
@@ -52,19 +47,12 @@ describe('the founder specimens', () => {
     expect(Object.keys(FOUNDER_SPECIMENS).sort()).toEqual(['clay', 'daniel']);
     for (const c of Object.values(FOUNDER_SPECIMENS)) expect(c.kind).toBe('herbal');
   });
-});
 
-describe('groupProjects', () => {
-  it('covers all twelve projects exactly once, in discipline then n order', () => {
-    const groups = groupProjects();
-    expect(groups.map((g) => g.discipline)).toEqual(DISCIPLINE_ORDER);
-    const flat = groups.flatMap((g) => g.projects);
-    expect(flat).toHaveLength(PROJECTS.length);
-    expect(new Set(flat.map((p) => p.n)).size).toBe(PROJECTS.length);
-    for (const g of groups) {
-      const ns = g.projects.map((p) => p.n);
-      expect([...ns].sort()).toEqual(ns);
-      for (const p of g.projects) expect(p.discipline).toBe(g.discipline);
-    }
+  it('is the WHOLE ledger: every commission is some founder\'s specimen', () => {
+    // The frontispieces are deleted, not merely unrendered — a commission nothing hangs is a
+    // painting the worker still queues and no one ever sees. If a slot is added back, it should
+    // be because a real surface asks for it, and this test should be the thing that says so.
+    expect(new Set(ALL_COMMISSIONS)).toEqual(new Set(Object.values(FOUNDER_SPECIMENS)));
+    expect(Object.keys(FOUNDER_SPECIMENS).sort()).toEqual(TEAM.map((m) => m.id).sort());
   });
 });

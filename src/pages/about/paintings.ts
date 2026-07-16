@@ -1,23 +1,28 @@
 /**
  * paintings.ts — the commission ledger for the About page's botanical specimens.
  *
- * The page hangs FIVE paintings (the flower economy is a design rule, not a shortage):
- * three discipline frontispieces and the two founder specimens. Each is a permanent
- * commission — a seed string the generator grows into the same painting forever. Change
- * a seed here and the studio has commissioned a new work; that is a design review, not a
- * refactor. Curate candidates in the gongbi lab (#/lab/gongbi) before pinning.
+ * The page hangs TWO paintings (the flower economy is a design rule, not a shortage): the
+ * founder specimens. Each is a permanent commission — a seed string the generator grows into
+ * the same painting forever. Change a seed here and the studio has commissioned a new work;
+ * that is a design review, not a refactor. Curate candidates in the gongbi lab (#/lab/gongbi)
+ * before pinning.
  *
  * HISTORY (2026-07-16). This ledger arrived with the hanging-scroll About draft and moved
  * here when the drafts were retired and their engine harvested as ornament for Daniel's
  * shipped page. Two commissions went with the drafts: `hero` (the scroll/ascent landing
  * branch) and `eden` (the summit crown, which collided with the BowerMark by construction —
- * see quality.matRect). Pigment now appears on the SPECIMENS ONLY; the page's structure is
+ * see quality.matRect). Pigment appears on the SPECIMENS ONLY; the page's structure is
  * INK_SEPIA. The specimens' seeds are the founders' own names, which is the whole idea.
  *
- * Also here: the pure grouping function the work index shares. Pure data + pure functions
- * only, so vitest covers it in the node environment.
+ * ROUND 2, same day: the three DISCIPLINE FRONTISPIECES (`Architecture`, `Product Design`,
+ * `Software`) are deleted, and `groupProjects` with them. They hung at 44px beside the work
+ * index's discipline headings; Daniel: "Get rid of the small logo and extra product design
+ * software architecture." At that size the aged-paper mount swallows the plant and the
+ * frontispiece reads as a beige smudge — the ledger's own note said 44 was already the floor,
+ * and the floor was still too small to be a painting. The index is flat now, so the headings
+ * they sat beside are gone too. A project still carries its `discipline`; nothing draws it.
  */
-import { DISCIPLINE_ORDER, PROJECTS, type Discipline, type FounderId, type Project } from './projects';
+import { type FounderId } from './projects';
 
 export type Archetype = 'woody' | 'herbal';
 
@@ -68,27 +73,9 @@ export const PAINTINGS = {
     mode: 'mounted',
     alt: "Daniel's specimen: a painted herbal nonflower grown from his name",
   },
-  Architecture: {
-    seed: 'bower/architecture',
-    kind: 'woody',
-    mode: 'mounted',
-    alt: 'Architecture frontispiece: a painted woody nonflower branch on aged paper',
-  },
-  'Product Design': {
-    seed: 'bower/product-design',
-    kind: 'herbal',
-    mode: 'mounted',
-    alt: 'Product design frontispiece: a painted herbal nonflower on aged paper',
-  },
-  Software: {
-    seed: 'bower/software',
-    kind: 'herbal',
-    mode: 'mounted',
-    alt: 'Software frontispiece: a painted herbal nonflower on aged paper',
-  },
 } as const satisfies Record<string, Commission>;
 
-/** The five, as a list, for integrity tests and eager warm-up. */
+/** The two, as a list, for integrity tests and eager warm-up. */
 export const ALL_COMMISSIONS: Commission[] = Object.values(PAINTINGS);
 
 /**
@@ -101,21 +88,8 @@ export const FOUNDER_SPECIMENS: Record<FounderId, Commission> = {
   daniel: PAINTINGS.daniel,
 };
 
-export interface WorkGroup {
-  discipline: Discipline;
-  projects: Project[];
-}
-
-/**
- * Group the twelve projects for the three work sections and the plates index:
- * disciplines in Daniel's order, projects by `n` (reverse-chronological display
- * order) within each. Pure so the node tests can pin it.
+/*
+ * `groupProjects` / `WorkGroup` were deleted here on 2026-07-16 (round 2). They grouped the twelve
+ * projects under the work index's three discipline headings, which no longer exist — the index is one
+ * flat reverse-chronological list. Their only remaining caller was the index itself.
  */
-export function groupProjects(projects: Project[] = PROJECTS): WorkGroup[] {
-  return DISCIPLINE_ORDER.map((discipline) => ({
-    discipline,
-    projects: projects
-      .filter((p) => p.discipline === discipline)
-      .sort((a, b) => a.n.localeCompare(b.n)),
-  }));
-}

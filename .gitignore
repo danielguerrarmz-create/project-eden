@@ -18,3 +18,5 @@ docs/re-application-*
 docs/pr-*-review-*
 docs/handoff-clay-*
 docs/brief-for-evaluators.md
+qa-shot.mjs
+qa-measure.mjs

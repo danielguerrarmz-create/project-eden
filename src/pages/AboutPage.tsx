@@ -2,15 +2,27 @@
  * AboutPage.tsx — the dedicated projects page (#/about).
  *
  * Order: the header (title + the two questions) drawn AS the cross-paths timeline, then the
- * co-founders (Clay + Daniel) borne at the node where the finale's ink line forks, then the projects.
+ * co-founders (Clay + Daniel), then the projects.
  *
- * The projects use a master-detail LIST: a slim numbered SELECTION MENU on the left, and on the
- * right the selected project's IMAGES — a large HERO (image or video) that reads clearly, then the
- * remaining images in a clean supporting grid below — plus its description and the "What we learned"
- * takeaway beside them. There is no fixed cramped frame and no inner masonry: the detail panel scrolls
- * if a project runs long, so every picture is legible. The hero is the first image by default and is
- * hand-selectable per project (see `hero` in about/projects.ts). On mobile the projects stack, each
- * with its images and text inline. Captions live only in the lightbox.
+ * The projects use a master-detail LIST: a SELECTION MENU on the left — one FLAT reverse-
+ * chronological list — and on the right the selected project, laid out in ROWS (2026-07-16, round 2;
+ * Daniel: "What if we switch them to rows instead where the main images of the projects show up at
+ * the top... and have the project information at the bottom"):
+ *
+ *   row 1  the PICTURES: a large landscape HERO (image or video) with the supporting images standing
+ *          beside it as a vertical filmstrip. See SupportingStrip for why the strip is vertical —
+ *          it is not a style choice, it is what buys the hero its aspect ratio.
+ *   row 2  the INFORMATION BAND, reading across under the picture: title · credit · description,
+ *          then awards and collaborators, then the "What we learned" takeaway. See ProjectInfoBand
+ *          for why the columns are split the way they are.
+ *
+ * The detail is height-locked to the viewport, which is what makes the master-detail an instrument
+ * rather than a document: hovering the menu swaps the detail IN PLACE, and nothing below it moves.
+ * That lock is also the whole constraint the two comments above are negotiating with.
+ *
+ * The hero is the first image by default and is hand-selectable per project (see `hero` in
+ * about/projects.ts). On mobile the projects stack, each with its images and text inline. Captions
+ * live only in the lightbox.
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
@@ -32,7 +44,7 @@ import {
 import { AboutIntro, shouldPlayAboutIntro } from './about/AboutIntro';
 import { CrossPathsTimeline, INK_SEPIA, INK_SEPIA_TEXT } from './about/CrossPathsTimeline';
 import { FanPainting } from './about/FanPainting';
-import { FOUNDER_SPECIMENS, PAINTINGS, groupProjects } from './about/paintings';
+import { FOUNDER_SPECIMENS } from './about/paintings';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
@@ -223,64 +235,94 @@ function ProjectImg({
 }
 
 /**
- * The curated gallery (Comment 4 + the fill fix, 2026-07-15): the media area is the hero on top and a
- * supporting row beneath, filling the panel with NO dead space.
- *
- * The supporting row is a JUSTIFIED ROW, not an equal grid: each cell's width is proportional to its
- * image's aspect ratio (`flexGrow: ratio`, `flexBasis: 0`) and the row's height is set by the SUM of
- * those ratios (`aspectRatio: sumRatio` over the full width). That makes every cell's shape match its
+ * The supporting images as a JUSTIFIED ROW (mobile): each cell's width is proportional to its image's
+ * aspect ratio (`flexGrow: ratio`, `flexBasis: 0`) and the row's height comes from the SUM of those
+ * ratios (`aspectRatio: sumRatio` across the full width). That makes every cell's shape match its
  * image's shape, so BOTH `object-cover` (photos) and `object-contain` (diagrams that must not crop)
  * fill their cell edge-to-edge — the old equal grid forced a contain image into a tall narrow cell and
- * left a white band above/below it (the Plentify bug). The row height is capped so the hero always keeps
- * the larger share. The hero fills the remaining height (`flex-1`) with its own object-fit.
- *
- * `variant='stacked'` (mobile) reads the hero at 3:2, then the rest as a justified row below.
+ * left a white band above and below it (the Plentify bug). Free to take whatever height it needs,
+ * because the mobile page scrolls.
  */
-function Gallery({
-  project,
+function SupportingRow({
+  images,
   onOpen,
-  reduced = false,
-  variant = 'fixed',
+  reduced,
 }: {
-  project: Project;
+  images: ProjectImage[];
   onOpen?: (image: ProjectImage) => void;
   reduced?: boolean;
-  variant?: 'fixed' | 'stacked';
 }) {
-  const { hero, rest } = heroSplit(project.images);
-  // Sum of the supporting ratios sets the justified row's height: rowHeight = width / sumRatio, so each
-  // cell (width = ratio · rowHeight) has aspect === its image ratio and the images fill exactly.
-  const sumRatio = rest.reduce((s, im) => s + im.ratio, 0);
-
-  const supportingRow = rest.length > 0 && (
-    <div
-      className="flex w-full shrink-0 gap-2 lg:max-h-[46%]"
-      style={{ aspectRatio: sumRatio > 0 ? sumRatio : undefined }}
-    >
-      {rest.map((img) => (
+  if (images.length === 0) return null;
+  const sumRatio = images.reduce((s, im) => s + im.ratio, 0);
+  return (
+    <div className="flex w-full shrink-0 gap-2" style={{ aspectRatio: sumRatio > 0 ? sumRatio : undefined }}>
+      {images.map((img) => (
         <div key={img.src} className="relative min-h-0" style={{ flexGrow: img.ratio, flexBasis: 0 }}>
           <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
         </div>
       ))}
     </div>
   );
+}
 
-  if (variant === 'stacked') {
-    return (
-      <figure className="space-y-3">
-        <ProjectImg image={hero} className="aspect-[3/2]" onOpen={onOpen} reduced={reduced} />
-        {supportingRow}
-      </figure>
-    );
-  }
+/** The desktop filmstrip's width. No project carries more than three supporting images (measured),
+ *  so at this width the tallest strip is ~450px and always fits beside the hero. */
+const STRIP_W = 132;
 
-  // Desktop: FIXED. Hero fills the remaining height above the justified supporting row.
+/**
+ * The supporting images as a VERTICAL FILMSTRIP beside the hero (desktop).
+ *
+ * This is here to buy the hero its aspect ratio. The desktop detail is height-locked to the viewport
+ * (~729px of panel), and every pixel a horizontal strip takes comes straight out of the hero's height
+ * — with the strip under the hero, the hero measured 875x306..401, i.e. 2.2:1 to 2.9:1, against source
+ * images that are natively 1.2:1 to 1.9:1. That is Daniel's own complaint (an image forced into a box
+ * the wrong shape) arriving from the opposite side: it was portrait, and a naive row made it a slot.
+ * Standing the strip on its end spends WIDTH, which this panel has, instead of HEIGHT, which it does
+ * not: the hero becomes ~735x415..509 — 1.44:1 to 1.77:1 — which is the source images' own range.
+ *
+ * Each thumb takes the strip's full width at its own `aspectRatio`, so nothing is cropped. They may
+ * shrink (and only then cover-crop) if a project ever carries enough supporting images to overrun the
+ * column; `overflow-hidden` is the backstop.
+ */
+function SupportingStrip({
+  images,
+  onOpen,
+  reduced,
+}: {
+  images: ProjectImage[];
+  onOpen?: (image: ProjectImage) => void;
+  reduced?: boolean;
+}) {
+  if (images.length === 0) return null;
   return (
-    <figure className="flex h-full min-h-0 flex-col gap-2">
-      <div className="relative min-h-0 flex-1">
-        <ProjectImg image={hero} onOpen={onOpen} reduced={reduced} fill />
-      </div>
-      {supportingRow}
+    <div
+      className="flex min-h-0 shrink-0 flex-col gap-2 overflow-hidden"
+      style={{ width: STRIP_W }}
+    >
+      {images.map((img) => (
+        <div key={img.src} className="relative min-h-0 w-full" style={{ aspectRatio: img.ratio }}>
+          <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Mobile: the hero at 3:2, then the rest as a justified row below. */
+function Gallery({
+  project,
+  onOpen,
+  reduced = false,
+}: {
+  project: Project;
+  onOpen?: (image: ProjectImage) => void;
+  reduced?: boolean;
+}) {
+  const { hero, rest } = heroSplit(project.images);
+  return (
+    <figure className="space-y-3">
+      <ProjectImg image={hero} className="aspect-[3/2]" onOpen={onOpen} reduced={reduced} />
+      <SupportingRow images={rest} onOpen={onOpen} reduced={reduced} />
     </figure>
   );
 }
@@ -460,73 +502,131 @@ function DownloadGlyph() {
   );
 }
 
+/** The awards / publications block, with the paper download. Omitted entirely when a project has
+ *  neither, so no empty label ever shows. Olive stays reserved for the one lesson pill, so it isn't
+ *  diluted by a second use here. */
+function Recognition({ project, className = '' }: { project: Project; className?: string }) {
+  const { paper, awards } = project;
+  if (!(awards && awards.length > 0) && !paper) return null;
+  return (
+    <div className={className}>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
+        Awards and publications
+      </p>
+      {awards && awards.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {awards.map((award) => (
+            <li key={award} className="font-serifDisplay text-[14px] leading-snug text-inkBlack/75">
+              {award}
+            </li>
+          ))}
+        </ul>
+      )}
+      {paper && (
+        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
+          {paper.venue} · {paper.authors}
+        </p>
+      )}
+      {paper?.pdf && (
+        <a
+          href={paper.pdf}
+          download
+          className="group mt-3 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+        >
+          <DownloadGlyph />
+          Read the paper
+          <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** The lesson, as a filled/bordered pill. No divider rule — the chip itself sets it apart. */
+function LessonPill({ project }: { project: Project }) {
+  return (
+    <div className="inline-flex max-w-full flex-col gap-1 rounded-2xl border border-accentOlive/35 bg-accentOlive/[0.07] px-4 py-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accentOlive">
+        What we learned
+      </span>
+      <span className="font-serifDisplay text-[clamp(1rem,1.2vw,1.2rem)] leading-snug text-inkBlack">
+        {project.learned}
+      </span>
+    </div>
+  );
+}
+
 /**
- * The detail panel text (Comment 4, 2026-07-15). Hierarchy is established by type size / weight /
- * colour / spacing — NOT by horizontal divider lines (the old `border-t` rules are gone). Order, top to
- * bottom: (1) title + the byline credit, (2) a 2–3 sentence description with a clear outcome, (3) awards
- * and publications, (4) collaborators / professors, (5) at the very bottom, the "What we learned" lesson
- * rendered as a filled/bordered PILL. Stages 3 and 4 are omitted when a project has no data for them, so
- * no empty label ever shows.
+ * THE PROJECT INFORMATION BAND — the bottom row of the desktop detail (2026-07-16, round 2).
  *
- * `fixed` pins the pill to the bottom of a full-height column (desktop, side-by-side with the media);
- * mobile leaves it in normal flow just below the text.
+ * Daniel: "What if we switch them to rows instead where the main images of the projects show up at
+ * the top... and have the project information at the bottom". So the information reads ACROSS, under
+ * the picture rather than beside it: (1) title · credit · description, (2) awards and publications ·
+ * collaborators, (3) the lesson.
+ *
+ * THE COLUMN SPLIT IS A HEIGHT BUDGET, NOT A STYLE CHOICE, and it is counter-intuitive enough to be
+ * worth stating: a grid row is as tall as its TALLEST column, and this band's height comes straight
+ * out of the hero above it. So the split has to BALANCE the stacks, and there are two ways to get it
+ * wrong, both of which shipped in this file today before this comment did:
+ *   - Stacking description AND recognition in one column (3 cols) made that column 319px on Synthetic
+ *     Vision and squeezed the hero to 254px at 875 wide — a 3.4:1 letterbox. The same "wrong aspect"
+ *     complaint that this whole rework is fixing, arriving from the other direction.
+ *   - Splitting them apart into FOUR columns made it WORSE, not better (465px on Robots as
+ *     Instruments): narrower columns wrap more, so every column grows taller at once. More columns
+ *     does not mean a shorter band.
+ * What works is three columns with the description paired with the SHORT thing (the title) and the
+ * recognition list paired with the other short thing (collaborators): two stacks of ~195 and ~180
+ * instead of one of 319. The measure lands near 40ch, which is a real reading measure.
+ *
+ * The band is NOT capped and NOT scrollable. An earlier cut put `maxHeight` + `overflow-y-auto` here
+ * to protect the hero's height, and it silently hid the bottom of seven projects' awards and
+ * collaborators (up to 61px of it) behind a scrollbar nobody would find in a band this short. The
+ * band takes the height it needs; the hero absorbs the difference down to its floor.
  */
-function ProjectText({ project, fixed = false }: { project: Project; fixed?: boolean }) {
-  const paper = project.paper;
-  const awards = project.awards;
-  const hasRecognition = (awards && awards.length > 0) || !!paper;
+function ProjectInfoBand({ project }: { project: Project }) {
   return (
     <div
-      className={
-        fixed
-          ? 'flex h-full min-h-0 flex-col overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-          : ''
-      }
+      data-project-band
+      className="grid shrink-0 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-7 border-t border-inkBlack/12 pt-4"
     >
-      {/* 1. Title + byline credit. */}
+      <div>
+        <h3 className="font-serifDisplay text-[26px] leading-tight text-inkBlack">{project.title}</h3>
+        <Meta project={project} className="mt-1.5 block" />
+        <p className="mt-3 font-serifDisplay text-[15px] leading-snug text-inkBlack/75">{project.description}</p>
+      </div>
+      <div>
+        <Recognition project={project} />
+        {project.collaborators && (
+          <div className="mt-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">Collaborators</p>
+            <p className="mt-1.5 font-serifDisplay text-[13px] leading-snug text-inkBlack/75">
+              {project.collaborators}
+            </p>
+          </div>
+        )}
+      </div>
+      <div>
+        <LessonPill project={project} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The MOBILE project text: the same material in one column, in reading order — title + credit,
+ * description, awards and publications, collaborators, then the lesson.
+ */
+function ProjectText({ project }: { project: Project }) {
+  return (
+    <div>
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className="font-serifDisplay text-[22px] leading-tight text-inkBlack">{project.title}</h3>
+        <h3 className="font-serifDisplay text-[24px] leading-tight text-inkBlack">{project.title}</h3>
         <Meta project={project} className="shrink-0" />
       </div>
-      {/* 2. Description with its outcome. */}
       <p className="mt-3 font-serifDisplay text-[15px] leading-snug text-inkBlack/75">
         {project.description}
       </p>
-      {/* 3. Awards and publications. No rule above it — the mono label + spacing carry the shift. Olive
-          stays reserved for the one lesson pill below, so it isn't diluted by a second use here. */}
-      {hasRecognition && (
-        <div className="mt-5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-            Awards and publications
-          </p>
-          {awards && awards.length > 0 && (
-            <ul className="mt-1.5 space-y-0.5">
-              {awards.map((award) => (
-                <li key={award} className="font-serifDisplay text-[14px] leading-snug text-inkBlack/75">
-                  {award}
-                </li>
-              ))}
-            </ul>
-          )}
-          {paper && (
-            <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
-              {paper.venue} · {paper.authors}
-            </p>
-          )}
-          {paper?.pdf && (
-            <a
-              href={paper.pdf}
-              download
-              className="group mt-3 inline-flex items-center gap-2.5 border border-inkBlack/25 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-inkBlack transition-colors hover:border-accentOlive hover:text-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
-            >
-              <DownloadGlyph />
-              Read the paper
-              <span className="text-inkBlack/40 group-hover:text-accentOlive/70">{paper.pdfSize}</span>
-            </a>
-          )}
-        </div>
-      )}
-      {/* 4. Collaborators / professors — the people beyond the founders, when there are named ones. */}
+      <Recognition project={project} className="mt-5" />
       {project.collaborators && (
         <div className="mt-5">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">Collaborators</p>
@@ -535,17 +635,8 @@ function ProjectText({ project, fixed = false }: { project: Project; fixed?: boo
           </p>
         </div>
       )}
-      {/* 5. The lesson, as a filled/bordered pill at the very bottom (mt-auto pins it there in the
-          fixed column). No divider rule — the chip itself sets it apart. */}
-      <div className={fixed ? 'mt-auto pt-6' : 'mt-6'}>
-        <div className="inline-flex max-w-full flex-col gap-1 rounded-2xl border border-accentOlive/35 bg-accentOlive/[0.07] px-4 py-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accentOlive">
-            What we learned
-          </span>
-          <span className="font-serifDisplay text-[clamp(1.05rem,1.35vw,1.35rem)] leading-snug text-inkBlack">
-            {project.learned}
-          </span>
-        </div>
+      <div className="mt-6">
+        <LessonPill project={project} />
       </div>
     </div>
   );
@@ -556,15 +647,19 @@ function ProjectText({ project, fixed = false }: { project: Project; fixed?: boo
 function ListView({ reduced }: { reduced: boolean }) {
   // REVERSE CHRONOLOGICAL: the most recent work leads. `n` encodes that order (01 = newest),
   // so sorting by it and sorting by year agree — the number the reader sees is the position.
+  //
+  // THE INDEX IS FLAT (2026-07-16, round 2). It used to be grouped by discipline, each group led by a
+  // mono ARCHITECTURE / PRODUCT DESIGN / SOFTWARE heading and a 44px painted frontispiece. Daniel:
+  // "Get rid of the small logo and extra product design software architecture." Both went. At 44px the
+  // frontispieces read as beige smudges rather than paintings, and the headings chopped one twelve-item
+  // reverse-chronological list into three short ones that each restarted the clock. `groupProjects` was
+  // display machinery for those headings and is deleted with them; each project still carries its
+  // `discipline`, which is simply no longer drawn.
   const items = [...PROJECTS].sort((a, b) => a.n.localeCompare(b.n));
-  // The menu is GROUPED BY DISCIPLINE (Architecture, Product Design, Software); reverse-chronological
-  // within each group, and only non-empty groups render. `groupProjects` is the shared, tested
-  // grouping (paintings.ts) — this used to re-implement it inline, and the two could drift.
-  const groups = groupProjects(items).filter((g) => g.projects.length > 0);
-  // Active selection is tracked by project `n` — stable across the grouped layout — defaulting to the
-  // first project of the first group (top of the menu). The right-hand detail follows it exactly as before.
-  const [activeN, setActiveN] = useState(() => groups[0]?.projects[0]?.n ?? items[0].n);
+  // Active selection is tracked by project `n`, defaulting to the top of the menu.
+  const [activeN, setActiveN] = useState(() => items[0].n);
   const project = items.find((p) => p.n === activeN) ?? items[0];
+  const { hero, rest } = heroSplit(project.images);
 
   // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
   // they are excluded here and never enter the arrow-key walk.
@@ -589,102 +684,97 @@ function ListView({ reduced }: { reduced: boolean }) {
 
   return (
     <div className="min-h-0 flex-1">
-      {/* Desktop master-detail: the numbered SELECTION MENU hard left, the media + project info on the
-          right, side-by-side from lg up. The detail is FIXED to the frame height — the media area splits
-          into a top-half hero and a bottom-half grid, and nothing scrolls. */}
-      <div className="hidden h-full min-h-0 gap-x-16 gap-y-8 lg:grid lg:grid-cols-[minmax(300px,0.85fr)_2fr] xl:gap-x-24">
-        {/* The project menu, GROUPED BY DISCIPLINE: a small mono heading, then that group's projects.
-            The item font and vertical padding are tightened so all twelve projects AND the three
-            headings fit at once at normal desktop heights — no inner scroll. `overflow-y-auto` is only a
-            last-resort safety for unusually short viewports. Hover/focus selects; the tint bar rides the
-            active row's left edge. */}
+      {/* Desktop master-detail: the SELECTION MENU hard left, and the selected project's ROWS on the
+          right. The detail is FIXED to the frame height. */}
+      <div className="hidden h-full min-h-0 gap-x-16 gap-y-8 lg:grid lg:grid-cols-[minmax(300px,0.8fr)_2.2fr] xl:gap-x-20">
+        {/* The project menu: one FLAT reverse-chronological list of all twelve. Hover/focus selects;
+            the tint bar rides the active row's left edge. `overflow-y-auto` is only a last-resort
+            safety for unusually short viewports — the list fits at normal desktop heights. */}
         <nav className="min-h-0 min-w-0 self-stretch overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {groups.map((group) => (
-            <div key={group.discipline} className="mb-3 last:mb-0">
-              {/* The discipline FRONTISPIECE: a small painted chapter-break mark beside the
-                  heading — one of Clay's three commissioned specimens, in full pigment.
-                  Deliberately NO BowerMark over it: matRect (quality.ts) base-anchors every
-                  plant so its densest region sits on the mat's bottom row, and the retired
-                  drafts then placed the mark at bottom-[5%] of the same frame — they collide
-                  by construction, for every seed. A frontispiece stands alone. */}
-              <div className="flex items-center gap-3 px-4 pb-1.5 pt-2">
-                {/* 44px, not 28: below ~40 the aged-paper mount swallows the plant and the
-                    frontispiece reads as a beige swatch rather than a painting. */}
-                <FanPainting commission={PAINTINGS[group.discipline]} size={44} caption={false} />
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">
-                  {group.discipline}
-                </p>
-              </div>
-              <ol>
-                {group.projects.map((p) => {
-                  const on = p.n === activeN;
-                  // `tint` is the STRUCTURE colour (the bar + the row's ground); `ink` is the same
-                  // colour at reading weight for the glyphs that sit ON that tinted ground.
-                  const tint = authorColor(p.by);
-                  const ink = authorTextColor(p.by);
-                  return (
-                    <li key={p.n} className="border-t border-inkBlack/10 last:border-b">
-                      <button
-                        type="button"
-                        onMouseEnter={() => setActiveN(p.n)}
-                        onFocus={() => setActiveN(p.n)}
-                        onClick={() => setActiveN(p.n)}
-                        aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}
-                        aria-current={on}
-                        className="group relative flex w-full items-baseline gap-3 py-1.5 pl-4 pr-1 text-left transition-colors duration-200"
-                        style={on ? { backgroundColor: `${tint}14` } : undefined}
-                      >
-                        <span
-                          aria-hidden
-                          className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
-                          style={{ background: tint, transform: `scaleY(${on ? 1 : 0})` }}
-                        />
-                        <span
-                          className={`font-serifDisplay text-[clamp(0.9rem,1.25vw,1.1rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
-                            on && !reduced ? 'translate-x-1' : ''
-                          }`}
-                          style={on ? { color: ink } : undefined}
-                        >
-                          {p.title}
-                        </span>
-                        <span
-                          className="ml-auto shrink-0 font-mono text-[10px] tracking-[0.14em] text-inkBlack/40 transition-colors"
-                          style={on ? { color: ink } : undefined}
-                        >
-                          {p.year}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
-          ))}
+          <ol>
+            {items.map((p) => {
+              const on = p.n === activeN;
+              // `tint` is the STRUCTURE colour (the bar + the row's ground); `ink` is the same
+              // colour at reading weight for the glyphs that sit ON that tinted ground.
+              const tint = authorColor(p.by);
+              const ink = authorTextColor(p.by);
+              return (
+                <li key={p.n} className="border-t border-inkBlack/10 last:border-b">
+                  <button
+                    type="button"
+                    onMouseEnter={() => setActiveN(p.n)}
+                    onFocus={() => setActiveN(p.n)}
+                    onClick={() => setActiveN(p.n)}
+                    aria-label={`${p.title}, ${AUTHOR_LABEL[p.by]}, ${p.year}`}
+                    aria-current={on}
+                    className="group relative flex w-full items-baseline gap-3 py-2 pl-4 pr-1 text-left transition-colors duration-200"
+                    style={on ? { backgroundColor: `${tint}14` } : undefined}
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-[3px] origin-center transition-transform duration-200 ease-out motion-reduce:transition-none"
+                      style={{ background: tint, transform: `scaleY(${on ? 1 : 0})` }}
+                    />
+                    {/* Bigger than it was (Daniel: "project titles slightly bigger"). The three
+                        discipline headings are gone, which is exactly the room this spends. */}
+                    <span
+                      className={`font-serifDisplay text-[clamp(1rem,1.45vw,1.3rem)] leading-tight tracking-[-0.01em] text-inkBlack transition-transform duration-300 ease-out motion-reduce:transition-none ${
+                        on && !reduced ? 'translate-x-1' : ''
+                      }`}
+                      style={on ? { color: ink } : undefined}
+                    >
+                      {p.title}
+                    </span>
+                    <span
+                      className="ml-auto shrink-0 font-mono text-[10px] tracking-[0.14em] text-inkBlack/40 transition-colors"
+                      style={on ? { color: ink } : undefined}
+                    >
+                      {p.year}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
         </nav>
 
-        {/* Detail: the active project's media BESIDE its text, cross-fading as the selection changes.
-            FIXED height, no inner scroll: the media fills its column (hero top half, rest bottom half)
-            and the text column pins its lesson pill to the bottom. */}
-        <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against the
-                `layoutId` images inside this subtree: framer-motion holds the exiting panel open
-                waiting on a shared-layout transition that never resolves, so the exit never
-                completes, the incoming panel never mounts, and the detail FREEZES on whichever
-                project rendered first while the list happily highlights another. (That is the bug
-                this page shipped with once.) Keying a plain motion.div remounts it on every change
-                and fades the new one in — same read, no exit to get stuck on. */}
-            <motion.div
-              key={project.n}
-              className="grid h-full min-h-0 grid-cols-[1.55fr_1fr] gap-x-8 xl:gap-x-10"
-              initial={reduced ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduced ? 0 : 0.55, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <Gallery project={project} onOpen={openShot} variant="fixed" reduced={reduced} />
-              <ProjectText project={project} fixed />
-            </motion.div>
-          </div>
+        {/* THE DETAIL, AS ROWS (2026-07-16, round 2). Daniel: "a lot of these images are not looking
+            good because they're natively landscape but they're being displayed in portrait mode."
+            They were: the hero used to sit in the left COLUMN of a [1.55fr_1fr] split beside the text,
+            which at 1440 made its box ~505x557 — PORTRAIT — so a landscape hero floated in it with dead
+            paper above and below.
+            Now the picture takes the full width of the detail and the information reads across
+            underneath it. Nothing here fixes an aspect ratio: the hero's box is simply the full width
+            by whatever height the band leaves it (~860x450 at 1440 — landscape), so a landscape image
+            fills it edge to edge and a `contain` diagram letterboxes in the correct direction. */}
+        <div className="min-h-0 overflow-hidden">
+          {/* NO AnimatePresence here, and that is deliberate. `mode="wait"` deadlocks against the
+              `layoutId` images inside this subtree: framer-motion holds the exiting panel open
+              waiting on a shared-layout transition that never resolves, so the exit never
+              completes, the incoming panel never mounts, and the detail FREEZES on whichever
+              project rendered first while the list happily highlights another. (That is the bug
+              this page shipped with once.) Keying a plain motion.div remounts it on every change
+              and fades the new one in — same read, no exit to get stuck on. */}
+          <motion.div
+            key={project.n}
+            data-project-detail
+            className="flex h-full min-h-0 flex-col gap-3"
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduced ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {/* ROW 1 — the pictures. The main image takes the row, with the supporting filmstrip
+                standing beside it; it fills whatever height the band leaves, so a project with
+                little to say gets a bigger picture. */}
+            <div className="flex min-h-0 flex-1 gap-2">
+              <div data-project-hero className="relative min-h-0 flex-1">
+                <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fill />
+              </div>
+              <SupportingStrip images={rest} onOpen={openShot} reduced={reduced} />
+            </div>
+            {/* ROW 2 — the project information. */}
+            <ProjectInfoBand project={project} />
+          </motion.div>
         </div>
       </div>
 
@@ -696,7 +786,7 @@ function ListView({ reduced }: { reduced: boolean }) {
               <span aria-hidden className="h-[3px] w-6 rounded-full" style={{ background: authorColor(p.by) }} />
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">{p.year}</span>
             </div>
-            <Gallery project={p} variant="stacked" reduced={reduced} />
+            <Gallery project={p} reduced={reduced} />
             <div className="mt-5">
               <ProjectText project={p} />
             </div>
