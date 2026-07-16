@@ -15,6 +15,7 @@ import { ENVELOPE, GROWTH } from '../data/config';
 import { runEngine } from '../engine';
 import { DEFAULT_SPECIES_ID, SPECIES_BY_ID } from '../engine/species';
 import type { DesignParams, EngineOutputs, JointSystem } from '../engine/types';
+import type { ShapeField } from '../engine/geometry';
 import type { Year } from '../data/config';
 
 export type OverlayKey = 'strutHeatmap' | 'growth';
@@ -118,6 +119,12 @@ interface DesignState {
    * engine four times and briefly render states the user never drew.
    */
   setParams: (patch: Partial<DesignParams>) => void;
+  /**
+   * Hand the engine a DRAWN shape (engine/shapeFromDrawing). With one, the
+   * generator roots at the bearings that were drawn and lays the lattice on the
+   * sculpted surface; without one it stays parametric. The studio never sets it.
+   */
+  setShape: (shape: ShapeField | undefined) => void;
   setJointSystem: (system: JointSystem) => void;
   setSpecies: (id: string) => void;
   setYear: (year: Year) => void;
@@ -132,9 +139,14 @@ const initialParams = paramsFromURL();
 const initialOutputs = runEngine(initialParams);
 
 export const useDesign = create<DesignState>((set, get) => {
+  // The drawn shape, if any. Held outside the store's reactive state because
+  // it's a bundle of closures, not data to diff — the store only needs it to
+  // be in hand whenever the engine re-runs.
+  let shape: ShapeField | undefined;
+
   /** Run the engine on a param patch; keep the clamped params it returns. */
   const recompute = (patch: Partial<DesignParams>) => {
-    const outputs = runEngine({ ...get().params, ...patch });
+    const outputs = runEngine({ ...get().params, ...patch }, shape);
     const params = { ...outputs.geometry.params };
     writeURL(params);
     return { params, outputs };
@@ -153,6 +165,11 @@ export const useDesign = create<DesignState>((set, get) => {
     setParam: (key, value) => set(recompute({ [key]: value })),
 
     setParams: (patch) => set(recompute(patch)),
+
+    setShape: (s2) => {
+      shape = s2;
+      set(recompute({}));
+    },
 
     setJointSystem: (jointSystem) => set(recompute({ jointSystem })),
 

@@ -121,32 +121,81 @@ export function insideHullM(hull: Pt[], p: Pt): number {
   return best;
 }
 
-/** How far in from the hull edge the skin has come fully down to the lawn. */
-const EDGE_MARGIN_M = 0.35;
+/**
+ * Centre of the plan — the placement the net is built about.
+ */
+export function planCentre(arcs: Spine[]): Pt {
+  const pts = arcs.flatMap((a) => [a.a, a.b]);
+  if (pts.length === 0) return { x: 0, y: 0 };
+  let x = 0;
+  let y = 0;
+  for (const p of pts) {
+    x += p.x;
+    y += p.y;
+  }
+  return { x: x / pts.length, y: y / pts.length };
+}
 
 /**
- * The surface height at p — a VAULT over the plan your lines claim.
+ * Distance from `centre` out to the hull boundary along a compass bearing.
  *
- * Three parts:
- *   1. Shepard interpolation of the ribs' heights (inverse-square weights). On
- *      a rib the weight blows up and the skin equals that rib exactly; between
- *      ribs it's their weighted average, so the skin sags in the spans.
- *   2. The FOOTPRINT is the hull through the feet, and the skin drops to the
- *      lawn at that boundary.
- *   3. Everything outside is simply lawn.
+ * This is what lets the net FILL THE DRAWN PLAN instead of an ellipse the
+ * grammar invented. The engine's polar net asks "how far out does the canopy
+ * go at this bearing" — for a drawn design the answer is "as far as your lines
+ * did", and that is this function.
+ */
+export function hullRadiusAtM(hull: Pt[], centre: Pt, bearingRad: number): number {
+  if (hull.length < 3) return 0;
+  // Engine bearing convention: 0 = north = +y, 90 = east = +x.
+  const dx = Math.sin(bearingRad);
+  const dy = Math.cos(bearingRad);
+  let best = Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    // Solve centre + t*d = a + u*e for t, with 0<=u<=1.
+    const den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const t = ((a.x - centre.x) * ey - (a.y - centre.y) * ex) / den;
+    const u = ((a.x - centre.x) * dy - (a.y - centre.y) * dx) / den;
+    if (t > 1e-9 && u >= -1e-9 && u <= 1 + 1e-9) best = Math.min(best, t);
+  }
+  return Number.isFinite(best) ? best : 0;
+}
+
+/**
+ * The surface height at p — a CANOPY over the plan your lines claim.
+ *
+ * Shepard interpolation of the ribs' heights (inverse-square weights). On a rib
+ * the weight blows up and the skin equals that rib exactly; between ribs it's
+ * their weighted average, so the skin sags across the spans.
+ *
+ * NOTE WHAT IS NOT HERE: there is no skirt down to the lawn at the hull edge.
+ * That is the difference between a canopy and a igloo. The ribs already reach
+ * the ground at their own feet, so the skin dives to the lawn THERE and nowhere
+ * else; along the hull between two feet it stays up, and that lifted free edge
+ * IS the eave. An earlier version skirted the whole boundary to zero and the
+ * result sat on the ground all the way round — which looked fine in isolation
+ * and was completely wrong: it threw away the legs and the open sides, the two
+ * things that make an Eden an Eden, and it meant baking the drawing could only
+ * ever produce something the product doesn't build.
+ *
+ * Outside the hull is lawn; callers cut there (see hullRadiusAtM).
  *
  * Two earlier versions were wrong in instructive ways. A p-norm blend of tents
- * lifted the surface ABOVE every arc and buried the lines you drew inside a
+ * lifted the surface ABOVE every arc and BURIED the lines you drew inside a
  * mound — you made a mark and it vanished. Decaying from each rib instead fixed
  * that but spread the skin metres past your feet, so the thing read as a sand
- * dune and claimed 54 m² when you'd drawn a 15 m² pavilion. Anchoring the skirt
- * to the hull instead of to the ribs is what makes it read as a canopy: it
- * stands on the feet you drew, and the area it reports is the area the engine
- * will price, because both are that same hull.
+ * dune and claimed 54 m² when you'd drawn a 15 m² pavilion.
  */
 export function surfaceHeight(input: SurfaceInput, p: Pt): number {
   let h = 0;
   if (input.arcs.length > 0) {
+    const hull = footprintHull(input.arcs);
+    if (insideHullM(hull, p) < 0) return 0; // off the plan: lawn
+
     let wsum = 0;
     let hw = 0;
     for (const arc of input.arcs) {
@@ -155,13 +204,7 @@ export function surfaceHeight(input: SurfaceInput, p: Pt): number {
       wsum += w;
       hw += w * ribHeight;
     }
-    const shepard = wsum > 0 ? hw / wsum : 0;
-
-    const hull = footprintHull(input.arcs);
-    const inside = insideHullM(hull, p);
-    // Off the plan entirely: lawn. Near the edge: easing down onto it.
-    const edge = Math.max(0, Math.min(1, inside / EDGE_MARGIN_M));
-    h = shepard * edge * edge * (3 - 2 * edge); // smoothstep, no crease at the eave
+    h = wsum > 0 ? hw / wsum : 0;
   }
 
   // Lifts: a smooth bump. Excavation is a mask, not a dent — see isHole.

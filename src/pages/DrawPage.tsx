@@ -40,6 +40,7 @@ import { webglSupported } from '../ui/webgl';
 import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
 import { readDrawing, type Spine } from '../engine/fromDrawing';
 import { surfaceAreaM2, surfacePeakM, type Edit, type SurfaceInput } from '../engine/surface';
+import { shapeFromDrawing } from '../engine/shapeFromDrawing';
 import { buildProjectExport, buildDrawingExport, exportFilename } from '../engine/exportProject';
 import { useDesign } from '../state/store';
 
@@ -84,10 +85,16 @@ export function DrawPage() {
   );
 
   const setParams = useDesign((s) => s.setParams);
+  const setShape = useDesign((s) => s.setShape);
   const outputs = useDesign((s) => s.outputs);
   useEffect(() => {
-    if (baked) setParams(read.params);
-  }, [baked, read.params, setParams]);
+    if (!baked) return;
+    // The drawing IS the input. Hand the generator the shape, not just a
+    // footprint number — otherwise it spreads feet evenly round an ellipse and
+    // raises its own dome, and everything you sculpted was decoration.
+    setShape(shapeFromDrawing(surface));
+    setParams(read.params);
+  }, [baked, read.params, surface, setParams, setShape]);
 
   const soft = arcs.length > 0 && !baked;
   const canBake = arcs.length >= 2 && !baked;

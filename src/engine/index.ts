@@ -11,7 +11,7 @@
 import { LEAD_TIME, SITE } from '../data/config';
 import { decomposeComponents } from './components';
 import { computeEcology } from './ecology';
-import { generateGeometry } from './geometry';
+import { generateGeometry, type ShapeField } from './geometry';
 import { deriveBounds, ellipsePerimeterM } from './grammar';
 import { computeGrowth } from './growth';
 import { nestComponents } from './nesting';
@@ -36,9 +36,15 @@ function planBuild(geometry: CanopyGeometry, components: ComponentList, plantCou
   return { assemblySteps, leadTimeWeeks, plantCount };
 }
 
-export function runEngine(params: DesignParams): EngineOutputs {
+/**
+ * Run the engine. `shape` is the DRAWN design (engine/shapeFromDrawing) when
+ * there is one: pass it and the generator roots at the bearings that were drawn
+ * and lays the lattice on the surface that was sculpted. Omit it and the
+ * parametric studio behaves exactly as it always has.
+ */
+export function runEngine(params: DesignParams, shape?: ShapeField): EngineOutputs {
   const bounds = deriveBounds(params);
-  const geometry = generateGeometry(params);
+  const geometry = generateGeometry(params, shape);
   const species = getSpecies(params.speciesId);
 
   const sunPath = computeSunPath(SITE.latitudeDeg);

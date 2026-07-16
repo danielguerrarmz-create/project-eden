@@ -136,37 +136,46 @@ describe('surfaceHeight: a skin stretched OVER the ribs', () => {
 });
 
 describe('lift: a place and a size, no numbers', () => {
-  const base: SurfaceInput = { arcs: [arcEW], edits: [] };
+  // Two arcs: a lift needs a surface to lift, and one rib isn't one.
+  const base: SurfaceInput = { arcs: [arcEW, arcNS], edits: [] };
   const lifted: SurfaceInput = {
-    arcs: [arcEW],
-    edits: [{ kind: 'lift', at: { x: 1, y: 0 }, radiusM: 1, amountM: 0.5 }],
+    arcs: [arcEW, arcNS],
+    edits: [{ kind: 'lift', at: { x: 0.6, y: 0.2 }, radiusM: 0.8, amountM: 0.4 }],
   };
 
   it('raises the surface at the lift, and only there', () => {
-    expect(surfaceHeight(lifted, { x: 1, y: 0 })).toBeGreaterThan(
-      surfaceHeight(base, { x: 1, y: 0 }),
+    expect(surfaceHeight(lifted, { x: 0.6, y: 0.2 })).toBeGreaterThan(
+      surfaceHeight(base, { x: 0.6, y: 0.2 }),
     );
     // Outside the radius, untouched.
-    expect(surfaceHeight(lifted, { x: -1.8, y: 0 })).toBeCloseTo(
-      surfaceHeight(base, { x: -1.8, y: 0 }),
+    expect(surfaceHeight(lifted, { x: -1.2, y: -0.2 })).toBeCloseTo(
+      surfaceHeight(base, { x: -1.2, y: -0.2 }),
       6,
     );
   });
 
   it('is still capped — a lift cannot buy you a planning application', () => {
     const silly: SurfaceInput = {
-      arcs: [arcEW],
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 2, amountM: 99 }],
+      arcs: [arcEW, arcNS],
+      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: 99 }],
     };
     expect(surfaceHeight(silly, { x: 0, y: 0 })).toBe(GRAMMAR.pdHeightCapM);
   });
 
   it('never drives the surface below ground', () => {
     const dug: SurfaceInput = {
-      arcs: [arcEW],
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 2, amountM: -99 }],
+      arcs: [arcEW, arcNS],
+      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: -99 }],
     };
     expect(surfaceHeight(dug, { x: 0, y: 0 })).toBeGreaterThanOrEqual(0);
+  });
+
+  it('a lift cannot happen off the plan — there is nothing there to lift', () => {
+    const offPlan: SurfaceInput = {
+      arcs: [arcEW, arcNS],
+      edits: [{ kind: 'lift', at: { x: 8, y: 8 }, radiusM: 2, amountM: 1 }],
+    };
+    expect(surfaceHeight(offPlan, { x: 8, y: 8 })).toBe(0);
   });
 });
 

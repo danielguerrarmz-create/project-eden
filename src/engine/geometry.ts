@@ -65,6 +65,29 @@ function angDiff(a: number, b: number): number {
   return d;
 }
 
+/**
+ * A DRAWN shape the generator should obey instead of inventing one.
+ *
+ * Without this the generator answers every question from the grammar: feet get
+ * spread evenly around an ellipse, and the canopy is an analytic cap. That is
+ * right for a parametric studio and WRONG the moment somebody draws, because
+ * their lines then change nothing but a footprint number — the tool quietly
+ * throws the drawing away and builds its own generic dome on top of it.
+ *
+ * Every field is optional and every default reproduces the old behaviour
+ * exactly, so the parametric path (and its tests) is untouched.
+ */
+export interface ShapeField {
+  /** Where the canopy roots, as compass bearings. Replaces even spacing. */
+  footBearingsDeg?: number[];
+  /** Plan radius at a bearing (m). Replaces the grammar's ellipse. */
+  planRadiusAtM?: (bearingRad: number) => number;
+  /** Canopy height at a world plan point (m). Replaces the analytic cap. */
+  heightAtM?: (x: number, z: number) => number;
+  /** True where the canopy has been excavated away. */
+  isHoleAt?: (x: number, z: number) => boolean;
+}
+
 interface SurfaceCtx {
   a: number;
   b: number;
@@ -72,25 +95,48 @@ interface SurfaceCtx {
   eaveBaseM: number;
   apertureRad: number;
   footAnglesRad: number[];
+  shape?: ShapeField;
 }
 
-function surfaceCtx(p: DesignParams, snapToSpokes?: number): SurfaceCtx {
+function surfaceCtx(p: DesignParams, snapToSpokes?: number, shape?: ShapeField): SurfaceCtx {
   const { a, b } = planDims(p.footprintM2);
   const H = p.riseM;
-  const feet = feetCountFor(p.footprintM2);
   const apertureRad = p.apertureDeg * DEG;
-  // Feet sit evenly spaced, offset half a bay from the aperture so the opening
-  // is always clear of a leg. When generating members, each foot snaps to the
-  // nearest diagrid spoke so a leg (or the foot sweep) lands EXACTLY on a
-  // node column (a foot hovering a few cm off the lawn would undo the whole
-  // "is it real" answer).
-  const footAnglesRad = Array.from({ length: feet }, (_, i) => {
-    const raw = apertureRad + (TWO_PI / feet) * (i + 0.5);
+
+  // Feet: the DRAWN bearings when there are any, else the grammar's even
+  // spread offset half a bay from the aperture so the opening is always clear
+  // of a leg. Either way each foot snaps to the nearest diagrid spoke so a leg
+  // lands EXACTLY on a node column — a foot hovering a few cm off the lawn
+  // would undo the whole "is it real" answer.
+  const snap = (raw: number) => {
     if (!snapToSpokes) return raw;
     const spokeStep = TWO_PI / snapToSpokes;
     return Math.round(raw / spokeStep) * spokeStep;
-  });
-  return { a, b, H, eaveBaseM: 0.62 * H, apertureRad, footAnglesRad };
+  };
+
+  let footAnglesRad: number[];
+  const drawn = shape?.footBearingsDeg;
+  if (drawn && drawn.length > 0) {
+    // Snap first, THEN dedupe: two drawn feet inside one bay are one node, and
+    // emitting both would put two shoes on the same screw.
+    const seen = new Set<number>();
+    footAnglesRad = [];
+    for (const deg of drawn) {
+      const s = ((snap(deg * DEG) % TWO_PI) + TWO_PI) % TWO_PI;
+      const key = Math.round(s * 1e6);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      footAnglesRad.push(s);
+    }
+    footAnglesRad.sort((x, y) => x - y);
+  } else {
+    const feet = feetCountFor(p.footprintM2);
+    footAnglesRad = Array.from({ length: feet }, (_, i) =>
+      snap(apertureRad + (TWO_PI / feet) * (i + 0.5)),
+    );
+  }
+
+  return { a, b, H, eaveBaseM: 0.62 * H, apertureRad, footAnglesRad, shape };
 }
 
 /** Free-edge (eave) height at bearing θ: lifts toward the aperture. */
@@ -111,15 +157,33 @@ function footPull(ctx: SurfaceCtx, thetaRad: number): number {
   return Math.min(1, w);
 }
 
-/** World point of the canopy surface at polar-parametric (r 0..1, θ bearing rad). */
+/**
+ * World point of the canopy surface at polar-parametric (r 0..1, θ bearing rad).
+ *
+ * With a drawn ShapeField the plan radius and the height BOTH come from the
+ * drawing: the net fills the footprint the lines enclosed and lies on the
+ * surface that was sculpted. Without one, the analytic cap below — unchanged.
+ */
 function canopyPoint(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
+  // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
+  const sin = Math.sin(thetaRad);
+  const cos = Math.cos(thetaRad);
+
+  if (ctx.shape?.planRadiusAtM && ctx.shape?.heightAtM) {
+    const R = ctx.shape.planRadiusAtM(thetaRad);
+    const x = r * R * sin;
+    const z = r * R * cos;
+    // The drawn surface already dives to the lawn at the feet and stays up
+    // between them — the eave is a property of the drawing, not of a rule.
+    return [x, Math.max(0, ctx.shape.heightAtM(x, z)), z];
+  }
+
   const E = eaveHeightM(ctx, thetaRad);
   let y = E + (ctx.H - E) * capProfile(r);
   // The ONE typology: near the edge, the surface sweeps down and roots at
   // the feet (FABRICATION.md §5).
   y *= 1 - footPull(ctx, thetaRad) * Math.pow(r, 5);
-  // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
-  return [ctx.a * r * Math.sin(thetaRad), y, ctx.b * r * Math.cos(thetaRad)];
+  return [ctx.a * r * sin, y, ctx.b * r * cos];
 }
 
 /** Outward (upward) unit surface normal at (r, θ), by central differences. */
@@ -192,7 +256,7 @@ const STRUT_DEPTH_M = STOCK.strut.depthMm / 1000;
 const LAMELLA_DEPTH_M = STOCK.lamella.depthMm / 1000;
 const BLANK_DEPTH_M = STOCK.blank.depthMm / 1000;
 
-export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
+export function generateGeometry(rawParams: DesignParams, shape?: ShapeField): CanopyGeometry {
   const params = clampParams(rawParams);
   const lamella = params.jointSystem === 'lamella';
   const { a: planAM, b: planBM } = planDims(params.footprintM2);
@@ -203,7 +267,7 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   const bayM = params.strutSpacingM * 1.35;
   const spokeCount = Math.max(12, 2 * Math.round(perimeterM / bayM / 2));
 
-  const ctx = surfaceCtx(params, spokeCount);
+  const ctx = surfaceCtx(params, spokeCount, shape);
   const { a, b, H } = ctx;
   const feetCount = ctx.footAnglesRad.length;
   const meanR = (a + b) / 2;
@@ -477,6 +541,37 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   // derive the trims from the planes, then fill the PHYSICAL cut lengths the
   // BOM prices. The scene draws the same clipped solids.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // EXCAVATION. A hole has to remove real members, or "excavate" is a lie the
+  // soft surface tells and the cut list contradicts: the opening shows on
+  // screen, then the kit arrives solid and priced as solid.
+  //
+  // Pruned BEFORE joint resolution on purpose. The members that survive are the
+  // ones whose ends must be cut and whose lengths get priced — resolving joints
+  // first would compute planes against neighbours that are about to vanish, and
+  // the BOM would quietly bill for them.
+  // ---------------------------------------------------------------------------
+  if (shape?.isHoleAt) {
+    const holed = (m: Member) =>
+      shape.isHoleAt!((m.start[0] + m.end[0]) / 2, (m.start[2] + m.end[2]) / 2);
+    const gone = new Set(members.filter(holed).map((m) => m.id));
+    if (gone.size > 0) {
+      for (let k = members.length - 1; k >= 0; k--) {
+        if (gone.has(members[k].id)) members.splice(k, 1);
+      }
+      for (const n of nodes) n.memberIds = n.memberIds.filter((id) => !gone.has(id));
+      for (const pc of pieces) pc.memberIds = pc.memberIds.filter((id) => !gone.has(id));
+      // A piece with nothing left is not a piece; it must not reach the BOM.
+      for (let k = pieces.length - 1; k >= 0; k--) {
+        if (pieces[k].memberIds.length === 0) pieces.splice(k, 1);
+      }
+      // A node nothing arrives at is not a joint; it must not get a connector.
+      for (let k = nodes.length - 1; k >= 0; k--) {
+        if (nodes[k].memberIds.length === 0) nodes.splice(k, 1);
+      }
+    }
+  }
+
   resolveJointCuts(nodes, members, params.jointSystem);
   const memberById = new Map(members.map((m) => [m.id, m]));
   for (const piece of pieces) {

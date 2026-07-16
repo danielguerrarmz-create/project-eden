@@ -1,81 +1,81 @@
 /**
  * SurfaceMesh.tsx — the soft thing you sculpt, before it becomes a kit.
  *
- * Evaluates engine/surface.ts over a plan grid and drops triangles that fall in
- * a hole or off the edge, so excavations are real openings you see through
- * rather than dents. Vertex colours darken toward the ground so the form reads
- * without any lighting trickery.
+ * Built on the SAME POLAR NET the generator uses (rings × spokes over the
+ * faired plan radius), for one reason: the soft surface and the baked lattice
+ * must be the same surface. If the preview is a square grid clipped to a hull
+ * and the kit is a polar net over a faired plan, they disagree at exactly the
+ * place people look — the eave — and baking becomes a jump-cut instead of a
+ * resolution.
  *
- * Deliberately NOT the finished object: it's matte, seamless and jointless.
- * The whole point of the bake is that this becomes something with nodes and a
- * cut list, so it must not pretend to be that yet.
+ * It also fixes the edge. A square grid can only cut the boundary along cell
+ * lines, so the eave came out ragged; earlier attempts to hide that culled at a
+ * height threshold (which left a sawtooth of teeth) and then kept a ring of
+ * zero-height vertices outside the hull (which, once the surface grew a real
+ * eave, turned into a one-cell vertical CLIFF and made the thing read as a tent
+ * with walls). In polar the boundary IS the last ring, so there is no cut to
+ * make and nothing to hide.
+ *
+ * Deliberately NOT the finished object: matte, seamless, jointless. The whole
+ * point of the bake is that this becomes something with nodes and a cut list.
  */
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import {
-  surfaceHeight,
-  isHole,
-  surfaceBounds,
-  footprintHull,
-  insideHullM,
-  type SurfaceInput,
-} from '../../engine/surface';
+import { surfaceHeight, isHole, footprintHull, planCentre, type SurfaceInput } from '../../engine/surface';
+import { fairedRadius } from '../../engine/shapeFromDrawing';
 
-const RES = 76;
+const RINGS = 34;
+const SPOKES = 96;
 
 export function SurfaceMesh({ input, ghost = false }: { input: SurfaceInput; ghost?: boolean }) {
   const geo = useMemo(() => {
-    const b = surfaceBounds(input);
-    const w = b.maxX - b.minX;
-    const h = b.maxY - b.minY;
+    if (input.arcs.length < 2) return null;
+
+    const centre = planCentre(input.arcs);
     const hull = footprintHull(input.arcs);
-    const cellDiag = Math.hypot(w / RES, h / RES);
+    const radiusAt = fairedRadius(hull, centre);
 
     const pos: number[] = [];
     const col: number[] = [];
     const idx: number[] = [];
-    const height: number[] = [];
     const dead: boolean[] = [];
 
     const lo = new THREE.Color('#8f7c56');
     const hi = new THREE.Color('#d8c49a');
     const c = new THREE.Color();
 
-    for (let j = 0; j <= RES; j++) {
-      for (let i = 0; i <= RES; i++) {
-        const x = b.minX + (w * i) / RES;
-        const z = b.minY + (h * j) / RES;
+    for (let i = 0; i <= RINGS; i++) {
+      const r = i / RINGS;
+      for (let j = 0; j < SPOKES; j++) {
+        const theta = (j / SPOKES) * Math.PI * 2;
+        const R = radiusAt(theta);
+        // Engine bearing convention: 0 = north = +z, 90 = east = +x.
+        const x = centre.x + r * R * Math.sin(theta);
+        const z = centre.y + r * R * Math.cos(theta);
         const p = { x, y: z };
         const y = surfaceHeight(input, p);
+        // DRAWN coords, not re-centred: the arcs are drawn where you put them,
+        // and a skin that doesn't sit on its own ribs is worse than no skin.
+        // (The bake re-centres on the plan centroid; that's the generator's
+        // frame, and the swap is the moment the soft thing hands over.)
         pos.push(x, y, z);
-        height.push(y);
-        // Cut a RING OUTSIDE the footprint, not at a height threshold and not
-        // exactly on the boundary.
-        //
-        // Culling on `y <= 0.06` cut mid-slope: every dropped quad left a tooth
-        // with real height and the eave grew a sawtooth fringe. Culling exactly
-        // at the hull is better but not enough — the surviving vertices sit up
-        // to a cell inside, where the skirt has already climbed ~0.2 m, so the
-        // teeth persist. Keeping a ring just OUTSIDE the hull works because the
-        // surface is identically zero out there: the boundary quads lie flat on
-        // the lawn, and grid stair-stepping in a flat rim is invisible.
-        dead.push(isHole(input, p) || insideHullM(hull, p) < -(cellDiag * 1.5));
+        dead.push(isHole(input, p));
         c.copy(lo).lerp(hi, Math.min(1, y / 2.2));
         col.push(c.r, c.g, c.b);
       }
     }
 
-    const at = (i: number, j: number) => j * (RES + 1) + i;
-    for (let j = 0; j < RES; j++) {
-      for (let i = 0; i < RES; i++) {
+    const at = (i: number, j: number) => i * SPOKES + (j % SPOKES);
+    for (let i = 0; i < RINGS; i++) {
+      for (let j = 0; j < SPOKES; j++) {
         const a = at(i, j);
-        const bb = at(i + 1, j);
+        const b = at(i, j + 1);
         const cc = at(i + 1, j + 1);
-        const d = at(i, j + 1);
-        // A quad survives only if all four corners are live: that gives holes a
-        // clean edge instead of a fringe of half-triangles hanging in the air.
-        if (dead[a] || dead[bb] || dead[cc] || dead[d]) continue;
-        idx.push(a, bb, cc, a, cc, d);
+        const d = at(i + 1, j);
+        // A quad survives only if all four corners are live: that gives a hole
+        // a clean edge instead of a fringe of half-triangles in mid-air.
+        if (dead[a] || dead[b] || dead[cc] || dead[d]) continue;
+        idx.push(a, b, cc, a, cc, d);
       }
     }
 
@@ -87,7 +87,7 @@ export function SurfaceMesh({ input, ghost = false }: { input: SurfaceInput; gho
     return g;
   }, [input]);
 
-  if (geo.index === null || geo.index.count === 0) return null;
+  if (!geo || geo.index === null || geo.index.count === 0) return null;
 
   return (
     <mesh geometry={geo} castShadow receiveShadow>
@@ -98,7 +98,6 @@ export function SurfaceMesh({ input, ghost = false }: { input: SurfaceInput; gho
         metalness={0}
         transparent={ghost}
         opacity={ghost ? 0.25 : 1}
-        flatShading={false}
       />
     </mesh>
   );
