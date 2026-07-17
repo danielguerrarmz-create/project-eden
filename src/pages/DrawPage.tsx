@@ -49,21 +49,10 @@ import { CinematicCamera } from './draw/CinematicCamera';
 import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
-  COMMISSION_FROM,
-  COMMISSION_LABEL,
-  COMMISSION_QUALIFIER,
-  COST_BUILDUP_LABEL,
-  COST_BUILDUP_NOTE,
-  COST_SUMMARY_LABEL,
-  COST_TO_COMMISSION_BRIDGE,
-  DEMO_SCOPE_NOTE,
-  PRICE_QUALIFIER,
-  STEWARDSHIP_LABEL,
-  STEWARDSHIP_NOTE,
+  COMMISSION_DEMO_FIGURE,
+  COMMISSION_DEMO_LABEL,
   priceMetaLine,
 } from '../ui/priceCopy';
-import { attributionFor, selectionLabel } from '../ui/costAttribution';
-import { deDash } from '../ui/text';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
@@ -221,13 +210,6 @@ export function DrawPage() {
   const explodeUniforms = useMemo(() => makeExplodeUniforms(), []);
   const [exploded, setExploded] = useState(false);
   const explodeProgressRef = useRef(0);
-  /** Index into `outputs.geometry.pieces`, or null for nothing selected. */
-  const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
-  // Resolved rather than stored: the index is the durable thing, and holding
-  // the Piece OBJECT across a re-bake would pin a part of a design that no
-  // longer exists.
-  const selectedPieceObj =
-    selectedPiece == null ? null : (outputs.geometry.pieces[selectedPiece] ?? null);
   const skinFadeRef = useRef(1);
   const revealProgressRef = useRef(0);
   const [dissolving, setDissolving] = useState(false);
@@ -425,11 +407,14 @@ export function DrawPage() {
                 {/* Both passes, on the same materials. `Folly` applies the
                     reveal first and CHAINS the explode onto it — see
                     explodeShader.ts; assigning would have deleted the reveal. */}
+                {/* No `onSelectPiece` for the demo: the per-piece money hop was
+                    dropped from the panel, and without a handler R3F does not
+                    raycast the members, so a stray click on the kit can't select
+                    a part that has nowhere to report to. */}
                 {baked && (
                   <Folly
                     revealUniforms={revealUniforms}
                     explodeUniforms={explodeUniforms}
-                    onSelectPiece={setSelectedPiece}
                   />
                 )}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
@@ -616,160 +601,47 @@ export function DrawPage() {
                 </div>
 
                 <div className="absolute bottom-4 left-4 max-w-[300px] rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
-                  {/* SUMMARY COST TO CONSTRUCT, EXPANDABLE. Daniel's ask,
-                      2026-07-17: "a summary cost to construct, and then the user
-                      can expand it and see their itemized costs."
+                  {/* DEMO PANEL (2026-07-17). Deliberately minimal: one general
+                      commission figure and one quiet line of true geometry.
+                      Daniel, for a very short demo video: "assume a general
+                      £150,000 figure and do not get into specifics of pricing.
+                      This is for a very short demo, does not have to be true."
 
-                      This slot held the computed figure until this morning, when
-                      it was dropped for being a price claim no 9px qualifier
-                      could scope. It is back, and the reason that is not a
-                      reversal is the LABEL: "cost to construct" is a different
-                      KIND of claim from "your price". A cost may sit beside a
-                      price and differ from it — the difference is the business.
-                      What was indefensible was a bare £17,000 in a serif hero
-                      reading as what the client pays.
-
-                      The itemisation is the credible half and it is real: every
-                      line is built off the actual BOM. Only the MAGNITUDES are
-                      pre-quote. */}
+                      The computed cost-to-construct summary, the itemized
+                      disclosure, the per-piece money hop, the cost-to-commission
+                      bridge, the stewardship line and the demo-scope note were
+                      all here until this commit. They live in git history and
+                      this CONSCIOUSLY SUPERSEDES the price-honesty pass FOR THE
+                      DEMO — it is not a silent reversal. See
+                      docs/handoffs/2026-07-17-demo-simplification.md and the
+                      COMMISSION_DEMO_FIGURE note in ui/priceCopy.ts. The build-up
+                      machinery (priceCopy.ts, costAttribution.ts) is kept and
+                      still tested; rollup drops the now-unused exports. */}
                   <div className="flex items-baseline gap-2.5">
-                    <p className="font-serif text-[26px] leading-none">
-                      £{outputs.price.costBuildUpGBP.toLocaleString()}
-                    </p>
+                    <p className="font-serif text-[26px] leading-none">{COMMISSION_DEMO_FIGURE}</p>
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
-                      {COST_SUMMARY_LABEL}
+                      {COMMISSION_DEMO_LABEL}
                     </p>
                   </div>
+                  {/* The one quiet supporting line, and it is TRUE: every count
+                      is read off the baked kit, no pricing claim in it. It films
+                      well and grounds the figure without getting into specifics. */}
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
-                    {PRICE_QUALIFIER} · {priceMetaLine({
+                    {priceMetaLine({
                       footprintM2: outputs.geometry.params.footprintM2,
                       feetCount: outputs.geometry.feetCount,
                       pieceCount: outputs.geometry.pieces.length,
                       nodeCount: outputs.geometry.nodes.length,
                     })}
                   </p>
-                  {/* The sequence, told in the panel the eye is already on
-                      rather than as floating 3D callouts — those are the literal
-                      IKEA-manual reading and the highest clutter risk on a
-                      filmed frame. The cascade itself does the telling; this is
-                      one more fact where a fact already lives. */}
+                  {/* The assembly sequence, part of the explode star, told in
+                      the panel the eye is already on rather than as floating 3D
+                      callouts. Only present while exploded. */}
                   {exploded && (
                     <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accentOlive">
                       {explodeReadout(outputs.geometry.ringCount)}
                     </p>
                   )}
-
-                  {/* THE MONEY HOP. A part on screen, resolved to its rows in
-                      the same build-up above it — in the same panel, the same
-                      register, no new HUD. Every line is either the pricing
-                      model's own flat per-unit rate (exact) or its real basis
-                      with the sharing named. Nothing divides a batch cost by a
-                      count to manufacture precision: see ui/costAttribution.ts,
-                      which is where that reasoning lives and is tested. */}
-                  {selectedPieceObj && (
-                    <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/70">
-                          {selectionLabel({ kind: 'piece', piece: selectedPieceObj })}
-                        </p>
-                        <button
-                          onClick={() => setSelectedPiece(null)}
-                          className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/40 hover:text-inkBlack"
-                        >
-                          clear
-                        </button>
-                      </div>
-                      <div className="mt-1.5 space-y-1">
-                        {attributionFor({ kind: 'piece', piece: selectedPieceObj }, outputs.nesting).map(
-                          (l) => (
-                            <div key={l.label}>
-                              <div className="flex justify-between gap-3 text-[10px]">
-                                <span className={l.exact ? 'text-inkBlack/70' : 'text-inkBlack/45'}>
-                                  {l.label}
-                                </span>
-                                <span
-                                  className={`shrink-0 font-mono tabular-nums ${
-                                    l.exact ? 'text-inkBlack/80' : 'text-inkBlack/45'
-                                  }`}
-                                >
-                                  {l.amount}
-                                  {!l.exact && ' *'}
-                                </span>
-                              </div>
-                              {l.note && (
-                                <p className="text-[9px] leading-relaxed text-inkBlack/40">* {l.note}</p>
-                              )}
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <details className="group mt-2">
-                    <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/50 hover:text-inkBlack">
-                      <span className="transition group-open:rotate-90">›</span>
-                      <span>{COST_BUILDUP_LABEL}</span>
-                    </summary>
-                    <div className="mt-2 space-y-1">
-                      {outputs.price.lines.map((l) => (
-                        <div key={l.label} className="flex justify-between gap-3 text-[10px]">
-                          <span className="text-inkBlack/60">{deDash(l.label)}</span>
-                          <span className="shrink-0 font-mono tabular-nums text-inkBlack/80">
-                            £{l.valueGBP.toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                      <p className="pt-1 text-[9px] leading-relaxed text-inkBlack/45">
-                        {COST_BUILDUP_NOTE}
-                      </p>
-                    </div>
-                  </details>
-
-                  {/* Below the rule: STATED, and nothing above the rule moves it.
-                      The divider is the whole point — it is what stops the floor
-                      reading as another thing the engine just worked out.
-
-                      The two visibly disagree by ~10x. That is deliberate and
-                      it is Daniel's to see: a cost of construction is not a
-                      commission price, and the gap between them IS the business
-                      model. See ui/priceCopy.ts's header for what the gap
-                      implies and why no rate was moved to close it. */}
-                  <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
-                    {/* THE BRIDGE. This panel is the one that gets FILMED, and
-                        it had the same defect CommissionSheet did: the computed
-                        cost and the stated floor adjacent, ~10x apart, with
-                        nothing between them to explain the distance. A reader
-                        supplies their own explanation and both available ones
-                        are wrong — "they print money", or "the £14k is fake".
-                        The second costs us the decomposition above it, which is
-                        the only thing in this panel that is true right now.
-
-                        Names the categories, prices none of them. A figure here
-                        could only be back-solved from £150k. See the constant's
-                        note in ui/priceCopy.ts before adding one. */}
-                    <p className="mb-2.5 text-[10px] leading-relaxed text-inkBlack/60">
-                      {COST_TO_COMMISSION_BRIDGE}
-                    </p>
-                    <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
-                      {COMMISSION_LABEL}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[11px] tracking-[0.02em] text-inkBlack/70">
-                      {COMMISSION_FROM}{' '}
-                      <span className="text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
-                        {COMMISSION_QUALIFIER}
-                      </span>
-                    </p>
-                    <p className="mt-1.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-inkBlack/45">
-                      {STEWARDSHIP_LABEL} · {STEWARDSHIP_NOTE}
-                    </p>
-                    {/* Which rung. GRAMMAR caps at 18 m² / 2.5 m, so the object
-                        on screen is the entry piece, not the core commission
-                        the floor prices. Scope, not an accusation. */}
-                    <p className="mt-1.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-inkBlack/45">
-                      {DEMO_SCOPE_NOTE}
-                    </p>
-                  </div>
                 </div>
               </>
             )}
@@ -817,7 +689,6 @@ export function DrawPage() {
                     onClick={() => {
                       setBaked(false);
                       setExploded(false); // a soft surface has nothing to explode
-                      setSelectedPiece(null); // and no pieces to have selected
                       setTurntable(false); // you cannot sculpt a moving target
                     }}
                   >

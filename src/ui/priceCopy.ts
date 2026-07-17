@@ -95,6 +95,29 @@ export const COMMISSION_NOTE =
   'What an Eden of this kind commissions from, installed and planted. Landmark and hospitality pieces run into the mid six figures. Your own figure is set after a site survey and a fabrication quote, not before.';
 
 /**
+ * DEMO ONLY (2026-07-17). For a very short demo video Daniel asked the `#/draw`
+ * panel to state ONE general commission figure and not get into the specifics
+ * of pricing: no computed build-up, no itemisation, no money hop, no bridge, no
+ * stewardship line. His words: "assume a general £150,000 figure and do not get
+ * into specifics of pricing. This is for a very short demo, does not have to be
+ * true."
+ *
+ * This CONSCIOUSLY SUPERSEDES the price-honesty pass FOR THE DEMO. The honest,
+ * itemised panel — cost to construct vs stated floor, the ~10x gap on screen on
+ * purpose, the bridge that prices nothing — lives in git history and its whole
+ * argument is above. It is not gone, it is not filmed. When the demo is cut,
+ * the honest panel comes back; the constants it needs (everything above) are
+ * kept and still tested, and `#/studio` still renders them.
+ *
+ * A flat figure, not "from £150k", because the panel now shows one clean number
+ * on camera and Daniel authorised a general figure. £150,000 is his own floor.
+ */
+export const COMMISSION_DEMO_FIGURE = '£150,000';
+
+/** The mono label beside the demo figure. Register: lowercase, terse. */
+export const COMMISSION_DEMO_LABEL = 'commission';
+
+/**
  * STEWARDSHIP — a revenue line the demo never mentioned, and the most on-thesis
  * number in the model: recurring income that exists BECAUSE the thing is alive.
  * A pavilion does not need stewarding; a living structure does.

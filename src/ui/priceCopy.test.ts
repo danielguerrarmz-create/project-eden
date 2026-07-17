@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  COMMISSION_DEMO_FIGURE,
+  COMMISSION_DEMO_LABEL,
   COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_NOTE,
@@ -18,6 +20,8 @@ import {
 /** Everything this module ships onto a screen. New export => add it here. */
 const ALL_COPY = [
   PRICE_QUALIFIER,
+  COMMISSION_DEMO_FIGURE,
+  COMMISSION_DEMO_LABEL,
   COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_QUALIFIER,
@@ -123,6 +127,22 @@ describe('the stated commission floor is stated, and says so', () => {
     // ladder's tier is the installed one.
     expect(COMMISSION_LABEL.toLowerCase()).toContain('installed');
     expect(COMMISSION_NOTE.toLowerCase()).toContain('installed');
+  });
+});
+
+describe('the demo figure the #/draw panel shows on camera', () => {
+  // DEMO ONLY (2026-07-17). Daniel narrowed the filmed panel to one general
+  // figure: "assume a general £150,000 figure and do not get into specifics of
+  // pricing. This is for a very short demo, does not have to be true." The
+  // honest cost-vs-floor panel is in git history and still renders on #/studio;
+  // these pins are for what a viewer actually reads in the demo.
+  it('is the general £150,000 figure Daniel named', () => {
+    expect(COMMISSION_DEMO_FIGURE).toBe('£150,000');
+  });
+
+  it('carries a short lowercase mono label, per the panel register', () => {
+    expect(COMMISSION_DEMO_LABEL).toBe(COMMISSION_DEMO_LABEL.toLowerCase());
+    expect(COMMISSION_DEMO_LABEL.length).toBeLessThanOrEqual(16);
   });
 });
 
