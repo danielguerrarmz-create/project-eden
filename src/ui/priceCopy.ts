@@ -128,6 +128,47 @@ export const COST_BUILDUP_LABEL = 'itemized';
 export const COST_BUILDUP_NOTE =
   "A build-up from this design's real cut list, at placeholder rates. It moves correctly as you shape the form, but every rate is a placeholder until fabrication quotes land. It is the cost of the kit and its install, not the commission price.";
 
+/**
+ * THE BRIDGE, AND WHY IT HAS NO NUMBERS IN IT.
+ *
+ * `CommissionSheet` put the stated floor and the computed build-up four lines
+ * apart with nothing between them, so a reader met two figures an order of
+ * magnitude apart and was left to explain the gap themselves. The two available
+ * explanations are both wrong and both expensive: "they print money", or "the
+ * £14k is fake" — and the second one takes the itemization down with it, which
+ * is the most credible thing in the product (138 pieces and 80 nodes are
+ * counted off the real kit and are true right now).
+ *
+ * So the gap gets named. It does NOT get priced, and that restraint is the
+ * whole point of this constant. A numeric bridge — "kit £14k → design and
+ * engineering £X → delivered £150k" — requires inventing £X, and £X could only
+ * ever be BACK-SOLVED from £150k, because that is the only constraint
+ * available. That is precisely the circular move this module already refuses to
+ * make on rates, committed at a higher altitude and made MORE dangerous by
+ * looking more rigorous. Asked about the £14k today there is a strong answer:
+ * it is the real cut list at placeholder rates. There is no answer at all for
+ * "how do you know design is £38,000?"
+ *
+ * Words, not figures. Do not add numbers to this sentence.
+ */
+export const COST_TO_COMMISSION_BRIDGE =
+  'What this kit costs to construct is not what an Eden commissions for. Between them sit the design, the engineering stamp, the specifier’s fee, project management, insurance and VAT. Those numbers land when the quotes do.';
+
+/**
+ * WHICH RUNG THIS IS.
+ *
+ * The grammar caps every design at 18 m² and 2.5 m, non-occupied and
+ * planning-free (`GRAMMAR.maxFootprintM2`, `pdHeightCapM`). That object is the
+ * SMALLEST thing this studio makes — the original ladder called it the entry
+ * piece. The £150k floor is a core commission: enclosed, serviced, larger. The
+ * engine has never built one and currently cannot.
+ *
+ * That is not a defect to hide, it is a fact about scope, and saying it out
+ * loud turns the distance between the two figures from an accusation into
+ * information. It costs nothing, moves no rate, and is true.
+ */
+export const DEMO_SCOPE_NOTE = 'This demo models the smallest structure we make.';
+
 /** The BOM decomposition: every number here is counted off the real kit. */
 export function priceMetaLine(kit: {
   footprintM2: number;

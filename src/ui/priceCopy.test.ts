@@ -7,6 +7,8 @@ import {
   COST_BUILDUP_LABEL,
   COST_BUILDUP_NOTE,
   COST_SUMMARY_LABEL,
+  COST_TO_COMMISSION_BRIDGE,
+  DEMO_SCOPE_NOTE,
   PRICE_QUALIFIER,
   STEWARDSHIP_LABEL,
   STEWARDSHIP_NOTE,
@@ -199,5 +201,52 @@ describe('the decomposition stays on screen', () => {
   it('reports the kit it is given, not a remembered one', () => {
     const line = priceMetaLine({ footprintM2: 22.6, feetCount: 6, pieceCount: 240, nodeCount: 131 });
     expect(line).toBe('22.6 m² · 6 feet · 240 pieces · 131 nodes');
+  });
+});
+
+describe('the bridge between the two figures', () => {
+  it('names every category that sits in the gap', () => {
+    // The floor and the build-up used to sit four lines apart with nothing
+    // between them. A reader who meets two figures an order of magnitude apart
+    // and no explanation supplies their own, and both available explanations
+    // are wrong: "they print money", or "the £14k is fake". The second one
+    // costs us the decomposition, which is the only thing on the sheet that is
+    // true right now.
+    const b = COST_TO_COMMISSION_BRIDGE.toLowerCase();
+    expect(b).toContain('design');
+    expect(b).toContain('engineering stamp');
+    expect(b).toContain('project management');
+    expect(b).toContain('insurance');
+    expect(b).toContain('vat');
+  });
+
+  it('PRICES NONE OF THEM — this is the whole discipline, do not relax it', () => {
+    // A numeric bridge ("kit £14k -> design £X -> delivered £150k") requires
+    // inventing £X, and £X could only ever be BACK-SOLVED from £150k, because
+    // that is the only constraint available. That is the same circular move
+    // this module already refuses on rates, committed at a higher altitude and
+    // made MORE dangerous by looking more rigorous: asked about the £14k there
+    // is a strong answer ("the real cut list at placeholder rates"); asked "how
+    // do you know design is £38,000?" there is none.
+    //
+    // If this test fails, someone put a figure in the bridge. Do not update the
+    // test. Take the figure out.
+    expect(COST_TO_COMMISSION_BRIDGE).not.toMatch(/\d/);
+    expect(COST_TO_COMMISSION_BRIDGE).not.toContain('£');
+  });
+
+  it('defers the figures to the quote rather than implying they exist', () => {
+    expect(COST_TO_COMMISSION_BRIDGE.toLowerCase()).toContain('when the quotes do');
+  });
+});
+
+describe('which rung the demo is on', () => {
+  it('says the object on screen is the smallest one, and prices nothing', () => {
+    // GRAMMAR caps every design at 18 m² / 2.5 m, non-occupied. That object is
+    // the entry piece; the £150k floor prices a core commission the engine has
+    // never built and currently cannot. Saying so turns the distance between
+    // the figures from an accusation into scope.
+    expect(DEMO_SCOPE_NOTE.toLowerCase()).toContain('smallest');
+    expect(DEMO_SCOPE_NOTE).not.toMatch(/\d/);
   });
 });

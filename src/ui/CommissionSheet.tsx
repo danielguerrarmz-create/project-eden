@@ -25,6 +25,8 @@ import {
   COMMISSION_QUALIFIER,
   COST_BUILDUP_NOTE,
   COST_SUMMARY_LABEL,
+  COST_TO_COMMISSION_BRIDGE,
+  DEMO_SCOPE_NOTE,
   PRICE_QUALIFIER,
   STEWARDSHIP_LABEL,
   STEWARDSHIP_NOTE,
@@ -112,8 +114,22 @@ export function CommissionSheet() {
             </span>{' '}
             {STEWARDSHIP_NOTE}
           </p>
+          {/* THE BRIDGE. The floor and the build-up used to sit four lines
+              apart with nothing between them: two figures an order of magnitude
+              apart, and a reader left to explain the distance themselves. The
+              only two available explanations were "they print money" and "the
+              £14k is fake", and the second one costs us the itemization, which
+              is the one thing on this sheet that is true right now.
+
+              It names the categories and prices NONE of them, deliberately. A
+              numeric bridge could only be back-solved from £150k — the same
+              circular move priceCopy.ts already refuses on rates. See the
+              constant's own note before adding a figure here. */}
           <div className="mt-4 border-t border-inkBlack/12 pt-3">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="max-w-xl text-[12px] leading-relaxed text-inkBlack/65">
+              {COST_TO_COMMISSION_BRIDGE}
+            </p>
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/55">
                 this design, {COST_SUMMARY_LABEL}
               </span>
@@ -126,6 +142,13 @@ export function CommissionSheet() {
             </div>
             <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-inkBlack/50">
               {COST_BUILDUP_NOTE}
+            </p>
+            {/* Which rung this is. The grammar caps at 18 m² / 2.5 m, so the
+                object on screen is the entry piece, not the core commission the
+                floor prices. Saying so turns the distance between the figures
+                into scope rather than an accusation. */}
+            <p className="mt-2 max-w-xl font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-inkBlack/45">
+              {DEMO_SCOPE_NOTE}
             </p>
           </div>
         </div>
