@@ -688,17 +688,35 @@ export const PROJECTS: Project[] = [
         alt: 'The Resia landing page, a one-stop remodeling solution to generate, estimate, contract, and manage a renovation',
         caption: 'One stop, from generate to manage',
       },
+      /*
+       * CLAY PITCHING IS THE SECONDARY, AND THE SCREENSHOT IT REPLACED IS GONE (round 10, Daniel:
+       * "the middle one is rather useless... bring the picture of Clay making the presentation to be
+       * the top right picture, the secondary in command"). The old `resia-product-screenshot-2.webp`
+       * said so itself — alt "A second Resia product screenshot", caption "Inside the product". Copy
+       * that admits it is a second one of something is the copy of an image with no job.
+       *
+       * NOTE THE COST, it is real and it is not a bug: this asset is 600x800, ratio 0.75 — the only
+       * PORTRAIT image in the rail. `railWidth` derives the rail's width from the stack, so a portrait
+       * cell narrows every Resia support cell. That was measured at ~26% before the round-10 divider
+       * pin landed and must be RE-MEASURED against the current geometry, not trusted from that note.
+       * If it drops the rail under MIN_CELL=60, raise it — do not widen MIN_CELL, and do not crop this
+       * to landscape to make the number behave. Daniel asked for this photograph specifically.
+       *
+       * It is the same file as the timeline's `resia-pitch.webp`, copied rather than cross-linked: the
+       * timeline and the ledger own their own assets, and a shared path couples two surfaces that are
+       * allowed to diverge.
+       */
+      {
+        src: `${A}/12-resia/resia-clay-pitching.webp`,
+        ratio: 0.75,
+        alt: 'Clay Seifert presenting the Resia startup pitch deck, "Removing the Waste from Home Renovation", to a room',
+        caption: 'Clay pitching Resia',
+      },
       {
         src: `${A}/12-resia/resia-brand-artboard.webp`,
         ratio: 1.0,
         alt: 'A Resia brand artboard, a kitchen shown before and after a renovation with the line "Kitchen Renovation Made Simple"',
         caption: 'Before and after, the renovation made simple',
-      },
-      {
-        src: `${A}/12-resia/resia-product-screenshot-2.webp`,
-        ratio: 2.0438,
-        alt: 'A second Resia product screenshot',
-        caption: 'Inside the product',
       },
       {
         src: `${A}/12-resia/resia-logo.webp`,
@@ -809,27 +827,38 @@ export const PROJECTS: Project[] = [
       'Architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
     // TODO(Daniel): collaborators/professors
     /*
-     * TODO(Daniel) — THE PAPER DOWNLOAD (round 10, item 8). IT IS DELIBERATELY NOT SCAFFOLDED, and the
-     * reason is a real defect rather than caution.
+     * THE PAPER (round 10 continued). Daniel handed the file over on 2026-07-17 and the three facts
+     * the previous round correctly refused to invent now come off its title page:
      *
-     * The brief said to scaffold this against Archipedia's `pdf: ''` precedent. That precedent does not
-     * transfer, because of what makes it work: Archipedia has a REAL venue and REAL authors and is
-     * missing only the file, and `Recognition` gates the download button on `paper?.pdf` — so it renders
-     * a correct citation with no button, which is exactly right for a paper awaiting its PDF.
+     *   "Biogenic Hempcrete-Bamboo Composite with Enhanced Mechanical Performance"
+     *   Daniel A. Guerra · The University of Texas at Austin, School of Architecture
+     *   Dr. Daniel Koehler · July 2025
      *
-     * PLENTIFY HAS NONE OF THE THREE. Venue and authors appear NOWHERE in this repo. And `Recognition`
-     * renders `{paper.venue} · {paper.authors}` UNCONDITIONALLY whenever `paper` exists — so an empty
-     * scaffold here does not render "nothing yet", it renders a bare "·" under an "AWARDS AND
-     * PUBLICATIONS" heading. A scaffold that ships a visible artefact is worse than the absence it was
-     * meant to hold, and inventing a venue to fill it is the one thing this file must never do.
+     * AUTHORS IS `Daniel Guerra` ALONE, AND THAT IS A DELIBERATE READ, NOT AN OVERSIGHT. Dr. Daniel
+     * Koehler sits below the affiliation on the title page, which is the supervisor's position, not a
+     * byline. TODO(Daniel): confirm whether Koehler should be credited as an author or named as the
+     * advisor. Under-crediting is a correction; putting a real professor's name on a company's public
+     * page as author of something he advised is the same misattribution class as the desk lamp, aimed
+     * at someone outside the company. If unsure, this stays as it is.
      *
-     * THREE FACTS ARE NEEDED, and only Daniel has them: the VENUE (where/when published), the AUTHORS,
-     * and the PDF itself. He has said he will hand over the file. Note that the file alone is not
-     * enough — with it and no venue, this still cannot ship.
+     * THE CITATION IS SOLE-AUTHORED WHILE THE PROJECT IS `by: 'clay+daniel'`, AND BOTH ARE TRUE. Read
+     * the note above at `by`: Plentify the project is shared; the composite inside it is the part
+     * Daniel grew, and this paper is about the composite. The paper does not claim the building.
      *
-     * `projects.test.ts` now asserts every `paper` carries a non-empty venue and authors, so this
-     * cannot be quietly half-filled later. `pdf`/`pdfSize` may be empty; the citation may not.
+     * THE FILE WAS 46.7 MB AND IS NOW 3.48 MB, and the arithmetic matters because "re-export it" was
+     * nearly the wrong call. 99.6% of the original was images and TWO of them were 82% of the whole
+     * paper: 4032x3024 phone photographs saved as LOSSLESS PNG and displayed at ~330pt, i.e. ~886 and
+     * ~1034 DPI. Re-encoded at 300 DPI (still print resolution) via PyMuPDF `rewrite_images`. Page
+     * count 25 before and after; text is vector and untouched; p1 and p21 rendered and compared by eye
+     * at 110 DPI, visually identical. Nothing about the research was lost, only ~700 DPI nobody could
+     * see. If this file is ever replaced, re-measure — do not assume a source PDF is web-weight.
      */
+    paper: {
+      venue: 'Independent Research 2025 · UT Austin School of Architecture',
+      authors: 'Daniel Guerra',
+      pdf: `${A}/01-synergy/2025-plentify-biogenic-hempcrete-bamboo-composite-guerra.pdf`,
+      pdfSize: 'PDF · 3.5 MB',
+    },
     images: [
       {
         src: `${A}/01-synergy/synergy-cosmos-growth-loop-poster.webp`,
