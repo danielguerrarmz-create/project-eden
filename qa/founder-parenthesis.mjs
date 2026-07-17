@@ -17,6 +17,7 @@
  * camera — so this cannot be a vitest. jsdom has no layout, no sticky, and no getPointAtLength.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +40,7 @@ const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
 
-await page.goto('http://localhost:5333/#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(MOTION ? 1200 : 6000);
 
 if (MOTION) {
@@ -92,11 +93,28 @@ const r = await page.evaluate(() => {
   const descent = document.querySelector('[data-descent-exit]').parentElement.querySelector('path[stroke-linecap="round"]');
   const descentW = parseFloat(getComputedStyle(descent).strokeWidth) * tlScale;
   const trunkW = parseFloat(getComputedStyle(paren).strokeWidth);
+
+  // THE MEETING (round 11 item 7): the two arm tails must join at the bower's base with 0px gap. Each
+  // `[data-paren-arm]` group's LAST run ends on that join; read both in screen px and compare. This is
+  // a SEPARATE, named concern from the trunk seam above — the seam is descent→trunk at the TOP, this
+  // is left-tail→right-tail at the BOTTOM, and the old harness pinned only the former while Daniel's
+  // eye was on the latter.
+  const armEnd = (side) => {
+    const g = document.querySelector(`[data-paren-arm="${side}"]`);
+    const runs = g ? [...g.querySelectorAll('path')] : [];
+    const last = runs[runs.length - 1];
+    if (!last) return null;
+    const q = last.getPointAtLength(last.getTotalLength());
+    const d = new DOMPoint(q.x, q.y).matrixTransform(last.getScreenCTM());
+    return { x: +d.x.toFixed(2), y: +d.y.toFixed(2) };
+  };
   return {
     exit: { x: +(e.left + e.width / 2).toFixed(2), y: +(e.top + e.height / 2).toFixed(2) },
     trunkTop: { x: +s.x.toFixed(2), y: +s.y.toFixed(2) },
     descentW: +descentW.toFixed(2),
     trunkW: +trunkW.toFixed(2),
+    leftEnd: armEnd('left'),
+    rightEnd: armEnd('right'),
   };
 });
 
@@ -122,6 +140,19 @@ if (!r.trunkTop || !r.exit?.x) {
       `the line STEPS ${(step * 100).toFixed(0)}% in width at the join (spine ${r.descentW}px -> trunk ${r.trunkW}px) — a seam.`,
     );
 }
+
+// THE ARMS MEET — the closed bower (item 7). Its own check, so a failure names the BASE join, not the
+// top seam. Allow a couple px (round caps overlapping); forbid daylight, the same standard as the seam.
+if (!r.leftEnd || !r.rightEnd) {
+  fail.push(`missing an arm terminus — left: ${!!r.leftEnd}, right: ${!!r.rightEnd} ([data-paren-arm] gone?)`);
+} else {
+  const meetGap = Math.hypot(r.leftEnd.x - r.rightEnd.x, r.leftEnd.y - r.rightEnd.y);
+  if (meetGap > MAX_GAP)
+    fail.push(
+      `the bower does NOT close: the two arm tails are ${meetGap.toFixed(2)}px apart at the base ` +
+        `(left ${r.leftEnd.x},${r.leftEnd.y} vs right ${r.rightEnd.x},${r.rightEnd.y}) — Daniel ruled they meet.`,
+    );
+}
 if (errs.length) fail.push(`console errors: ${errs.slice(0, 3).join(' | ')}`);
 
 console.log(`mode            : ${MOTION ? 'MOTION (parked at the track end)' : 'reduced'}`);
@@ -132,10 +163,14 @@ if (r.trunkTop && r.exit?.x) {
   console.log('overlap (want >= 0):', (r.exit.y - r.trunkTop.y).toFixed(2), 'px');
   console.log('sideways jog    :', Math.abs(r.trunkTop.x - r.exit.x).toFixed(2), 'px');
 }
+if (r.leftEnd && r.rightEnd) {
+  console.log('arm tails        :', `left ${r.leftEnd.x},${r.leftEnd.y}  right ${r.rightEnd.x},${r.rightEnd.y}`);
+  console.log('bower meet gap   :', Math.hypot(r.leftEnd.x - r.rightEnd.x, r.leftEnd.y - r.rightEnd.y).toFixed(2), `px (want <= ${MAX_GAP})`);
+}
 await browser.close();
 
 if (fail.length) {
   console.error('\nFAIL\n - ' + fail.join('\n - '));
   process.exit(1);
 }
-console.log('\nPASS — the timeline\'s line and the founders\' trunk are one continuous line.');
+console.log('\nPASS — the trunk continues the timeline\'s line, and the two arms close the bower at its base.');

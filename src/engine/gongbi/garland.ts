@@ -173,8 +173,10 @@ export function inkTune(params: FloraParams): FloraParams {
 /* Path plumbing                                                              */
 /* ------------------------------------------------------------------------- */
 
-/** Even arc-length resample of a root-first polyline into 3-vectors (z = 0). */
-function resample(path: Array<[number, number]>, step: number): Vec[] {
+/** Even arc-length resample of a root-first polyline into 3-vectors (z = 0). Exported so a caller that
+ *  places its own reveal discs over these organs can index the SAME points the painter stamped on,
+ *  rather than a differently-sampled copy — see FounderParenthesis's `marks` (round 11 item 7). */
+export function resample(path: Array<[number, number]>, step: number): Vec[] {
   const out: Vec[] = [];
   let carry = 0;
   for (let i = 1; i < path.length; i++) {

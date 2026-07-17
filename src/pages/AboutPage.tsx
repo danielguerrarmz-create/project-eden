@@ -52,6 +52,7 @@ import {
   TIMELINE_W,
 } from './about/CrossPathsTimeline';
 import { requestGarland } from '../engine/gongbi/painter';
+import { resample } from '../engine/gongbi/garland';
 import { armPts, polyD, taperRuns, trunkPts, PAREN_STATIONS, PAREN_ORGANS, type ParenLayout, type TaperRun } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
 import {
@@ -718,6 +719,11 @@ function Recognition({ project, className = '' }: { project: Project; className?
             </li>
           ))}
         </ul>
+      )}
+      {paper?.title && (
+        <p className="mt-1.5 font-serifDisplay text-[14px] italic leading-snug text-inkBlack/75">
+          {paper.title}
+        </p>
       )}
       {paper && (
         <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
@@ -1620,19 +1626,25 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   );
 
   /**
-   * THE ORGANS' STATIONS, resolved in the SAME place the painter's are, from the same array. The
-   * discs that uncover the painted organs have to sit exactly where the composer stamped them, and
-   * the only way to guarantee that is to derive both from one list rather than from two that agree.
+   * THE ORGANS' STATIONS, resolved where the painter ACTUALLY stamps them — which is NOT the arm's own
+   * points. The composer resamples every vine to an even 4px arc-length polyline first (garland.ts
+   * `resample`), then indexes `round(t * (n-1))` on THAT. `arms[side]` is a 6px centripetal
+   * Catmull-Rom sampling whose spacing is uneven — dense on the belly, sparse across the tight tail
+   * curl — so indexing t on it lands a different world point than the painter's even resample,
+   * off by the most exactly where the curvature is highest. That was the detached bloom near the old
+   * terminus (round 11 item 7): the reveal disc sat where t*index pointed, the painted flower sat
+   * where t*arclength did, and the mask uncovered bare paper beside the bloom. Resample here the SAME
+   * way, so disc and organ are one point by construction, not two that are supposed to agree.
    */
   const marks = useMemo(() => {
     if (!arms) return [];
     const out: Array<{ x: number; y: number; arm: 'left' | 'right'; t: number }> = [];
     (['left', 'right'] as const).forEach((side) => {
-      const pts = arms[side];
+      const rpts = resample(arms[side].map((p) => [p.x, p.y] as [number, number]), 4);
       for (const t of PAREN_STATIONS) {
-        // The painter's own index arithmetic (see paintGarland's station loop).
-        const i = Math.max(1, Math.min(pts.length - 1, Math.round(t * (pts.length - 1))));
-        out.push({ x: pts[i].x, y: pts[i].y, arm: side, t });
+        const i = Math.max(1, Math.min(rpts.length - 1, Math.round(t * (rpts.length - 1))));
+        const [x, y] = rpts[i];
+        out.push({ x, y, arm: side, t });
       }
     });
     return out;
@@ -1815,25 +1827,32 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
             strokeWidth={layout.trunkW}
             {...dashProps(polyLen(arms.trunk), trunkGrow)}
           />
-          {/* The arms TAPER root → tip. They are not a constant-width rail: they are the line
-              thinning as it grows away from the trunk, and without this each one ends in a blunt
-              round cap of full width, hanging in open paper — a cut line. See taperRuns.
-              Each run also DRAWS ON as the card line reaches it, which is what makes a 650px arm
-              grow with the reader instead of shooting out whole the moment the line clears the fork.
-              The arms are monotone in y, so reading each run at its own y is safe here — unlike the
-              space-colonization branches, where 195 of 332 organs sit above their own root. */}
-          {([arms.left, arms.right] as const).map((pts, i) =>
-            taperRuns(pts).map((run, j) => (
-              <path
-                key={`${i}-${j}`}
-                d={run.d}
-                strokeWidth={
-                  layout.trunkW * (PAREN_STEM_FRAC + (PAREN_TIP_FRAC - PAREN_STEM_FRAC) * run.t)
-                }
-                {...dashProps(polyLen(run.pts), runGrow(run))}
-              />
-            )),
-          )}
+          {/* The arms TAPER root → tip: the line thinning as it grows away from the trunk, so the
+              stem reads as a stem and not a constant-width rail. (It no longer ends in a blunt cap in
+              open paper — the two tips now MEET at the bower's base, item 7 — but the taper is still
+              what gives the closing curve its drawn-stem weight.) See taperRuns.
+              Each run also DRAWS ON as the card line reaches it, which is what makes a long arm grow
+              with the reader instead of shooting out whole the moment the line clears the fork. The
+              arms are non-decreasing in y down to the join, so reading each run at its own y is safe
+              here — unlike the space-colonization branches, where 195 of 332 organs sit above their
+              own root. */}
+          {([arms.left, arms.right] as const).map((pts, i) => (
+            // Grouped per arm so the meeting can be pinned: `data-paren-arm`'s last run ends on the
+            // bower's join, and qa/founder-parenthesis.mjs reads left vs right to assert 0px there —
+            // the same standard as the trunk seam, a separate named concern from it.
+            <g key={i} data-paren-arm={i === 0 ? 'left' : 'right'}>
+              {taperRuns(pts).map((run, j) => (
+                <path
+                  key={j}
+                  d={run.d}
+                  strokeWidth={
+                    layout.trunkW * (PAREN_STEM_FRAC + (PAREN_TIP_FRAC - PAREN_STEM_FRAC) * run.t)
+                  }
+                  {...dashProps(polyLen(run.pts), runGrow(run))}
+                />
+              ))}
+            </g>
+          ))}
         </svg>
       )}
     </div>

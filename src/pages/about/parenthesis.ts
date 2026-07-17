@@ -1,5 +1,5 @@
 /**
- * parenthesis.ts — the founders' parenthesis: where the one line arrives, and how it opens.
+ * parenthesis.ts — the founders' BOWER: where the one line arrives, opens, and CLOSES around them.
  *
  * Daniel, round 3: "I'd like the main branch — the one that has fallout all throughout — to
  * actually kind of go into some parentheses and go right and left from Clay, and on the right side
@@ -9,6 +9,13 @@
  *
  * So: one continuous line, top to bottom. The Oculus unravels, the spine descends the timeline,
  * arrives here, and OPENS — an arm left and an arm right — and those arms carry the flowers.
+ *
+ * IT IS NO LONGER AN OPEN PARENTHESIS (round 11 item 7). Daniel marked the bottom centre and ruled
+ * the two arms must MEET there, enclosing the founders in a closed loop — a bower is a leafy
+ * enclosure, and that is what this now draws. The old intent, an open "closing bracket, not two
+ * parallel rails" that trailed its tails off into paper, is DEAD; the file no longer describes it,
+ * because a comment that contradicts the render is this page's cardinal sin. The name `parenthesis`
+ * is kept only to avoid churn; the concept is the bower.
  *
  * THIS FILE IS ORNAMENT, AND ORNAMENT READS LAYOUT (CLAUDE.md). Everything here is a pure function
  * of a `ParenLayout` that the caller MEASURES off the real DOM. Nothing in it is authored against a
@@ -205,7 +212,8 @@ export function trunkPts(L: ParenLayout): Pt[] {
 }
 
 /**
- * One arm, rooted at the fork, opening outward and bowing around the founders.
+ * One arm, rooted at the fork, opening outward, bowing around the founders, and curling in to MEET
+ * its opposite at the bottom centre — half of the closed bower (round 11 item 7).
  *
  * `side` is -1 for the left arm, +1 for the right. The two are NOT mirror images: they are the same
  * anchor recipe read against the layout's own measured left/right turn lines, which are not
@@ -238,6 +246,13 @@ export function armPts(L: ParenLayout, side: -1 | 1): Pt[] {
   // THE BOW'S BELLY sits at the founders' vertical middle — the gap between the two rows, not the
   // middle of the overlay, which also carries the seam above and the tails below.
   const bellyY = (top + bottom) / 2;
+
+  // CLOSING THE BOWER (round 11 item 7). `meetY` is where the two tails come together, below the last
+  // founder — the depth of the enclosure, by eye. `approachInset` is how far outboard the horizontal
+  // run-in starts, i.e. the radius of the bottom curl; a fraction of this arm's own reach so both
+  // sides curl alike despite the founders' left-aligned content making the two reaches unequal.
+  const meetY = bottom + span * 0.2;
+  const approachInset = Math.abs(reach) * 0.16;
 
   /*
    * WHY THIS IS A SWAG AND NOT A V, and why that is forced rather than chosen.
@@ -284,15 +299,20 @@ export function armPts(L: ParenLayout, side: -1 | 1): Pt[] {
     { x: keepOut(turnX), y: top + span * 0.16 },
     // The bow's belly, easing outward around the two of them.
     { x: keepOut(turnX - reach * 0.06), y: bellyY },
-    // Tucking back in, the way a parenthesis closes — but STILL OUTBOARD, and held there until the
-    // founders are behind us. This anchor used to sit at `bottom - span * 0.12`, which put the start
-    // of the inward curl a tenth of a row ABOVE the last caption, so the curve was already heading
-    // back across the text by the time it reached it.
+    // Tucking back in, STILL OUTBOARD, and held there until the founders are behind us. This anchor
+    // used to sit at `bottom - span * 0.12`, which put the start of the inward curl a tenth of a row
+    // ABOVE the last caption, so the curve was already heading back across the text by the time it
+    // reached it.
     { x: keepOut(turnX - reach * 0.02), y: bottom + 8 },
-    // The tail, curling back toward the centre and running out BELOW the founders. This is the only
-    // anchor allowed inboard, because there is nothing down here to cross. It ends inboard of the
-    // turn line so the pair reads as a closing bracket rather than two parallel rails.
-    { x: turnX - reach * 0.22, y: bottom + span * 0.16 },
+    // THE APPROACH TO THE MEETING. Sits at the meeting HEIGHT but offset outboard by `approachInset`,
+    // so the tail arrives at the centre travelling HORIZONTALLY: the two arms then close as one smooth
+    // bowl across the bottom rather than snapping to a V where they touch. Inboard is safe here —
+    // everything below `bottom` is under the founders, with nothing to cross.
+    { x: L.trunkX + side * approachInset, y: meetY },
+    // THE MEETING. IDENTICAL for both arms — `L.trunkX` is the one content centre they both read — so
+    // the two tails join with 0px gap, the same standard as the top fork. This is a CONNECTION, a
+    // fact, not a by-eye shape: qa/founder-parenthesis.mjs pins it.
+    { x: L.trunkX, y: meetY },
   ];
   return sampleCatmullRom(anchors, 6);
 }
