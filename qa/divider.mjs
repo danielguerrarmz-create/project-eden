@@ -44,9 +44,35 @@ console.log(`viewport ${VW}x${VH}`);
 console.log('project                    | divider y | band h | text below the line?');
 const ys = [];
 let textAbove = 0;
+/*
+ * WAIT FOR THE PICTURE, NOT FOR A GUESSED NUMBER OF MILLISECONDS. This originally clicked and measured
+ * 400ms later, and it was FLAKY IN THE FALSE-POSITIVE DIRECTION: roughly one run in three reported
+ * "1 MEDIA CROSSES THE LINE" on Archipedia and no other project — because Archipedia is measured FIRST,
+ * when the page is least settled, and a hero whose bytes have not landed has not taken its final rect.
+ * The layout was correct on every one of those runs.
+ *
+ * That is worth more than the fix. A guard that cries wolf does not get investigated, it gets
+ * WEAKENED — the natural "fix" for an intermittent failure is to raise a tolerance or delete the
+ * check, and this one is the only thing standing between the page and Daniel's rule. This suite's
+ * documented trap #3 is a starved rAF making a real layout read as broken; this is the same error with
+ * the sign flipped. Wait on the CONDITION (the image is loaded, a frame has been painted), never on a
+ * sleep that was tuned on one machine.
+ */
 for (let i = 0; i < names.length; i++) {
   await page.evaluate((k) => [...document.querySelectorAll('[data-project-list] button, nav button')][k]?.click(), i);
-  await sleep(400);
+  await page
+    .waitForFunction(
+      () => {
+        const media = [...document.querySelectorAll('[data-project-hero] img, [data-project-rail] img')];
+        if (!media.length) return false;
+        return media.every((m) => m.complete && m.naturalWidth > 0);
+      },
+      { timeout: 15000 },
+    )
+    .catch(() => null); // a video-only hero has no <img>; fall through to the settle below.
+  // Two rAFs: the images are in, now let the layout that depends on them actually paint.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await sleep(250);
   const r = await page.evaluate(() => {
     const band = document.querySelector('[data-project-band="active"]');
     const detail = document.querySelector('[data-project-detail]');
