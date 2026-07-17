@@ -18,7 +18,8 @@ import * as THREE from 'three';
 import { memberPrism, sectionFor } from '../engine/jointGeometry';
 import type { Vec3 } from '../engine/types';
 import { useDesign } from '../state/store';
-import { buildSteel } from './connectors';
+import { buildSteel, type SteelOwner } from './connectors';
+import { applyExplode, explodeDistanceM, type ExplodeUniforms } from './explodeShader';
 import { applyReveal, makeRevealDepthMaterial, type RevealUniforms } from './revealShader';
 
 // Prism corners come ordered [start 0..3, end 0..3] around the section.
@@ -31,10 +32,25 @@ const FACES: [number, number, number, number][] = [
   [3, 0, 4, 7],
 ];
 
-/** Merge clipped member prisms into one flat-shaded BufferGeometry. */
-function prismsToGeometry(prisms: Vec3[][]): THREE.BufferGeometry {
+/**
+ * Merge clipped member prisms into one flat-shaded BufferGeometry.
+ *
+ * `explode` carries, per prism, the world-space vector that prism travels at
+ * full explode and when it starts (0 = eave/ground, 1 = crown). Written as
+ * per-vertex attributes the same way `position` and `normal` already are: the
+ * merge throws away per-piece identity by design, so the only way a piece can
+ * move on its own afterwards is if every one of its vertices already knows
+ * where it is going. Baked once here, animated by one uniform — the same trade
+ * `revealShader` makes. See scene/explodeShader.ts.
+ */
+function prismsToGeometry(
+  prisms: Vec3[][],
+  explode?: { offsets: Vec3[]; delays: number[] },
+): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
+  const offsets: number[] = [];
+  const delays: number[] = [];
   const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
   const cross = (a: Vec3, b: Vec3): Vec3 => [
     a[1] * b[2] - a[2] * b[1],
@@ -43,7 +59,9 @@ function prismsToGeometry(prisms: Vec3[][]): THREE.BufferGeometry {
   ];
   const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-  for (const v of prisms) {
+  for (const [pi, v] of prisms.entries()) {
+    const off = explode?.offsets[pi] ?? ([0, 0, 0] as Vec3);
+    const delay = explode?.delays[pi] ?? 0;
     const centroid: [number, number, number] = [0, 0, 0];
     for (const p of v) {
       centroid[0] += p[0] / 8;
@@ -74,6 +92,8 @@ function prismsToGeometry(prisms: Vec3[][]): THREE.BufferGeometry {
         for (const i of tri) {
           positions.push(v[i][0], v[i][1], v[i][2]);
           normals.push(un[0], un[1], un[2]);
+          offsets.push(off[0], off[1], off[2]);
+          delays.push(delay);
         }
       }
     }
@@ -82,12 +102,18 @@ function prismsToGeometry(prisms: Vec3[][]): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  if (explode) {
+    geo.setAttribute('aExplodeOffset', new THREE.Float32BufferAttribute(offsets, 3));
+    geo.setAttribute('aExplodeDelay', new THREE.Float32BufferAttribute(delays, 1));
+  }
   return geo;
 }
 
 function useInstanceMatrices(
   ref: React.RefObject<THREE.InstancedMesh>,
   matrices: THREE.Matrix4[],
+  owners: SteelOwner[],
+  distM: number,
 ) {
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -95,7 +121,23 @@ function useInstanceMatrices(
     matrices.forEach((mat, i) => mesh.setMatrixAt(i, mat));
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [ref, matrices]);
+
+    // One value per INSTANCE rather than per vertex — `instanceId` is what the
+    // shader indexes these by, for free. The offset stays in world space here;
+    // the shader undoes `instanceMatrix`'s linear part, because that matrix
+    // carries each plate's non-uniform scale and would otherwise squash the
+    // travel. See scene/explodeShader.ts.
+    const offsets = new Float32Array(matrices.length * 3);
+    const delays = new Float32Array(matrices.length);
+    owners.forEach((o, i) => {
+      offsets[i * 3] = o.normal[0] * distM;
+      offsets[i * 3 + 1] = o.normal[1] * distM;
+      offsets[i * 3 + 2] = o.normal[2] * distM;
+      delays[i] = o.v;
+    });
+    mesh.geometry.setAttribute('aExplodeOffset', new THREE.InstancedBufferAttribute(offsets, 3));
+    mesh.geometry.setAttribute('aExplodeDelay', new THREE.InstancedBufferAttribute(delays, 1));
+  }, [ref, matrices, owners, distM]);
 }
 
 /**
@@ -104,7 +146,7 @@ function useInstanceMatrices(
  * casting it. A no-op unless `revealUniforms` is passed, so HeroScene and the
  * studio compile exactly the shaders they always did.
  */
-function useReveal(revealUniforms?: RevealUniforms) {
+function useReveal(revealUniforms?: RevealUniforms, explodeUniforms?: ExplodeUniforms) {
   const depth = useMemo(
     () => (revealUniforms ? makeRevealDepthMaterial(revealUniforms) : undefined),
     [revealUniforms],
@@ -113,41 +155,64 @@ function useReveal(revealUniforms?: RevealUniforms) {
 
   return useCallback(
     (mesh: THREE.Mesh | THREE.InstancedMesh | null) => {
-      if (!mesh || !revealUniforms) return;
+      if (!mesh) return;
       const mat = mesh.material as THREE.Material;
-      applyReveal(mat, revealUniforms);
-      mesh.customDepthMaterial = depth;
+      if (revealUniforms) {
+        applyReveal(mat, revealUniforms);
+        mesh.customDepthMaterial = depth;
+      }
+      // AFTER the reveal, and it must be: `applyReveal` ASSIGNS
+      // `onBeforeCompile`, `applyExplode` CHAINS onto it. Reversing these two
+      // lines silently deletes the explode and nothing errors.
+      //
+      // The depth material deliberately does NOT get the explode. It carries
+      // the reveal's cut so the shadow map matches the structure mid-sweep, and
+      // the reveal and the explode never run at once (the explode is gated
+      // until the dissolve is done). An exploded shadow is a problem for the
+      // day someone wants both, not today.
+      if (explodeUniforms) applyExplode(mat, explodeUniforms);
     },
-    [revealUniforms, depth],
+    [revealUniforms, explodeUniforms, depth],
   );
 }
 
-export function Folly({ revealUniforms }: { revealUniforms?: RevealUniforms } = {}) {
+export function Folly({
+  revealUniforms,
+  explodeUniforms,
+}: { revealUniforms?: RevealUniforms; explodeUniforms?: ExplodeUniforms } = {}) {
   const geometry = useDesign((s) => s.outputs.geometry);
   const system = geometry.params.jointSystem;
   const lamellaSystem = system === 'lamella';
 
   const boxesRef = useRef<THREE.InstancedMesh>(null);
   const cylsRef = useRef<THREE.InstancedMesh>(null);
-  const reveal = useReveal(revealUniforms);
+  const reveal = useReveal(revealUniforms, explodeUniforms);
 
   // Timber split by STOCK, matching the BOM: planed C24 off the docking saw
   // vs LVL off the CNC sheets. Each member is its plane-clipped solid.
   const { c24Geo, lvlGeo, c24Count, lvlCount } = useMemo(() => {
     const c24: Vec3[][] = [];
     const lvl: Vec3[][] = [];
+    // Parallel to the prisms: each member's own outward normal times the travel
+    // distance, and its own `v`. The engine already computed both.
+    const c24Ex = { offsets: [] as Vec3[], delays: [] as number[] };
+    const lvlEx = { offsets: [] as Vec3[], delays: [] as number[] };
+    const distM = explodeDistanceM(geometry.planB);
     for (const m of geometry.members) {
       const { widthM, depthM } = sectionFor(m.type, system);
       const isLinear = !lamellaSystem && (m.type === 'lattice' || m.type === 'foot');
       (isLinear ? c24 : lvl).push(memberPrism(m, widthM, depthM));
+      const ex = isLinear ? c24Ex : lvlEx;
+      ex.offsets.push([m.normal[0] * distM, m.normal[1] * distM, m.normal[2] * distM]);
+      ex.delays.push(m.v);
     }
     return {
-      c24Geo: prismsToGeometry(c24),
-      lvlGeo: prismsToGeometry(lvl),
+      c24Geo: prismsToGeometry(c24, c24Ex),
+      lvlGeo: prismsToGeometry(lvl, lvlEx),
       c24Count: c24.length,
       lvlCount: lvl.length,
     };
-  }, [geometry.members, system, lamellaSystem]);
+  }, [geometry.members, geometry.planB, system, lamellaSystem]);
   useEffect(
     () => () => {
       c24Geo.dispose();
@@ -159,8 +224,9 @@ export function Folly({ revealUniforms }: { revealUniforms?: RevealUniforms } = 
   // The steel of the joints (connectors.ts) — plates + cylinders.
   const steel = useMemo(() => buildSteel(geometry), [geometry]);
 
-  useInstanceMatrices(boxesRef, steel.boxes);
-  useInstanceMatrices(cylsRef, steel.cylinders);
+  const steelDistM = explodeDistanceM(geometry.planB);
+  useInstanceMatrices(boxesRef, steel.boxes, steel.boxOwners, steelDistM);
+  useInstanceMatrices(cylsRef, steel.cylinders, steel.cylOwners, steelDistM);
 
   // The steel already owns its refs for the instance matrices, so it takes the
   // reveal here rather than through a ref callback. Keyed on the counts because

@@ -44,3 +44,21 @@ export const TOOLS: ToolCopy[] = [
 
 /** The two lines of the guidance rail, in order. */
 export const RAIL_LINES = ['right-drag, or hold space, to turn it', 'scroll to zoom'] as const;
+
+/**
+ * The explode's sequence, named in the panel the eye is already on.
+ *
+ * NOT floating 3D callouts: those are the literal IKEA-manual reading and the
+ * highest clutter risk on a filmed frame. The cascade itself tells the sequence
+ * through TIME — this only names what you are watching.
+ *
+ * STATIC, not a live "ring n of N" ticker, which is a deliberate deviation from
+ * the spec. A ticking counter needs a React state write per frame, and this
+ * page's own rule — stated in `BakeReveal` and followed by `ExplodeReveal` —
+ * is that per-frame writes go to refs, because a re-render per frame fights the
+ * animation it is drawing. Here it would re-render the whole Canvas subtree for
+ * a 2.2 s counter. The sentence is true for every frame of the cascade anyway.
+ */
+export function explodeReadout(ringCount: number): string {
+  return `ground up · ${ringCount} rings · crown last`;
+}

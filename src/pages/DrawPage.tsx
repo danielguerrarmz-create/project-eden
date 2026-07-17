@@ -42,9 +42,11 @@ import { useSpaceHeld } from './draw/useSpaceHeld';
 import { StudioEnvironment } from './draw/StudioEnvironment';
 import { PlacedScaleFigure } from './draw/PlacedScaleFigure';
 import { BakeReveal, REVEAL_S } from './draw/BakeReveal';
+import { ExplodeReveal } from './draw/ExplodeReveal';
 import { makeRevealUniforms } from '../scene/revealShader';
+import { explodeDistanceM, makeExplodeUniforms } from '../scene/explodeShader';
 import { CinematicCamera } from './draw/CinematicCamera';
-import { RAIL_LINES, TOOLS } from './draw/toolCopy';
+import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
   COMMISSION_FROM,
@@ -64,6 +66,7 @@ import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
 import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
 import { readDrawing, type Spine } from '../engine/fromDrawing';
+import type { Vec3 } from '../engine/types';
 import {
   isHole,
   surfaceAreaM2,
@@ -210,6 +213,11 @@ export function DrawPage() {
   // stays for the length of the reveal, fading, while the lattice sweeps up
   // out of the ground through it. `dissolving` is what keeps it mounted.
   const revealUniforms = useMemo(() => makeRevealUniforms(), []);
+  // The explode's own clock, deliberately not the bake's: the bake is a one-shot
+  // narrative beat, this is a repeatable toggle you reach for afterwards.
+  const explodeUniforms = useMemo(() => makeExplodeUniforms(), []);
+  const [exploded, setExploded] = useState(false);
+  const explodeProgressRef = useRef(0);
   const skinFadeRef = useRef(1);
   const revealProgressRef = useRef(0);
   const [dissolving, setDissolving] = useState(false);
@@ -261,12 +269,28 @@ export function DrawPage() {
     if (!baked) return;
     // The nodes ARE the object: fitting their box instead would reserve a third
     // of the frame for the empty corners a dome never reaches.
+    //
+    // Exploded, the object is bigger, so the frame has to open with it or the
+    // outermost pieces leave the shot at the moment they become the point. The
+    // exploded point set is computed ANALYTICALLY — every node plus its own
+    // normal times the travel — rather than measured off the GPU mid-tween:
+    // the destination is known before the first frame moves, so the camera and
+    // the pieces glide on their own clocks to a frame that already fits.
+    const distM = exploded ? explodeDistanceM(outputs.geometry.planB) : 0;
     setFraming({
       kind: 'fit',
-      points: outputs.geometry.nodes.map((n) => n.position),
+      points: outputs.geometry.nodes.map((n) =>
+        exploded
+          ? ([
+              n.position[0] + n.normal[0] * distM,
+              n.position[1] + n.normal[1] * distM,
+              n.position[2] + n.normal[2] * distM,
+            ] as Vec3)
+          : n.position,
+      ),
       margin: FRAME_MARGIN,
     });
-  }, [baked, outputs.geometry]);
+  }, [baked, exploded, outputs.geometry]);
 
   // Start over: back to the opening shot, so the next take opens where the
   // last one did. The lawn has no object to fit, so this pose is authored.
@@ -376,13 +400,22 @@ export function DrawPage() {
                   progressRef={revealProgressRef}
                 />
 
+                <ExplodeReveal
+                  active={exploded}
+                  uniforms={explodeUniforms}
+                  progressRef={explodeProgressRef}
+                />
+
                 {/* The bake: soft surface out, real kit in — and the ground
                     resolves with it. The soft phase keeps its plain green
                     disc deliberately: loose ground invites editing, polished
                     ground stops it, which is the same law that makes bake a
                     resolution rather than a jump-cut. DrawStage's own lawn is
                     gated on !resolved so these two never sit coplanar. */}
-                {baked && <Folly revealUniforms={revealUniforms} />}
+                {/* Both passes, on the same materials. `Folly` applies the
+                    reveal first and CHAINS the explode onto it — see
+                    explodeShader.ts; assigning would have deleted the reveal. */}
+                {baked && <Folly revealUniforms={revealUniforms} explodeUniforms={explodeUniforms} />}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
                 {/* A dome renders identically at 3 m and at 30 m. One person
                     and it snaps to human scale. Bake only: see the file. */}
@@ -599,6 +632,16 @@ export function DrawPage() {
                       nodeCount: outputs.geometry.nodes.length,
                     })}
                   </p>
+                  {/* The sequence, told in the panel the eye is already on
+                      rather than as floating 3D callouts — those are the literal
+                      IKEA-manual reading and the highest clutter risk on a
+                      filmed frame. The cascade itself does the telling; this is
+                      one more fact where a fact already lives. */}
+                  {exploded && (
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accentOlive">
+                      {explodeReadout(outputs.geometry.ringCount)}
+                    </p>
+                  )}
 
                   <details className="group mt-2">
                     <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/50 hover:text-inkBlack">
@@ -677,9 +720,19 @@ export function DrawPage() {
                       Daniel's call: "we will have that later." The engine side
                       (`engine/exportProject.ts`) is deliberately KEPT — see its
                       header. Nothing imports it now, so it costs zero bundle. */}
+                  {/* Gated on the dissolve being FINISHED, not just on `baked`:
+                      exploding a structure that is still sweeping up out of the
+                      ground would run two clocks over the same vertices and read
+                      as a glitch rather than as either move. */}
+                  {!dissolving && (
+                    <Chip onClick={() => setExploded((x) => !x)}>
+                      {exploded ? 'reassemble' : 'explode'}
+                    </Chip>
+                  )}
                   <Chip
                     onClick={() => {
                       setBaked(false);
+                      setExploded(false); // a soft surface has nothing to explode
                       setTurntable(false); // you cannot sculpt a moving target
                     }}
                   >

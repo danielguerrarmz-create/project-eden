@@ -31,6 +31,26 @@ export interface SteelParts {
   boxes: THREE.Matrix4[];
   /** Unit-cylinder (Ø1 × h1, axis Y) instances: core drums, bolts. */
   cylinders: THREE.Matrix4[];
+  /**
+   * EXPLODE, per instance, parallel to `boxes` / `cylinders`.
+   *
+   * `owner` is the node each instance belongs to, so a piece of steel carries
+   * its node's outward normal (the direction it flies) and its node's `v` (when
+   * it starts, ground-up). Every instance a node emits inherits that node's
+   * values — a hub's fins and its bolts travel together, which is what makes
+   * the kit separate into real connectors rather than into loose parts.
+   */
+  boxOwners: SteelOwner[];
+  cylOwners: SteelOwner[];
+}
+
+/** Which node an instance came from, and the two facts the explode needs. */
+export interface SteelOwner {
+  nodeId: string;
+  /** Outward unit surface normal: the direction this steel flies. */
+  normal: Vec3;
+  /** 0 = eave/ground, 1 = crown. Start order, ground first. */
+  v: number;
 }
 
 /** Oriented box: basis columns = the three edge directions × dimensions. */
@@ -77,6 +97,8 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
   const lamella = g.params.jointSystem === 'lamella';
   const boxes: THREE.Matrix4[] = [];
   const cylinders: THREE.Matrix4[] = [];
+  const boxOwners: SteelOwner[] = [];
+  const cylOwners: SteelOwner[] = [];
   const memberById = new Map(g.members.map((m) => [m.id, m]));
 
   /** Incident ends: member + the unit dir from this node into it + its trim. */
@@ -219,7 +241,17 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
         }
       }
     }
+
+    // Tagged at the loop BOUNDARY, not at each push. A node emits steel from a
+    // dozen call sites above (fins, drums, bolts, plates, shoes, fish plates),
+    // and threading an owner through every one would be a dozen chances to miss
+    // one — and a missed one is an instance with no explode data, i.e. a bolt
+    // that stays behind while its hub leaves. Backfilling from the array
+    // lengths cannot miss anything, whatever gets added here later.
+    const owner: SteelOwner = { nodeId: node.id, normal: node.normal, v: node.v };
+    while (boxOwners.length < boxes.length) boxOwners.push(owner);
+    while (cylOwners.length < cylinders.length) cylOwners.push(owner);
   }
 
-  return { boxes, cylinders };
+  return { boxes, cylinders, boxOwners, cylOwners };
 }

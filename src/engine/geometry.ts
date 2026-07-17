@@ -311,6 +311,8 @@ export function generateGeometry(rawParams: DesignParams, shape?: ShapeField): C
         id: `n-${i}-${j}`,
         position: grounded ? [pos[0], 0, pos[2]] : pos,
         normal: surfaceNormal(ctx, rAt(i), thetaAt(j)),
+        // Same sense as Member.v (see uv() below): 0 = eave/ground, 1 = crown.
+        v: 1 - i / ringCount,
         kind: grounded ? 'ground' : i === 0 ? 'crown' : i === ringCount ? 'eave' : 'interior',
         memberIds: [],
       });
@@ -477,6 +479,8 @@ export function generateGeometry(rawParams: DesignParams, shape?: ShapeField): C
             from.normal[1] + to.normal[1],
             from.normal[2] + to.normal[2],
           ]),
+          // A splice sits mid-bay on its own ring, so it shares that ring's v.
+          v,
           kind: 'splice',
           memberIds: [],
         };
