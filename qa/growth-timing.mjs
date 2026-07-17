@@ -98,12 +98,42 @@ const safeEval = async (fn, arg) => {
   }
 };
 
-/** camY, read off the one element that exposes it: the frame's viewBox is `0 <camY> W viewH`. */
+/**
+ * camY, read off the one element that exposes it: the frame's viewBox is `0 <camY> W viewH`.
+ *
+ * TWO SELECTORS, AND THE FALLBACK IS THE LOAD-BEARING ONE. `data-timeline-camera` is an explicit
+ * handle added for this harness, but it lives in `CrossPathsTimeline.tsx`, which is another agent's
+ * file and currently carries a large uncommitted refactor. **A committed harness must not depend on an
+ * uncommitted line in someone else's lane** — if that file is reverted or the attribute is dropped in
+ * a rebase, this harness dies with it and item 2's live verification dies silently with that.
+ * `[data-timeline-track] svg[viewBox]` is the path production code already uses (`usePageCardLine.ts`,
+ * `AboutPage.tsx`), so it is maintained by the app itself rather than by my say-so. Verified: both
+ * resolve to EXACTLY ONE element and to the SAME element.
+ *
+ * AND IT ASSERTS WHAT IT FOUND, WHICH IS THE WHOLE LESSON. The first version of this handle was named
+ * `data-timeline-frame` — a name ALREADY TAKEN by the founders' parenthesis on an ancestor <div>.
+ * `querySelector` returns the FIRST match, so it silently got the div, which has no viewBox, and read
+ * camY as null. A smoke check of `!!querySelector(...)` cheerfully said "true" about the wrong element.
+ * So this refuses to guess: exactly one match, and it must actually carry a parseable viewBox y.
+ * **A selector that cannot say WHICH element it found is not a selector.**
+ */
 const camY = () =>
   safeEval(() => {
-    const svg = document.querySelector('[data-timeline-camera]');
+    const pick = () => {
+      const explicit = document.querySelectorAll('[data-timeline-camera]');
+      if (explicit.length === 1) return explicit[0];
+      if (explicit.length > 1) return 'AMBIGUOUS';
+      const fb = document.querySelectorAll('[data-timeline-track] svg[viewBox]');
+      if (fb.length === 1) return fb[0];
+      if (fb.length > 1) return 'AMBIGUOUS';
+      return null;
+    };
+    const svg = pick();
+    if (svg === 'AMBIGUOUS') return 'AMBIGUOUS';
     if (!svg) return null;
-    const vb = (svg.getAttribute('viewBox') || '').split(/\s+/);
+    // The element must carry the thing we came for. Matching is not finding.
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/);
+    if (vb.length !== 4) return null;
     const y = Number(vb[1]);
     return Number.isFinite(y) ? y : null;
   });
@@ -126,7 +156,10 @@ const STILL_READS = 5;
 const seek = async (scrollY) => {
   const before = await camY();
   if (before === DESTROYED) return { harness: 'the page reloaded (HMR?) before the seek — reading poisoned' };
-  if (before === null) return { harness: 'no [data-timeline-camera] — cannot see the camera at all' };
+  if (before === 'AMBIGUOUS')
+    return { harness: 'the camera selector matched MORE THAN ONE element — refusing to guess which is the frame' };
+  if (before === null)
+    return { harness: 'no camera frame (no [data-timeline-camera], no single [data-timeline-track] svg[viewBox])' };
   if ((await safeEval((y) => window.scrollTo(0, y), scrollY)) === DESTROYED)
     return { harness: 'the page reloaded (HMR?) during the seek — reading poisoned' };
 
@@ -136,6 +169,7 @@ const seek = async (scrollY) => {
   while (Date.now() < moveDeadline) {
     const c = await camY();
     if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to start' };
+    if (c === 'AMBIGUOUS') return { harness: 'camera selector became ambiguous mid-seek' };
     if (c !== null && Math.abs(c - before) > EPS) {
       moved = true;
       break;
@@ -152,6 +186,7 @@ const seek = async (scrollY) => {
   while (Date.now() < settleDeadline) {
     const c = await camY();
     if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to settle' };
+    if (c === 'AMBIGUOUS') return { harness: 'camera selector became ambiguous mid-settle' };
     if (c === null) return { harness: 'camera disappeared mid-seek' };
     if (last !== null && Math.abs(c - last) <= EPS) still++;
     else still = 0;
@@ -166,7 +201,10 @@ const seek = async (scrollY) => {
 const sampleAt = async (scrollY) => {
   const s = await seek(scrollY);
   if (s.harness) return { harness: s.harness };
-  return page.evaluate(() => {
+  // camY comes from `seek`, which already resolved the frame unambiguously and waited for it to
+  // arrive. Re-reading it here with a second, weaker selector would be a different question wearing
+  // the same name — which is the mistake this whole file is a monument to.
+  const r = await safeEval(() => {
     const vh = window.innerHeight;
     const stems = [...document.querySelectorAll('[data-sub-branch]')];
     let growingAboveHalfway = 0;
@@ -185,10 +223,10 @@ const sampleAt = async (scrollY) => {
         if (!worst || rootF < worst.f) worst = { f: rootF, order: s.getAttribute('data-sub-branch') };
       }
     }
-    const svg = document.querySelector('[data-timeline-camera]');
-    const cam = svg ? Number((svg.getAttribute('viewBox') || '').split(/\s+/)[1]) : NaN;
-    return { total: stems.length, growing, growingAboveHalfway, worst, scrollY: window.scrollY, cam };
+    return { total: stems.length, growing, growingAboveHalfway, worst, scrollY: window.scrollY };
   });
+  if (r === DESTROYED) return { harness: 'the page reloaded (HMR?) during the measurement — reading poisoned' };
+  return { ...r, cam: s.cam };
 };
 
 const stops = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65];
