@@ -14,12 +14,26 @@
  * them to is how you end up with Grasshopper.
  *
  * Nothing here bakes. The surface stays soft until you say otherwise.
+ *
+ * WHAT THIS DOES NOT OWN: the camera. A left drag with no space held is the
+ * tool's; everything else belongs to OrbitControls and must pass through here
+ * untouched. This file used to claim EVERY pointerdown — every button, always
+ * — which is why right-drag drew a line instead of orbiting, and why there was
+ * no way to turn the object at all. See `gesture.ts` for the rule; it is one
+ * function, and it is pure so it can be tested.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Pt, Spine } from '../../engine/fromDrawing';
 import { arcRiseM, type Edit, type SurfaceInput } from '../../engine/surface';
+import {
+  MIN_HOLE_RADIUS_M,
+  commitGesture,
+  holeRadiusM,
+  liftAmountM,
+  toolClaimsPointer,
+} from './gesture';
 import { SurfaceMesh } from './SurfaceMesh';
 
 export type Tool = 'draw' | 'lift' | 'hole';
@@ -75,6 +89,7 @@ export function DrawStage({
   tool,
   enabled,
   resolved,
+  spaceHeldRef,
   onArc,
   onEdit,
 }: {
@@ -85,6 +100,8 @@ export function DrawStage({
   enabled: boolean;
   /** Baked: the surface steps aside for the real structure. */
   resolved: boolean;
+  /** Space down = the camera has the pointer. A ref, so `down` reads NOW. */
+  spaceHeldRef: React.RefObject<boolean>;
   onArc: (s: Spine) => void;
   onEdit: (e: Edit) => void;
 }) {
@@ -98,14 +115,30 @@ export function DrawStage({
   const nowRef = useRef<Pt | null>(null);
   const screenYRef = useRef(0);
   const amountRef = useRef(0);
+  // What the press landed on. A move over anything else is not this gesture.
+  const downObjRef = useRef<THREE.Object3D | null>(null);
   const [start, setStart] = useState<Pt | null>(null);
   const [now, setNow] = useState<Pt | null>(null);
   const [amount, setAmount] = useState(0);
 
   const plan = useCallback((e: ThreeEvent<PointerEvent>): Pt => ({ x: e.point.x, y: e.point.z }), []);
 
+  const clear = useCallback(() => {
+    startRef.current = null;
+    nowRef.current = null;
+    amountRef.current = 0;
+    downObjRef.current = null;
+    setStart(null);
+    setNow(null);
+    setAmount(0);
+    if (controls) controls.enabled = true;
+  }, [controls]);
+
   const down = (e: ThreeEvent<PointerEvent>) => {
-    if (!enabled) return;
+    // The camera's drag. Do not stopPropagation, do not disable controls, do
+    // not arm anything: OrbitControls must see this exactly as it would have.
+    if (!toolClaimsPointer({ button: e.nativeEvent.button, spaceHeld: !!spaceHeldRef.current, enabled }))
+      return;
     e.stopPropagation();
     if (controls) controls.enabled = false;
     const p = plan(e);
@@ -113,6 +146,7 @@ export function DrawStage({
     nowRef.current = p;
     screenYRef.current = e.nativeEvent.clientY;
     amountRef.current = 0;
+    downObjRef.current = e.eventObject;
     setStart(p);
     setNow(p);
     setAmount(0);
@@ -120,57 +154,62 @@ export function DrawStage({
 
   const move = (e: ThreeEvent<PointerEvent>) => {
     if (!enabled || !startRef.current) return;
+    // Off-surface guard. R3F reports the hit point on whatever the ray struck,
+    // so a sculpt drag that wanders off the canopy onto the lawn gets handed
+    // the LAWN's point: a jump of metres in plan space, and one excavate
+    // gesture eats the whole canopy. The lawn sits behind the canopy and R3F
+    // walks every intersection, so both handlers fire on the same move —
+    // taking only the one we pressed on keeps the last good point instead.
+    if (e.eventObject !== downObjRef.current) return;
     const p = plan(e);
     nowRef.current = p;
     setNow(p);
     if (tool === 'lift') {
       // Pull UP the screen to raise. Screen-space, because the gesture is
       // "lift this", not "set y to 1.8".
-      const dy = screenYRef.current - e.nativeEvent.clientY;
-      amountRef.current = Math.max(-1.2, Math.min(1.6, dy * 0.006));
+      amountRef.current = liftAmountM(screenYRef.current - e.nativeEvent.clientY);
       setAmount(amountRef.current);
     }
   };
 
-  const up = () => {
-    if (controls) controls.enabled = true;
+  const up = useCallback(() => {
     const a = startRef.current;
-    const b = nowRef.current;
-    const amt = amountRef.current;
-    startRef.current = null;
-    nowRef.current = null;
-    amountRef.current = 0;
-    setStart(null);
-    setNow(null);
-    setAmount(0);
-    if (!a || !b) return;
+    if (!a) return; // not our drag; the camera just finished orbiting
+    const c = commitGesture({ tool, from: a, to: nowRef.current, amountM: amountRef.current });
+    clear();
+    if (!c) return; // a click is a click, and a click changes nothing
+    if (c.kind === 'arc') onArc(c.spine);
+    else onEdit(c.edit);
+  }, [tool, clear, onArc, onEdit]);
 
-    const drag = Math.hypot(b.x - a.x, b.y - a.y);
-    if (tool === 'draw') {
-      if (drag > 0.9) onArc({ a, b }); // a tap isn't a line
-    } else if (tool === 'lift') {
-      if (Math.abs(amt) > 0.05) {
-        onEdit({ kind: 'lift', at: a, radiusM: 1.5, amountM: amt });
-      }
-    } else if (tool === 'hole') {
-      const r = Math.max(0.35, drag);
-      onEdit({ kind: 'hole', at: a, radiusM: r });
-    }
-  };
+  // WHY THE WINDOW HEARS THE RELEASE, NOT THE MESH. R3F only delivers
+  // pointerup to an object the ray still hits, so letting go anywhere off the
+  // canopy — which is most of the frame, and exactly where a lift's pull ENDS,
+  // since pulling up drags the cursor off the top of the thing — never
+  // reached the mesh at all. The lift was silently lost and the refs stayed
+  // armed until the next press. The window always hears it.
+  useEffect(() => {
+    const onCancel = () => clear(); // interrupted is not decided: discard
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('blur', onCancel);
+    return () => {
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onCancel);
+    };
+  }, [up, clear]);
 
-  const liveHoleR = tool === 'hole' && start && now ? Math.max(0.35, Math.hypot(now.x - start.x, now.y - start.y)) : 0;
+  const liveHoleR = tool === 'hole' && start && now ? holeRadiusM(start, now) : 0;
 
   return (
     <group>
       {/* The lawn — and the drawing surface, when nothing is built yet. */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        receiveShadow
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerLeave={up}
-      >
+      {/* No onPointerUp/onPointerLeave: the window owns the release (above).
+          onPointerLeave in particular used to COMMIT the gesture the instant
+          the cursor crossed the lawn's edge, so a stroke drawn to the far side
+          landed short, at the rim. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onPointerDown={down} onPointerMove={move}>
         {/* Sized so a natural, comfortable stroke lands NEAR the buildable
             family (12-18 m²) rather than 90 m². The lawn is the only scale cue
             in the frame, so it quietly teaches how big to draw — and the bake
@@ -181,11 +220,7 @@ export function DrawStage({
 
       {/* The soft thing. Also a drag target, so you sculpt ON it, not near it. */}
       {!resolved && arcs.length > 0 && (
-        <group
-          onPointerDown={down}
-          onPointerMove={move}
-          onPointerUp={up}
-        >
+        <group onPointerDown={down} onPointerMove={move}>
           <SurfaceMesh input={surface} />
         </group>
       )}
@@ -213,7 +248,13 @@ export function DrawStage({
           {tool === 'draw' && Math.hypot(now.x - start.x, now.y - start.y) > 0.2 && (
             <ArchRibbon a={start} b={now} ghost />
           )}
-          {tool === 'hole' && <EditHalo at={start} radiusM={liveHoleR} kind="hole" />}
+          {/* The ring appears exactly when the drag becomes a hole, and it is
+              the size of the hole. Below the threshold there is no ring,
+              because there would be no hole: a halo under a gesture that is
+              going to commit nothing is the same lie the 0.35 m floor told. */}
+          {tool === 'hole' && liveHoleR >= MIN_HOLE_RADIUS_M && (
+            <EditHalo at={start} radiusM={liveHoleR} kind="hole" />
+          )}
           {tool === 'lift' && (
             <>
               <EditHalo at={start} radiusM={1.5} kind="lift" />

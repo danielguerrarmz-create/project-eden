@@ -35,8 +35,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import { SplashHeader } from './splash/SplashHeader';
 import { DrawStage, type Tool } from './draw/DrawStage';
+import { useSpaceHeld } from './draw/useSpaceHeld';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
 import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
@@ -89,6 +91,31 @@ const HOME: Framing = { kind: 'pose', position: [5.6, 3.6, 6.6], target: [0, 1.0
  * turntable brings its wider axis round.
  */
 const FRAME_MARGIN = 1.22;
+/**
+ * How high the camera may climb. `maxPolarAngle` already stopped it going
+ * underground; nothing stopped it going straight up, and it went all the way:
+ * measured at exactly 0 rad, a dead plan view.
+ *
+ * WHY CLAMP AT ALL. Straight down is degenerate, not merely unflattering. At
+ * polar 0 the view direction is parallel to the rig's up vector, so azimuth
+ * stops being defined and the object can spin under a gesture that only meant
+ * to tilt. It is also a trap with no handle: there is no horizon left to grab
+ * and no obvious way back out.
+ *
+ * WHY 30° AND NOT MORE, WHICH IS THE TEMPTING MISTAKE. Shot across the range,
+ * the SOFT canopy does not read from anywhere above ~50°: its eave, the whole
+ * point of the form, is edge-on and the skin is an untextured beige mass, so
+ * 40° and 15° are equally a blob. That argues for clamping at 50°. It would be
+ * the wrong fix. The skin is illegible from above because it has no detail,
+ * which is a material question, and the BAKED lattice — the thing actually on
+ * camera — reads beautifully steep: at 25° the oculus, the diagrid and every
+ * node are crisp. Clamping to 50° would spend the kit's best views paying for
+ * the skin's missing texture.
+ *
+ * So the clamp only removes what is genuinely broken. 30° keeps every view
+ * that measured well and deletes the singularity.
+ */
+const MIN_POLAR = Math.PI / 6;
 
 export function DrawPage() {
   const [arcs, setArcs] = useState<Spine[]>([]);
@@ -129,6 +156,54 @@ export function DrawPage() {
   const soft = arcs.length > 0 && !baked;
   const canBake = arcs.length >= 2 && !baked;
   const activeHint = TOOLS.find((t) => t.id === tool)!.hint;
+
+  // --- The pointer. Left drag makes; right drag and space-drag look.
+  const { held: spaceHeld, heldRef: spaceHeldRef } = useSpaceHeld();
+  // Only so the hand can close while it turns. Window-level, because the
+  // release that matters most is the one that happens off the canvas.
+  const [pressing, setPressing] = useState(false);
+  useEffect(() => {
+    const down = () => setPressing(true);
+    const up = () => setPressing(false);
+    window.addEventListener('pointerdown', down);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    window.addEventListener('blur', up);
+    return () => {
+      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      window.removeEventListener('blur', up);
+    };
+  }, []);
+
+  /**
+   * System cursors only. The hand says "you are about to move the view, not
+   * the thing"; the crosshair says "this gesture lands somewhere precise".
+   * Once baked there is no tool, so the pointer stops promising one.
+   */
+  const cursor = spaceHeld
+    ? pressing
+      ? 'cursor-grabbing'
+      : 'cursor-grab'
+    : baked
+      ? 'cursor-default'
+      : 'cursor-crosshair';
+
+  // One hint, once, when the first canopy stands: the moment there is finally
+  // an object worth walking round, and the first moment the user is not busy
+  // being told how to draw. NOT persisted to localStorage on purpose — a take
+  // has to be reproducible with a reload, the same reason "start over"
+  // returns to the opening pose.
+  const [hintShown, setHintShown] = useState(false);
+  const [hintUp, setHintUp] = useState(false);
+  useEffect(() => {
+    if (hintShown || arcs.length < 2 || baked) return;
+    setHintShown(true);
+    setHintUp(true);
+    const t = setTimeout(() => setHintUp(false), 6500);
+    return () => clearTimeout(t);
+  }, [arcs.length, baked, hintShown]);
 
   // --- Camera. The object should fill the frame, and it should move once baked.
   const [framing, setFraming] = useState<Framing>(HOME);
@@ -193,8 +268,11 @@ export function DrawPage() {
                 shadows
                 dpr={[1, 2]}
                 camera={{ position: [5.6, 3.6, 6.6], fov: 42 }}
-                className="!absolute inset-0"
+                className={`!absolute inset-0 ${cursor}`}
                 resize={{ debounce: 0, scroll: false }}
+                // Right-drag is the orbit, so the right button must not also
+                // summon the browser's menu on top of the shot mid-gesture.
+                onContextMenu={(e) => e.preventDefault()}
               >
                 <color attach="background" args={['#F6F4EE']} />
                 <fog attach="fog" args={['#F6F4EE', 24, 54]} />
@@ -214,6 +292,7 @@ export function DrawPage() {
                   tool={tool}
                   enabled={!baked}
                   resolved={baked}
+                  spaceHeldRef={spaceHeldRef}
                   onArc={(s) => setArcs((xs) => [...xs, s])}
                   onEdit={(e) => setEdits((xs) => [...xs, e])}
                 />
@@ -234,8 +313,21 @@ export function DrawPage() {
                   target={[0, 1.0, 0]}
                   minDistance={4}
                   maxDistance={18}
+                  minPolarAngle={MIN_POLAR}
                   maxPolarAngle={Math.PI / 2.05}
                   enablePan={false}
+                  // THE ORBIT. OrbitControls binds RIGHT to PAN by default, and
+                  // pan is off here (deliberately: there is one object and it is
+                  // at the origin), so the right button drove a disabled action
+                  // and did nothing at all. That, plus DrawStage claiming every
+                  // button, is why there was no way to turn the object.
+                  // LEFT is ROTATE too; DrawStage takes it back for the tool
+                  // unless space is held, so this is the space-hold orbit.
+                  mouseButtons={{
+                    LEFT: THREE.MOUSE.ROTATE,
+                    MIDDLE: THREE.MOUSE.DOLLY,
+                    RIGHT: THREE.MOUSE.ROTATE,
+                  }}
                   // Without damping the view stops dead on pointer-up, which
                   // makes a hand-turned object feel like a stepper motor.
                   enableDamping
@@ -265,6 +357,22 @@ export function DrawPage() {
                   : arcs.length === 1
                     ? 'one more, crossing it'
                     : activeHint}
+              </p>
+            )}
+
+            {/* How to look at the thing you just made. Said once, quietly, then
+                never again. Both paths are named because they are not the same
+                user: right-drag is the mouse's, space is the trackpad's, where
+                two-finger drag is a wheel event and already means zoom. */}
+            {hintShown && !baked && (
+              <p
+                // max-w is generous on purpose: `ch` under-measures tracked
+                // text, and at 44ch this line wrapped its last word alone.
+                className={`pointer-events-none absolute inset-x-0 bottom-16 mx-auto max-w-[60ch] text-center font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/40 transition-opacity duration-700 ${
+                  hintUp ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                right-drag, or hold space, to turn it
               </p>
             )}
 
