@@ -126,3 +126,86 @@ describe('no bio claims a project its owner does not own', () => {
     expect(stale, `TELLS names projects that are not in PROJECTS: ${stale.join(', ')}`).toEqual([]);
   });
 });
+
+/**
+ * THE ACM DIS 2026 CLAIM, AND WHAT A TEST CAN HONESTLY DO ABOUT IT.
+ *
+ * On 2026-07-17 Daniel ruled that **Archipedia was never submitted to ACM DIS 2026** — they meant to
+ * and ran out of time. The claim had been live on the public page in three places (his bio, the
+ * project description, and `paper.venue`) plus a provenance comment asserting nothing was inferred.
+ *
+ * BE CLEAR ABOUT WHAT THESE TESTS CATCH, because the obvious guard is the one that does not work:
+ *
+ *   - **NO TEST CAN KNOW WHETHER A PAPER WAS SUBMITTED.** That is a fact about the world. Only Daniel
+ *     had it, and the only reason the page was wrong for rounds is that nobody asked him.
+ *   - **A BIO-VERSUS-LEDGER CONSISTENCY CHECK WOULD NOT HAVE CAUGHT IT EITHER, and this is the whole
+ *     lesson.** The bio said "ACM DIS 2026" and `paper.venue` said "ACM DIS 2026 · submitted". They
+ *     AGREED. Two places, one fact, perfectly consistent, and both false. Consistency is not truth,
+ *     and a cross-check between two copies of the same claim can only ever find a TYPO. That is the
+ *     limit of the "one fact, two places" guard above, stated out loud so the green does not get read
+ *     as "the bios are true".
+ *
+ * So the first test below is not clever and is not meant to be: it PINS THE CORRECTION. The lie is
+ * still written down in `bower-docs/handoffs/2026-07-12-…` (corrected in place, but the words survive
+ * in git), so the realistic way it comes back is a future editor "restoring" a fact they found in a
+ * private doc. This makes that loud instead of silent. The second one catches real drift.
+ */
+describe('the ACM DIS 2026 claim stays dead', () => {
+  const surfaces = (): string[] => [
+    ...TEAM.flatMap((m) => m.facts.map((f) => `${m.name} / ${f.label}: ${f.value}`)),
+    ...PROJECTS.flatMap((p) => [
+      `${p.title} description: ${p.description}`,
+      ...(p.paper ? [`${p.title} paper: ${p.paper.title ?? ''} ${p.paper.venue} ${p.paper.authors}`] : []),
+      ...(p.awards ?? []).map((a) => `${p.title} award: ${a}`),
+    ]),
+  ];
+
+  it('guards the probe: there is reader-facing copy to search', () => {
+    // Without this the filters below iterate an empty list and report success — this file's own
+    // original sin (`p.id`), and the harness that printed "PASS across all 0 projects".
+    expect(surfaces().length).toBeGreaterThan(20);
+    expect(surfaces().some((s) => s.includes('CAADRIA 2026'))).toBe(true);
+  });
+
+  it('no reader-facing string claims ACM DIS anywhere', () => {
+    const hits = surfaces().filter((s) => /\bACM\b|\bDIS\s*20\d\d/i.test(s));
+    expect(
+      hits,
+      `\nArchipedia was NEVER submitted to ACM DIS 2026 (Daniel, 2026-07-17). It is one paper and it\n` +
+        `went to CAADRIA 2026, accepted. If a private handoff told you otherwise, that doc is wrong and\n` +
+        `is corrected at bower-docs/handoffs/2026-07-12-…:95.\n${hits.join('\n')}\n`,
+    ).toEqual([]);
+  });
+
+  it('Archipedia carries the CAADRIA paper, accepted, with its real title and four authors', () => {
+    const arch = PROJECTS.find((p) => p.title === 'Archipedia');
+    expect(arch?.paper).toBeDefined();
+    expect(arch!.paper!.venue).toBe('CAADRIA 2026 · accepted');
+    expect(arch!.paper!.title).toBe(
+      'Multi-Modal Precedent Retrieval: Patch-Aware and Tri-Scalar Rank Weighted Guidance for Design Search',
+    );
+    expect(arch!.paper!.authors).toBe('Clay Seifert, Daniel Guerra, Armaan Kokan, Patrick Danahy');
+    // NOT FABRICATED, AND THAT IS THE ASSERTION. There is no PDF. An empty string here is the honest
+    // state; a plausible "PDF · 2.4 MB" next to a dead link is the failure this pins.
+    expect(arch!.paper!.pdf).toBe('');
+    expect(arch!.paper!.pdfSize).toBe('');
+  });
+
+  it('every venue a bio names exists in the ledger (drift, not truth)', () => {
+    // WOULD NOT HAVE CAUGHT THE DIS BUG — see the note above. It catches the NEXT thing: one of the
+    // three copies of this fact getting updated and the others not.
+    const ledger = PROJECTS.filter((p) => p.paper).map((p) => p.paper!.venue);
+    const bios = TEAM.flatMap((m) => m.facts.map((f) => `${m.name}: ${f.value}`));
+    const orphans: string[] = [];
+    for (const bio of bios) {
+      for (const [, venue] of bio.matchAll(/\b([A-Z]{3,7}(?: [A-Z]{2,4})? 20\d\d)\b/g)) {
+        if (!ledger.some((v) => v.startsWith(venue))) orphans.push(`"${venue}" in ${bio}`);
+      }
+    }
+    expect(
+      orphans,
+      `\nA bio names a venue no paper in the ledger claims. Either the ledger lost a paper or the bio\n` +
+        `invented one. Ledger venues: ${ledger.join(' | ')}\n${orphans.join('\n')}\n`,
+    ).toEqual([]);
+  });
+});

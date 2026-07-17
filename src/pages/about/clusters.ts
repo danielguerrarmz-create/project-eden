@@ -491,8 +491,33 @@ export const CLUSTERS: Cluster[] = [
     /**
      * THE LAST PLATE, and the other half of the bracket. Daniel: "put this image as our LAST, we
      * just graduated." Orientation (2021, `origin-2021`) opens on strangers who have not met; this
-     * closes on them graduating. Both bookends are `showcase` and both sit RIGHT, so they rhyme
-     * across the length of the drawing — which is also what balances the lanes at 7 clusters a side.
+     * closes on them graduating.
+     *
+     * IT SITS LEFT (2026-07-17, Daniel, round 11 item 1): "Move the graduation photograph to the LEFT
+     * side of the timeline, next to the 2026 text."
+     *
+     * THIS OVERRULES A DOCUMENTED RHYME, so the rhyme is written down here rather than deleted. This
+     * note used to read: "Both bookends are `showcase` and both sit RIGHT, so they rhyme across the
+     * length of the drawing — which is also what balances the lanes at 7 clusters a side." Two of its
+     * three clauses had already expired before Daniel touched it, which is the only reason it is worth
+     * a paragraph:
+     *
+     *   - **"Both bookends are `showcase`" was already FALSE.** Round 10 (items 10/11) took orientation
+     *     to `hero` and this plate to `standard`, two tiers down, on Daniel's "much smaller". The
+     *     bookends had not matched in size for a round, and the sentence claiming they did was still
+     *     sitting here being read as a reason.
+     *   - **The rhyme was the SIDE, and Daniel has now spent it deliberately.** Bookending by side is a
+     *     composition he can have or not have; he looked at it and asked for this instead.
+     *   - **The lane balance is real and is the one true cost.** Measured after the move: plates run
+     *     11 left / 9 right, from 10 / 10. Nothing enforces the balance and no test asserts it (which
+     *     is why "7 clusters a side" could sit in a comment while the plate count was even), so it is
+     *     a composition fact, not an invariant. Flagged in the round-11 handoff, not silently eaten.
+     *
+     * MOVING IT WAS NOT ENOUGH, and this is the part worth knowing: the 2026 label used to pick
+     * whichever side had MORE ROOM, so putting the photograph on the left made the numerals flee to the
+     * right and the two ended up exactly as far apart as they began. His second clause ("next to the
+     * 2026 text") is what forced the real fix, in `yearLabelSides` — read that note before touching
+     * either. **A plate's side and its year label's side are one composition now, not two.**
      *
      * THIS IS THE FIRST CLUSTER 2026 HAS EVER HAD, and it changes a documented invariant: the
      * `yearLabelYs` note used to say 2026 has no work to sit beside, so its label fell back to the
@@ -505,7 +530,7 @@ export const CLUSTERS: Cluster[] = [
      */
     id: 'graduation',
     year: 2026.0,
-    side: 'right',
+    side: 'left',
     hint: '',
     nodes: [
       {

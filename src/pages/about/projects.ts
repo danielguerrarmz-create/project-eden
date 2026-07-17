@@ -85,7 +85,11 @@ export interface ProjectImage {
 /** A published paper behind a project (the project IS the research). Renders a
  *  "read the paper" download framed in the project's text. */
 export interface ProjectPaper {
-  /** Where and when it was published, e.g. "AAG 2025 · MIT". */
+  /** The paper's real title, verbatim. Optional because not every `paper` block has one on record,
+   *  and an invented title is worse than an absent one. */
+  title?: string;
+  /** Where and when it was published, e.g. "AAG 2025 · MIT". Carry the STATUS in it where the status
+   *  is load-bearing ("CAADRIA 2026 · accepted") — a venue with no status reads as published. */
   venue: string;
   authors: string;
   /** Public path to the downloadable PDF. */
@@ -366,14 +370,28 @@ export const TEAM: TeamMember[] = [
        * nowhere else to go, and the block existed to hold it. The composite has a home now: it has a
        * paper, and the paper is about the composite.
        *
-       * HE HAS THREE PUBLICATIONS AND ALL THREE ARE SOURCED IN THIS REPO. Nothing here is inferred:
+       * THIS BLOCK USED TO SAY "HE HAS THREE PUBLICATIONS AND ALL THREE ARE SOURCED IN THIS REPO"
+       * AND IT WAS FALSE. He has TWO. The third was the second counted twice: it listed "Archipedia,
+       * submitted to ACM DIS 2026" and "Archipedia's methodology, ACCEPTED at CAADRIA 2026" as
+       * separate publications, and they are ONE PAPER. **ARCHIPEDIA WAS NEVER SUBMITTED TO ACM DIS
+       * 2026** — Daniel ruled 2026-07-17, in his own words: they meant to and ran out of time. There
+       * was only ever one Archipedia paper and it went to CAADRIA 2026, where it is ACCEPTED.
+       *
+       * The word "methodology" is what made the double-count survive: it made one paper sound like a
+       * companion to another, so a sentence naming the SAME work twice read as two facts. **A
+       * publication count is a claim about DOCUMENTS, not about sentences you can write.** See the
+       * matching correction at Archipedia (n:01) and in `bower-docs`.
+       *
+       * HE HAS TWO PUBLICATIONS AND BOTH ARE SOURCED IN THIS REPO. Nothing here is inferred:
        *   - The composite paper. "Biogenic Hempcrete-Bamboo Composite with Enhanced Mechanical
        *     Performance", UT Austin School of Architecture, July 2025, SOLE-AUTHORED. It is wired to
        *     Plentify (n:10) below — see the citation note there, including why Koehler is not on it.
-       *   - Archipedia, submitted to ACM DIS 2026 (Clay Seifert, Daniel Guerra, Armaan Kokan,
-       *     Patrick Danahy). In `paper` on Archipedia (n:01).
-       *   - Archipedia's methodology, ACCEPTED at CAADRIA 2026. Named in the resume handoff, and
-       *     already carried in Clay's PUBLISHED block as "a third is accepted at CAADRIA 2026".
+       *   - "Multi-Modal Precedent Retrieval: Patch-Aware and Tri-Scalar Rank Weighted Guidance for
+       *     Design Search" (Clay Seifert, Daniel Guerra, Armaan Kokan, Patrick Danahy), ACCEPTED at
+       *     CAADRIA 2026. In `paper` on Archipedia (n:01). This is the paper Clay's PUBLISHED block
+       *     counts as "a third is accepted at CAADRIA 2026" — CLAY'S COUNT OF THREE STILL HOLDS, and
+       *     it holds *because* it always pointed at this one paper: AAG 2025, ACADIA 2025, and this.
+       *     Clay never carried the DIS claim. Only Daniel's block double-counted.
        *
        * THE COMPOSITE, NOT THE PROJECT — and this wording is load-bearing, not stylistic. RULED
        * 2026-07-16 with Daniel looking at the ledger: `by: 'clay+daniel'` is on `Plentify` (n:10), THE
@@ -393,9 +411,16 @@ export const TEAM: TeamMember[] = [
        * It is phrased passively ("Archipedia is submitted") for exactly that reason.
        */
       {
+        /*
+         * THIS VALUE USED TO SAY "Archipedia is submitted to ACM DIS 2026, and its methodology
+         * accepted at CAADRIA 2026." BOTH HALVES WERE FALSE AS WRITTEN: the submission never
+         * happened, and "its methodology" invented a second paper out of the first. Replaced with the
+         * one true fact. Still phrased passively and about the WORK, not the project, for the reason
+         * the note above gives: `by: 'clay+daniel'` is on Archipedia, so this claims a share.
+         */
         label: 'Published',
         value:
-          'A paper on a load-bearing composite grown from bamboo and hemp, tested 30% stronger than hempcrete, at UT Austin. Archipedia is submitted to ACM DIS 2026, and its methodology accepted at CAADRIA 2026.',
+          'A paper on a load-bearing composite grown from bamboo and hemp, tested 30% stronger than hempcrete, at UT Austin. Archipedia’s precedent retrieval is accepted at CAADRIA 2026.',
       },
       { label: 'This round', value: 'The engine, the demo, the numbers.' },
     ],
@@ -441,7 +466,7 @@ export const PROJECTS: Project[] = [
     discipline: 'Software',
     year: '2026',
     description:
-      'Architectural precedent search rebuilt as a node canvas you compose and steer, not a single best-match ranking. Wire image, text, and attribute nodes into a query, then dial the fusion weights live to widen the search without narrowing your taste. Written up and submitted to ACM DIS 2026.',
+      'Architectural precedent search rebuilt as a node canvas you compose and steer, not a single best-match ranking. Wire image, text, and attribute nodes into a query, then dial the fusion weights live to widen the search without narrowing your taste. Written up and accepted at CAADRIA 2026.',
     learned:
       'Keep the designer in the loop and the machine widens the search without narrowing the taste.',
     collaborators: 'Armaan Kokan, Patrick Danahy',
@@ -476,8 +501,25 @@ export const PROJECTS: Project[] = [
         fit: 'contain',
       },
     ],
+    /*
+     * THIS BLOCK USED TO SAY `venue: 'ACM DIS 2026 · submitted'` AND IT WAS A LIE. **Archipedia was
+     * never submitted to ACM DIS 2026.** Daniel, 2026-07-17: they meant to and ran out of time. It
+     * was on the public page, in his bio, and in the provenance comment that claimed nothing here was
+     * inferred — sourced, footnoted, and false. Recorded rather than quietly deleted because a silent
+     * delete leaves the next editor free to "restore" it from the private handoff, which still
+     * carried it (that doc is corrected too).
+     *
+     * THERE WAS ONLY EVER ONE ARCHIPEDIA PAPER. The private handoff
+     * `bower-docs/handoffs/2026-07-12-…:95` asserted "Search by Assembly is ACM DIS 2026 (submitted),
+     * not CAADRIA 2025 — those are DIFFERENT PAPERS", and then, eleven lines later, filed the CAADRIA
+     * paper as a "fourth, separate publication" needing its own tile — **with the identical four
+     * authors**. The refutation was already inside the document making the claim. It is this paper.
+     * `pdf`/`pdfSize` stay EMPTY: there is no file. Do not fabricate a size.
+     */
     paper: {
-      venue: 'ACM DIS 2026 · submitted',
+      title:
+        'Multi-Modal Precedent Retrieval: Patch-Aware and Tri-Scalar Rank Weighted Guidance for Design Search',
+      venue: 'CAADRIA 2026 · accepted',
       authors: 'Clay Seifert, Daniel Guerra, Armaan Kokan, Patrick Danahy',
       pdf: '',
       pdfSize: '',
@@ -803,6 +845,10 @@ export const PROJECTS: Project[] = [
       'An arts center rebuilt from its own salvaged structure, with 3D-printed catenary arches turning a floodplain site into shaded public space. The building touches the ground lightly and gives the park back as public room rather than fencing it off.',
     learned:
       'On a floodplain the honest move is to touch the ground lightly and give public space back.',
+    // Daniel, 2026-07-17. Worded to match Hydraulic Commons' existing 'Fall 2024 Design Excellence
+    // Nominee' — the ledger says the same kind of thing the same way, or the reader reads a
+    // difference that is not there.
+    awards: ['Spring 2024 Design Excellence Nominee'],
     // TODO(Daniel): collaborators/professors
     images: [
       {
@@ -891,6 +937,8 @@ export const PROJECTS: Project[] = [
       'A building that grows its own structure, its walls farmed on site as bamboo and hemp, then cast into Plentify, a composite prototyped and tested 30% stronger than hempcrete. It shows architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
     learned:
       'Architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
+    // Daniel, 2026-07-17. Same wording as Hydraulic Commons and Dougherty.
+    awards: ['Fall 2023 Design Excellence Nominee'],
     // TODO(Daniel): collaborators/professors
     /*
      * THE PAPER (round 10 continued). Daniel handed the file over on 2026-07-17 and the three facts
@@ -980,6 +1028,21 @@ export const PROJECTS: Project[] = [
       'A $0.25 origami-inspired device to prevent pressure wounds, prototyped for Moi Teaching Hospital in Kenya with AMPATH. Daniel directed a fourteen-student team, and the design was transferred for clinical deployment.',
     learned:
       'A constraint this hard, a device that has to cost cents and fold flat, is a design tool: it forces the idea down to the one move that matters.',
+    /*
+     * Daniel, 2026-07-17: "the President's Award for Global Learning, one of the highest awards UT
+     * Austin gives."
+     *
+     * THE SUPERLATIVE IS DELIBERATELY NOT ON THE PAGE, and this note is why, so it does not get
+     * "restored" as an oversight. "One of the highest awards UT Austin gives" is Daniel's
+     * characterization of his own award, said in conversation; nothing in this repo sources it. On a
+     * public About page a named award ranks itself — "President's Award" and the university's name
+     * are the distinction — whereas a founder telling the reader how important his own prize was is
+     * the one framing that can make it read SMALLER. The instruction was to let it read as the
+     * distinction it is WITHOUT inflating it beyond what he said; the award's own name does that and
+     * an adjective spends credibility to add nothing. If he wants the superlative, it is his page and
+     * his call: this is the line to change.
+     */
+    awards: ['President’s Award for Global Learning, The University of Texas at Austin'],
     // TODO(Daniel): collaborators/professors (AMPATH partner + the fourteen-student team — unnamed)
     /*
      * THE CONSTRUCTION DOCUMENTATION (2026-07-16, round 8). Daniel: "Origami Medical Device is
