@@ -115,6 +115,37 @@ describe('projects.ts — the fixed detail panel fits without an inner scroll', 
     }
   });
 
+  /*
+   * THE LICENSED CROP IS A LICENCE, NOT A PRECEDENT — and this test is where that sentence stops
+   * being prose. Daniel ruled, twice and explicitly, that ONE asset may fill the hero region and lose
+   * the overflow: Robots' KUKA loop, because a uniform region and an uncropped 1.7778 video cannot
+   * coexist and he chose uniformity ("prioritize that every project occupies the same formatting").
+   *
+   * IT COSTS 20.1% OF WIDTH. The Plentify loss that got `object-fit: cover` BANNED on heroes was 21%.
+   * The difference is not the number — there is no meaningful difference in the number. The difference
+   * is that this one is a scoped ruling on a named asset and that one was a silent default. Which
+   * means the ONLY thing separating a licence from the return of the banned pattern is that it stays
+   * on exactly one asset. Six months from now the comment explaining that will read as permission.
+   *
+   * So the scope is asserted, by src, rather than described. A second `fillHero` fails here — and it
+   * fails with this paragraph attached, which is the point: the next person gets Daniel's reasoning
+   * and its cost, not a mystery boolean they route around.
+   */
+  it('exactly ONE asset carries the licensed crop, and it is the one Daniel licensed', () => {
+    const licensed = PROJECTS.flatMap((p) => p.images.filter((im) => im.fillHero === true).map((im) => ({ p, im })));
+    expect(
+      licensed.length,
+      `fillHero is Daniel's scoped licence on ONE asset (Robots' KUKA loop). Found ${licensed.length}: ` +
+        `${licensed.map((l) => `${l.p.title} -> ${l.im.src}`).join(', ')}. If a new asset needs to crop its hero, ` +
+        `that is a ruling from Daniel, not a flag you add.`,
+    ).toBe(1);
+    expect(licensed[0].im.src, 'the licence belongs to the KUKA robot loop poster and nothing else').toContain(
+      'kuka-robotics-robot-loop-poster',
+    );
+    // It only means anything on a hero: fillHero on a rail image would crop a supporting shot silently.
+    expect(licensed[0].im.hero, 'the licensed crop must be the hero of its project').toBe(true);
+  });
+
   it('the `n` order is a clean reverse-chronological run with no gaps', () => {
     const ns = [...PROJECTS].map((p) => p.n).sort((a, b) => a.localeCompare(b));
     ns.forEach((n, i) => {

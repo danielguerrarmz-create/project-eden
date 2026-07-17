@@ -166,7 +166,7 @@ function ProjectVideoEl({
         : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
-  if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
+  if (reduced) return <img src={image.src} alt={image.alt} className={frame} data-licensed-crop={fillHero || undefined} />;
 
   return (
     <video
@@ -178,6 +178,7 @@ function ProjectVideoEl({
       poster={image.src}
       aria-label={image.alt}
       className={frame}
+      data-licensed-crop={fillHero || undefined}
       onLoadedData={start}
       onCanPlay={start}
     >
@@ -231,6 +232,14 @@ function ProjectImg({
    * asset has it and why it is not a precedent. It is reachable ONLY by an image that names itself,
    * so no `fit: 'cover'` and no future hero can wander into a crop by default. That gate is the whole
    * safety of it: the banned pattern got in last time by being the DEFAULT for a whole branch.
+   *
+   * `data-licensed-crop` EXISTS FOR THE INSTRUMENTS, and it is not decoration. A licensed crop is, by
+   * construction, a deliberate ratio deviation — which is indistinguishable in a rect measurement from
+   * the regression the guard exists to catch. Without a marker in the DOM, `qa/project-media.mjs` can
+   * only be wrong in one of two directions: fail forever on Daniel's ruling, or drop the crop check for
+   * every hero to accommodate one. The marker lets it do the correct third thing — allow the deviation
+   * HERE and nowhere else, and count the licences so a second one cannot appear quietly. The licence's
+   * scope is enforced by `projects.test.ts`, which pins it to the one asset by src.
    */
   const fillHero = fit && image.fillHero === true;
   const frame = fillHero
@@ -269,9 +278,16 @@ function ProjectImg({
   // screen, so `lazy` was never right for it.
   const loading = fit ? 'eager' : 'lazy';
   const img = onOpen ? (
-    <motion.img layoutId={`shot-${image.src}`} src={image.src} alt={image.alt} loading={loading} className={frame} />
+    <motion.img
+      layoutId={`shot-${image.src}`}
+      src={image.src}
+      alt={image.alt}
+      loading={loading}
+      className={frame}
+      data-licensed-crop={fillHero || undefined}
+    />
   ) : (
-    <img src={image.src} alt={image.alt} loading={loading} className={frame} />
+    <img src={image.src} alt={image.alt} loading={loading} className={frame} data-licensed-crop={fillHero || undefined} />
   );
 
   if (!onOpen) return img;
@@ -413,7 +429,31 @@ export function railWidth(images: readonly { ratio: number }[], height: number, 
   return Math.max(0, (height - Math.max(0, images.length - 1) * gap) / inv);
 }
 
-/** Mobile: the hero at 3:2, then the rest as a justified row below. */
+/**
+ * Mobile: the hero at its OWN shape, then the rest as a justified row below.
+ *
+ * THE BANNED PATTERN WAS LIVE HERE, ON A HERO, AND IT WAS REPORTED THREE TIMES BEFORE ANYONE MEASURED
+ * IT. This read `className="aspect-[3/2]"` and passed neither `fit` nor `fill`, which lands on
+ * ProjectImg's default branch: `object-cover`, inside a hardcoded 3:2 box. That is precisely the
+ * wrong-shape box the page's most-repeated bug is about — "STOP FORCING GEOMETRY ONTO SOMETHING THAT
+ * ALREADY KNOWS ITS OWN SHAPE" — and it survived because every measurement of it was taken on desktop,
+ * where this tree is `lg:hidden` and its rects are meaningless.
+ *
+ * MEASURED AT 390x844 BEFORE THE FIX: eight heroes cropped, 10.7% to 22.6% of the picture gone.
+ * Robotic Factory lost 22.6% and Archipedia 18.1%. **The Plentify loss that got `object-fit: cover`
+ * BANNED on heroes was 21%** — so the banned pattern was quietly costing MORE on mobile than the
+ * incident that banned it, for rounds, on the same page that carries the law forbidding it.
+ *
+ * THE FIX IS THE LAW, NOT A BETTER RATIO: drop the box. With `w-full` and no height constraint the
+ * <img> takes its own intrinsic ratio, the box becomes the picture's own shape, and `object-cover` has
+ * nothing left to crop. Do not put an `aspect-[...]` back on this: any fixed ratio is wrong for
+ * eleven of twelve projects, because they do not share one.
+ *
+ * The licensed crop deliberately does NOT reach here. It is gated on `fit`, which this does not pass,
+ * and that is correct rather than an oversight: the licence exists to hold ONE uniform region on
+ * desktop (see ProjectImage.fillHero). Mobile stacks, has no uniform region, and therefore has no
+ * reason to spend 20% of a video to get one.
+ */
 function Gallery({
   project,
   onOpen,
@@ -426,7 +466,12 @@ function Gallery({
   const { hero, rest } = heroSplit(project.images);
   return (
     <figure className="space-y-3">
-      <ProjectImg image={hero} className="aspect-[3/2]" onOpen={onOpen} reduced={reduced} />
+      {/* `data-mobile-hero` is the handle qa/mobile-hero.mjs measures. Desktop's hero is findable by
+          `[data-project-hero]`; this tree had no handle at all, which is a large part of why it went
+          unmeasured through three reports. A guard cannot check what it cannot select. */}
+      <div data-mobile-hero>
+        <ProjectImg image={hero} onOpen={onOpen} reduced={reduced} />
+      </div>
       <SupportingRow images={rest} onOpen={onOpen} reduced={reduced} />
     </figure>
   );
