@@ -58,6 +58,11 @@ import {
 } from './reveal';
 import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
 import { colonize, branches, seededRandom, type Vec2, type Branch } from './spaceColonization';
+// The sub-branch colonization baked to disk (round 11, item 5). subBranchPolylines() runs colonize(),
+// ~2.2s of blocking work that used to run in useMemo at mount and froze the intro text mid-render. The
+// geometry is deterministic under SUB_SEED and reads no DOM, so this JSON is byte-identical to a fresh
+// run — enforced by subBranches.generated.test.ts, which fails until it is regenerated (GEN=1 vitest).
+import SUB_BRANCHES_PRECOMPUTED from './subBranches.generated.json';
 import { CLUSTERS, CLUSTER_GAP_Y, MAX_YEAR, YEAR_TICKS, plateBox, type Plate, type Side } from './clusters';
 
 /* The content and its box now live in `about/clusters.ts` (see the note at the top of that file: the
@@ -396,6 +401,62 @@ export function yearLabelYs(
   return out;
 }
 
+/**
+ * WHICH SIDE A YEAR LABEL SITS ON: THE SIDE OF THE WORK IT NAMES. The exact mirror of `yearLabelYs`
+ * above — "a year with work sits at the first plate of that work; a year without keeps the axis" —
+ * and it is deliberately the same shape, because it is the same ruling read in the other axis.
+ *
+ * RULED 2026-07-17, Daniel, item 1: "Move the graduation photograph to the LEFT side of the timeline,
+ * NEXT TO THE 2026 TEXT." That is unsatisfiable under the old rule, and this is the interesting part:
+ * moving the plate to the left made the label RUN AWAY to the right. Measured, before and after — the
+ * plate landed left at x=303 and the 2026 label flipped from left to right, so the photograph and the
+ * numerals stayed exactly as far apart as they started, mirrored. **Executing his instruction
+ * literally would have satisfied its first clause and defeated its second.**
+ *
+ * WHY THE OLD RULE COULD NOT STAY: `yearLabelSide` picks THE SIDE WITH MORE ROOM, and its doc said it
+ * exists so "the label steps aside to stay clear". **It has not had anything to stay clear OF since
+ * the gutter law landed.** A label reaches `YEAR_LABEL_OFFSET + YEAR_LABEL_W` = 102 from the spine and
+ * a plate's near edge is `OFFSET_X` = 110, so the two CANNOT touch on either side, at any year, by
+ * construction. Measured across every year and BOTH sides: **the minimum label-to-plate clearance is
+ * 13.60 and it is never negative.** So "more room" was never buying safety; it was maximising
+ * whitespace, and the way it maximised whitespace was by fleeing the only plate the label is *for*.
+ * The contract test said this out loud and nobody read it as a finding: *"Keep this true and the side
+ * rule has nothing left to fight."* It had already won.
+ *
+ * This is the page's own recurring shape (`MARK_K`, `heroCrop`): a rule that was load-bearing once,
+ * kept its authority after the thing it protected against was designed out, and then quietly worked
+ * against the ruling it was written to serve — round 8's "A YEAR SITS BESIDE THE WORK IT NAMES",
+ * which this file asserts by name and which the side rule was contradicting in x while honouring in y.
+ *
+ * THE FALLBACK IS NOT DEAD CODE: a year with no work has no plate to sit beside, so the roomier side
+ * is the only honest answer left, exactly as `yearToY` is for its y. No year exercises it today
+ * (2026 gained the graduation photograph in round 9); the moment one is added between the ticks, it
+ * will.
+ *
+ * COST, MEASURED AND ACCEPTED, because it is a real composition change and not only 2026's: three of
+ * six labels move (2021 to the right, 2023 and 2026 to the left). Every one of them moves TOWARD the
+ * work it names, which is the ruling. `qa/` screenshots are in the round-11 handoff.
+ */
+export function yearLabelSides(
+  laid: ReadonlyArray<{ year: number; side: Side; plates: ReadonlyArray<{ y: number }> }>,
+  obstacles: readonly LabelObstacle[],
+  labelYs: ReadonlyMap<number, number>,
+): Map<number, Side> {
+  const out = new Map<number, Side>();
+  for (const [year, ty] of labelYs) {
+    // The cluster that owns the TOP-MOST plate of this year is the work the label is aligned to.
+    // Keyed on the authored year (a FACT), never on "the nearest obstacle" (a magnitude — and the
+    // magnitude that looks like the own plate can be a neighbour's).
+    let best: { y: number; side: Side } | null = null;
+    for (const c of laid) {
+      if (Math.floor(c.year) !== year) continue;
+      for (const p of c.plates) if (!best || p.y < best.y) best = { y: p.y, side: c.side };
+    }
+    out.set(year, best ? best.side : yearLabelSide(obstacles, ty));
+  }
+  return out;
+}
+
 /** An obstacle a year label must stay clear of: a plate. `computePlates()` returns exactly this
  *  shape, so the rule below scores the REAL layout rather than a parallel model of it.
  *
@@ -529,13 +590,18 @@ export function convArmPts(dir: number): Array<{ x: number; y: number }> {
  * person re-derives something from, which is how it got its second job the first time. The fact lives
  * in this sentence, where it cannot be multiplied by anything.
  */
-/** The mark's scale, and ONLY its scale. 90 * MARK_K = 241px wide — the size Daniel approved, pinned
- *  as the size it is rather than falling out of the spine's weight. The value is unchanged (it was
- *  SPINE_W / 2.8 = 7.5 / 2.8 back when the spine was 7.5), so **no point of the finale's geometry
- *  moved when the ink thinned** — only the width of the ink. `qa/hero-lockup.mjs` and the mark-size
- *  contract test both pin this. */
-export const MARK_K = 2.6786;
-export const MARK_R = 30 * MARK_K; // 80.36 — world radius of one mark circle
+/** The mark's scale, and ONLY its scale. ENLARGED ~1.4x by round 11 item 8: Daniel drew a target
+ *  circle concentric with the mark ("scale it, do not move it") measuring ≈1.40x the rendered Oculus,
+ *  taking the 241px he had approved to ≈337px. Landed by eye in his 1.36–1.44 band; the exact pixel is
+ *  NOT a law (do not re-enshrine one — that was item 1a's whole trap). What IS invariant lives
+ *  elsewhere: the mark is stroked at `SPINE_W` (a literal, not `MARK_STROKE * k`), so the ink does NOT
+ *  scale with the mark and the join into the mark still does not step in width — the only real
+ *  constraint here. The centre does not move either: `MARK_CENTER_X`/`MARK_CENTER_Y` are independent of
+ *  this. Everything else that is a fact OF the mark (its circles, the ring, the winding tail, the
+ *  finale height) hangs off this scale and grows with it, which is what "scale it" means.
+ *  `qa/hero-lockup.mjs` (the lockup + stroke invariant) and the mark-size contract test pin it. */
+export const MARK_K = 3.75;
+export const MARK_R = 30 * MARK_K; // 112.5 — world radius of one mark circle (scales with MARK_K)
 const LEAN_SPAN = 620; // descent the spine spends easing off-axis to the attach point
 const MARK_CENTER_X = CX; // variant A: the mark stays on the axis
 const MARK_CENTER_Y = CONVERGE_Y + LEAN_SPAN; // 3650 — the mark's centre
@@ -1139,9 +1205,12 @@ export function subBranchObstacles(): WRect[] {
     }
   }
   // The labels' REAL positions — they follow the plates now, so an obstacle computed off the axis
-  // would reserve empty paper and leave the actual numerals open to be grown through.
-  for (const [, ty] of yearLabelPositions()) {
-    const side = yearLabelSide(plates, ty);
+  // would reserve empty paper and leave the actual numerals open to be grown through. The SIDE has to
+  // come from the same source as the render's for the same reason: reserving the mirror of where the
+  // numerals actually are protects blank paper and feeds the label to the vine.
+  const sides = yearLabelSidePositions();
+  for (const [year, ty] of yearLabelPositions()) {
+    const side = sides.get(year)!;
     const b = yearLabelBox(side === 'right' ? 1 : -1, ty);
     out.push(padRect({ x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 }, SUB_PLATE_PAD));
   }
@@ -1404,7 +1473,11 @@ export function subOrganMarks(runs: readonly Branch[]): OrganMark[] {
  * much of it is inked changes.
  */
 function SubBranches({ reduced, cardLineY, stagger }: { reduced: boolean; cardLineY: number; stagger: number }) {
-  const runs = useMemo(() => subBranchPolylines(), []);
+  // Precomputed at build time, not colonized at render — see subBranches.generated.json. The old
+  // `subBranchPolylines()` here was the intro's stagger: it blocked the main thread for ~2.2s while
+  // the texts sat frozen. subBranchPolylines() is still the source of truth (the generator + drift
+  // guard call it); this render just reads what it already produced.
+  const runs = useMemo(() => SUB_BRANCHES_PRECOMPUTED as Branch[], []);
   const lens = useMemo(() => runs.map((b) => polyLen(b.pts)), [runs]);
   const marks = useMemo(() => subOrganMarks(runs), [runs]);
   const [url, setUrl] = useState<string | null>(null);
@@ -1950,6 +2023,15 @@ export function yearLabelPositions(): Map<number, number> {
   return yearLabelYs(layoutClusters(sample('spine', spinePts())));
 }
 
+/** WHICH SIDE EACH YEAR LABEL SITS ON, resolved off the same layout — the x-axis counterpart to
+ *  `yearLabelPositions()`, and one entry point for the same reason: the render and the sub-branches'
+ *  no-go rects both need it, and two call sites re-deriving a side is how the ornament ends up
+ *  dodging a label that is no longer there. */
+export function yearLabelSidePositions(): Map<number, Side> {
+  const laid = layoutClusters(sample('spine', spinePts()));
+  return yearLabelSides(laid, computePlates(), yearLabelYs(laid));
+}
+
 export function computePlates(): Array<{
   clusterId: string;
   plateIndex: number;
@@ -2030,6 +2112,11 @@ export function CrossPathsTimeline({
   const trackRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [p, setP] = useState(0); // 0 to 1, the SMOOTHED camera progress
+  // The scroll cue (round 11, item 2) shows only when the reader has STOPPED. This is the "has the
+  // scroll gone quiet" half; the "is the mark finished" half is a fact of the finale (windW/p), not a
+  // clock — see the cue's render. Stillness alone cannot tell "not started" from "finished", so it is
+  // never the gate on its own; it only decides whether an already-finished mark has been left sitting.
+  const [scrollIdle, setScrollIdle] = useState(false);
   const { aspect, h: frameH, bleed: BLEED_PX } = useFrameBox(frameRef);
   // Page-centre expressed in the frame's viewBox-x (see the descD comment). The frame sits in the
   // right column, so its axis (CX=600) is NOT the page centre; this measures the gap so the finale's
@@ -2101,6 +2188,26 @@ export function CrossPathsTimeline({
       window.removeEventListener('scroll', kick);
       window.removeEventListener('resize', kick);
       cancelAnimationFrame(raf);
+    };
+  }, [reduced]);
+
+  // SCROLL IDLE — "the reader has stopped". Any scroll clears it and a short quiet restores it; the
+  // autoplay drives real scroll, so idle stays false through the whole descent and only turns true
+  // once the page is genuinely parked. Motion only: reduced motion has no held pin to sit at, and
+  // adding an appearing hint there would be the motion prefers-reduced-motion is meant to spare. The
+  // 1.1s quiet outlasts the camera's own settle (a ~0.7s rAF lerp), so the cue never appears mid-glide.
+  useEffect(() => {
+    if (reduced) return;
+    let t = 0;
+    const onScroll = () => {
+      setScrollIdle(false);
+      clearTimeout(t);
+      t = window.setTimeout(() => setScrollIdle(true), 1100);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(t);
     };
   }, [reduced]);
 
@@ -2205,6 +2312,12 @@ export function CrossPathsTimeline({
   /** Where the year labels sit: beside the work they name (see yearLabelYs). Static layout, so it is
    *  resolved once per mount rather than per camera frame. */
   const labelYs = useMemo(() => yearLabelYs(laid), [laid]);
+  /** ...and which side each one sits on: the side of the work it names (see yearLabelSides). Same
+   *  layout, same lifetime. */
+  const labelSides = useMemo(
+    () => yearLabelSides(laid, labelObstacles, labelYs),
+    [laid, labelObstacles, labelYs],
+  );
 
   // The two convergence strands (the twist-fuse). Sampled for a smooth over-under lay-up; drawn
   // solid because they ARE the structure, not a whisper. The viewBox pan clips their off-frame tops.
@@ -2311,6 +2424,16 @@ export function CrossPathsTimeline({
       ? clamp01((camY - windStartCamY) / (pinCamY - windStartCamY || 1))
       : 1 - easeInOutCubic(clamp01(q / 0.4));
   const g = useMemo(() => solveMark(), []);
+  // THE SCROLL CUE (round 11, item 2). The finale mark reads as an ENDING, but ~a third of the page —
+  // the founders and the work — is still below it, so a reader who lands on the wound mark and stops
+  // can think the page is over. Show a quiet cue then, and ONLY then. The gate is the THING, not a
+  // timer: `windW > 0.9` is true only within a few percent of the pin (windW falls the instant the
+  // unravel begins), so this fires when the mark is actually shut, not merely when the scroll is old.
+  // `p >= PIN_FRAC` keeps it off the wind-UP, where windW also climbs past 0.9 just before the pin.
+  // `scrollIdle` is the only clock, and it cannot mistake "not started" for "finished" because the two
+  // windW/p terms have already established the mark is finished. It fades out the instant the reader
+  // scrolls again (scrollIdle → false), which is also when they no longer need it.
+  const scrollCueVisible = !reduced && p >= PIN_FRAC && windW > 0.9 && scrollIdle;
   // The RAVEL (wind, p <= PIN_FRAC) uses the original right-flank tail; the UNRAVEL (post-pin) uses
   // the morphing tail so it opens with the OPPOSITE curl rather than retracing the wind-up. Both are
   // the identical circle 0 at windW=1, so the swap at the pin is seamless (no pop).
@@ -2384,6 +2507,28 @@ export function CrossPathsTimeline({
               'sticky top-[var(--header-h)] flex h-[calc(100svh-var(--header-h))] flex-col gap-8 py-4 lg:flex-row lg:items-stretch lg:gap-12 lg:pb-[calc(var(--header-h)+3.25rem)] xl:gap-16'
         }
       >
+        {/* THE SCROLL CUE (item 2). Anchored to this sticky row, so it holds at the bottom of the
+            viewport while the mark is pinned. Sepia, no bounce — the ONLY motion is an opacity fade,
+            which is why it is safe past the `!reduced` gate already on `scrollCueVisible`. It never
+            takes pointer events, so it cannot interrupt the finale or the scroll it is asking for.
+            THE CHEVRON IS CSS, NOT AN `<svg>`, ON PURPOSE: FounderParenthesis and three qa harnesses
+            all reach the finale camera with `querySelector('[data-timeline-track] svg')`, which returns
+            the FIRST svg in the track. An svg here would be that first match, and it made the founders'
+            trunk read `SPINE_W * (18/1200) = 0.033px` — the whole bower went invisible in motion. A
+            rotated bordered box is the same glyph with nothing for that selector to grab. */}
+        {!reduced && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 transition-opacity duration-500"
+            style={{ opacity: scrollCueVisible ? 0.85 : 0, color: INK_SEPIA_TEXT }}
+          >
+            <span className="font-mono text-[0.66rem] uppercase tracking-[0.22em]">scroll</span>
+            <span
+              className="block h-2 w-2 -translate-y-1 rotate-45"
+              style={{ borderRight: '1.5px solid currentColor', borderBottom: '1.5px solid currentColor' }}
+            />
+          </div>
+        )}
         {/* THE HERO LOCKUP'S HEIGHT — round 2, corrected in round 4.
             Round 2, Daniel: "the entire thing should be lifted up slightly to be on centre on my
             screen." Arithmetic, not taste: this column is `justify-center` inside a box that starts
@@ -2567,14 +2712,15 @@ export function CrossPathsTimeline({
 
             {/* Year labels: heavy, painted AFTER the clusters (numerals never blocked), with a vellum
                 halo (paint-order stroke) so they stay legible over any adjacent-year plate. The side
-                flip (yearLabelSide, unit-tested) puts each label on whichever side the laid-out
-                plates and branches actually leave room on. */}
+                (yearLabelSides, unit-tested) puts each label on the side of the WORK IT NAMES — it
+                used to take whichever side had more room, which meant fleeing its own plate. The
+                gutter law is what makes sitting beside the work safe; see the note on yearLabelSides. */}
             {YEAR_TICKS.map((y) => {
               // Beside the work it names, not at its metric position. See yearLabelYs.
               const ty = labelYs.get(y) ?? yearToY(y);
               const vis = reduced ? 1 : clamp01((camY + viewH + 40 - ty) / 60) * clamp01((ty - camY + 120) / 80);
               if (vis <= 0.01) return null;
-              const drawSide = yearLabelSide(labelObstacles, ty);
+              const drawSide = labelSides.get(y) ?? yearLabelSide(labelObstacles, ty);
               const dir = drawSide === 'right' ? 1 : -1;
               return (
                 <g key={y} opacity={vis}>
@@ -2643,6 +2789,7 @@ export function CrossPathsTimeline({
               return (
                 <circle
                   key={j}
+                  data-mark-circle
                   cx={MARK_CENTER_X + (mx - 50) * g.k}
                   cy={MARK_CENTER_Y + (my - 50) * g.k}
                   r={g.r}
@@ -2676,6 +2823,7 @@ export function CrossPathsTimeline({
                 strokeLinejoin="round"
               />
               <path
+                data-spine-stroke
                 d={poly(tail)}
                 fill="none"
                 stroke={INK_SEPIA}

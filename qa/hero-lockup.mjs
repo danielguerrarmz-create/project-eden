@@ -20,6 +20,7 @@
  * "the center of the middle circle" means.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -51,7 +52,7 @@ const PROUD_MAX = 30;
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--window-size=1440,900'] });
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?species=spine-2#/about`, { waitUntil: 'domcontentloaded' });
 
 // CANCEL THE AUTOPLAY FIRST, or it wins: it owns window.scrollTo for a 24s descent, so a scroll set
 // underneath it is simply overwritten on the next frame (measured — the datum read wherever the
@@ -113,6 +114,13 @@ const r = await page.evaluate(() => {
   const title = document.querySelector('[data-about-title]');
   const markPt = document.querySelector('[data-mark-center]');
   const svg = document.querySelector('[data-timeline-track] svg');
+  // THE CAMERA'S WINDOW IS THE VIEWPORT DIV, NOT THE SVG. The svg is `height: calc(100% + BLEED_PX)`
+  // with a negative bottom margin (item 1b), so its BOX extends ~half the bleed below the frame and
+  // its centre sits ~68px below where the camera actually centres the mark. Reading the svg made this
+  // harness assert the mark sits on a centre the camera never uses — it went red at every build while
+  // the lockup was pixel-perfect (mark == copy). `[data-timeline-viewport]` is the flex-1 div the
+  // camera's viewH/pinCamY are derived from; its centre is the true frame centre.
+  const viewport = document.querySelector('[data-timeline-viewport]');
   const mid = (el) => {
     const b = el?.getBoundingClientRect();
     return b ? +(b.top + b.height / 2).toFixed(2) : null;
@@ -127,13 +135,42 @@ const r = await page.evaluate(() => {
   const t = title?.getBoundingClientRect();
   const d = dl?.getBoundingClientRect();
   const copyCenterY = t && d ? +((t.top + d.bottom) / 2).toFixed(2) : null;
+
+  // THE MARK'S INK MUST NOT SCALE WITH THE MARK (round 11 item 8). The circles are stroked at a
+  // literal `SPINE_W`, the same constant the winding tail carries, so the join into the mark cannot
+  // step in width however large the mark grows. Both live in the SAME viewBox, so equal world width =
+  // equal rendered px. If someone re-couples the mark's stroke to MARK_K (item 1a's original bug, and
+  // round 10 flagged the coverage on it as thin), these diverge and this catches it. Read them off the
+  // real render, because the whole point is that the stroke is a fact of the pixels, not of a comment.
+  const markCircle = document.querySelector('[data-mark-circle]');
+  const spineStroke = document.querySelector('[data-spine-stroke]');
+  const px = (el) => (el ? +parseFloat(getComputedStyle(el).strokeWidth).toFixed(2) : null);
+
+  // The pin's camY is not a magic number — it is where the camera centres the mark:
+  // MARK_CENTER_Y − viewH/2, where viewH is the CAMERA WINDOW (the viewport div), NOT the bled viewBox.
+  // Deriving it from vb[3] would over-subtract half the item-1b bleed (~98px here) and print a "want"
+  // that is itself wrong — dishonest in a different direction than the stale `3806.1` literal it
+  // replaces (four axis-revisions out of date). So convert the viewport's own screen height to world
+  // units through the svg's scale: worldPerPx = vb[3] / svgScreenH; viewH = viewportScreenH * worldPerPx.
+  const vb = svg ? svg.getAttribute('viewBox').split(' ').map(Number) : null;
+  const markWorldY = markPt ? +markPt.getAttribute('cy') : null;
+  const svgH = svg ? svg.getBoundingClientRect().height : null;
+  const viewportH = viewport ? viewport.getBoundingClientRect().height : null;
+  const expectedCamY =
+    vb && markWorldY != null && svgH && viewportH
+      ? +(markWorldY - (viewportH * (vb[3] / svgH)) / 2).toFixed(1)
+      : null;
+
   return {
     screenCenterY: window.innerHeight / 2,
     copyCenterY,
     colBoxCenterY: mid(col),
-    frameCenterY: mid(svg),
+    frameCenterY: mid(viewport),
     markCenterY: mid(markPt),
-    camY: svg ? +svg.getAttribute('viewBox').split(' ')[1] : null,
+    camY: vb ? vb[1] : null,
+    expectedCamY,
+    markStrokePx: px(markCircle),
+    spineStrokePx: px(spineStroke),
   };
 });
 
@@ -156,9 +193,20 @@ const atPin = r.markCenterY !== null && r.frameCenterY !== null && Math.abs(r.ma
 if (!atPin)
   fail.push(
     `NOT AT THE PIN: the mark (${r.markCenterY}) is not on the frame's centre (${r.frameCenterY}), ` +
-      `so the scroll never converged (p=${atP}, camY=${r.camY}, want ~3806.1). This is a harness ` +
-      'failure, not a layout one — nothing below is meaningful.',
+      `so the scroll never converged (p=${atP}, camY=${r.camY}, want ~${r.expectedCamY}). This is a ` +
+      'harness failure, not a layout one — nothing below is meaningful.',
   );
+
+// THE MARK'S STROKE DID NOT SCALE WITH THE MARK (item 8's one real invariant). Checked whenever the
+// mark is on screen — it does not need the pin, only a painted circle.
+if (r.markStrokePx === null || r.spineStrokePx === null) {
+  fail.push(`cannot read the mark/spine stroke (mark ${r.markStrokePx}, spine ${r.spineStrokePx}) — did a handle move?`);
+} else if (Math.abs(r.markStrokePx - r.spineStrokePx) > 0.5) {
+  fail.push(
+    `the mark's INK stepped: a mark circle strokes ${r.markStrokePx}px but the spine ${r.spineStrokePx}px ` +
+      '— the stroke has been re-coupled to MARK_K (item 1a/8). The join will step in width.',
+  );
+}
 
 if (atPin && r.copyCenterY !== null) {
   const disagree = r.markCenterY - r.copyCenterY;
@@ -174,12 +222,13 @@ if (atPin && r.copyCenterY !== null) {
 }
 
 console.log('track p          :', atP, `(want ${PIN_HOLD_FRAC})`);
-console.log('camera y (pin)   :', r.camY, '(the hold; want ~3806.1)');
+console.log('camera y (pin)   :', r.camY, `(the hold; want ~${r.expectedCamY} = MARK_CENTER_Y − viewH/2)`);
 console.log('screen centre  y :', r.screenCenterY);
 console.log('copy CONTENT   y :', r.copyCenterY, `(${(r.screenCenterY - r.copyCenterY).toFixed(2)}px proud of screen centre)`);
 console.log('copy box       y :', r.colBoxCenterY, '(does NOT move under the bug — not the assertion)');
-console.log('svg frame      y :', r.frameCenterY);
+console.log('frame window   y :', r.frameCenterY, '([data-timeline-viewport], the camera window — not the bled svg)');
 console.log('mark datum     y :', r.markCenterY, `(${(r.markCenterY - r.copyCenterY).toFixed(2)}px vs the words)`);
+console.log('mark / spine ink :', r.markStrokePx, '/', r.spineStrokePx, 'px (must be equal — stroke does not scale with the mark)');
 await browser.close();
 
 if (fail.length) {

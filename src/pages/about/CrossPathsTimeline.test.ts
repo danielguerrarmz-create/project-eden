@@ -4,6 +4,7 @@ import {
   MAX_CONCURRENT_STRANDS,
   yearLabelSide,
   yearLabelPositions,
+  yearLabelSidePositions,
   YEAR_TICKS,
   CLUSTERS,
   spinePts,
@@ -44,8 +45,45 @@ import { growWild } from '../../engine/botanical';
 import { subBranchPolylines, subBranchObstacles, subBranchAttractors, subBranchVines, subBranchWidth, plateBox } from './CrossPathsTimeline';
 import { PROJECTS } from './projects';
 import { seededRandom } from './spaceColonization';
+import { armPts, type ParenLayout } from './parenthesis';
 
 const GAP = 40;
+
+describe('the founders BOWER closes: the two arms MEET at the content centre (round 11 item 7)', () => {
+  // Daniel ruled the open parenthesis shut into a closed loop; the two tails must join at the content
+  // centre with 0px gap — a CONNECTION, a fact, the same standard as the top fork. Left-aligned
+  // content with the trunk in the middle of the rows is the real, non-mirror-symmetric case (see
+  // FounderParenthesis.measure), which is exactly where a naive mirror would MISS the join.
+  const L: ParenLayout = {
+    w: 1200,
+    h: 1300,
+    trunkX: 600,
+    trunkY0: -80,
+    forkY: 120,
+    leftX: 60,
+    rightX: 1140,
+    rowLeft: 180,
+    rowRight: 1000,
+    rows: [
+      { y0: 300, y1: 640 },
+      { y0: 700, y1: 1040 },
+    ],
+    pageTop: 0,
+    frameScale: 0.7,
+    viewH: 860,
+    headerH: 84,
+    trunkW: 3,
+  };
+  const lastOf = (a: { x: number; y: number }[]) => a[a.length - 1];
+  it('both tails land on EXACTLY one point — a 0px join, not two rails ending near each other', () => {
+    const lEnd = lastOf(armPts(L, -1));
+    const rEnd = lastOf(armPts(L, 1));
+    expect(Math.hypot(lEnd.x - rEnd.x, lEnd.y - rEnd.y)).toBeLessThan(1e-9);
+  });
+  it('the meeting sits ON the content centre (x = trunkX), not merely between the arms', () => {
+    expect(lastOf(armPts(L, -1)).x).toBeCloseTo(L.trunkX, 9);
+  });
+});
 
 describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
   const heights = (h: number[]) => h.reduce((s, x) => s + x, 0) + Math.max(0, h.length - 1) * GAP;
@@ -350,15 +388,19 @@ describe('composition contract', () => {
    *
    * So the two facts are separated here, in the code, where they can fail:
    */
-  it('ITEM 1a: the mark is the size Daniel approved, and the spine\'s weight cannot move it', () => {
-    // 90 world units across at MARK_K. Daniel approved 241px; it used to be a CONSEQUENCE of the
-    // spine's weight (MARK_K was defined as SPINE_W / 2.8), so "make the line thinner" silently meant
-    // "make the logo smaller" — thinning to 2.2 would have dropped the Oculus to 70.7px, under a third
-    // of the approved size, which is what item 1a was refused over. Pinning the SIZE is what makes the
-    // weight free. If someone re-derives MARK_K from SPINE_W, this fails immediately.
-    expect(90 * MARK_K, 'the mark is no longer 241px — has MARK_K been re-derived from SPINE_W?').toBeCloseTo(241, 0);
-    // ...and the finale's geometry hangs off the same scale, so it moves with the size and not with
-    // the ink. MARK_R is what TAIL_LEN (2*pi*r, the winding tail's conserved arc length) is built from.
+  it('ITEM 8: the mark carries Daniel\'s ~1.4x enlargement, and the spine\'s weight is not its size', () => {
+    // The mark is 90 world units across at MARK_K. It was 241px (MARK_K 2.6786), and round 11 item 8
+    // enlarged it: Daniel drew a target circle ≈1.40x the rendered Oculus and said "scale it, do not
+    // move it". The ASSERTION is his instruction — a scale factor in his 1.36–1.44 band — NOT a pixel
+    // count re-enshrined as law (that literal, `241`, is exactly what item 1a warned against). Landed
+    // by eye at 1.40x (≈337px).
+    const scaleFromApproved = (90 * MARK_K) / 241;
+    expect(scaleFromApproved, 'the mark is not in Daniel\'s ~1.4x band — was item 8 reverted or over/undershot?').toBeGreaterThanOrEqual(1.36);
+    expect(scaleFromApproved, 'the mark is not in Daniel\'s ~1.4x band — was item 8 reverted or over/undershot?').toBeLessThanOrEqual(1.44);
+    // AND THE SIZE IS STILL NOT THE SPINE'S WEIGHT (item 1a's fact, unchanged by the enlargement). If
+    // someone re-derives MARK_K from SPINE_W, MARK_K collapses back toward 2.2/2.8 ≈ 0.79 and the band
+    // above fails immediately. The finale's geometry hangs off this scale, so it moves with the size
+    // and not with the ink; MARK_R is what TAIL_LEN (2*pi*r, the conserved winding arc) is built from.
     expect(MARK_R).toBeCloseTo(30 * MARK_K, 6);
   });
 
@@ -488,7 +530,21 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
     }
   });
 
-  it('picks the side with more room, not the side away from the authored year', () => {
+  /**
+   * THESE TWO NOW TEST THE FALLBACK, AND SAYING SO IS THE POINT.
+   *
+   * `yearLabelSide` (roomier side) stopped being the page's rule on 2026-07-17 — `yearLabelSides`
+   * puts a label beside the work it names, and the roomier side survives ONLY for a year with no work
+   * to sit beside. **The whole suite stayed green (523/523) through a change that moved five of the
+   * six labels**, because every test in this block called the function the page had stopped asking.
+   * That is this repo's own warning arriving on schedule: *"after a change big enough that you
+   * expected something to fail, an all-green run is a finding about your coverage, not a pass"* — and
+   * a guard that quietly stops guarding still reports green, which reads as "checked".
+   *
+   * So: these keep their value as fallback tests, renamed to say which rule they are about. The tests
+   * for the LIVE rule are in the block below, and they fail when the live rule breaks.
+   */
+  it('THE FALLBACK picks the side with more room, for a year with no work to sit beside', () => {
     // One plate hard against the label band on the right, nothing on the left → go left.
     const obstacles = [
       { side: 'right' as const, rect: { x: 710, y: 1404, w: 320, h: 213 } },
@@ -496,7 +552,7 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
     expect(yearLabelSide(obstacles, 1500)).toBe('left');
   });
 
-  it('always chooses the roomier side — it can never pick the worse one', () => {
+  it('THE FALLBACK always chooses the roomier side — it can never pick the worse one', () => {
     const obstacles = computePlates();
     for (const y of YEARS) {
       const ty = LABEL_Y.get(y)!;
@@ -546,6 +602,72 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
         }
       }
     }
+  });
+});
+
+/**
+ * THE LIVE SIDE RULE: a year label sits beside the work it names, in x as well as y.
+ *
+ * Daniel, 2026-07-17, item 1: "Move the graduation photograph to the LEFT side of the timeline, NEXT
+ * TO THE 2026 TEXT." Measured, moving the plate alone did not do it: the label used to take the
+ * roomier side, so the plate arriving on the left pushed the numerals to the right and the two stayed
+ * exactly as far apart as they started. These tests pin the rule that makes his instruction hold.
+ */
+describe('yearLabelSides: a year label sits beside the work it names', () => {
+  const CLUSTER_YEAR: Record<string, number> = Object.fromEntries(CLUSTERS.map((c) => [c.id, c.year]));
+
+  it('guards the probe: there are labels and plates to compare', () => {
+    // Every assertion below iterates these. An empty map satisfies all of them silently.
+    expect(yearLabelSidePositions().size).toBe(6);
+    expect(computePlates().length).toBeGreaterThan(10);
+  });
+
+  it('THE RULE: every year label is on the side of its own first plate', () => {
+    const plates = computePlates();
+    const sides = yearLabelSidePositions();
+    for (const [year, side] of sides) {
+      // Key on the AUTHORED year — a fact — never on "the nearest plate", which is a magnitude.
+      const mine = plates.filter((p) => Math.floor(CLUSTER_YEAR[p.clusterId] ?? NaN) === year);
+      if (mine.length === 0) continue; // no work: the fallback owns this year, tested above
+      const first = mine.reduce((a, b) => (b.rect.y < a.rect.y ? b : a));
+      expect(side, `${year}'s label is across the spine from the work it names`).toBe(first.side);
+    }
+  });
+
+  it("ITEM 1: the 2026 label is on the same side as the graduation photograph", () => {
+    // Daniel's actual sentence, as a test. This is the one that fails if someone "restores" the
+    // roomier-side rule or flips the plate back, and it names why it matters.
+    const plates = computePlates();
+    const grad = plates.find((p) => p.clusterId === 'graduation');
+    expect(grad, 'the graduation plate is gone').toBeDefined();
+    expect(grad!.side, 'the graduation photograph must sit LEFT (Daniel, round 11 item 1)').toBe('left');
+    expect(
+      yearLabelSidePositions().get(2026),
+      'the 2026 numerals must sit beside the photograph, not across the spine from it',
+    ).toBe('left');
+  });
+
+  it('THE LAW THAT MAKES IT SAFE: a label can never touch a plate, on EITHER side, at any year', () => {
+    // This is why sitting beside the work costs nothing. The gutter law (YEAR_LABEL_OFFSET +
+    // YEAR_LABEL_W <= OFFSET_X) means the label lane and the plate lane cannot intersect, so the old
+    // "step aside to stay clear" had nothing to step aside from. Asserted on BOTH sides at every year,
+    // so it holds whichever side the rule picks — that is what makes the rule free to pick.
+    const obstacles = computePlates();
+    for (const [, ty] of yearLabelPositions()) {
+      for (const side of ['left', 'right'] as const) {
+        expect(yearLabelClearance(obstacles, ty, side)).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('the render and the ornament read ONE side per year, so the vine cannot dodge a ghost', () => {
+    // The no-go rects and the render both resolve the side. If they ever disagree, the ornament
+    // reserves the MIRROR of where the numerals are: it protects blank paper and grows through the
+    // label. One entry point is the fix; this asserts there is only one answer to read.
+    const a = yearLabelSidePositions();
+    const b = yearLabelSidePositions();
+    expect([...a]).toEqual([...b]);
+    for (const [, side] of a) expect(['left', 'right']).toContain(side);
   });
 });
 
