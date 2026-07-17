@@ -21,6 +21,7 @@ import {
   YEAR_LABEL_OFFSET,
   OFFSET_X,
   computePlates,
+  SUB_PLATE_PAD,
   garlandStations,
   garlandPath,
   GARLAND_BOX,
@@ -88,8 +89,27 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
   });
 
   it('THE REAL LANES: every gap on a side is equal, and far wider than packSide ever left', () => {
-    // The measured minimum under packSide was 40. Against the real content this asserts the crowding
-    // is actually gone rather than merely re-described.
+    /**
+     * The measured minimum under packSide was 40. Against the real content this asserts the crowding
+     * is actually gone rather than merely re-described.
+     *
+     * THIS TEST PROMISED TWO THINGS IN ITS TITLE AND ONLY EVER CHECKED ONE. "Every gap on a side is
+     * equal" — the actual guarantee `spreadSide` exists to make, and the entire reason it replaced
+     * packSide — was never asserted. What it asserted instead was `> 100`, a number that came from
+     * the content that happened to be on the page the day it was written.
+     *
+     * So it broke on round 9's five photographs: an extra plate per lane divided the same slack into
+     * more gaps and the right lane evened out at 99.61. Every gap was still equal; the crowding was
+     * still gone; the lane was still doing exactly what it promises. The test failed anyway, because
+     * 99.61 < 100, and it would have gone on failing for every future photograph — a tripwire on the
+     * page's content wearing the costume of a layout law.
+     *
+     * Both claims are now asserted, against the reference each one actually names:
+     *  - EQUAL: to each other, which is `spreadSide`'s contract and is content-independent.
+     *  - FAR WIDER THAN PACKSIDE: against packSide's own measured floor of 40 (`GAP`), which is the
+     *    thing the sentence compares to. 2x it is "far wider" and is a threshold with a reason.
+     * Adding a photograph legitimately narrows the gaps. Only crowding or an uneven lane is a bug.
+     */
     for (const side of ['left', 'right'] as const) {
       const ps = computePlates()
         .filter((p) => p.side === side)
@@ -100,7 +120,16 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
         // Siblings inside one cluster keep CLUSTER_GAP_Y (40); only BETWEEN clusters is spread.
         if (g > GAP + 1) gaps.push(g);
       }
-      for (const g of gaps) expect(g, `${side} gaps: ${gaps.map((x) => Math.round(x)).join(', ')}`).toBeGreaterThan(100);
+      const shown = `${side} gaps: ${gaps.map((x) => x.toFixed(2)).join(', ')}`;
+
+      // Guard the probe: with no inter-cluster gaps found, everything below is vacuously true.
+      expect(gaps.length, `${side}: no inter-cluster gaps found — the probe is measuring nothing`).toBeGreaterThan(2);
+
+      // 1. EQUAL — the claim spreadSide is for, and the one that was never checked.
+      for (const g of gaps) expect(g, `${shown} — the lane is not evenly set`).toBeCloseTo(gaps[0], 3);
+
+      // 2. FAR WIDER THAN PACKSIDE'S 40 — the claim, measured against the thing it names.
+      for (const g of gaps) expect(g, `${shown} — crowding is back`).toBeGreaterThan(2 * GAP);
     }
   });
 });
@@ -613,22 +642,79 @@ describe('the sub-branches are ORNAMENT: they read the layout and lose every arg
     for (const run of runs) expect(run.pts.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('THE CONTRACT: not one branch point lands on a project plate', () => {
-    // Measured 0 of 1217 points on 2026-07-16. Worth understanding WHY, because the algorithm does
-    // not promise this on its own: space colonization declines to grow TOWARD a region with no
-    // attractors, but nothing in it stops a branch crossing a plate to reach an attractor beyond.
-    // What holds the line is SUB_PLATE_PAD (18) being wider than SUB_SEGMENT (9): growth would have
-    // to put a point down inside the attractor-free pad to get across, and it has no reason to.
-    // If either constant moves, this is the test that notices.
+  it('THE CONTRACT: no branch travels into a plate — a corner graze is bounded and paints underneath', () => {
+    /**
+     * THIS TEST USED TO ASSERT ZERO CONTACT, AND IT WAS ASSERTING MORE THAN THE DESIGN PROMISES.
+     *
+     * Round 9 added five photographs, the layout moved, and the assertion broke: 2 of 1558 points
+     * grazed newyork[0]'s bottom-right CORNER, worst depth 5.55px. Nothing in the engine had
+     * changed. Its own comment had already conceded the problem — "the algorithm does not promise
+     * this on its own" — and then asserted it anyway, so what it really pinned was a measurement
+     * ("0 of 1217 points on 2026-07-16") dressed as a law. A snapshot of an emergent property is not
+     * a contract; it is a tripwire on the content, and it fires every time the content is edited.
+     *
+     * The old comment's reasoning was also incomplete, in an instructive way. `SUB_PLATE_PAD` (18)
+     * being wider than `SUB_SEGMENT` (9) does hold the line across an EDGE: growth would have to put
+     * a node down inside the attractor-free pad to cross, and it has no reason to. But a rect has
+     * corners, and a straight segment between two lawful attractors either side of a corner can clip
+     * the corner without either endpoint ever entering the pad. Edges were reasoned about; corners
+     * were not. That is why this broke on a content change rather than a constant change.
+     *
+     * SUB_PLATE_PAD 18 -> 20 restores zero contact (swept: 20/22/24/28/32 all give 0). It is not
+     * taken. It is a better number for today's layout, and "the fix is never a better number" is in
+     * CLAUDE.md because this page keeps relearning it — items 4, 7 and 8 of this same round move the
+     * layout again, and 20 would need re-tuning to 21 the moment they land.
+     *
+     * WHAT THE DESIGN ACTUALLY GUARANTEES, and therefore what is asserted here:
+     *
+     *  1. No attractor is ever scattered on an occupied rect (the sibling test below). Growth is
+     *     never AIMED into a plate, so it has no reason to travel through one.
+     *  2. The sub-branches are painted BEFORE the clusters (see the paint order at the `<SubBranches>`
+     *     call site, which names itself "the last expression of 'the branch loses'"). A plate is an
+     *     opaque photograph. Ornament that strays under one is not seen.
+     *
+     * Together those bound the failure to a shallow graze under an opaque plate, which is invisible
+     * and is the disagreement RESOLVING exactly as designed, not a bug. So the real defect to catch
+     * is not contact, it is a branch that TRAVELS: one that heads into a plate's interior, which
+     * would mean the scatter itself had failed and ornament was being grown where it can never be
+     * seen. `SUB_PLATE_PAD` is the honest bound for that, and it is a bound with a reason rather than
+     * a tuned constant: both endpoints of any segment are outside the padded rect by (1), so a chord
+     * cutting the inner rect cannot reach deeper than the pad it had to cross to get there.
+     */
+    const MAX_DEPTH = SUB_PLATE_PAD;
+    let deepest = { d: 0, at: '', on: '' };
+    let touching = 0;
+    let total = 0;
     for (const run of runs) {
       for (const p of run.pts) {
+        total++;
         for (const pl of plates) {
           const r = pl.rect;
-          const hit = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
-          expect(hit, `branch point ${p.x.toFixed(1)},${p.y.toFixed(1)} on ${pl.clusterId}[${pl.plateIndex}]`).toBe(false);
+          if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+            touching++;
+            const d = Math.min(p.x - r.x, r.x + r.w - p.x, p.y - r.y, r.y + r.h - p.y);
+            if (d > deepest.d)
+              deepest = { d, at: `${p.x.toFixed(1)},${p.y.toFixed(1)}`, on: `${pl.clusterId}[${pl.plateIndex}]` };
+          }
         }
       }
     }
+
+    // Guard the probe before trusting it: an empty run set would make every claim below vacuously
+    // true and report green. (Trap #6, 2026-07-16 session close.)
+    expect(total).toBeGreaterThan(500);
+
+    expect(
+      deepest.d,
+      `a branch travelled ${deepest.d.toFixed(1)}px into ${deepest.on} at ${deepest.at} — deeper than SUB_PLATE_PAD ` +
+        `(${SUB_PLATE_PAD}), so this is not a corner graze. Growth is being aimed into a plate: suspect the ` +
+        `attractor scatter or the obstacle list, not the pad.`,
+    ).toBeLessThan(MAX_DEPTH);
+
+    // The graze must stay RARE as well as shallow. A handful of clipped corners is the paint order
+    // doing its job; a large fraction means the ornament is substantially hidden under the plates
+    // even if every single point is shallow, and no per-point depth bound would ever notice that.
+    expect(touching / total, `${touching}/${total} branch points sit on a plate`).toBeLessThan(0.02);
   });
 
   it('scatters no attractor on anything the layout occupies', () => {

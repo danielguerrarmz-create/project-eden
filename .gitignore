@@ -19,3 +19,12 @@ docs/pr-*-review-*
 docs/handoff-clay-*
 docs/brief-for-evaluators.md
 qa-*.mjs
+
+# HELD PENDING A PRIVACY RULING -- this repo is PUBLIC, so `git add` here is
+# `publish`, and a branch is not a safe holding pen. This photograph carries ~40
+# identifiable UT students with their names printed under their faces. Daniel has
+# not ruled on it. Ignored so that a stray `git add .` cannot publish it by
+# accident -- the protection is mechanical, not a matter of remembering.
+# See CrossPathsTimeline.tsx `origin-2021` (the slot is held on `pending`).
+# Delete this rule when he rules in favour; the file is already on disk.
+public/assets/about/timeline/2021-orientation-zoom.webp

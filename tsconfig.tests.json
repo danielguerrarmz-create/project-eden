@@ -1,0 +1,22 @@
+{
+  // THE TEST PROGRAM. Same rules as the app (strict, unused locals, the lot), plus node.
+  //
+  // This exists so that `tsconfig.json`'s narrow `types` array keeps its meaning. The tests run in
+  // vitest's node environment (see vitest.config.ts) and a couple of them are about the repo rather
+  // than about the browser: timeline-photos.test.ts reads the real bytes of an asset and asks `git
+  // ls-files` what is actually committed, because "the file is on my disk" is exactly the assumption
+  // that let round 9 ship a commit referencing five assets it never added.
+  //
+  // The alternative — a `/// <reference types="node" />` in the one test that needs it — was tried
+  // first and is WRONG, in a way worth recording: a triple-slash reference is not file-scoped. It
+  // adds node's globals to the whole program, and `process.cwd()` then typechecks happily inside a
+  // React component. Verified by sabotage rather than assumed: dropping `const x: string =
+  // process.cwd()` into AboutIntro.tsx produced zero errors. Two programs is the honest way to say
+  // "these files are node and those files are not".
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@react-three/fiber", "node"]
+  },
+  "include": ["src/**/*.test.ts"],
+  "exclude": []
+}
