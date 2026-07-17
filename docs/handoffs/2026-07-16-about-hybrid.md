@@ -799,3 +799,88 @@ a session.
    hardware is a better failure mode than jank. Not taken: it is visible, and the constraint was that
    the optimisation must not cost the look.
 3. Everything from rounds 4–5 still open (the asset re-export, Forsite clause, year labels).
+
+---
+
+# ROUND 7 — the growth arrives on time, and the intro gets its hook back
+
+**Branch:** `about-hybrid-sepia`. **`main` untouched, nothing pushed.** **Author:** Edward.
+Rounds 1–6 preserved above, unedited.
+
+Two commits: `39bb3aa` the growth's timing · `d6da7b6` the setup line.
+
+## 1. The parenthesis finishes growing before the reader arrives (`39bb3aa`)
+
+Daniel: *"Let the flowers and vine make their loading animation earlier in the cycle, so they are
+fully visualized before being out of frame, like it currently is now."*
+
+**MEASURED, and it was worse than "late": the parenthesis first reached fully-grown at scrollY 10440,
+at which point its own top was 636px ABOVE the viewport.** It never existed finished and on screen at
+the same time. The animation was playing to nobody. Now it completes at scrollY 9960 with its box at
+**top 42 / bottom 689** — framed, with both founders.
+
+**The cause was mine, from round 6.** Each taper run was keyed to its OWN y, so a 650px arm's tail
+only drew when the card line reached the tail — by which time its head was long gone. That was a
+local fix for "a long arm should not shoot out whole", and it traded one failure for a worse one.
+**The timeline's own rule was right all along: a stem draws root → tip as ONE event.** An arm is just
+a long stem.
+
+**The fix is the START, not the duration.** Compressing the growth to fit the window would trade
+"invisible" for "too fast to see". So: one progress for the whole ornament, which
+- **begins** when the wrapper's top first appears at the BOTTOM of the screen (`readerLead`), and
+- **ends** when the founders are framed — the reader looks up and it is already done.
+
+Both ends derive from the measured layout and the **live** viewport (height and the real
+`--header-h`). Measured ramp: 0.04 → 0.21 → 0.49 → 0.77 → 0.94 → **0.99 exactly as the founders
+reach the frame**.
+
+`readerLead` is the card-line equivalent of an IntersectionObserver's `rootMargin`. The brief
+suggested `rootMargin`; there is no observer here — the reveal is a **line**, so "start earlier" is a
+distance rather than a threshold. Same idea in this page's own mechanism. It is also "paint ahead of
+the reader, not on top of them", from the other end.
+
+**THE TIMELINE IS UNTOUCHED, DELIBERATELY, and that is what keeps the plates in sync.** Its branches
+are short — each draws over `UNFURL_SPAN` as it crosses the card line and completes at ~38% of the
+frame, well inside — and its plates fade on exactly the same line. Pulling the branches earlier
+without the plates would break the one thing Daniel has been consistent about. **The autoplay also
+stops at the pin, inside the track, so it never reaches the founders**: the two traverse rates do not
+interact, which is why one trigger works for both.
+
+One bug found on the way: the last arm run starts at `t0`≈0.9 with only `OVERLAP` (0.34) of runway,
+so it topped out at 0.29 and **the arm's tail never finished**. The ramp is stretched by
+`(1 + OVERLAP)` so the arm is complete when its progress hits 1.
+
+## 2. The setup line (`d6da7b6`)
+
+    Bower is new.
+    We've been chasing it for five years.
+
+**They QUEUE, they do not cross, and that is not a taste call.** The setup and the title share ONE
+box — that is the whole continuity, the title's first line lands exactly where the setup line was —
+and both render at that box's TOP. The first cut crossfaded them and put "Bower is new." directly on
+top of "We've been chasing it for": two lines stacked, neither readable, for 360ms. **Photographed
+it**, then delayed the title's fade by exactly the setup's exit. The original had the same overlap
+and only got away with it because its two lines were different lengths.
+
+Timing tuned by watching, not pasted (the original's numbers paced a seven-word sentence; this is
+three words): setup in at 0, out at 800, title fades up at 1160, flies at 2000, lands at 2960, done
+at 3560.
+
+`qa/title-alignment.mjs` still passes. Reduced motion: no veil, no setup line.
+
+## A MEASUREMENT TRAP, twice in one round — worth naming
+
+**The intro's t=0 is the component's MOUNT, and in the dev build the module graph takes ~1.8s to get
+there.** Sampling against wall-clock-from-navigation reports the wrong beat entirely: it looked
+"stuck on the setup at 3200ms" when that was really intro-time ~1400. **Sample by STATE, not by
+clock.** The sibling of it: a screenshot costs ~300ms, so sampling a single page load drifts late and
+every frame after the first lies about when it was taken — take one fresh load per sample.
+
+This is the third time this session a confident measurement has been wrong in a way that looked
+right (see also: the stale preview port, and the bounding-box text probe). The pattern: **when a
+number surprises you, check the instrument before you change the code.**
+
+## Left (open)
+
+Unchanged from rounds 4–6: the hero asset re-export (Plentify 48.4% / Resia 34.6% dead white), the
+Forsite clause confirmation, the year labels, the bake, and 6x-throttle compute.
