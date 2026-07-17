@@ -1475,10 +1475,39 @@ function SubBranches({ reduced, cardLineY, stagger }: { reduced: boolean; cardLi
   return (
     <g pointerEvents="none">
       <defs>
-        {/* Soft-edged, so an organ blooms out of the paper instead of arriving inside a circle. */}
+        {/*
+          * Soft-edged, so an organ blooms out of the paper instead of arriving inside a circle — but a
+          * RIM FEATHER, not a wash. This is "the strange blur on our flowers" (Daniel, 2026-07-17), and
+          * it is the THIRD of three identical copies of this gradient; Edward measured and fixed the
+          * other two (`#coda-organ-disc`, `#paren-organ-disc`) in `2a77821`. All three were the same
+          * four lines, which is why he said "our flowers" and not "that flower".
+          *
+          * MASK ALPHA IS LUMINANCE, and that is the whole bug. `offset 0.45 -> #fff` does not mean
+          * "feather the last 55%" — it means the disc is fully opaque only inside r = 38.25 of an
+          * `ORGAN_DISC_R` of 85, and then ramps to nothing. The painted organs are much bigger than
+          * 38.25. Measured independently against THIS disc's own radius: mean applied alpha 0.551, and
+          * only 20.3% of the disc's area ever reaches full opacity. **Two thirds of every organ on
+          * every twig has been rendering semi-transparent, forever** — not during the reveal, at steady
+          * state, with the camera settled and nothing growing.
+          *
+          * IT IS NOT A TIMING BUG, and that matters because this page has one in the same organ.
+          * Round 10 found `organAt` keyed to a growth that saturates at 1 while asking for
+          * `t + LAG + FADE`, so 87 of 218 organs could never reach full opacity. That was real, it was
+          * fixed, and this survived it: this is a permanent property of the mask, so no reveal change
+          * could ever have reached it. Same symptom, different mechanism, and fixing the first made the
+          * second look like taste.
+          *
+          * TWO STOPS, TWO MECHANISMS, BOTH NEEDED (Edward's finding, verified here):
+          *   - `0.45 -> 0.9` makes the core opaque out to where the organ actually is (81.0% of the
+          *     disc, mean alpha 0.903). A feather at the rim, which is what "soft-edged" meant.
+          *   - `stopOpacity=0` on the black stop: the rim was OPAQUE black, and mask children composite
+          *     SOURCE-OVER, so a later disc's rim painted over an earlier disc's revealed core. With
+          *     332 discs on this layer they overlap constantly, so an organ could be dimmed by a
+          *     NEIGHBOUR's edge — nothing to do with its own reveal.
+          */}
         <radialGradient id="sub-organ-disc">
-          <stop offset="0.45" stopColor="#fff" />
-          <stop offset="1" stopColor="#000" />
+          <stop offset="0.9" stopColor="#fff" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
         </radialGradient>
         <mask id="sub-organ-mask" maskUnits="userSpaceOnUse" x={SUB_BOX.x} y={SUB_BOX.y} width={SUB_BOX.w} height={SUB_BOX.h}>
           {marks.map((m, i) => {
