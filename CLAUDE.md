@@ -4,24 +4,20 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Where the work is — read this first
 
-**Current: round 10, branch `about-round-10`. Handoff: `docs/handoffs/2026-07-17-round-10.md`.**
+**Current: round 11, branch `about-round-10`. Handoff: `docs/handoffs/2026-07-17-round-11.md`.**
 Read it before continuing; it carries what shipped, what is open, and what needs Daniel.
 
-**RESOLVED 2026-07-17, and every sentence that stood here was false by the time it was read.** It said
-the uniform axis's price was unresolved, that the bands CANNOT be tightened because `SLOPE` sits on a
-measured floor, and that item 1a collides. **All three are dead.** Daniel gave up equal bands, so
-`SLOPE` and its floor are deleted (each year's band is now as long as its own content needs); 1a's
-collision was a conflation rather than a constraint and shipped. Left as a warning about ITSELF: this
-section is the first thing every session reads, and a stale map here is worse than no map — the same
-lesson that cut 81 lines from this spot hours earlier. **Keep it a POINTER; the round log is the
-record.**
+Round 11 shipped items 1, 3+4, 6 (content), then 5 (intro stagger: colonization precomputed to
+`subBranches.generated.json`, byte-identical), 8 (the Bower mark enlarged ~1.4x, stroke unchanged),
+2 (a scroll cue on the finale pin), and 7 (the founders' parenthesis is now a CLOSED BOWER — the two
+arms meet at the content centre; `parenthesis.ts` no longer describes the old open form). **The
+former "known red" `qa/hero-lockup.mjs` is fixed** — it reads `[data-timeline-viewport]` now, re-derives
+its camY honestly, and adds a mark-stroke invariant.
 
-**Still open:** item 3 (ornament on the mark) and the spine garland's 900ms mount timer — check
-whether that timer is even live before spending on it (`SpineGarland` returns null when `!url`, so it
-may always mount at opacity 1). **Known red: `qa/hero-lockup.mjs`** — a broken proxy, not a broken
-layout; it asserts the mark sits on the `<svg>`'s centre, and the item-1b bleed moves the *element's*
-centre 68px while the camera's window stays put. It must read `[data-timeline-viewport]`. Its
-`want ~3806.1` string is stale too.
+**Still open / needs Daniel:** the bower's BASE curve carries no foliage (reads as a clean binding —
+offered to lush it, his call); the spine garland's 900ms mount timer (check it is even live before
+spending — `SpineGarland` returns null when `!url`). **Keep this section a POINTER; the round log is
+the record.**
 
 *An 81-line round-2/round-3 task list stood here and was cut on 2026-07-17: it described a dead branch
 (`about-hybrid-sepia`, "seven commits", "132 vitest"), a finale that no longer exists (the woven
@@ -151,8 +147,9 @@ POINTER; the round log is the record.*
     half-loaded page showed organs on the spine and none on the twigs — **a coherent, plausible, wrong
     picture that does not look broken, it looks like a design decision.** Wait for the SPECIFIC
     1200-wide `<image>`, never for "some image" and never for a count to stop rising. Also **cancel
-    the 14s autoplay BEFORE any long wait** or it drives the camera underneath it (measured: sought
-    30% of the track, got camY 4934 — the pin). And **pin `?species=`**: `PAGE_SPECIES` rolls per
+    the autoplay BEFORE any long wait** (`AUTOPLAY_MS` 24000ms, after a 2500ms `AUTOPLAY_LEAD_IN_MS`;
+    it is a linear descent, NOT 14s and NOT eased) or it drives the camera underneath it (measured:
+    sought 30% of the track, got camY 4934 — the pin). And **pin `?species=`**: `PAGE_SPECIES` rolls per
     load, so an unpinned A/B measures the species, not the change. **The tell I ignored: I could not
     explain WHY the twigs were bare when a passing test said their stations exist. An unexplained
     contradiction between a green test and your own eyes is evidence against your INSTRUMENT.**
