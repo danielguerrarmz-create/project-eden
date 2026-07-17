@@ -1,12 +1,18 @@
 /**
- * DrawStage.tsx — draw, lift, excavate. Three gestures, no numbers.
+ * DrawStage.tsx — draw, push/pull, excavate. Three gestures, no numbers.
  *
  * All three are the same shape of move: press somewhere on the thing, drag,
  * release. What changes is what the drag MEANS.
  *
- *   DRAW      drag across the lawn -> an arc, its ends are feet.
- *   LIFT      press on the surface and pull up -> it rises under your hand.
- *   EXCAVATE  press on the surface and drag out -> a hole opens.
+ *   DRAW       drag across the lawn -> an arc, its ends are feet.
+ *   PUSH/PULL  press on the surface and drag -> it follows your hand, EITHER
+ *              WAY. Up pulls, down pushes.
+ *   EXCAVATE   press on the surface and drag out -> a hole opens.
+ *
+ * EVERY HANDLE LIVES ON THE SKIN, not on the floor. It did not until
+ * 2026-07-17, which was the worst legibility bug in the demo: the halo sat at
+ * y=0.03 while the thing you were sculpting floated metres above it, so nothing
+ * on screen told you where the gesture was landing. See `drape.ts`.
  *
  * This is the 2D-logic-on-a-3D-surface hybrid on purpose. Every gesture is
  * "here, this big" — a point and a radius — which people can reason about on a
@@ -27,16 +33,23 @@ import { useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Pt, Spine } from '../../engine/fromDrawing';
 import { arcRiseM, type Edit, type SurfaceInput } from '../../engine/surface';
+import { drapeRing, previewHeightM, skinRuns } from './drape';
 import {
   MIN_HOLE_RADIUS_M,
+  PUSHPULL_RADIUS_M,
   commitGesture,
   holeRadiusM,
-  liftAmountM,
+  pushPullAmountM,
   toolClaimsPointer,
 } from './gesture';
 import { SurfaceMesh } from './SurfaceMesh';
 
-export type Tool = 'draw' | 'lift' | 'hole';
+/**
+ * `pushpull` was `lift` until 2026-07-17. The tool has always been
+ * bidirectional (see gesture.ts's limits); only its name and its floor-pinned
+ * handle hid that.
+ */
+export type Tool = 'draw' | 'pushpull' | 'hole';
 
 /** Sample a drawn arc as a 3D curve. Agrees with surface.ts's tent by design. */
 export function archPoints(a: Pt, b: Pt, segments = 32): THREE.Vector3[] {
@@ -73,13 +86,67 @@ function ArchRibbon({ a, b, ghost = false }: { a: Pt; b: Pt; ghost?: boolean }) 
   );
 }
 
-/** The live footprint of a lift or a hole, drawn on the ground as you size it. */
-function EditHalo({ at, radiusM, kind }: { at: Pt; radiusM: number; kind: 'lift' | 'hole' }) {
+/** Clear of the skin by enough that a 0.03 tube reads proud instead of z-fighting. */
+const RING_PROUD_M = 0.03;
+
+/**
+ * The live footprint of a push/pull or a hole, LYING ON THE SKIN as you size it.
+ *
+ * Until 2026-07-17 this was a flat `ringGeometry` pinned at y=0.03 — on the
+ * FLOOR, for both tools, while the thing being sculpted floated metres overhead.
+ * It is now Rhino's pulled curve: sampled in plan, dropped onto the height
+ * field, and broken wherever the skin has been excavated away (`drape.ts` owns
+ * all of that, and is where the reasoning lives).
+ *
+ * A TubeGeometry rather than a line because WebGL line width is 1 px on most
+ * platforms and this is a hero shot; `ArchRibbon` above already builds its
+ * ribbon exactly this way, so it is the house pattern and costs no new import.
+ * drei's fat-line would have cost bundle we do not have (42 kB of headroom).
+ */
+function DrapedRing({
+  input,
+  at,
+  radiusM,
+  kind,
+}: {
+  input: SurfaceInput;
+  at: Pt;
+  radiusM: number;
+  kind: 'pushpull' | 'hole';
+}) {
+  const runs = useMemo(
+    () => skinRuns(drapeRing(input, at, radiusM)),
+    [input, at, radiusM],
+  );
+  const geos = useMemo(
+    () =>
+      runs
+        .filter((run) => run.length >= 2) // a single station is not a curve
+        .map((run) => {
+          // `skinRuns` closes an intact ring by repeating its first point. Feed
+          // THAT to a closed curve rather than an open one through a duplicated
+          // endpoint: open leaves the tangents discontinuous at the seam, which
+          // renders as a kink at an arbitrary station in the commonest case of
+          // all (a ring over unbroken skin).
+          const closed = run.length > 2 && run[0] === run[run.length - 1];
+          const path = (closed ? run.slice(0, -1) : run).map(
+            (p) => new THREE.Vector3(p.x, p.y + RING_PROUD_M, p.z),
+          );
+          const curve = new THREE.CatmullRomCurve3(path, closed);
+          return new THREE.TubeGeometry(curve, Math.max(8, path.length), 0.03, 6, closed);
+        }),
+    [runs],
+  );
+  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
+
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[at.x, 0.03, at.y]}>
-      <ringGeometry args={[Math.max(0.02, radiusM - 0.04), radiusM, 48]} />
-      <meshBasicMaterial color={kind === 'hole' ? '#b8402f' : '#7d8e5b'} transparent opacity={0.85} />
-    </mesh>
+    <>
+      {geos.map((geo, i) => (
+        <mesh key={i} geometry={geo}>
+          <meshBasicMaterial color={kind === 'hole' ? '#b8402f' : '#7d8e5b'} transparent opacity={0.9} />
+        </mesh>
+      ))}
+    </>
   );
 }
 
@@ -174,10 +241,10 @@ export function DrawStage({
     const p = plan(e);
     nowRef.current = p;
     setNow(p);
-    if (tool === 'lift') {
-      // Pull UP the screen to raise. Screen-space, because the gesture is
-      // "lift this", not "set y to 1.8".
-      amountRef.current = liftAmountM(screenYRef.current - e.nativeEvent.clientY);
+    if (tool === 'pushpull') {
+      // Up the screen pulls, down the screen pushes. Screen-space, because the
+      // gesture is "move this", not "set y to 1.8".
+      amountRef.current = pushPullAmountM(screenYRef.current - e.nativeEvent.clientY);
       setAmount(amountRef.current);
     }
   };
@@ -211,6 +278,25 @@ export function DrawStage({
   }, [up, clear]);
 
   const liveHoleR = tool === 'hole' && start && now ? holeRadiusM(start, now) : 0;
+
+  /**
+   * Where the push/pull node sits: on the skin at rest, and at the height the
+   * surface WILL take once this commits, as you drag. Asking the engine (rather
+   * than drawing `amount` above the ground, which is what the old node did) is
+   * what makes it a preview instead of a picture of one — it inherits the
+   * falloff and the planning cap for free.
+   */
+  const previewY = useMemo(
+    () =>
+      start && tool === 'pushpull'
+        ? previewHeightM(
+            surface,
+            { kind: 'pushpull', at: start, radiusM: PUSHPULL_RADIUS_M, amountM: amount },
+            start,
+          )
+        : 0,
+    [surface, start, tool, amount],
+  );
 
   return (
     <group>
@@ -278,17 +364,24 @@ export function DrawStage({
               because there would be no hole: a halo under a gesture that is
               going to commit nothing is the same lie the 0.35 m floor told. */}
           {tool === 'hole' && liveHoleR >= MIN_HOLE_RADIUS_M && (
-            <EditHalo at={start} radiusM={liveHoleR} kind="hole" />
+            <DrapedRing input={surface} at={start} radiusM={liveHoleR} kind="hole" />
           )}
-          {tool === 'lift' && (
+          {tool === 'pushpull' && (
             <>
-              <EditHalo at={start} radiusM={1.5} kind="lift" />
-              {Math.abs(amount) > 0.02 && (
-                <mesh position={[start.x, Math.max(0.1, amount) + 0.1, start.y]}>
-                  <sphereGeometry args={[0.09, 12, 10]} />
-                  <meshBasicMaterial color="#7d8e5b" />
-                </mesh>
-              )}
+              <DrapedRing input={surface} at={start} radiusM={PUSHPULL_RADIUS_M} kind="pushpull" />
+              {/* The node rides the skin at rest and moves to where the surface
+                  WILL be as you drag — the engine answers that, cap included,
+                  so the preview cannot promise a height the grammar refuses.
+
+                  depthTest off ON PURPOSE, and only while a gesture is in
+                  flight: a PUSH drives the node below the skin, where the skin
+                  would hide it, and an invisible preview of the direction
+                  nobody knew existed is worse than no preview. Rhino's gumball
+                  draws through the model for the same reason. */}
+              <mesh position={[start.x, previewY, start.y]} renderOrder={10}>
+                <sphereGeometry args={[0.09, 12, 10]} />
+                <meshBasicMaterial color="#7d8e5b" depthTest={false} />
+              </mesh>
             </>
           )}
         </>

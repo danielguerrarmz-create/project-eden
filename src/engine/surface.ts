@@ -46,12 +46,21 @@ import { capProfile, eaveHeightAtM, footPullAt } from './geometry';
 
 export { arcRiseM };
 
-/** One sculpt edit. Both are "a place and a size" — nothing to type. */
+/**
+ * One sculpt edit. Both are "a place and a size" — nothing to type.
+ *
+ * `pushpull` was called `lift` until 2026-07-17. It was ALWAYS bidirectional
+ * (`amountM` is signed and the falloff below adds it, so a negative amount sinks
+ * the skin), but every name in the stack said "lift" and the UI put its handle
+ * on the floor, so nobody could tell. The rename is the fix: an identifier that
+ * says `lift` regenerates copy that says lift, and then the capability stays
+ * invisible no matter what the panel is edited to say.
+ */
 export interface Edit {
-  kind: 'lift' | 'hole';
+  kind: 'pushpull' | 'hole';
   at: Pt;
   radiusM: number;
-  /** Lift only: metres added at the centre. Holes don't need one. */
+  /** push/pull only: metres added at the centre, SIGNED. Holes don't need one. */
   amountM?: number;
 }
 
@@ -268,9 +277,10 @@ export function surfaceHeight(input: SurfaceInput, p: Pt): number {
   let h = E + (ctx.H - E) * capProfile(r);
   h *= 1 - footPullAt(ctx.footRad, thetaRad) * Math.pow(r, 5);
 
-  // Lifts: a smooth bump. Excavation is a mask, not a dent — see isHole.
+  // push/pull: a smooth bump, and a smooth dent when amountM is negative — the
+  // sign does all the work. Excavation is a mask, not a dent — see isHole.
   for (const e of input.edits) {
-    if (e.kind !== 'lift') continue;
+    if (e.kind !== 'pushpull') continue;
     const d = Math.hypot(p.x - e.at.x, p.y - e.at.y);
     if (d >= e.radiusM) continue;
     const u = d / e.radiusM;

@@ -79,7 +79,7 @@ describe('the drawn shape reaches the generator', () => {
     const flat = shapeFromDrawing({ arcs: lopsided, edits: [] });
     const bumped = shapeFromDrawing({
       arcs: lopsided,
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 1.2, amountM: 0.45 }],
+      edits: [{ kind: 'pushpull', at: { x: 0, y: 0 }, radiusM: 1.2, amountM: 0.45 }],
     });
     const a = generateGeometry(paramsFor(lopsided), flat);
     const b = generateGeometry(paramsFor(lopsided), bumped);
@@ -125,7 +125,7 @@ describe('the drawn shape reaches the generator', () => {
     ];
     const g = generateGeometry(paramsFor(wild), shapeFromDrawing({
       arcs: wild,
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 2, amountM: 50 }],
+      edits: [{ kind: 'pushpull', at: { x: 0, y: 0 }, radiusM: 2, amountM: 50 }],
     }));
     for (const n of g.nodes) expect(n.position[1]).toBeLessThanOrEqual(ENVELOPE.riseM.max + 1e-6);
   });

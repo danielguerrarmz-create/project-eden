@@ -34,15 +34,28 @@ export const MIN_ARC_DRAG_M = 0.9;
  * costs the user a window and buys them nothing.
  */
 export const MIN_HOLE_RADIUS_M = 0.35;
-/** ~8 px of pull. Enough that a shaky click cannot raise the roof. */
-export const MIN_LIFT_AMOUNT_M = 0.05;
-/** A lift's footprint. Fixed: the gesture is "lift this", not "set a radius". */
-export const LIFT_RADIUS_M = 1.5;
+/** ~8 px of drag. Enough that a shaky click cannot move the roof. */
+export const MIN_PUSHPULL_AMOUNT_M = 0.05;
+/**
+ * A push/pull's footprint. Fixed: the gesture is "push this", not "set a
+ * radius" — the radius is the excavate tool's variable, and giving two tools
+ * the same variable is how a toolbar turns into a parameter panel.
+ */
+export const PUSHPULL_RADIUS_M = 1.5;
 
-/** Screen pixels to metres of lift. Up the screen raises. */
-export const LIFT_M_PER_PX = 0.006;
-export const LIFT_MIN_M = -1.2;
-export const LIFT_MAX_M = 1.6;
+/** Screen pixels to metres. Up the screen pulls, down the screen pushes. */
+export const PUSHPULL_M_PER_PX = 0.006;
+/**
+ * THE TWO LIMITS ARE NOT SYMMETRIC, AND BOTH ARE REAL.
+ *
+ * Named for the direction they bound, because this pair IS the evidence that
+ * the tool was always bidirectional: it has been clamping a negative amount
+ * since the day it was written, under the name `lift`, with a handle on the
+ * floor and a label that said "pull up". Drag down the screen today and the
+ * surface goes down. Nobody knew.
+ */
+export const PUSH_LIMIT_M = -1.2;
+export const PULL_LIMIT_M = 1.6;
 
 /**
  * Which mouse button, and is space down?
@@ -66,9 +79,12 @@ export function toolClaimsPointer({
   return enabled && button === 0 && !spaceHeld;
 }
 
-/** Screen drag to lift height, clamped to what the canopy can take. */
-export function liftAmountM(dyPx: number): number {
-  return Math.max(LIFT_MIN_M, Math.min(LIFT_MAX_M, dyPx * LIFT_M_PER_PX));
+/**
+ * Screen drag to metres, clamped to what the canopy can take. Signed: positive
+ * pulls up, negative pushes down.
+ */
+export function pushPullAmountM(dyPx: number): number {
+  return Math.max(PUSH_LIMIT_M, Math.min(PULL_LIMIT_M, dyPx * PUSHPULL_M_PER_PX));
 }
 
 /** The radius a hole gesture is currently asking for. Honest: no floor. */
@@ -94,7 +110,7 @@ export function commitGesture({
   tool: Tool;
   from: Pt | null;
   to: Pt | null;
-  /** Lift only: metres, signed. */
+  /** push/pull only: metres, signed. */
   amountM: number;
 }): Commit {
   if (!from || !to) return null;
@@ -104,9 +120,11 @@ export function commitGesture({
     return drag > MIN_ARC_DRAG_M ? { kind: 'arc', spine: { a: from, b: to } } : null;
   }
 
-  if (tool === 'lift') {
-    return Math.abs(amountM) > MIN_LIFT_AMOUNT_M
-      ? { kind: 'edit', edit: { kind: 'lift', at: from, radiusM: LIFT_RADIUS_M, amountM } }
+  if (tool === 'pushpull') {
+    // Math.abs: a push counts exactly as much as a pull. This gate has always
+    // been symmetric — it is the tool's NAME that was not.
+    return Math.abs(amountM) > MIN_PUSHPULL_AMOUNT_M
+      ? { kind: 'edit', edit: { kind: 'pushpull', at: from, radiusM: PUSHPULL_RADIUS_M, amountM } }
       : null;
   }
 

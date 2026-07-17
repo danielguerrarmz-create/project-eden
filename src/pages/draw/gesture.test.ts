@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LIFT_RADIUS_M,
+  PUSHPULL_RADIUS_M,
+  PULL_LIMIT_M,
+  PUSH_LIMIT_M,
   MIN_ARC_DRAG_M,
   MIN_HOLE_RADIUS_M,
   commitGesture,
   holeRadiusM,
-  liftAmountM,
+  pushPullAmountM,
   toolClaimsPointer,
 } from './gesture';
 
 const at = (x: number, y: number) => ({ x, y });
-const commit = (tool: 'draw' | 'lift' | 'hole', from: { x: number; y: number } | null, to: { x: number; y: number } | null, amountM = 0) =>
+const commit = (tool: 'draw' | 'pushpull' | 'hole', from: { x: number; y: number } | null, to: { x: number; y: number } | null, amountM = 0) =>
   commitGesture({ tool, from, to, amountM });
 
 describe('toolClaimsPointer — who owns the drag', () => {
@@ -77,32 +79,32 @@ describe('commitGesture — excavate needs a real drag', () => {
   });
 });
 
-describe('commitGesture — lift needs a real pull', () => {
-  it('does NOT lift on a bare click', () => {
-    // Lift was already guarded (a click yields dy=0), unlike excavate. Pinned
-    // so a later refactor cannot give it excavate's bug.
-    expect(commit('lift', at(0, 0), at(0, 0), 0)).toBeNull();
+describe('commitGesture — push/pull needs a real drag', () => {
+  it('does NOT move the surface on a bare click', () => {
+    // push/pull was already guarded (a click yields dy=0), unlike excavate.
+    // Pinned so a later refactor cannot give it excavate's bug.
+    expect(commit('pushpull', at(0, 0), at(0, 0), 0)).toBeNull();
   });
 
   it('ignores a pull too small to be meant', () => {
-    expect(commit('lift', at(0, 0), at(0, 0), 0.04)).toBeNull();
+    expect(commit('pushpull', at(0, 0), at(0, 0), 0.04)).toBeNull();
   });
 
-  it('lifts on a real pull', () => {
-    expect(commit('lift', at(1, 2), at(1, 2), 0.5)).toEqual({
+  it('commits on a real pull', () => {
+    expect(commit('pushpull', at(1, 2), at(1, 2), 0.5)).toEqual({
       kind: 'edit',
-      edit: { kind: 'lift', at: at(1, 2), radiusM: LIFT_RADIUS_M, amountM: 0.5 },
+      edit: { kind: 'pushpull', at: at(1, 2), radiusM: PUSHPULL_RADIUS_M, amountM: 0.5 },
     });
   });
 
-  it('presses down as readily as it pulls up', () => {
-    const c = commit('lift', at(0, 0), at(0, 0), -0.5);
-    expect(c?.kind === 'edit' && c.edit.kind === 'lift' && c.edit.amountM).toBe(-0.5);
+  it('PUSHES DOWN as readily as it pulls up, and always has', () => {
+    const c = commit('pushpull', at(0, 0), at(0, 0), -0.5);
+    expect(c?.kind === 'edit' && c.edit.kind === 'pushpull' && c.edit.amountM).toBe(-0.5);
   });
 
-  it('sizes a lift by the pull, never by how far the pointer wandered', () => {
-    const near = commit('lift', at(0, 0), at(0, 0), 0.4);
-    const far = commit('lift', at(0, 0), at(9, 9), 0.4);
+  it('sizes the move by the drag, never by how far the pointer wandered', () => {
+    const near = commit('pushpull', at(0, 0), at(0, 0), 0.4);
+    const far = commit('pushpull', at(0, 0), at(9, 9), 0.4);
     expect(far).toEqual(near);
   });
 });
@@ -126,35 +128,48 @@ describe('commitGesture — draw', () => {
 
 describe('commitGesture — a missing endpoint is never a gesture', () => {
   it('commits nothing without a start', () => {
-    for (const tool of ['draw', 'lift', 'hole'] as const) {
+    for (const tool of ['draw', 'pushpull', 'hole'] as const) {
       expect(commit(tool, null, at(2, 2), 1)).toBeNull();
     }
   });
 
   it('commits nothing without an end', () => {
-    for (const tool of ['draw', 'lift', 'hole'] as const) {
+    for (const tool of ['draw', 'pushpull', 'hole'] as const) {
       expect(commit(tool, at(2, 2), null, 1)).toBeNull();
     }
   });
 });
 
-describe('liftAmountM', () => {
+describe('pushPullAmountM', () => {
   it('reads a pull UP the screen as a rise', () => {
     // DrawStage passes (startY - currentY), so a positive dy is upward.
-    expect(liftAmountM(100)).toBeGreaterThan(0);
+    expect(pushPullAmountM(100)).toBeGreaterThan(0);
   });
 
   it('reads a push DOWN as a fall', () => {
-    expect(liftAmountM(-100)).toBeLessThan(0);
+    expect(pushPullAmountM(-100)).toBeLessThan(0);
   });
 
   it('clamps a wild drag to what the canopy can take', () => {
-    expect(liftAmountM(100000)).toBe(1.6);
-    expect(liftAmountM(-100000)).toBe(-1.2);
+    expect(pushPullAmountM(100000)).toBe(PULL_LIMIT_M);
+    expect(pushPullAmountM(-100000)).toBe(PUSH_LIMIT_M);
   });
 
   it('does nothing at rest', () => {
-    expect(liftAmountM(0)).toBe(0);
+    expect(pushPullAmountM(0)).toBe(0);
+  });
+
+  it('is bidirectional END TO END, which is the whole reason for the rename', () => {
+    // The claim in one assertion. A drag of the same size up and down produces
+    // equal and opposite amounts, and BOTH commit. This was true under the name
+    // `lift` too; that is the point. If someone ever makes the tool
+    // one-directional again, the copy and the name will still say push/pull,
+    // and this is what catches it.
+    expect(pushPullAmountM(200)).toBeCloseTo(-pushPullAmountM(-200), 9);
+    for (const dy of [200, -200]) {
+      const c = commit('pushpull', at(0, 0), at(0, 0), pushPullAmountM(dy));
+      expect(c?.kind).toBe('edit');
+    }
   });
 });
 

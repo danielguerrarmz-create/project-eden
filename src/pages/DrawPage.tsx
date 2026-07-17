@@ -86,7 +86,10 @@ const TOOLS: { id: Tool; label: string; hint: string }[] = [
   // canopy up: the one state where that sentence is plainly false. The two
   // sentences the opening needs are special-cased below, by line count.
   { id: 'draw', label: 'draw', hint: 'another line grows it' },
-  { id: 'lift', label: 'lift', hint: 'press on it and pull up' },
+  // "push/pull", not "lift", and the hint names BOTH directions. The tool has
+  // been bidirectional since it was written; the old label and its floor-pinned
+  // handle were the only reasons nobody knew. See gesture.ts.
+  { id: 'pushpull', label: 'push/pull', hint: 'press on it and drag up or down' },
   { id: 'hole', label: 'excavate', hint: 'press on it and drag out a hole' },
 ];
 

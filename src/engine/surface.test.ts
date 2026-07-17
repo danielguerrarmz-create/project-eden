@@ -174,29 +174,44 @@ describe("surfaceHeight: the ENGINE'S canopy over the plan your lines claim", ()
   });
 });
 
-describe('lift: a place and a size, no numbers', () => {
-  // Two arcs: a lift needs a surface to lift, and one rib isn't one.
+describe('push/pull: a place and a size, no numbers', () => {
+  // Two arcs: push/pull needs a surface to act on, and one rib isn't one.
   const base: SurfaceInput = { arcs: [arcEW, arcNS], edits: [] };
-  const lifted: SurfaceInput = {
+  const pulled: SurfaceInput = {
     arcs: [arcEW, arcNS],
-    edits: [{ kind: 'lift', at: { x: 0.6, y: 0.2 }, radiusM: 0.8, amountM: 0.4 }],
+    edits: [{ kind: 'pushpull', at: { x: 0.6, y: 0.2 }, radiusM: 0.8, amountM: 0.4 }],
   };
 
-  it('raises the surface at the lift, and only there', () => {
-    expect(surfaceHeight(lifted, { x: 0.6, y: 0.2 })).toBeGreaterThan(
+  it('raises the surface where you pull, and only there', () => {
+    expect(surfaceHeight(pulled, { x: 0.6, y: 0.2 })).toBeGreaterThan(
       surfaceHeight(base, { x: 0.6, y: 0.2 }),
     );
     // Outside the radius, untouched.
-    expect(surfaceHeight(lifted, { x: -1.2, y: -0.2 })).toBeCloseTo(
+    expect(surfaceHeight(pulled, { x: -1.2, y: -0.2 })).toBeCloseTo(
       surfaceHeight(base, { x: -1.2, y: -0.2 }),
       6,
     );
   });
 
-  it('is still capped — a lift cannot buy you a planning application', () => {
+  it('LOWERS the surface where you push, which it has always done', () => {
+    // Renamed from `lift` on 2026-07-17. This assertion is the receipt: a
+    // negative amount has sunk the skin since the day the tool was written.
+    // The capability was not missing, it was unnamed and unshown — the tool
+    // was called "lift", its hint said "pull up", and its handle lay on the
+    // floor where no displacement could be read against anything.
+    const pushed: SurfaceInput = {
+      arcs: [arcEW, arcNS],
+      edits: [{ kind: 'pushpull', at: { x: 0.6, y: 0.2 }, radiusM: 0.8, amountM: -0.4 }],
+    };
+    expect(surfaceHeight(pushed, { x: 0.6, y: 0.2 })).toBeLessThan(
+      surfaceHeight(base, { x: 0.6, y: 0.2 }),
+    );
+  });
+
+  it('is still capped — a pull cannot buy you a planning application', () => {
     const silly: SurfaceInput = {
       arcs: [arcEW, arcNS],
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: 99 }],
+      edits: [{ kind: 'pushpull', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: 99 }],
     };
     expect(surfaceHeight(silly, { x: 0, y: 0 })).toBe(GRAMMAR.pdHeightCapM);
   });
@@ -204,15 +219,15 @@ describe('lift: a place and a size, no numbers', () => {
   it('never drives the surface below ground', () => {
     const dug: SurfaceInput = {
       arcs: [arcEW, arcNS],
-      edits: [{ kind: 'lift', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: -99 }],
+      edits: [{ kind: 'pushpull', at: { x: 0, y: 0 }, radiusM: 1.5, amountM: -99 }],
     };
     expect(surfaceHeight(dug, { x: 0, y: 0 })).toBeGreaterThanOrEqual(0);
   });
 
-  it('a lift cannot happen off the plan — there is nothing there to lift', () => {
+  it('cannot happen off the plan — there is nothing there to push or pull', () => {
     const offPlan: SurfaceInput = {
       arcs: [arcEW, arcNS],
-      edits: [{ kind: 'lift', at: { x: 8, y: 8 }, radiusM: 2, amountM: 1 }],
+      edits: [{ kind: 'pushpull', at: { x: 8, y: 8 }, radiusM: 2, amountM: 1 }],
     };
     expect(surfaceHeight(offPlan, { x: 8, y: 8 })).toBe(0);
   });
