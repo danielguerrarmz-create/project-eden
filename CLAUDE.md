@@ -2,87 +2,24 @@
 
 Loaded automatically at the start of every session in this repo. Keep it short.
 
-## Open task list — surface this at the start of a session
+## Where the work is — read this first
 
-**LATEST (2026-07-16): the About HYBRID, ROUND 2, on branch `about-hybrid-sepia`** (handoff:
-`docs/handoffs/2026-07-16-about-hybrid.md` — round 2 is the second half of that file; read it before
-continuing). Seven commits, nothing on main, nothing pushed. Round 1's ruling stands (Daniel's About
-is the shell; Clay's retired drafts are harvested as ORNAMENT; the page is sepia; the pigment
-specimens are keepers). Round 2 is his next pass of notes:
+**Current: round 10, branch `about-round-10`. Handoff: `docs/handoffs/2026-07-17-round-10.md`.**
+Read it before continuing; it carries what shipped, what is open, and what needs Daniel.
 
-- **The founders are Clay's page, ported wholesale** from `about-v2-nonflowers:src/pages/ascent/AscentPage.tsx`.
-- **The work index is ROWS, not columns, and FLAT.** The hero was in a 505x557 PORTRAIT box against
-  natively-landscape images; it is now 735x414..509. The discipline headers and their frontispieces
-  are deleted (with `groupProjects` and three commissions).
-- **THE PROJECTS ARE DECOUPLED FROM THE TIMELINE.** Nothing holds them: the branches, the calyx
-  holders, and `unfurl()` are all gone (-298 lines). The entrance is a fade. The 2025 label collision
-  round 1 flagged is gone with the branch that caused it.
-- **The ornament is now an ENGINE**: space colonization (`src/pages/about/spaceColonization.ts`,
-  Runions et al. 2007) grows sub-branches into the negative space. **Read the direction rule below.**
+**Open and his, not ours:** the uniform year axis is a deliberate FICTION he asked for, and its price
+is unresolved (a one-cluster year gets a five-cluster year's band; the void either fills with vine or
+stays empty — screenshots in the handoff). The bands CANNOT be tightened: `SLOPE` sits on a measured
+floor. Also open: item 1 (the spine — **read the note at `SPINE_W` before touching it, 1a collides**),
+item 3 (ornament on the mark), the spine garland's 900ms mount timer, and `qa/growth-timing.mjs`'s
+camera wait — **until that lands, item 2's live verification is withdrawn and must not be quoted.**
 
-**THE ORNAMENT READS THE LAYOUT; THE LAYOUT NEVER READS THE ORNAMENT.** This is the load-bearing
-lesson of round 1 and the thing most likely to be undone by accident. The old branches were
-STRUCTURE — they carried the plates, so the layout depended on them, and every collision round 1
-fought existed because ornament was allowed to dictate layout. The sub-branches are ORNAMENT: they
-read `computePlates()` and nothing reads them back, they are painted before the clusters, and no
-attractor is ever scattered on an occupied rect. If a branch and a plate disagree, the branch loses
-by construction. Filling the whitespace and avoiding the plates are the SAME mechanism (a plate has
-no attractors on it), which is why there is no collision test in the engine and must not become one.
-
-The About page was reworked to **round 3** on 2026-07-13 (spec:
-`docs/2026-07-13-about-refinement-spec.md`; handoff: `docs/handoffs/2026-07-13-about-round3-*.md`).
-It builds on v2 (`docs/2026-07-13-timeline-v2-composition-spec.md`), keeping the one-spine + short
-branch-edges node graph, piecewise axis, seam fix, plate tiers, `packSide`, one-colour INK_BLUE.
-Round-3 changes shipped (static-verified only, NOT live-QA'd yet):
-
-- **The seed is retired; the finale is a woven bower.** `seedPath`/`embryoPath` deleted from
-  `growth.ts`. The spine now forks at `WEAVE_START_Y` into two arms that weave over/under (three
-  segments each, alternating z-order) and rejoin at `WEAVE_END_Y`, framing the wordmark rendered in
-  the header's own mono face + the eight-circle Oculus mark (crisp, INK_BLUE). Payoff line is now
-  "Everything above, grown into one place." (TODO(Daniel) sign-off).
-- **Ornamental leaves** on every branch edge (last `BRANCH_LEAF_LEN` units become a lanceolate blade
-  with midrib + veins, fixed size, `leafOpacity` budding after the stem draws) and at the two weave
-  crossings (0.7x).
-- **Year labels** heavy (30px/700, tabular-nums) with a data-driven side flip (opposite whichever
-  cluster shares the year); 2024 and 2025 flip left.
-- **Autoplay on entry** (§7): 14s eased `window.scrollTo` from the track's pin to its end, once per
-  load, cancelled instantly by any wheel/touch/keydown, reduced-motion gated.
-- **projects.ts content pass** (round 2): DAC hero is now the big wall-section drawing then the new
-  cardboard model photo then plans (site + ground floor, `fit:'contain'`); KUKA + Texas Robotics
-  MERGED into one "Robots as Instruments" (n:02) carrying both image sets + both videos; renames
-  (Origami Medical Device, LLO: Dream Machine); Resia re-attributed `by:'clay'`; Archipedia gains the
-  system-pipeline image. n runs 01..11 with no gaps.
-- **Timeline** (round 2): DAC physical-model photo added to the dougherty cluster; the Plentify
-  `making` node swapped from the AI render to the real MTS compression-test photo; Robotic Factory
-  section-assembly video added (all three videos now play in the timeline); hints thinned to four
-  (Research Paper, LLO: Dream Machine, Resia: AI-Remodel Software, NYC: Rogers Partners), rest
-  hintless; the 2021 merge shows only "Clay" / "Daniel", the "Architecture Practice" plate removed;
-  cleaner tangent merge (vertical run-in along the spine).
-- **AboutPage** (§4/§5): founder spacers cut from 100svh to 38svh; founders now in a bordered panel
-  with a hairline divider and 128px portraits; `ProjectText` reordered to title / credits /
-  description / awards+publications / lessons learned (`awards?: string[]` field added, empty);
-  `Gallery` supporting images now a balanced CSS multi-column pack at intrinsic aspect ratios.
-- **Founder bios** in `TEAM` are two sentences each (one repo-sourced quirky fact + the role
-  sentence); Sai's fuller drafts with unconfirmed facts are held in a TODO(Daniel) comment, not shipped.
-
-Still open / TODO(Daniel): payoff-line wording; "What we learned" vs "Lessons learned"; bio facts
-(Rick Wright / TestFit years, Clay's Resia verb, Rogers Partners dates, "Dream Machine" naming);
-Robotic Factory n:03 still PLACEHOLDER copy; Texas Robotics year in the merged project.
-
-LIVE-QA'd in Chrome on 2026-07-13 (team lead) + Gojo static pass (no blockers), then a fix round,
-re-verified live. Fix round: year labels now paint AFTER the clusters with a vellum halo
-(paint-order stroke) so timestamps are never occluded (elementFromPoint sweep: zero occlusions);
-the flip rule extracted as exported `yearLabelSide` + 4 unit tests (132 vitest now); 2026 got the
-same heavy year treatment above the weave fork (tiny lockup label removed); autoplay also cancels
-on pointerdown (scrollbar grab); founder spacers 38svh → 24svh; stale seed comments rewritten.
-Verified live: autoplay runs 14s and any input cancels instantly; all 3 timeline videos play;
-all assets 200. Gates green (tsc 0, 132 vitest, vite build). Open for Daniel: (1) payoff-line
-wording TODO; (2) the weave rejoin's pointed bud + dot can read teardrop-adjacent — TODO at the
-site offers an open-tuck alternative; (3) at 24svh the payoff line's tail can share a frame edge
-with the founders (only 100svh spacers fully prevented that — tight framing won); (4) 5 orphan
-assets (~1.08MB) are deletion candidates: synergy biocore-axon / building-elevation /
-eidetic-aerial / living-walls + testfit-clay-desk-recording-setup. Nothing committed; Daniel
-reviews before any commit.
+*An 81-line round-2/round-3 task list stood here and was cut on 2026-07-17: it described a dead branch
+(`about-hybrid-sepia`, "seven commits", "132 vitest"), a finale that no longer exists (the woven
+bower; it is an unravel into the mark now), bios that have since been rewritten, and TODOs that were
+resolved rounds ago (Rogers' dates among them). A stale map at the top of the file every session reads
+first is worse than no map. Recover: `git show <this commit>^ -- CLAUDE.md`. Keep this section a
+POINTER; the round log is the record.*
 
 ## Things worth knowing
 
@@ -177,15 +114,38 @@ reviews before any commit.
   not exist** — every lookup returned undefined and it passed green while checking nothing, inside the
   file written to catch exactly that. **Match on `src`**, or author a real `id`. See the note above
   `interface Project`.
-- **OPEN, AND `qa/project-media.mjs` IS RED ON IT RIGHT NOW: Origami's rail is EIGHT sheets at 53px.**
-  NEEDS DANIEL (editorial). `railWidth` divides the region by `sum(1/ratio)`, so eight ~1.29 sheets
-  give **53px cells at 900 and 30px at 760** — visually confirmed as illegible postage stamps. The
-  arithmetic is correct and the guard is right to fail; **the input is the problem** (eight assembly
-  sheets in one vertical rail cannot be legible at any width), so the fix is dropping sheets or a
-  different rail, not a smaller `MIN_CELL`. **The guard has failed since the commit that wrote it**
-  (`b96fc85` added the sheets and hardened the sliver check *in the same commit*), 17 commits ago.
-  **A guard nobody runs is not a guard** — this is the fourth variant of the session's trap: not a test
-  passing while measuring nothing, but a test failing while nobody looks.
+- **RESOLVED (2026-07-17), kept for the lesson: Origami's rail was EIGHT sheets at 53px.** Daniel cut
+  it to four (120px, clears `MIN_CELL` 60 by 2x). **They were not cut because they did not fit** — a
+  twelve-step instruction manual (cut lines, tab dimensions, A/B/C/D panels) was never legible in a
+  supporting rail at ANY width. "It did not fit" is a reason that expires the moment the rail gets
+  wider; "a rail was the wrong place for it" does not. **When a constraint forces a content cut, ask
+  whether the content was ever right, and say THAT.** `MIN_CELL` stays 60; widening a guard to make it
+  pass is tuning the instrument to fit the result.
+- **WAIT FOR THE THING, NOT THE CLOCK.** Two agents hit this the same night in different files without
+  seeing each other: `qa/growth-timing.mjs` slept 450ms after seeking and measured a camera that had
+  not arrived (`camY` 148, 148, 148, 965, 3702, 4439 — stuck for three stops; at 1800ms it tracks),
+  and `qa/divider.mjs` measured Archipedia before the page settled, false-positive one run in three.
+  **It had a guard and the guard passed**: it asked whether the SCROLL landed, and `scrollY` lands
+  instantly — the question is whether the CAMERA arrived. **Guard the quantity the measurement depends
+  on, not the one you set.** It also got newly wrong with no edit, because the page got heavier (438
+  ornament runs, was 195), so a fixed sleep is a bug waiting for the page to slow down.
+  - **Polling for STILLNESS cannot tell "not started" from "finished"** — it reported "settled at 0"
+    twice. **Wait for MOVEMENT first, then stillness**, and discard as a HARNESS failure if it never
+    moves. This sentence was already in the round-7 doc and was read the same session and walked into
+    anyway: **reading the warning does not inoculate you.**
+- **IF A GUARD FILTERS ITS INPUTS, CHECK WHETHER THE SCREEN CAN THROW AWAY THE PROOF.** The
+  no-crowding test filtered `if (g <= GAP + 1) continue` — "a ~40px gap must be one cluster's own
+  stack". True of a healthy lane, **false of exactly the lane it guards**, because a *crowded* gap is
+  also small. It discarded every gap that was too tight and asserted only on the ones already fine, so
+  **it could not fail** — and sat green over 15.1px crowding shipped one commit after claiming that
+  property fixed. Proof: with the broken page live, the old filter passed all 58 and the fixed one
+  failed instantly. **Filter by a FACT (`clusterId`), never by a MAGNITUDE — the magnitude that looks
+  like noise can BE the failure.**
+- **WHEN DANIEL RULES ON A SCREENSHOT, CHECK THE STATE HE SAW WAS VALID BEFORE EXECUTING.** He was
+  shown the axis at `SLOPE` 1150 — a value below its own 1280 floor, crowding 2024 — and ruled "tighten
+  the bands". The honest answer was **looser**. Complying would have made it worse *on his
+  instruction*. **A ruling made on a broken render is unexecutable, and you only find out by measuring
+  the thing he was reacting to.**
 - **WHITE MARGINS AROUND A HERO MAY BE THE ASSET, NOT THE LAYOUT — measure before "fixing" it.**
   Measured on the real pixels: Plentify's 1920x1080 hero poster has 451 fully-white columns on the
   left and 478 on the right — **48.4% of the picture is white paper**. Resia's hero is **34.6%**,
