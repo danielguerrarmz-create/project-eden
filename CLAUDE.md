@@ -7,12 +7,21 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 **Current: round 10, branch `about-round-10`. Handoff: `docs/handoffs/2026-07-17-round-10.md`.**
 Read it before continuing; it carries what shipped, what is open, and what needs Daniel.
 
-**Open and his, not ours:** the uniform year axis is a deliberate FICTION he asked for, and its price
-is unresolved (a one-cluster year gets a five-cluster year's band; the void either fills with vine or
-stays empty — screenshots in the handoff). The bands CANNOT be tightened: `SLOPE` sits on a measured
-floor. Also open: item 1 (the spine — **read the note at `SPINE_W` before touching it, 1a collides**),
-item 3 (ornament on the mark), the spine garland's 900ms mount timer, and `qa/growth-timing.mjs`'s
-camera wait — **until that lands, item 2's live verification is withdrawn and must not be quoted.**
+**RESOLVED 2026-07-17, and every sentence that stood here was false by the time it was read.** It said
+the uniform axis's price was unresolved, that the bands CANNOT be tightened because `SLOPE` sits on a
+measured floor, and that item 1a collides. **All three are dead.** Daniel gave up equal bands, so
+`SLOPE` and its floor are deleted (each year's band is now as long as its own content needs); 1a's
+collision was a conflation rather than a constraint and shipped. Left as a warning about ITSELF: this
+section is the first thing every session reads, and a stale map here is worse than no map — the same
+lesson that cut 81 lines from this spot hours earlier. **Keep it a POINTER; the round log is the
+record.**
+
+**Still open:** item 3 (ornament on the mark) and the spine garland's 900ms mount timer — check
+whether that timer is even live before spending on it (`SpineGarland` returns null when `!url`, so it
+may always mount at opacity 1). **Known red: `qa/hero-lockup.mjs`** — a broken proxy, not a broken
+layout; it asserts the mark sits on the `<svg>`'s centre, and the item-1b bleed moves the *element's*
+centre 68px while the camera's window stays put. It must read `[data-timeline-viewport]`. Its
+`want ~3806.1` string is stale too.
 
 *An 81-line round-2/round-3 task list stood here and was cut on 2026-07-17: it described a dead branch
 (`about-hybrid-sepia`, "seven commits", "132 vitest"), a finale that no longer exists (the woven
@@ -133,6 +142,47 @@ POINTER; the round log is the record.*
     twice. **Wait for MOVEMENT first, then stillness**, and discard as a HARNESS failure if it never
     moves. This sentence was already in the round-7 doc and was read the same session and walked into
     anyway: **reading the warning does not inoculate you.**
+  - **AND WAITING FOR *A* THING IS NOT WAITING FOR *THE* THING. This page has several clocks.** I
+    reported "the sub-branch twigs render bare" twice, put it in a commit message and filed it — and
+    it was FALSE. My probe waited for the CAMERA correctly (movement, then stillness, tight
+    threshold); the camera settles in ~2s. **The sub-branch garland is a painted bitmap that arrives
+    at ~7.7s**, and every screenshot was taken at 3.5s. **There are TWO garlands on different clocks**
+    (the spine's narrow strip lands early; the sub-branches' 1200-wide strip lands late), so a
+    half-loaded page showed organs on the spine and none on the twigs — **a coherent, plausible, wrong
+    picture that does not look broken, it looks like a design decision.** Wait for the SPECIFIC
+    1200-wide `<image>`, never for "some image" and never for a count to stop rising. Also **cancel
+    the 14s autoplay BEFORE any long wait** or it drives the camera underneath it (measured: sought
+    30% of the track, got camY 4934 — the pin). And **pin `?species=`**: `PAGE_SPECIES` rolls per
+    load, so an unpinned A/B measures the species, not the change. **The tell I ignored: I could not
+    explain WHY the twigs were bare when a passing test said their stations exist. An unexplained
+    contradiction between a green test and your own eyes is evidence against your INSTRUMENT.**
+- **A CONFLATION IS NOT A CONSTRAINT: check whether X was DEFINED from Y before refusing over "X sets
+  Y".** Item 1a (a thinner spine) was refused twice, correctly on the evidence, because
+  `MARK_K = SPINE_W / MARK_STROKE` meant thinning the spine shrank the Oculus from the 241px Daniel
+  approved to 71px. Every word true; the conclusion false. `MARK_K` had TWO jobs — the mark's SIZE,
+  and the ratio making the mark's stroke equal the spine's. **Only the second is a real invariant (the
+  join must not step in width), and it is a claim about two STROKES, not about a diameter.** The 241px
+  was a CONSEQUENCE Daniel later approved as a fact, and **an approved consequence had become a
+  constraint on its own input.** Pin the size, free the weight: nothing was traded — mark still 241px,
+  `MARK_R`/`TAIL_LEN`/every point of the finale unchanged, only the ink's width. **This will recur
+  every time he says "that size is great, don't change it" about something derived.** Same shape as
+  the frame being both the camera's window AND the ink's clip (item 1b), and as `heroCrop` naming two
+  mechanisms.
+- **A COMMENT CANNOT FAIL. IT CAN ONLY BE BELIEVED.** Changing `SPINE_W` by 3.4x and rewriting
+  `MARK_K`'s definition **broke no test** — neither the mark's approved 241px nor the
+  spine-equals-mark-stroke identity was guarded anywhere. That is why the conflation above survived two
+  rounds: the relationship lived only in prose, and **the prose was CORRECT, which is exactly what made
+  it authoritative enough to veto a user's instruction with.** If a comment states a relationship
+  load-bearing enough to refuse a ruling over, **it must be a test before the refusal is credible.**
+  Corollary: after a change big enough that you expected something to fail, **an all-green run is a
+  finding about your coverage, not a pass.**
+- **A TEAMMATE'S CHARACTERIZATION OF A THIRD PARTY IS A LEAD, NOT A FACT.** I built a lesson on "the
+  escalation offered only two of three levers", got it from a briefing, never checked the handoff — a
+  file I had read that same session — and **quoted the refutation inside my own claim** ("cut content
+  from 2024, *or give up equal bands*… he took the third, give up equal bands"). Both escapes had been
+  named; the analysis was complete. **A borrowed frame is invisible: it arrives feeling like a
+  conclusion you reached.** Open the source before repeating it, especially before attributing a
+  mistake to someone who is not in the conversation.
   - **AND THE FALSE-POSITIVE HALF IS THE DANGEROUS ONE, which is why `divider.mjs` mattered more than
     its bug.** A guard that intermittently cries wolf does not get investigated — **it gets WEAKENED**,
     because the natural response to a flaky failure is to raise a tolerance or delete the check. That
