@@ -1663,9 +1663,19 @@ const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
  * Measured at the 1100px page measure: portrait 186x233 before AND after, block 289..1151, margins
  * 119/119, centre 720 = the content box's own centre.
  *
- * IT WRAPS THE KICKER TOO, NOT JUST THE ROWS. "The founders." was flush with the portrait's left
- * edge; centring only the rows left it 119px adrift of the composition it labels, which is a change
- * to the frame rather than the absence of one. Same block, one gesture, alignment preserved.
+ * IT WRAPS THE ROWS ONLY, AND THE KICKER IS DELIBERATELY LEFT BEHIND — TODO(Daniel), because it is
+ * his call and it is not free. "The founders." was flush with the portrait's left edge; centring the
+ * rows leaves it 119px adrift of the composition it labels. Wrapping it in this block too fixes the
+ * alignment and MEASURABLY BREAKS SOMETHING ELSE: it slides the kicker's glyph run from 170..275 to
+ * 289..394, and a parenthesis vine passes through 394. qa/founder-frame.mjs goes from 0 crossings to
+ * 1 ("a vine crosses TEXT: 'The founders.' at 394,6277"), and that probe measures glyph runs, so it
+ * is a real hit and not the box-based false positive its own header warns about.
+ *
+ * The fix for THAT lives in the vine, not here — and the layout does not get to move the ornament
+ * out of its way, because the arrow points one way (CLAUDE.md: the ornament reads the layout; the
+ * layout never reads the ornament). So this stops at Daniel's literal words, which cover the pair
+ * and not their label: "Move the image and text right." Centring the kicker is a second decision
+ * with an ornament cost attached, and it should be made on purpose, not inherited from this one.
  */
 const FOUNDERS_BLOCK_W = 'md:mx-auto md:w-[calc((100%_-_3rem)*11.7/14.7_+_1.5rem)]';
 
@@ -1820,10 +1830,10 @@ export function AboutPage() {
               z-50). Ported here the bug cannot recur: this page's <main> carries
               pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
           <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
-            <div className={`relative z-10 ${FOUNDERS_BLOCK_W}`}>
+            <div className="relative z-10">
               <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
 
-              <div className="mt-4 flex flex-col gap-6">
+              <div className={`mt-4 flex flex-col gap-6 ${FOUNDERS_BLOCK_W}`}>
                 {TEAM.map((person) => (
                   <FounderNode key={person.id} person={person} />
                 ))}
