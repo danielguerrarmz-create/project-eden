@@ -32,6 +32,7 @@ import { SplashHeader } from './splash/SplashHeader';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { useAutoplayVideo } from './about/useAutoplayVideo';
+import { packWall } from './about/pack';
 import {
   PROJECTS,
   TEAM,
@@ -140,6 +141,7 @@ function ProjectVideoEl({
   reduced,
   fill = false,
   fit = false,
+  brick = false,
 }: {
   image: ProjectImage;
   className: string;
@@ -150,6 +152,8 @@ function ProjectVideoEl({
   fill?: boolean;
   /** Hero mode — see FIT_FRAME. */
   fit?: boolean;
+  /** Wall mode — see ProjectImg's `brick`. */
+  brick?: boolean;
 }) {
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
@@ -157,13 +161,15 @@ function ProjectVideoEl({
   // KUKA loop) — ProjectImg's copy of this branch never sees it. Same gate: the asset's own flag,
   // nothing else. See ProjectImage.fillHero.
   const fillHero = fit && image.fillHero === true;
-  const frame = fillHero
-    ? `block h-full w-full object-cover ${className}`
-    : fit
-      ? `${FIT_FRAME} ${className}`
-      : fill
-        ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-        : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const frame = brick
+    ? `block h-full w-full object-contain ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'} ${className}`
+    : fillHero
+      ? `block h-full w-full object-cover ${className}`
+      : fit
+        ? `${FIT_FRAME} ${className}`
+        : fill
+          ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+          : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} data-licensed-crop={fillHero || undefined} />;
@@ -211,6 +217,7 @@ function ProjectImg({
   reduced = false,
   fill = false,
   fit = false,
+  brick = false,
 }: {
   image: ProjectImage;
   className?: string;
@@ -221,9 +228,28 @@ function ProjectImg({
   fill?: boolean;
   /** Hero mode — see FIT_FRAME. */
   fit?: boolean;
+  /**
+   * WALL MODE — the desktop pack (see pack.ts). The cell this sits in was BUILT to this picture's
+   * authored ratio, so the box and the picture are already the same shape and object-fit has nothing
+   * left to resolve. That is the same argument as FIT_FRAME, arrived at from the other side: FIT_FRAME
+   * makes the element size itself inside a given box; a brick is given a box that is already its size.
+   *
+   * IT IS `object-contain`, AND THAT IS THE POINT rather than an arbitrary pick between two no-ops.
+   * When the box matches the picture, `cover` and `contain` paint identically — so the choice is
+   * really about WHAT HAPPENS WHEN THE AUTHORED RATIO IS WRONG. `cover` would silently crop, which is
+   * this page's most expensive bug ("a cropped photo still looks like a photo, so nobody notices").
+   * `contain` letterboxes: a visible vellum band, in the one place a human is looking, and
+   * `qa/project-media.mjs` reads the same fact off the element's rect. So a bad number in projects.ts
+   * announces itself instead of quietly eating a picture. **Nothing in the wall can be cropped by
+   * object-fit — not by policy, by construction.**
+   *
+   * `fillHero` IS DELIBERATELY NOT HONOURED HERE, and it is not an oversight — see the note in
+   * ListView where the wall is built.
+   */
+  brick?: boolean;
 }) {
   // A pending image has no asset yet: render the inert placeholder plate, never a button.
-  if (image.pending) return <PendingPlate fill={fill} className={className} />;
+  if (image.pending) return <PendingPlate fill={fill || brick} className={className} />;
 
   const contain = image.fit === 'contain';
   /*
@@ -242,19 +268,21 @@ function ProjectImg({
    * scope is enforced by `projects.test.ts`, which pins it to the one asset by src.
    */
   const fillHero = fit && image.fillHero === true;
-  const frame = fillHero
-    ? `block h-full w-full object-cover ${className}`
-    : fit
-      ? `${FIT_FRAME} ${className}`
-      : fill
-        ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-        : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
-  const btnClass = `group relative block ${fillHero ? 'h-full w-full' : fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
+  const frame = brick
+    ? `block h-full w-full object-contain ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'} ${className}`
+    : fillHero
+      ? `block h-full w-full object-cover ${className}`
+      : fit
+        ? `${FIT_FRAME} ${className}`
+        : fill
+          ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+          : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const btnClass = `group relative block ${brick || fillHero ? 'h-full w-full' : fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
   if (image.video) {
-    const el = <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} fill={fill} fit={fit} />;
+    const el = <ProjectVideoEl image={image} className={className} contain={contain} reduced={reduced} fill={fill} fit={fit} brick={brick} />;
     if (!onOpen) return el;
     return (
       <button type="button" onClick={() => onOpen(image)} aria-label={`Enlarge: ${image.alt}`} className={btnClass}>
@@ -336,29 +364,48 @@ function SupportingRow({
 }
 
 /**
- * THE MEDIA AREA — TWO REGIONS (2026-07-16, round 5). Daniel annotated a screenshot with two boxes:
- * "Make the hero image of every project fit within square 1, and organize all the side images into
- * square 2. Make the images in square two really nice."
+ * THE MEDIA AREA — ONE WALL (2026-07-17). Daniel, on the live page: "Some of our project images are
+ * not filling their appropriate space (Archipedia, Synthetic Vision, LLO, Resia, DAC, Hydraulic,
+ * Plentify, Origami, and Flowerfield). Again, all of these photos are like bricks, there must be an
+ * equal line of mortar between them, and that must be very thin. There are too many spacings between.
+ * Find a dynamic way to organize them."
  *
- *   REGION 1 (~66%)  the hero, ALONE.
- *   REGION 2 (~31%)  EVERY supporting image, stacked.
+ * NINE OF TWELVE PROJECTS NAMED, which is the sentence that says this is the layout and not nine
+ * assets. The packer is `about/pack.ts`; read its header for the algorithm and for what is provably
+ * impossible. What is worth keeping HERE is the history, because each layout below was a correct
+ * response to Daniel's last note and became the next note's complaint:
  *
- * THIS REVISES ROUND 3's L-SHAPE, and it is Daniel overriding his own earlier note. That note asked
- * for the remainder "below AND to the right", which became a right column plus a full-width bottom
- * strip. He has now seen it: the strip put a lone thumbnail orphaned at the bottom-left of the hero's
- * region at a fraction of its size, which is what he is reacting to. The strip is gone; there is one
- * rail and everything supporting is on it.
+ *   ROUND 3, an L-SHAPE. The hero, a right column, and a full-width bottom strip. It orphaned a lone
+ *   thumbnail at the bottom-left of the hero at a fraction of its size. He overrode it.
  *
- * `dealSupporting` went with it — it existed only to choose which images went to which of the two
- * regions, and there is one region now. (Its rule was sound and is worth remembering if a second
- * region ever comes back: deal by SHAPE, never by position. Dealing by array order put Archipedia's
- * 0.46-ratio image — a very tall UI screenshot — into the wide strip, where a cell sized by the
- * strip's height came out 38px wide. A sliver.)
+ *   ROUND 5, TWO REGIONS. He annotated a screenshot with two boxes: "Make the hero image of every
+ *   project fit within square 1, and organize all the side images into square 2." So: hero ~66% alone,
+ *   every support stacked in a ~31% rail. `dealSupporting` died with the L-shape, and its rule is
+ *   still true and still worth knowing: DEAL BY SHAPE, NEVER BY POSITION. Dealing by array order put
+ *   Archipedia's 0.46-ratio screenshot into the wide strip, where it came out 38px wide. A sliver.
  *
- * EVERY CELL STILL TAKES ITS IMAGE'S OWN ASPECT (`aspectRatio: img.ratio`), never a fixed shape —
- * the wrong-shaped-box disease is this page's recurring bug (CLAUDE.md).
+ *   ROUND 10, TONIGHT — the two regions are what he is complaining about, and the measurement says
+ *   why. The hero's region was the `flex-1` REMAINDER after the rail, and the picture inside it sized
+ *   itself with FIT_FRAME. So whenever a hero's ratio disagreed with the remainder's, the slack
+ *   opened up as a column of paper BETWEEN the hero and the rail. Measured at 1440x900, the apparent
+ *   mortar down that seam, project by project:
+ *
+ *       12, 12, 12, 172, 12, 169, 12, 12, 12, 12, 219, 12      (the markup said `gap-3`, i.e. 12)
+ *
+ *   Origami's mortar line was 219px. That is "too many spacings between", exactly, and it is why he
+ *   could name it from across the room. Every project he named is one where a slack column or a slack
+ *   band opened; the three he did not name are the three where the hero's ratio happened to agree
+ *   with its remainder.
+ *
+ * THE SHAPE OF ALL THREE COMPLAINTS IS THE SAME, and it is CLAUDE.md's standing rule wearing a new
+ * hat: a REGION whose shape is decided before the picture is known is a wrong-shaped box, and every
+ * fix so far has been a better guess at that shape. The wall stops guessing — there is no region per
+ * picture at all, only the arrangement that the pictures' own ratios imply.
+ *
+ * WHAT DOES NOT CHANGE, and must not: the media area is still ONE uniform box on every project, and
+ * the divider below it is still pinned by the band (see ProjectInfoBand). The wall packs INSIDE that
+ * box and cannot move it.
  */
-const MEDIA = { supportW: 31 };
 
 /**
  * THE HERO'S FRAME — the element IS the picture, at the largest size its region allows.
@@ -849,27 +896,56 @@ function ListView({ reduced }: { reduced: boolean }) {
   const { hero, rest } = heroSplit(project.images);
 
 
-  // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
-  // they are excluded here and never enter the arrow-key walk.
-  // THE MEDIA ROW'S HEIGHT, measured. The rail's width is a function of it (see railWidth), and it
-  // is a flex-1 remainder of a viewport-locked panel, so nothing static knows it.
+  // THE MEDIA REGION, measured — BOTH dimensions now. The pack solves an arrangement against a real
+  // W x H (see pack.ts); the region is the `flex-1` remainder of a viewport-locked panel, so nothing
+  // static knows either number. The old rail only needed the height and took its width from a
+  // percentage; the pack needs the box.
   const mediaRowRef = useRef<HTMLDivElement>(null);
-  const [mediaRowH, setMediaRowH] = useState(0);
+  const [region, setRegion] = useState({ w: 0, h: 0 });
   // RE-BOUND ON EVERY PROJECT, because the row lives inside a `key={project.n}` subtree that
   // REMOUNTS on each switch. With `[]` deps the observer keeps watching the detached old element
-  // and the height freezes at whatever the first project measured — or at 0.
+  // and the size freezes at whatever the first project measured — or at 0.
   useEffect(() => {
     const el = mediaRowRef.current;
     if (!el) return;
     const measure = () => {
-      const h = el.getBoundingClientRect().height;
-      if (h > 0) setMediaRowH(h);
+      const r = el.getBoundingClientRect();
+      // Only ever widen from a real reading. A 0 here is the element between mounts, not a region
+      // that has collapsed, and writing it back would unpack the wall for a frame.
+      if (r.width > 0 && r.height > 0)
+        setRegion((prev) => (Math.abs(prev.w - r.width) < 0.5 && Math.abs(prev.h - r.height) < 0.5 ? prev : { w: r.width, h: r.height }));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, [project.n]);
+
+  /**
+   * THE WALL. Daniel, 2026-07-17: "all of these photos are like bricks, there must be an equal line of
+   * mortar between them, and that must be very thin. There are too many spacings between. Find a
+   * dynamic way to organize them."
+   *
+   * `packWall` searches every arrangement of THIS project's pictures against the region it actually
+   * has and picks the one that leaves the least paper, with every box built to its picture's authored
+   * ratio. The whole argument is in pack.ts; the two things that matter at this call site:
+   *
+   *   - THE HERO IS `items[0]`, so the pack knows which brick has to stay the biggest. Same split the
+   *     page has always used (`heroSplit`), same reading order after it — the pack is NOT allowed to
+   *     reorder the supports, because the captions tell a story in sequence.
+   *
+   *   - `fillHero` IS NOT PASSED, AND THE WALL REFUNDS THE CROP. Daniel licensed a 20.1% crop on
+   *     Robots' KUKA video because the alternative was a bespoke region height, and he had ruled
+   *     "prioritize that every project occupies the same formatting". The pack dissolves that
+   *     dilemma: the video's cell is built at exactly 1.7778, so it is uncropped AND the region is
+   *     still uniform — what varies is the arrangement inside it, which was always varying anyway
+   *     (the old heroes ran 511px to 744px wide across the twelve). The cost is 71px of paper at the
+   *     wall's bottom edge on that one project. The flag STAYS in projects.ts: it is Daniel's ruling
+   *     on the record, it costs nothing inert, and if the layout ever needs it again the licence is
+   *     still there. RAISED FOR HIM — uncropped video with air beneath it, or the crop back.
+   */
+  const wallItems = useMemo(() => [hero, ...rest], [hero, rest]);
+  const wall = useMemo(() => packWall(wallItems, region.w, region.h), [wallItems, region.w, region.h]);
 
   const lightboxImages = project.images.filter((im) => !im.pending);
   const [shot, setShot] = useState<number | null>(null);
@@ -971,55 +1047,37 @@ function ListView({ reduced }: { reduced: boolean }) {
             animate={{ opacity: 1 }}
             transition={{ duration: reduced ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* ROW 1 — the pictures. REGION 1: the hero, alone. REGION 2: every supporting image.
-                See the MEDIA comment. */}
-            <div ref={mediaRowRef} className="flex min-h-0 flex-1 gap-3">
-              {/* REGION 1 — the hero, alone, as large as the region allows and never cropped. The
-                  flex box is the REGION; the picture inside is its own size (see FIT_FRAME). */}
-              {/* `items-stretch`, NOT `items-start`, AND IT IS THE WHOLE FIX (round 10, item 8).
-                  MEASURED: at 1440x760 all TWELVE heroes were clipped, worst 47.7% of Synthetic
-                  Vision's picture; at 900, three were (Origami 22.3%, Synthetic Vision 15.8%, LLO
-                  9.6%). Not cropped by object-fit — CLIPPED, by the button's own `overflow-hidden`.
+            {/* ROW 1 — THE WALL. See the MEDIA comment above, and pack.ts for the packer. */}
+            <div ref={mediaRowRef} className="relative min-h-0 flex-1">
+              {/* THE CELLS ARE ABSOLUTE, AND THAT IS LOad-BEARING FOR THE DIVIDER. The media row is the
+                  `flex-1` REMAINDER of a viewport-locked panel and the band below it is `shrink-0`, so
+                  `dividerY = detail.bottom − band.height` and the row's height must depend on NOTHING
+                  the wall does. Absolute children have no intrinsic contribution, so there is no path
+                  from a pack decision back to the row's height, and therefore none to the divider.
+                  A flow-laid wall would close that loop — the wall would size the row, the row would
+                  size the wall — and the divider pin would start drifting per project. Verified with
+                  qa/divider.mjs at four widths.
 
-                  The chain: FIT_FRAME puts `max-h-full` on the <img>, which resolves against the
-                  BUTTON. `items-start` stops the button stretching, so its height is `auto` — and a
-                  percentage max-height against an indefinite containing block computes to `none`.
-                  The image then ignores the constraint entirely, takes its full natural height, and
-                  the button paints only as much of it as fits. Stretching the button makes its height
-                  definite, `max-h-full` resolves, and the picture sizes itself to the region under
-                  its own ratio, which is what FIT_FRAME was written to do all along.
-
-                  This is why Daniel saw it and the harness did not: the clip depends on the region's
-                  ratio, which rises as the window shortens. His window is shorter than 900. */}
-              <div data-project-hero className="flex min-h-0 flex-1 items-stretch justify-start">
-                <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fit />
-              </div>
-              {rest.length > 0 && (
-                /* REGION 2, and `railWidth` is what makes it read as a designed column rather than
-                   a pile. The rail's WIDTH is derived from the stack it has to hold AND the height it
-                   has to hold it in, so the cells share one width, each keeps its own exact height,
-                   and the stack lands flush with the hero's bottom edge — no sliver, no crop, no
-                   ragged rail. `max-w` caps it at its share; when that bites the cells just get
-                   shorter (still exact).
-
-                   IT IS MEASURED, NOT DECLARED, and that is the fix for Daniel's "every project
-                   seems to make the same mistake": `aspectRatio: stackRatio(rest)` could not
-                   subtract the (n-1) gaps from a height it was never told, so the cells filled the
-                   height and the gaps pushed the last one out of the box. See railWidth.
-
-                   It is a real trade and worth knowing: the rail gets NARROWER the more images a
-                   project has, because it is the height that is fixed. Three supporting images make
-                   a narrower rail than two. The alternative — full-width cells at their own heights
-                   — does not fit: Archipedia's three would stack 745px in a 510px rail, so
-                   something would have to be cropped or hidden behind a scrollbar nobody finds. */
-                <div
-                  data-project-rail
-                  className="flex h-full shrink-0 flex-col justify-start gap-3"
-                  style={{ width: railWidth(rest, mediaRowH), maxWidth: `${MEDIA.supportW}%` }}
-                >
-                  {rest.map((img) => (
-                    <div key={img.src} className="relative w-full" style={{ aspectRatio: img.ratio }}>
-                      <ProjectImg image={img} onOpen={openShot} reduced={reduced} fill />
+                  It also means the wall is measured, never declared: `mediaRowH`/`mediaRowW` come from
+                  a ResizeObserver, and before the first measurement `packWall` returns null and this
+                  renders nothing. That is deliberate. The old rail rendered `width: railWidth(rest, 0)`
+                  = 0 on the first paint, i.e. a row of zero-width images. */}
+              {wall && (
+                <div data-project-wall className="absolute left-0 top-0" style={{ width: wall.w, height: wall.h }}>
+                  {wall.cells.map((c) => (
+                    <div
+                      key={c.item.src}
+                      /* `data-project-hero` stays on the hero's CELL: it is the handle every probe
+                         selects (qa/hero-clip.mjs, qa/project-media.mjs), and a guard cannot check
+                         what it cannot select. `data-wall-cell` is new, because the wall's promise is
+                         about EVERY picture now, not only the hero — the rail was the only thing that
+                         was ever a separate species and it no longer exists. */
+                      data-wall-cell
+                      data-project-hero={c.item === hero ? '' : undefined}
+                      className="absolute"
+                      style={{ left: c.x, top: c.y, width: c.w, height: c.h }}
+                    >
+                      <ProjectImg image={c.item} onOpen={openShot} reduced={reduced} brick />
                     </div>
                   ))}
                 </div>
