@@ -186,39 +186,54 @@ export const TEAM: TeamMember[] = [
     image: '/assets/about/daniel-headshot.jpg',
     facts: [
       /*
-       * ROUND 10 (2026-07-16) — REWRITTEN ON DANIEL'S NOTE, AND IT IS NOT FINISHED. Two TODO(Daniel)
-       * gaps below, both of which are "he has to say it, nobody else can".
+       * ROUND 10 (2026-07-16) — REWRITTEN ON DANIEL'S NOTE, NOW FULLY SOURCED. No TODO left here.
        *
        * What he asked for: everything inside TRAINED; keep Rogers' six months but drop the dates
-       * ("the dates are not the point"); give Forsite Studio the MOST weight because it is a
-       * design-build firm, integrated and small (eight people), and that is why he saw a project go
-       * concept -> development -> contractors and subcontractors -> construction on site ->
-       * permitting; make it obvious he knows the construction process, not only design; mention the
-       * automation, with less room than Forsite; cut the Kenya medical device line.
+       * ("the dates are not the point") and convey the KIND of projects instead; give Forsite Studio
+       * the MOST weight because it is a design-build firm, integrated and small (eight people), and
+       * that is why he saw a project go concept -> development -> contractors and subcontractors ->
+       * construction on site -> permitting; make it obvious he knows the construction process, not
+       * only design; mention the automation, with less room than Forsite; cut the Kenya line.
+       *
+       * PROVENANCE, since two different kinds of fact are mixed here and the distinction is the whole
+       * safety of the paragraph:
+       *
+       *   - FROM HIS RESUME (first-party, `~/Downloads/Claude Corps Application Documents/
+       *     02-CV-and-Resume/source/DRAFT-RESUME.md`, read on his instruction): Forsite is TWO stints
+       *     — Architectural Design Intern May 2024 to May 2025, then Product Engineer May 2026 to
+       *     present. Rogers Partners, June to December 2025: primary visualization resource across
+       *     12+ concurrent engagements and 35+ client-facing renders; Grasshopper concepts for Pupin
+       *     Plaza at Columbia (on-structure waterproofing, ADA, Morningside Heights historic
+       *     district); the LPC submission package for the Buckley School's ~15,000 SF K-12 expansion,
+       *     approved and advanced to Construction Documents. The automation belongs to the SECOND
+       *     Forsite stint: a content-operations platform, a firm-wide AI operations layer, RAG over
+       *     the firm's archive.
+       *   - FROM HIS MOUTH, uncorroborated and fine: that Forsite is design-build, integrated, eight
+       *     people, and that this is why he saw concept through permitting. The resume does not say
+       *     any of it and the repo never mentioned Forsite before round 10. Nothing beyond it is
+       *     invented — no client detail, no scale, no dates it does not have.
+       *
+       * THE PROSE SAYS "TWICE", NOT THE DATES, and that is the instruction, not laziness: he asked
+       * for the kind of work rather than the calendar. But the two stints are a real fact about the
+       * shape of it — he went away and came back in a different seat — so the sentence carries the
+       * shape without the dates. "Now" is deliberately relative: the Product Engineer stint is
+       * current, and a bio that says "May 2026" goes stale silently.
+       *
+       * TODO(Daniel) — SIX MONTHS OR SEVEN? You said "six months at Rogers" twice, out loud, and the
+       * resume says June to December 2025 and "over 7 months". Your six is used here because it is
+       * your own history and you said it twice. Flagged rather than split, because quietly averaging
+       * two sources is how a bio ends up saying something neither of them said. Correct it if the
+       * resume is right.
        *
        * THE KENYA LINE IS CUT FROM THE BIO ONLY. Daniel: "I would probably remove the built medical
        * device in Kenya and talk more about Forsite." The Origami Medical Device project keeps it in
        * THE WORK, where it still reads in full. Recover this bio wording with:
        *   git show c2585c7 -- src/pages/about/projects.ts
-       *
-       * TODO(Daniel) #1 — HOW LONG AT FORSITE, and is it current? He asked for the duration in the
-       * copy and it cannot be invented, so the clause simply does not claim one. Add it here.
-       *
-       * TODO(Daniel) #2 — WHAT KIND OF WORK IS ROGERS PARTNERS? He said the dates do not matter and
-       * "what matters is the kind of work / the kind of projects Rogers Partners does. Convey the
-       * industry work, not the calendar." He never said WHAT that work is, and it appears nowhere in
-       * this repo, so there was nothing to source and the line still says only the six months. Round
-       * 10 declined to look the firm up and write it: that would be a fact about Rogers Partners
-       * asserted on Bower's About page on the strength of a search result, and the standing rule here
-       * is that every fact came from his mouth. One sentence from him closes it.
-       *
-       * The Forsite clause remains unverified in the older sense too: "Forsite" appears nowhere else
-       * in the repo. Everything in it below is his own words, and nothing is embroidered.
        */
       {
         label: 'Trained',
         value:
-          'Architecture, product design, and engineering. Six months at Rogers Partners in New York. Then Forsite Studio, a design-build firm of eight people. Small and integrated, so the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built Forsite’s AI operations layer.',
+          'Architecture, product design, and engineering. Six months at Rogers Partners in New York, on institutional and civic work under real regulatory constraint: Grasshopper concepts for Pupin Plaza at Columbia, and the landmarks package for a school expansion that was approved and went on to construction documents. Forsite Studio twice since, first drafting and now as a product engineer. It is a design-build firm of eight people, small and integrated enough that the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built the studio’s AI operations layer.',
       },
       /*
        * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
