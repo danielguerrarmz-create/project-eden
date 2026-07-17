@@ -57,6 +57,29 @@ export interface ProjectImage {
    *  is non-interactive (never opens the lightbox), and is excluded from the lightbox set. `src` may be
    *  empty; `ratio` still sizes the plate. Used to scaffold an asset Daniel will drop in later. */
   pending?: boolean;
+  /**
+   * FILL THE HERO REGION, CROPPING WHAT DOES NOT FIT. Opt-in, per asset, and it is a LICENCE ON ONE
+   * IMAGE, NOT A PRECEDENT. Read this before you put it on a second one.
+   *
+   * `object-fit: cover` is BANNED on heroes (see CLAUDE.md): it silently cropped 21% off Plentify's
+   * width, and "a cropped photo still looks like a photo, so nobody notices". This flag does the same
+   * arithmetic — on `Robots as Instruments` it discards 20.1% of the video's width — and the ONLY
+   * thing that makes it legitimate is that Daniel looked at that one asset and licensed it, twice,
+   * explicitly ("you may zoom in and crop; showing the full video is not required").
+   *
+   * WHY IT WAS NEEDED, because the alternative was better and lost on his ruling: the video is
+   * 1.7778 exactly against a ~1.419 region, and the honest fix is to build the region's height to the
+   * image (`height = width / 1.7778`), which crops nothing. That would give Robots a BESPOKE REGION
+   * HEIGHT, and he ruled the other way in the same breath: "Prioritize that every project occupies
+   * the same formatting." A uniform frame and an uncropped 1.7778 video in a 1.419 region cannot both
+   * be true. He chose uniformity; the crop is what uniformity costs.
+   *
+   * SO: it is deliberately NOT `fit: 'cover'` and deliberately not reachable by default. An image
+   * without this flag can never be cropped in the hero region, whatever its `fit` says. If you find
+   * yourself adding it to a second asset, that is not this licence extending — it is a new decision,
+   * and it is Daniel's, not yours.
+   */
+  fillHero?: boolean;
 }
 
 /** A published paper behind a project (the project IS the research). Renders a
@@ -397,6 +420,27 @@ export const PROJECTS: Project[] = [
         alt: 'A KUKA robot arm sanding an aluminium sheet, tooling an ornamented surface',
         caption: 'The KUKA arm, in motion',
         hero: true,
+        /*
+         * THE ONLY LICENSED CROP ON THE PAGE (round 10, item 8). Daniel: the video "does not fill its
+         * frame"; make it fill, flush right; "you may zoom in and crop, showing the full video is not
+         * required." See ProjectImage.fillHero before copying this onto anything else — it is a
+         * ruling about THIS asset, not a pattern.
+         *
+         * IT WAS ALREADY FLUSH RIGHT, measured: the element's right edge and the region's right edge
+         * are the same number, and the 12px apparent gap is the rail's own `gap-3`. The real defect
+         * was 84.2px of dead height BELOW the video, because the video is 1.7778 exactly and the
+         * region is ~1.419 — it fits by width and leaves a band. The rail beside it bottoming out
+         * ~33px early is the same fact, not a second bug.
+         *
+         * THE HONEST FIX WAS THE OTHER ONE, AND HE OVERRULED IT: size the region's height to
+         * width/1.7778 and nothing gets cropped. That gives this project a BESPOKE region height,
+         * which contradicts the uniform divider he ruled for in the same review ("Prioritize that
+         * every project occupies the same formatting"). Uniform frame + uncropped 1.7778 in a 1.419
+         * region is not satisfiable. He chose uniformity, so this is what uniformity costs: 20.1% of
+         * the width, which is within a point of the 21% Plentify loss that got `cover` banned. The
+         * difference is a person looked at this frame and said yes.
+         */
+        fillHero: true,
         video: {
           mp4: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.mp4`,
           webm: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.webm`,
@@ -801,11 +845,25 @@ export const PROJECTS: Project[] = [
      *
      * All seven are 793x613 (ratio 1.2936), measured off the files.
      *
-     * THE HERO IS THE DEVICE IN THE HOSPITAL, not the studio shot. Daniel: "switch the Hero Image to
-     * that of the item being utilized in the hospital." The project's claim is "transferred for
-     * clinical deployment" — a real device under a real patient is the evidence for that; the staged
-     * prototype is illustration. Lead with the proof. (Same instinct as the garden photograph on the
-     * home page.)
+     * THE HERO IS THE BROCHURE COVER (2026-07-16, round 10). DANIEL REVERSED HIMSELF, and this note
+     * exists so the next agent does not dutifully "fix" it back — the previous ruling was written
+     * here, in this comment, with a good argument behind it, which is exactly what makes it dangerous.
+     *
+     * Round 8 said, and it is now RETIRED: "THE HERO IS THE DEVICE IN THE HOSPITAL, not the studio
+     * shot. Daniel: 'switch the Hero Image to that of the item being utilized in the hospital.' The
+     * project's claim is 'transferred for clinical deployment' — a real device under a real patient
+     * is the evidence for that; the staged prototype is illustration. Lead with the proof."
+     *
+     * Round 10, his words: the DRAWING becomes the main, the photo of the girl in the operating room
+     * becomes the secondary. "The drawing" was ambiguous across seven 793x613 sheets, so it was put
+     * back to him rather than guessed: it is the brochure cover, the titled sheet carrying the wedge
+     * drawing, the tool inventory and the patient diagrams. The hospital photograph is not dropped —
+     * it demotes to secondary, so the proof still reads, second.
+     *
+     * NOTE FOR WHOEVER TOUCHES THIS NEXT: swapping the hero does NOT fix Origami's clipping. Its
+     * natural ratio (1.2936) is still below the region's, and the clip was never about which asset
+     * was in the slot — see the `items-stretch` fix in AboutPage.tsx. Two separate problems that
+     * looked like one.
      *
      * CAPTIONS: 01-02, 05-06, 11-12 and the cover are the portfolio's own words, reused verbatim
      * because they are already right. 03-04, 07-08 and 09-10 are written to match that voice —
@@ -816,24 +874,27 @@ export const PROJECTS: Project[] = [
      */
     images: [
       {
+        // THE HERO, round 10. `fit: 'contain'` stays: it is a paper sheet and wants a white ground.
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-brochure-cover.png`,
+        ratio: 1.2936,
+        alt: 'The brochure cover: the finished wedge, the materials needed (a box, scissors, a ruler, a shirt), the two-hour turning interval, and the device in use under a patient',
+        caption: 'The single-sheet brochure, what to build, from what, and why',
+        fit: 'contain',
+        hero: true,
+      },
+      {
+        // Demoted from hero to secondary, round 10. It stays FIRST of the supporting rail, so the
+        // proof still reads immediately after the drawing rather than being buried in the stack.
         src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
         ratio: 1.2125,
         alt: 'The device in use under a patient at Moi Teaching Hospital, Kenya',
         caption: 'In use at Moi Teaching Hospital, Kenya',
-        hero: true,
       },
       {
         src: `${A}/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp`,
         ratio: 1.2795,
         alt: 'The origami-inspired cardboard wedge prototype, a low-cost wound-prevention device, staged for photography',
         caption: 'The folded cardboard wedge, prototyped to cost cents',
-      },
-      {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-brochure-cover.png`,
-        ratio: 1.2936,
-        alt: 'The brochure cover: the finished wedge, the materials needed (a box, scissors, a ruler, a shirt), the two-hour turning interval, and the device in use under a patient',
-        caption: 'The single-sheet brochure, what to build, from what, and why',
-        fit: 'contain',
       },
       {
         src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-01-02.png`,

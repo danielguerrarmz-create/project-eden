@@ -153,11 +153,17 @@ function ProjectVideoEl({
 }) {
   const { ref, start } = useAutoplayVideo(image.video?.rate ?? 1);
 
-  const frame = fit
-    ? `${FIT_FRAME} ${className}`
-    : fill
-      ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-      : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  // The licensed crop has to live here too, because the one asset that carries it IS a video (Robots'
+  // KUKA loop) — ProjectImg's copy of this branch never sees it. Same gate: the asset's own flag,
+  // nothing else. See ProjectImage.fillHero.
+  const fillHero = fit && image.fillHero === true;
+  const frame = fillHero
+    ? `block h-full w-full object-cover ${className}`
+    : fit
+      ? `${FIT_FRAME} ${className}`
+      : fill
+        ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+        : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} />;
@@ -219,12 +225,22 @@ function ProjectImg({
   if (image.pending) return <PendingPlate fill={fill} className={className} />;
 
   const contain = image.fit === 'contain';
-  const frame = fit
-    ? `${FIT_FRAME} ${className}`
-    : fill
-      ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-      : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
-  const btnClass = `group relative block ${fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
+  /*
+   * THE LICENSED CROP, and it is deliberately gated on the asset's OWN flag rather than on `fit`.
+   * `fillHero` fills the hero region and crops the overflow — see ProjectImage.fillHero for why one
+   * asset has it and why it is not a precedent. It is reachable ONLY by an image that names itself,
+   * so no `fit: 'cover'` and no future hero can wander into a crop by default. That gate is the whole
+   * safety of it: the banned pattern got in last time by being the DEFAULT for a whole branch.
+   */
+  const fillHero = fit && image.fillHero === true;
+  const frame = fillHero
+    ? `block h-full w-full object-cover ${className}`
+    : fit
+      ? `${FIT_FRAME} ${className}`
+      : fill
+        ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+        : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const btnClass = `group relative block ${fillHero ? 'h-full w-full' : fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
   // into an <img> without a visible swap. It still opens the lightbox, on its poster.
