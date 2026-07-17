@@ -60,6 +60,7 @@ import {
   STEWARDSHIP_NOTE,
   priceMetaLine,
 } from '../ui/priceCopy';
+import { attributionFor, selectionLabel } from '../ui/costAttribution';
 import { deDash } from '../ui/text';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
@@ -218,6 +219,13 @@ export function DrawPage() {
   const explodeUniforms = useMemo(() => makeExplodeUniforms(), []);
   const [exploded, setExploded] = useState(false);
   const explodeProgressRef = useRef(0);
+  /** Index into `outputs.geometry.pieces`, or null for nothing selected. */
+  const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
+  // Resolved rather than stored: the index is the durable thing, and holding
+  // the Piece OBJECT across a re-bake would pin a part of a design that no
+  // longer exists.
+  const selectedPieceObj =
+    selectedPiece == null ? null : (outputs.geometry.pieces[selectedPiece] ?? null);
   const skinFadeRef = useRef(1);
   const revealProgressRef = useRef(0);
   const [dissolving, setDissolving] = useState(false);
@@ -415,7 +423,13 @@ export function DrawPage() {
                 {/* Both passes, on the same materials. `Folly` applies the
                     reveal first and CHAINS the explode onto it — see
                     explodeShader.ts; assigning would have deleted the reveal. */}
-                {baked && <Folly revealUniforms={revealUniforms} explodeUniforms={explodeUniforms} />}
+                {baked && (
+                  <Folly
+                    revealUniforms={revealUniforms}
+                    explodeUniforms={explodeUniforms}
+                    onSelectPiece={setSelectedPiece}
+                  />
+                )}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
                 {/* A dome renders identically at 3 m and at 30 m. One person
                     and it snaps to human scale. Bake only: see the file. */}
@@ -643,6 +657,53 @@ export function DrawPage() {
                     </p>
                   )}
 
+                  {/* THE MONEY HOP. A part on screen, resolved to its rows in
+                      the same build-up above it — in the same panel, the same
+                      register, no new HUD. Every line is either the pricing
+                      model's own flat per-unit rate (exact) or its real basis
+                      with the sharing named. Nothing divides a batch cost by a
+                      count to manufacture precision: see ui/costAttribution.ts,
+                      which is where that reasoning lives and is tested. */}
+                  {selectedPieceObj && (
+                    <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/70">
+                          {selectionLabel({ kind: 'piece', piece: selectedPieceObj })}
+                        </p>
+                        <button
+                          onClick={() => setSelectedPiece(null)}
+                          className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/40 hover:text-inkBlack"
+                        >
+                          clear
+                        </button>
+                      </div>
+                      <div className="mt-1.5 space-y-1">
+                        {attributionFor({ kind: 'piece', piece: selectedPieceObj }, outputs.nesting).map(
+                          (l) => (
+                            <div key={l.label}>
+                              <div className="flex justify-between gap-3 text-[10px]">
+                                <span className={l.exact ? 'text-inkBlack/70' : 'text-inkBlack/45'}>
+                                  {l.label}
+                                </span>
+                                <span
+                                  className={`shrink-0 font-mono tabular-nums ${
+                                    l.exact ? 'text-inkBlack/80' : 'text-inkBlack/45'
+                                  }`}
+                                >
+                                  {l.amount}
+                                  {!l.exact && ' *'}
+                                </span>
+                              </div>
+                              {l.note && (
+                                <p className="text-[9px] leading-relaxed text-inkBlack/40">* {l.note}</p>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <details className="group mt-2">
                     <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/50 hover:text-inkBlack">
                       <span className="transition group-open:rotate-90">›</span>
@@ -733,6 +794,7 @@ export function DrawPage() {
                     onClick={() => {
                       setBaked(false);
                       setExploded(false); // a soft surface has nothing to explode
+                      setSelectedPiece(null); // and no pieces to have selected
                       setTurntable(false); // you cannot sculpt a moving target
                     }}
                   >

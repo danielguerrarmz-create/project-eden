@@ -45,12 +45,13 @@ const FACES: [number, number, number, number][] = [
  */
 function prismsToGeometry(
   prisms: Vec3[][],
-  explode?: { offsets: Vec3[]; delays: number[] },
+  explode?: { offsets: Vec3[]; delays: number[]; pieceIndex: number[] },
 ): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
   const offsets: number[] = [];
   const delays: number[] = [];
+  const pieceIdx: number[] = [];
   const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
   const cross = (a: Vec3, b: Vec3): Vec3 => [
     a[1] * b[2] - a[2] * b[1],
@@ -62,6 +63,7 @@ function prismsToGeometry(
   for (const [pi, v] of prisms.entries()) {
     const off = explode?.offsets[pi] ?? ([0, 0, 0] as Vec3);
     const delay = explode?.delays[pi] ?? 0;
+    const piece = explode?.pieceIndex[pi] ?? -1;
     const centroid: [number, number, number] = [0, 0, 0];
     for (const p of v) {
       centroid[0] += p[0] / 8;
@@ -94,6 +96,7 @@ function prismsToGeometry(
           normals.push(un[0], un[1], un[2]);
           offsets.push(off[0], off[1], off[2]);
           delays.push(delay);
+          pieceIdx.push(piece);
         }
       }
     }
@@ -105,6 +108,10 @@ function prismsToGeometry(
   if (explode) {
     geo.setAttribute('aExplodeOffset', new THREE.Float32BufferAttribute(offsets, 3));
     geo.setAttribute('aExplodeDelay', new THREE.Float32BufferAttribute(delays, 1));
+    // Not read by any shader — this one exists so a RAYCAST can name what it
+    // hit. The merge destroys per-piece identity; this is the only thread back
+    // from a triangle on screen to a row in the cut list.
+    geo.setAttribute('aPieceIndex', new THREE.Float32BufferAttribute(pieceIdx, 1));
   }
   return geo;
 }
@@ -179,7 +186,18 @@ function useReveal(revealUniforms?: RevealUniforms, explodeUniforms?: ExplodeUni
 export function Folly({
   revealUniforms,
   explodeUniforms,
-}: { revealUniforms?: RevealUniforms; explodeUniforms?: ExplodeUniforms } = {}) {
+  onSelectPiece,
+}: {
+  revealUniforms?: RevealUniforms;
+  explodeUniforms?: ExplodeUniforms;
+  /**
+   * Index into `geometry.pieces` for the piece a click landed on, or null for a
+   * click that hit nothing. OPTIONAL, and the gate that keeps `#/studio` exactly
+   * as it was: R3F only raycasts objects that actually carry a handler, so
+   * without this prop these meshes are not interactive at all.
+   */
+  onSelectPiece?: (pieceIndex: number | null) => void;
+} = {}) {
   const geometry = useDesign((s) => s.outputs.geometry);
   const system = geometry.params.jointSystem;
   const lamellaSystem = system === 'lamella';
@@ -195,9 +213,12 @@ export function Folly({
     const lvl: Vec3[][] = [];
     // Parallel to the prisms: each member's own outward normal times the travel
     // distance, and its own `v`. The engine already computed both.
-    const c24Ex = { offsets: [] as Vec3[], delays: [] as number[] };
-    const lvlEx = { offsets: [] as Vec3[], delays: [] as number[] };
+    const c24Ex = { offsets: [] as Vec3[], delays: [] as number[], pieceIndex: [] as number[] };
+    const lvlEx = { offsets: [] as Vec3[], delays: [] as number[], pieceIndex: [] as number[] };
     const distM = explodeDistanceM(geometry.planB);
+    // A prism is a MEMBER; the cut list is PIECES, and one piece can be several
+    // members. This is the join, resolved once here rather than per click.
+    const pieceIndexById = new Map(geometry.pieces.map((p, i) => [p.id, i]));
     for (const m of geometry.members) {
       const { widthM, depthM } = sectionFor(m.type, system);
       const isLinear = !lamellaSystem && (m.type === 'lattice' || m.type === 'foot');
@@ -205,6 +226,7 @@ export function Folly({
       const ex = isLinear ? c24Ex : lvlEx;
       ex.offsets.push([m.normal[0] * distM, m.normal[1] * distM, m.normal[2] * distM]);
       ex.delays.push(m.v);
+      ex.pieceIndex.push(pieceIndexById.get(m.pieceId) ?? -1);
     }
     return {
       c24Geo: prismsToGeometry(c24, c24Ex),
@@ -212,7 +234,24 @@ export function Folly({
       c24Count: c24.length,
       lvlCount: lvl.length,
     };
-  }, [geometry.members, geometry.planB, system, lamellaSystem]);
+  }, [geometry.members, geometry.pieces, geometry.planB, system, lamellaSystem]);
+
+  /**
+   * Which piece a click hit. The geometry is NON-INDEXED (the merge writes three
+   * fresh vertices per triangle for flat shading), so the first vertex of face
+   * `f` is at `f * 3` and `aPieceIndex` is constant across the prism anyway.
+   */
+  const pick = useCallback(
+    (e: { faceIndex?: number | null; object: THREE.Object3D; stopPropagation: () => void }) => {
+      if (!onSelectPiece || e.faceIndex == null) return;
+      e.stopPropagation();
+      const attr = (e.object as THREE.Mesh).geometry.getAttribute('aPieceIndex');
+      if (!attr) return;
+      const idx = attr.getX(e.faceIndex * 3);
+      onSelectPiece(idx >= 0 ? idx : null);
+    },
+    [onSelectPiece],
+  );
   useEffect(
     () => () => {
       c24Geo.dispose();
@@ -239,14 +278,26 @@ export function Folly({
   return (
     <>
       {c24Count > 0 && (
-        <mesh geometry={c24Geo} castShadow receiveShadow ref={reveal}>
+        <mesh
+          geometry={c24Geo}
+          castShadow
+          receiveShadow
+          ref={reveal}
+          {...(onSelectPiece ? { onClick: pick } : {})}
+        >
           {/* Planed C24 spruce/larch, UC3 treated. */}
           <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
         </mesh>
       )}
 
       {lvlCount > 0 && (
-        <mesh geometry={lvlGeo} castShadow receiveShadow ref={reveal}>
+        <mesh
+          geometry={lvlGeo}
+          castShadow
+          receiveShadow
+          ref={reveal}
+          {...(onSelectPiece ? { onClick: pick } : {})}
+        >
           {/* Spruce LVL, CNC-profiled — paler than the sawn stock. */}
           <meshStandardMaterial color="#c2ab84" roughness={0.75} metalness={0} />
         </mesh>
