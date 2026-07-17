@@ -94,10 +94,31 @@ export interface ProjectPaper {
   pdfSize: string;
 }
 
+/*
+ * THERE IS NO STABLE KEY ON A PROJECT, AND EVERY FIELD THAT LOOKS LIKE ONE IS NOT ONE. Written down
+ * because `TeamMember` carries this exact warning on `FounderId` and the ledger never got it, and
+ * because round 10 wrote a bio guard keyed on `p.id` — A FIELD THAT DOES NOT EXIST. Every lookup
+ * returned undefined, every project was skipped, and it passed green while checking nothing, in the
+ * file whose entire purpose was catching things that check nothing.
+ *
+ *   - `n`  is DISPLAY ORDER. It renumbers whenever a project is added, removed, or merged — and it has:
+ *          KUKA and Texas Robotics merged into one entry and shifted every `n` below them. Anything
+ *          keyed on `n` silently re-points at a DIFFERENT project on the next merge. It is fine as a
+ *          React list key within one render; it is not an identity.
+ *   - `title` is DISPLAY COPY. It has already been rewritten at least twice ("Origami Medical Device",
+ *          "LLO: Dream Machine", "Robots as Instruments"). Keying on it means an editorial word change
+ *          breaks code, silently, in a file nobody thinks of as code.
+ *   - `src` paths are the closest thing to stable, which is why the licensed crop is pinned by src.
+ *
+ * So: match on `src`, or add a real `id` — do not invent one in a test and assume it is there. If you
+ * add one, it must be authored, never derived from `n` or `title`, and it must never be renumbered.
+ */
 export interface Project {
   /** Two-digit index shown in the list. It encodes the DISPLAY order, which is reverse
    *  chronological: 01 is the most recent work, and the numbers climb as you go back in
-   *  time. Keep it in sync with `year` when a project is added — no gaps. */
+   *  time. Keep it in sync with `year` when a project is added — no gaps.
+   *
+   *  NOT AN IDENTITY. It renumbers on add/remove/merge — see the note above this interface. */
   n: string;
   title: string;
   by: Author;
@@ -787,6 +808,28 @@ export const PROJECTS: Project[] = [
     learned:
       'Architecture can be grown in place and paced to the people who build it, not only trucked in and assembled.',
     // TODO(Daniel): collaborators/professors
+    /*
+     * TODO(Daniel) — THE PAPER DOWNLOAD (round 10, item 8). IT IS DELIBERATELY NOT SCAFFOLDED, and the
+     * reason is a real defect rather than caution.
+     *
+     * The brief said to scaffold this against Archipedia's `pdf: ''` precedent. That precedent does not
+     * transfer, because of what makes it work: Archipedia has a REAL venue and REAL authors and is
+     * missing only the file, and `Recognition` gates the download button on `paper?.pdf` — so it renders
+     * a correct citation with no button, which is exactly right for a paper awaiting its PDF.
+     *
+     * PLENTIFY HAS NONE OF THE THREE. Venue and authors appear NOWHERE in this repo. And `Recognition`
+     * renders `{paper.venue} · {paper.authors}` UNCONDITIONALLY whenever `paper` exists — so an empty
+     * scaffold here does not render "nothing yet", it renders a bare "·" under an "AWARDS AND
+     * PUBLICATIONS" heading. A scaffold that ships a visible artefact is worse than the absence it was
+     * meant to hold, and inventing a venue to fill it is the one thing this file must never do.
+     *
+     * THREE FACTS ARE NEEDED, and only Daniel has them: the VENUE (where/when published), the AUTHORS,
+     * and the PDF itself. He has said he will hand over the file. Note that the file alone is not
+     * enough — with it and no venue, this still cannot ship.
+     *
+     * `projects.test.ts` now asserts every `paper` carries a non-empty venue and authors, so this
+     * cannot be quietly half-filled later. `pdf`/`pdfSize` may be empty; the citation may not.
+     */
     images: [
       {
         src: `${A}/01-synergy/synergy-cosmos-growth-loop-poster.webp`,

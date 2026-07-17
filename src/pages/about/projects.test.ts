@@ -146,6 +146,32 @@ describe('projects.ts — the fixed detail panel fits without an inner scroll', 
     expect(licensed[0].im.hero, 'the licensed crop must be the hero of its project').toBe(true);
   });
 
+  /*
+   * A PAPER MAY BE MISSING ITS FILE. IT MAY NOT BE MISSING ITS CITATION.
+   *
+   * `Recognition` gates the download button on `paper?.pdf`, so `pdf: ''` is a supported, meaningful
+   * state: a real citation, no button, file pending (Archipedia). But it renders
+   * `{paper.venue} · {paper.authors}` UNCONDITIONALLY — so a `paper` with empty strings does not
+   * degrade to nothing, it ships a bare "·" under an "AWARDS AND PUBLICATIONS" heading.
+   *
+   * That is the trap this test exists for: round 10 was asked to scaffold Plentify's paper "against the
+   * Archipedia precedent", and the precedent silently does not transfer, because Archipedia is missing
+   * only the FILE while Plentify has no venue and no authors anywhere in the repo. The safe-looking move
+   * was the broken one. So the invariant is pinned instead of trusted: pdf may be empty, the citation
+   * may not, and the only lawful way to fill this is facts from Daniel.
+   */
+  it('every paper has a real citation, even when its PDF is still pending', () => {
+    for (const p of PROJECTS) {
+      if (!p.paper) continue;
+      expect(p.paper.venue.trim(), `${p.n} ${p.title}: a paper with no venue renders a bare "·"`).not.toBe('');
+      expect(p.paper.authors.trim(), `${p.n} ${p.title}: a paper with no authors renders a bare "·"`).not.toBe('');
+      // pdfSize is the button's label, so it only has to exist when the button does.
+      if (p.paper.pdf.trim() !== '') {
+        expect(p.paper.pdfSize.trim(), `${p.n} ${p.title}: a download button with no size label`).not.toBe('');
+      }
+    }
+  });
+
   it('the `n` order is a clean reverse-chronological run with no gaps', () => {
     const ns = [...PROJECTS].map((p) => p.n).sort((a, b) => a.localeCompare(b));
     ns.forEach((n, i) => {
