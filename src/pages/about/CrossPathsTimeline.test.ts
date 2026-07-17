@@ -15,6 +15,8 @@ import {
   spineLeanPtsTo,
   solveMark,
   MARK_R,
+  MARK_K,
+  SPINE_W,
   yearLabelClearance,
   yearLabelBox,
   yearToY,
@@ -328,6 +330,52 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
 describe('composition contract', () => {
   it('caps concurrent stroked paths at three', () => {
     expect(MAX_CONCURRENT_STRANDS).toBe(3);
+  });
+
+  /**
+   * ITEM 1a's TWO FACTS, PINNED SEPARATELY — because welding them together is what blocked item 1a for
+   * two rounds, and NOTHING GUARDED EITHER OF THEM.
+   *
+   * Changing `SPINE_W` from 7.5 to 2.2 and rewriting `MARK_K`'s definition broke no test. That is the
+   * whole reason the conflation survived: the relationship between the spine's weight and the mark's
+   * size lived in a COMMENT, and a comment cannot fail. The comment was even correct — "2.8 * MARK_K =
+   * SPINE_W, so the line becomes mark linework with no change in weight. That pins the mark at 90 *
+   * MARK_K = 241px wide" — and being correct is exactly what made it authoritative enough to refuse a
+   * ruling on. **The files most worth distrusting are the ones that explain themselves best.**
+   *
+   * So the two facts are separated here, in the code, where they can fail:
+   */
+  it('ITEM 1a: the mark is the size Daniel approved, and the spine\'s weight cannot move it', () => {
+    // 90 world units across at MARK_K. Daniel approved 241px; it used to be a CONSEQUENCE of the
+    // spine's weight (MARK_K was defined as SPINE_W / 2.8), so "make the line thinner" silently meant
+    // "make the logo smaller" — thinning to 2.2 would have dropped the Oculus to 70.7px, under a third
+    // of the approved size, which is what item 1a was refused over. Pinning the SIZE is what makes the
+    // weight free. If someone re-derives MARK_K from SPINE_W, this fails immediately.
+    expect(90 * MARK_K, 'the mark is no longer 241px — has MARK_K been re-derived from SPINE_W?').toBeCloseTo(241, 0);
+    // ...and the finale's geometry hangs off the same scale, so it moves with the size and not with
+    // the ink. MARK_R is what TAIL_LEN (2*pi*r, the winding tail's conserved arc length) is built from.
+    expect(MARK_R).toBeCloseTo(30 * MARK_K, 6);
+  });
+
+  it('ITEM 1a: the spine, the branches and the mark are all one weight, so no join steps', () => {
+    /**
+     * THE ONLY INVARIANT THAT WAS EVER REAL HERE: the line does not change width where it winds into
+     * the mark. CLAUDE.md lists the failure as already shipped once — "a trunk with a hardcoded stroke
+     * that matched the spine's position exactly and still stepped 46% in width at the join".
+     *
+     * It is a claim about STROKES being equal. It is not a claim about the mark's diameter, and
+     * conflating the two is what cost two rounds. Asserted as identity rather than arithmetic: the
+     * render strokes the mark's circles at `SPINE_W` directly now, not at `MARK_STROKE * k`.
+     */
+    // Daniel: "the same thickness as the other branches and leaves, including our logo as well."
+    // The branches' base weight IS the spine's weight now; the taper below it is by ORDER, which is
+    // what still tells a twig from what it forks off.
+    expect(subBranchWidth(0), 'the spine and its branches have drifted apart in weight').toBeCloseTo(SPINE_W, 6);
+    expect(subBranchWidth(1)).toBeLessThan(subBranchWidth(0)); // ...and depth still reads
+    // THIN, which is the word he used three times. Pinned as an upper bound rather than an equality:
+    // the exact value is a look call and his to move, but a spine at the old 7.5 is the thing he
+    // rejected, and it must not come back by way of somebody "restoring" a constant.
+    expect(SPINE_W, 'the spine is heavy again — item 1a asked for thin, three times').toBeLessThanOrEqual(3);
   });
 });
 

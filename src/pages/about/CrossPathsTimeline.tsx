@@ -116,44 +116,46 @@ const CX = 600;
 /** The spine's stroke, in WORLD units — not CSS px. What it renders at depends on the frame's
  *  scale, which is why the parenthesis measures rather than copies the number. */
 /**
- * THE SPINE'S WEIGHT — and it is not only a weight, which is round 10's item 1a and why that item is
- * NOT built. TODO(Daniel): read this before anyone thins the spine.
+ * THE SPINE'S WEIGHT — thin, and the SAME weight as the branches and the mark. Item 1a, built on the
+ * THIRD ask (2026-07-17). Read the whole note before changing it; it was refused twice for a reason
+ * that turned out not to exist.
  *
- * He asked for three things. 1b (the bottom should grow out of the screen) and 1c (the top should
- * fade, not cut, and stay clear of the header) are real, diagnosed and measured — see revealProps.
- * 1a asked that the spine be "drawn by the same procedural algorithm as the nonflowers stroke used
- * for the ornamental vines, at a similar (thin) weight", so it reads "as the same organism as the
- * branches around it, not as a rule with plants glued to it". The intent is right: it IS a uniform
- * 7.5 rule today. But the instruction as written collides with two load-bearing things, so it was
- * raised rather than complied with.
+ * Daniel: "Change the main timeline line to be the same thickness as the other branches and leaves,
+ * **including our logo as well**. Include leaves and flowers." Earlier, the same ask: draw it "at a
+ * similar (thin) weight" so it reads "as the same organism as the branches around it, not as a rule
+ * with plants glued to it".
  *
- * ONE: THIS CONSTANT SETS THE MARK'S SIZE. `MARK_K = SPINE_W / MARK_STROKE` and `MARK_R = 30 *
- * MARK_K`, and the comment there is explicit that "the mark's scale is not a free choice... 2.8 *
- * MARK_K = SPINE_W, so the line becomes mark linework with no change in weight. That pins the mark
- * at 90 * MARK_K = 241px wide." Thin the spine to the sub-branches' 2.2 and the Oculus drops to
- * ~71px — under a third of the size Daniel approved, and "the largest single object at the bottom of
- * the piece" stops being large. Hold the mark's size instead and the line steps in width where it
- * winds into it, which CLAUDE.md already lists as a shipped bug ("a trunk with a hardcoded stroke
- * that matched the spine's position exactly and still stepped 46% in width at the join").
+ * THE COLLISION THAT BLOCKED THIS FOR TWO ROUNDS WAS A CONFLATION, NOT A CONSTRAINT, and this is the
+ * page's own "the fix is never a better number" lesson wearing a new hat. The note here used to read:
+ * "THIS CONSTANT SETS THE MARK'S SIZE. `MARK_K = SPINE_W / MARK_STROKE`, `MARK_R = 30 * MARK_K`...
+ * thin the spine to the sub-branches' 2.2 and the Oculus drops to ~71px, under a third of the size
+ * Daniel approved." **Every word of that was true and the conclusion still did not follow.** `MARK_K`
+ * was doing TWO jobs: it scaled the mark's SIZE, and it was the ratio that made the mark's rendered
+ * stroke come out equal to the spine's. Only the second is a real invariant — the join must not step
+ * in width — and it is a statement about two STROKES, not about the mark's diameter. The size was a
+ * CONSEQUENCE that Daniel then approved as a fact, and an approved consequence quietly became a
+ * constraint on its own input.
  *
- * TWO: THE GARLAND'S TUBE IS A PAINTED BITMAP AND THE SPINE IS ANIMATED GEOMETRY. The nonflowers
- * stroke is `drawTube` inside the composer, which paints once into a canvas at fixed geometry (see
- * GarlandOpts.tube — the About page switches it OFF precisely because "the spine is Daniel's drawn
- * SVG line and must stay the drawn line"). The spine dash-reveals as the card line passes, leans off
- * its axis, and winds the last 2*pi*r units into the mark with arc length conserved at every w. A
- * bitmap cannot do any of that. Painting the spine with the composer's tube would cost the finale,
- * which is the page's climax and the reason the drafts that lost, lost.
+ * SO: PIN THE SIZE, FREE THE WEIGHT. `MARK_K` is now the mark's scale, pinned at the 241px he
+ * approved; the spine and the mark's stroke are both `SPINE_W`. The join is still seamless — MORE
+ * directly than before, because it is now one constant used twice instead of a product that happens
+ * to equal it. The mark is still 241px. `MARK_R`, `TAIL_LEN` and every point of the finale's geometry
+ * are unchanged; **only the width of the ink changed.** Nothing was traded. There was no triangle.
  *
- * WHAT WOULD HONOUR THE INTENT WITHOUT EITHER COST (proposed, not built, because it is a design call
- * and the composition around it is one Daniel has already signed off): keep SPINE_W as the weight
- * the mark is cut from, and give the spine an ORGANIC WIDTH PROFILE in SVG — a filled taper outline
- * with a slight waver rather than a constant-width stroke. `taperRuns` in about/parenthesis.ts
- * already does exactly this for the founders' arms, for the same complaint ("they are not a
- * constant-width rail: they are the line thinning as it grows away from the trunk"). Keep the mean
- * width at SPINE_W and the join stays seamless and the mark stays 241px, while the line stops
- * reading as a rule.
+ * WHAT IS STILL NOT BUILT, AND IT IS THE REST OF THE SENTENCE. He asked for the spine to be "drawn by
+ * the same procedural algorithm as the nonflowers stroke". That part DOES collide, and the collision
+ * is real: the nonflowers stroke is `drawTube` inside the composer, which paints once into a canvas
+ * at fixed geometry (`GarlandOpts.tube` is switched OFF here precisely because "the spine is Daniel's
+ * drawn SVG line and must stay the drawn line"). The spine dash-reveals as the card line passes,
+ * leans off its axis, and winds the last 2*pi*r units into the mark with arc length conserved at
+ * every w. **A bitmap cannot do any of that**, and painting it would cost the finale — the page's
+ * climax and the reason the drafts that lost, lost. The honest substitute is an organic width PROFILE
+ * in SVG (a filled taper outline with a slight waver, as `taperRuns` in about/parenthesis.ts already
+ * does for the founders' arms against this identical complaint), keeping the mean at `SPINE_W`.
+ * TODO(Daniel): thinness is what he named three times and it is what shipped. Look at it first — a
+ * 2.2 line may already read as growth rather than as a rule, in which case the taper buys nothing.
  */
-export const SPINE_W = 7.5;
+export const SPINE_W = 2.2;
 
 /**
  * THE TIME AXIS IS A PACKING, NOT A SCALE — and the years are DELIBERATELY UNEQUAL (2026-07-17).
@@ -464,8 +466,16 @@ const CONV_TWIST = 110; // height of the over-under lay above the junction
 const CONV_GATE_Y = CONV_JUNCTION_Y - CONV_TWIST; // 40 — where the wishbone hands off to the twist
 const CONV_AMP = 240; // how far off-axis each strand starts
 const CONV_OFF = 7.5; // half the lay separation through the twist
-/** Root-2 strand weight: each strand is substantial, so neither reads as subordinate. */
-const CONV_WEIGHT = 5.3;
+/**
+ * Root-2 strand weight: each strand is substantial, so neither reads as subordinate — two strands of
+ * this weight lay up into ONE spine of `SPINE_W`, and area adds, so each is `SPINE_W / sqrt(2)`.
+ *
+ * IT WAS THE LITERAL `5.3`, which is exactly `7.5 / sqrt(2)` = 5.3033 — a derived quantity typed out
+ * as a constant, so it was correct only while the spine was 7.5 and would have silently kept two fat
+ * arms feeding a hairline the moment item 1a landed. **The relationship was in the comment and not in
+ * the code, which is the same class as `CLUSTER_GAP_Y` versus `BAND_GAP`.** Now it follows.
+ */
+const CONV_WEIGHT = SPINE_W / Math.SQRT2;
 
 /** One convergence strand for side `dir` (-1 left, +1 right): wishbone in from off-frame, then a
  *  single over-under crossing that closes onto the spine axis at the junction. */
@@ -498,12 +508,33 @@ export function convArmPts(dir: number): Array<{ x: number; y: number }> {
 
 /**
  * THE FINALE (redline 1). The line winds itself into the Bower mark. Variant A: the mark is centred,
- * the spine leans to reach the attach point on the far flank of circle 0. The mark's scale is not a
- * free choice: its stroke is 2.8 at a 100-unit box, and 2.8 * MARK_K = SPINE_W, so the line becomes
- * mark linework with no change in weight. That pins the mark at 90 * MARK_K = 241px wide.
+ * the spine leans to reach the attach point on the far flank of circle 0.
+ *
+ * THE MARK'S SIZE AND THE MARK'S STROKE ARE TWO FACTS, AND THIS FILE USED TO MAKE THEM ONE (fixed
+ * 2026-07-17, item 1a). It read: "The mark's scale is not a free choice: its stroke is 2.8 at a
+ * 100-unit box, and 2.8 * MARK_K = SPINE_W, so the line becomes mark linework with no change in
+ * weight. That pins the mark at 90 * MARK_K = 241px wide." The arithmetic was right and it welded the
+ * mark's DIAMETER to the spine's WEIGHT — so "make the line thinner" read as "make the logo smaller",
+ * and item 1a was refused twice on that basis.
+ *
+ * The real invariant is only ever THE JOIN DOES NOT STEP IN WIDTH, which is a claim about two strokes
+ * being equal. It is now enforced the direct way — the mark is stroked at `SPINE_W`, the same constant
+ * the spine is stroked at, so they are equal because they are the same number rather than because a
+ * product works out. `MARK_K` keeps its value and loses its second job: it is the SCALE, pinned at the
+ * 241px Daniel approved, and the size no longer moves when the weight does.
+ *
+ * `MARK_STROKE` (2.8) IS DELETED RATHER THAN KEPT FOR REFERENCE. It was the Oculus artwork's own
+ * stroke at its native 100-unit box — a true fact about the source geometry, and once the mark is
+ * stroked at `SPINE_W` nothing derives from it. A constant that nothing reads is a constant the next
+ * person re-derives something from, which is how it got its second job the first time. The fact lives
+ * in this sentence, where it cannot be multiplied by anything.
  */
-const MARK_STROKE = 2.8;
-export const MARK_K = SPINE_W / MARK_STROKE; // 2.6786
+/** The mark's scale, and ONLY its scale. 90 * MARK_K = 241px wide — the size Daniel approved, pinned
+ *  as the size it is rather than falling out of the spine's weight. The value is unchanged (it was
+ *  SPINE_W / 2.8 = 7.5 / 2.8 back when the spine was 7.5), so **no point of the finale's geometry
+ *  moved when the ink thinned** — only the width of the ink. `qa/hero-lockup.mjs` and the mark-size
+ *  contract test both pin this. */
+export const MARK_K = 2.6786;
 export const MARK_R = 30 * MARK_K; // 80.36 — world radius of one mark circle
 const LEAN_SPAN = 620; // descent the spine spends easing off-axis to the attach point
 const MARK_CENTER_X = CX; // variant A: the mark stays on the axis
@@ -1039,9 +1070,21 @@ const SUB_SPINE_CLEAR = 30;
  *  straight segment clips a corner — the contract test measures against this rather than against a
  *  copy of the number. See "THE CONTRACT" in CrossPathsTimeline.test.ts. */
 export const SUB_PLATE_PAD = 18;
-/** The sub-branch stroke. Thin against SPINE_W (7.5): these read as growth OFF the main line,
- *  never as a second spine competing with it. */
-const SUB_BRANCH_W = 2.2;
+/**
+ * The sub-branch stroke, and it is now the SAME as the spine's — deliberately, on Daniel's ruling:
+ * "the main timeline line to be the same thickness as the other branches and leaves".
+ *
+ * IT USED TO SAY "Thin against SPINE_W (7.5): these read as growth OFF the main line, never as a
+ * second spine competing with it." That hierarchy is what he rejected. The line was reading as a rule
+ * with plants glued to it, and a trunk 3.4x its own branches is how a rule reads. The weight
+ * hierarchy is gone; the ORDER taper below is what still distinguishes a twig from what it forks off
+ * (0.72 per order, floored at 0.9), so the drawing keeps its depth without the spine shouting.
+ *
+ * `SPINE_W` rather than a second `2.2`: two constants that happen to be equal are two constants that
+ * disagree later, and this page has been bitten by exactly that (CONV_WEIGHT's 5.3, the trunk with a
+ * hardcoded stroke that stepped 46% at the join).
+ */
+const SUB_BRANCH_W = SPINE_W;
 /** The hint line's claimed band: 12px mono, and it overhangs its plate on the outer side. */
 const HINT_H = 22;
 const HINT_W = 90;
@@ -2306,7 +2349,12 @@ export function CrossPathsTimeline({
                   r={g.r}
                   fill="none"
                   stroke={INK_SEPIA}
-                  strokeWidth={MARK_STROKE * g.k}
+                  // THE MARK IS STROKED AT THE SPINE'S OWN WEIGHT, and that is now literal rather
+                  // than arithmetical. It was `MARK_STROKE * g.k`, which equalled SPINE_W only
+                  // because MARK_K was DEFINED as SPINE_W / MARK_STROKE — true, circular, and the
+                  // reason thinning the line appeared to shrink the logo. Daniel: "the same
+                  // thickness as the other branches and leaves, including our logo as well."
+                  strokeWidth={SPINE_W}
                   strokeLinecap="round"
                   opacity={o}
                 />
@@ -2314,9 +2362,11 @@ export function CrossPathsTimeline({
             })}
 
             {/* THE LINE INTO THE MARK: the plumb spine hands off to the organic meandering lean, and
-                the lean hands off to the winding tail. All at the spine's weight, which is also the
-                mark's stroke (MARK_STROKE * k = SPINE_W), so the one root reads as a single heavy line
-                that ravels itself into the mark with no change in weight. */}
+                the lean hands off to the winding tail. All at SPINE_W, which is ALSO what the mark's
+                circles are stroked at — the same constant, not a product that evaluates to it — so the
+                one root ravels itself into the mark with no change in weight. This used to read
+                "MARK_STROKE * k = SPINE_W... a single heavy line"; the identity is now direct and the
+                line is no longer heavy (item 1a). */}
             <g>
               <path
                 d={poly(leanPts)}
