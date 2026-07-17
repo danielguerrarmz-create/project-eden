@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  COMMISSION_ANCHOR_AREA_M2,
+  COMMISSION_ANCHOR_GBP,
+  COMMISSION_ANCHOR_PIECES,
   COMMISSION_DEMO_FIGURE,
   COMMISSION_DEMO_LABEL,
   COMMISSION_FROM,
@@ -14,6 +17,8 @@ import {
   PRICE_QUALIFIER,
   STEWARDSHIP_LABEL,
   STEWARDSHIP_NOTE,
+  commissionDemoFigureGBP,
+  commissionDemoLabel,
   priceMetaLine,
 } from './priceCopy';
 
@@ -143,6 +148,64 @@ describe('the demo figure the #/draw panel shows on camera', () => {
   it('carries a short lowercase mono label, per the panel register', () => {
     expect(COMMISSION_DEMO_LABEL).toBe(COMMISSION_DEMO_LABEL.toLowerCase());
     expect(COMMISSION_DEMO_LABEL.length).toBeLessThanOrEqual(16);
+  });
+});
+
+describe('the dynamic demo figure moves off a calibrated anchor', () => {
+  // Sai's demo-round §6: the figure MOVES with what you draw, off the one bake
+  // the demo has been shown against, floored at Daniel's stated £150k.
+  const clematis = 0.5; // stemLoad01 at the reference; species term is a no-op
+
+  it('returns exactly the anchor at the reference bake', () => {
+    // 14.3 m², 194 pieces, clematis => £150,000, so COMMISSION_DEMO_FIGURE stays
+    // true as prose. If this fails the calibration drifted and the constant lies.
+    const figure = commissionDemoFigureGBP({
+      footprintM2: COMMISSION_ANCHOR_AREA_M2,
+      pieceCount: COMMISSION_ANCHOR_PIECES,
+      speciesStemLoad01: clematis,
+    });
+    expect(figure).toBe(COMMISSION_ANCHOR_GBP);
+    expect(commissionDemoLabel(figure)).toBe('£150,000');
+    expect(commissionDemoLabel(figure)).toBe(COMMISSION_DEMO_FIGURE);
+  });
+
+  it('never dips below the stated floor, even for the lightest species on a small draw', () => {
+    // Sweet pea (0.1) on a smaller-than-anchor draw would compute under £150k;
+    // the Math.max floor holds it there. "from £150k" is stated elsewhere in
+    // this file and a demo figure under it, even scoped-off, would contradict it.
+    const figure = commissionDemoFigureGBP({
+      footprintM2: 8,
+      pieceCount: 120,
+      speciesStemLoad01: 0.1,
+    });
+    expect(figure).toBeGreaterThanOrEqual(COMMISSION_ANCHOR_GBP);
+  });
+
+  it('rises with area and with piece count', () => {
+    const base = commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, speciesStemLoad01: 0.5 });
+    const bigger = commissionDemoFigureGBP({ footprintM2: 26, pieceCount: 300, speciesStemLoad01: 0.5 });
+    expect(bigger).toBeGreaterThan(base);
+  });
+
+  it('is monotonic in species stem load, above the floor', () => {
+    // On a design large enough to clear the floor, a heavier species reads as at
+    // least as much, never less — the "wisteria needs heavier struts" beat.
+    const at = (stem: number) =>
+      commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, speciesStemLoad01: stem });
+    expect(at(0.95)).toBeGreaterThanOrEqual(at(0.5));
+    expect(at(0.5)).toBeGreaterThanOrEqual(at(0.1));
+  });
+
+  it('steps to round £5k figures, so the count-up never lands on noise', () => {
+    for (const stem of [0.1, 0.35, 0.5, 0.7, 0.95]) {
+      const figure = commissionDemoFigureGBP({ footprintM2: 22, pieceCount: 260, speciesStemLoad01: stem });
+      expect(figure % 5000).toBe(0);
+    }
+  });
+
+  it('formats with a thousands separator and no dash', () => {
+    expect(commissionDemoLabel(155000)).toBe('£155,000');
+    expect(/[—–]/.test(commissionDemoLabel(155000))).toBe(false);
   });
 });
 

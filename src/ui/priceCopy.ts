@@ -118,6 +118,61 @@ export const COMMISSION_DEMO_FIGURE = '£150,000';
 export const COMMISSION_DEMO_LABEL = 'commission';
 
 /**
+ * DYNAMIC DEMO FIGURE (2026-07-17, Sai's demo-round spec §6). Daniel: the
+ * £150,000 on screen must be dynamic to display, "demo-plausible, does not have
+ * to be true." So it MOVES with what you draw, off the anchor bake the demo has
+ * been described against, in named weighted proportion to area, real piece
+ * count and the selected species' stem load. It is floored at the anchor.
+ *
+ * DELIBERATELY SEPARATE from `pricing.ts`'s cost model. That machinery answers a
+ * different, already-honest question (cost to construct); tuning it to hit a
+ * marketing number is exactly the "reverse-engineer evidence to fit a figure"
+ * move this file's own header refuses for the real floor. This is openly
+ * demo-only, and `COMMISSION_DEMO_FIGURE` above stays true as prose because the
+ * formula returns exactly it at the reference bake.
+ */
+export const COMMISSION_ANCHOR_GBP = 150_000;
+/** The reference bake: 14.3 m², 194 pieces, clematis (stemLoad01 0.5). */
+export const COMMISSION_ANCHOR_AREA_M2 = 14.3;
+export const COMMISSION_ANCHOR_PIECES = 194;
+export const COMMISSION_AREA_WEIGHT = 0.5;
+export const COMMISSION_PIECE_WEIGHT = 0.35;
+export const COMMISSION_SPECIES_WEIGHT = 0.15;
+/**
+ * speciesFactor ranges 0.85 (stemLoad01=0) to 1.15 (stemLoad01=1); clematis
+ * (0.5) lands it at exactly 1.0, so the reference bake's species term is a no-op
+ * and the anchor calibration holds.
+ */
+export const COMMISSION_SPECIES_FLOOR = 0.85;
+export const COMMISSION_SPECIES_SPAN = 0.3;
+export const COMMISSION_STEP_GBP = 5_000;
+
+export function commissionDemoFigureGBP(kit: {
+  footprintM2: number;
+  pieceCount: number;
+  speciesStemLoad01: number;
+}): number {
+  const areaFactor = kit.footprintM2 / COMMISSION_ANCHOR_AREA_M2;
+  const pieceFactor = kit.pieceCount / COMMISSION_ANCHOR_PIECES;
+  const speciesFactor =
+    COMMISSION_SPECIES_FLOOR + kit.speciesStemLoad01 * COMMISSION_SPECIES_SPAN;
+  const multiplier =
+    COMMISSION_AREA_WEIGHT * areaFactor +
+    COMMISSION_PIECE_WEIGHT * pieceFactor +
+    COMMISSION_SPECIES_WEIGHT * speciesFactor;
+  const stepped =
+    Math.round((COMMISSION_ANCHOR_GBP * multiplier) / COMMISSION_STEP_GBP) *
+    COMMISSION_STEP_GBP;
+  // Never below Daniel's stated floor ("core commissions from £150k"): the demo
+  // figure moves UP from the anchor, never under it, even in this scoped panel.
+  return Math.max(COMMISSION_ANCHOR_GBP, stepped);
+}
+
+export function commissionDemoLabel(gbp: number): string {
+  return `£${gbp.toLocaleString('en-GB')}`;
+}
+
+/**
  * STEWARDSHIP — a revenue line the demo never mentioned, and the most on-thesis
  * number in the model: recurring income that exists BECAUSE the thing is alive.
  * A pavilion does not need stewarding; a living structure does.
