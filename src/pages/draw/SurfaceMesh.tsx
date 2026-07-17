@@ -18,12 +18,20 @@
  *
  * Deliberately NOT the finished object: matte, seamless, jointless. The whole
  * point of the bake is that this becomes something with nodes and a cut list.
+ *
+ * The wash is vertex colours (`lo`/`hi` by height); the INK on top of it is two
+ * shader injections, `scene/skinShader.ts` — contour rings every 0.25 m and a
+ * grazing-angle rim. Both write the albedo, so the rig lights them like
+ * material. That pair is what makes the canopy legible from directly above,
+ * where a smooth gradient reads as nothing, and it makes the skin read MORE like
+ * a study drawing rather than less, which is the constraint.
  */
-import { useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { surfaceHeight, isHole, footprintHull, planCentre, type SurfaceInput } from '../../engine/surface';
 import { fairedRadius } from '../../engine/shapeFromDrawing';
+import { applySkinInk } from '../../scene/skinShader';
 
 const RINGS = 34;
 const SPOKES = 96;
@@ -42,12 +50,23 @@ export function SurfaceMesh({
    */
   fadeRef?: React.RefObject<number>;
 }) {
-  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial | null>(null);
   useFrame(() => {
     const m = matRef.current;
     if (!m || !fadeRef || fadeRef.current === null) return;
     m.opacity = ghost ? 0.25 * fadeRef.current : fadeRef.current;
   });
+
+  /**
+   * A callback ref rather than a plain one: the material has to be INKED as
+   * well as remembered, and this is the only moment we hold the instance.
+   * Mirrors how `Folly` applies the reveal. `applySkinInk` is idempotent, so a
+   * re-render cannot force a shader recompile.
+   */
+  const setMat = useCallback((m: THREE.MeshStandardMaterial | null) => {
+    matRef.current = m;
+    if (m) applySkinInk(m);
+  }, []);
 
   const geo = useMemo(() => {
     if (input.arcs.length < 2) return null;
@@ -113,7 +132,7 @@ export function SurfaceMesh({
   return (
     <mesh geometry={geo} castShadow receiveShadow>
       <meshStandardMaterial
-        ref={matRef}
+        ref={setMat}
         vertexColors
         side={THREE.DoubleSide}
         roughness={0.92}
