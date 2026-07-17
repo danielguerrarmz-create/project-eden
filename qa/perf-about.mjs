@@ -13,6 +13,7 @@
  * Throttle is the honest test: 1 = this machine, 4 = a mid-range laptop, 6 = a phone.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const RATE = Number(process.argv[2] ?? 1);
@@ -34,7 +35,7 @@ await page.evaluateOnNewDocument(() => {
 });
 
 const t0 = Date.now();
-await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?species=spine-2#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(600);
 await page.keyboard.down('Shift');
 await page.keyboard.up('Shift');

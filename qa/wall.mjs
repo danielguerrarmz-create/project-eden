@@ -32,6 +32,7 @@
  * here was one a viewport-pinned harness structurally could not see. Run it at 900 AND 760.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const VH = Number(process.argv[2] ?? 900);
@@ -53,7 +54,7 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.setViewport({ width: VW, height: VH, deviceScaleFactor: 1 });
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?species=spine-2#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(9000);
 
 const names = await page.evaluate(() =>

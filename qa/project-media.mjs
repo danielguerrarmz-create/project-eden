@@ -53,6 +53,7 @@
  * screenshot of it.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 /** Daniel's window is shorter than 900. Default to 900 for continuity; pass 760 to see what he sees. */
@@ -70,7 +71,7 @@ const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new'
 const page = await browser.newPage();
 await page.setViewport({ width: VW, height: VH, deviceScaleFactor: 1 });
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?species=spine-2#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(9000);
 
 const names = await page.evaluate(() => [...document.querySelectorAll('nav ol button')].map((b) => (b.textContent || '').trim().slice(0, 24)));

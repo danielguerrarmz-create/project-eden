@@ -29,6 +29,7 @@
  *     blind to this. Neither implies the other. Run both.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const VW = Number(process.argv[2] ?? 390);
@@ -44,7 +45,7 @@ const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new'
 const page = await browser.newPage();
 await page.setViewport({ width: VW, height: VH, isMobile: true, hasTouch: true });
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-await page.goto('http://localhost:5333/#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(6000);
 
 /*

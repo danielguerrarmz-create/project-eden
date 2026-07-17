@@ -18,6 +18,7 @@
  * "one frame" on a real screen. Hence FRAME_AIR: it has to fit with room, or it has not fit.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,7 +34,7 @@ const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new'
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: VIEWPORT_H, deviceScaleFactor: 1 });
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?species=spine-2#/about`, { waitUntil: 'domcontentloaded' });
 // The ornament's cold paint is slow (~7s for the sub-branch garland alone); the vines must be on
 // the page before we can ask whether they cross anything.
 await sleep(26000);

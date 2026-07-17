@@ -14,6 +14,7 @@
  * two loads are comparable at all (see PAGE_SPECIES).
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -24,7 +25,7 @@ const read = async (species) => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-  await page.goto(`http://localhost:5333/?species=${species}#/about`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/?species=${species}#/about`, { waitUntil: 'domcontentloaded' });
   // The ornament's cold paint is SLOW (the sub-branch garland alone measures ~7s), and a half-painted
   // page reports a species difference that is really just a race.
   await sleep(26000);

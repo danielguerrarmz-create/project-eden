@@ -52,6 +52,7 @@
  * movement is guaranteed when the page is alive; if it is absent, the page is what is broken.
  */
 import puppeteer from 'puppeteer-core';
+import { BASE } from './base.mjs';
 
 const CHROME = process.env.CHROME ?? String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,7 +60,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--window-size=1440,900'] });
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900 });
-await page.goto('http://localhost:5333/#/about', { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(1200);
 // Cancel the 14s autoplay without moving the page (End would jump to the document bottom).
 await page.keyboard.down('Shift');
