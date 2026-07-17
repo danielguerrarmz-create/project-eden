@@ -19,9 +19,37 @@
  *
  * THE TRAP THIS HARNESS IS BUILT AGAINST (round 7, hero-lockup.mjs): the camera is a rAF lerp and a
  * cold paint starves it, so a harness that seeks and measures immediately reads a camera that has
- * not arrived and reports a confident wrong number. Every measurement below is guarded: if the
- * camera is not where it was sent, the reading is discarded as a HARNESS failure rather than
- * reported as a layout one.
+ * not arrived and reports a confident wrong number.
+ *
+ * ---
+ *
+ * AND IT WALKED STRAIGHT INTO THAT TRAP ANYWAY, THROUGH THE GUARD WRITTEN AGAINST IT (round 10).
+ * This is the most important comment in the file, because the bug is not "a sleep was too short".
+ *
+ * The guard asked: **did the SCROLL land?** (`Math.abs(scrollY - target) > 4`). The question it needed
+ * to ask was: **did the CAMERA arrive?** `scrollY` lands INSTANTLY and synchronously; `camY` is a
+ * separate rAF lerp (`current += (target - current) * 0.1`, settling only under 0.0005 — about
+ * SEVENTY-TWO frames). So the precondition passed, every time, while the camera was still nowhere
+ * near. **A guard that checks a proxy for the thing is not a guard.** Measured across six stops:
+ *
+ *     settle 450ms   camY = 148, 148, 148, 965, 3702, 4439   <- stuck for three stops
+ *     settle 1800ms  camY =   0, 2136, 3457, 4445, 5433, 6163  <- actually tracking
+ *
+ * On the first row it printed "PASS: nothing still growing above the halfway mark". That verdict was
+ * worthless: a stalled camera parks the drawing off-screen, no stem is anywhere near the halfway line,
+ * and "no violations" is what you get for looking at nothing.
+ *
+ * AND NOTE WHAT MADE IT NEWLY WRONG: nothing in this file changed. Item 9 made the page much heavier
+ * (438 sub-branch runs, was 195), frames got slower, and 450ms silently stopped being enough. **A
+ * fixed sleep is a bet on machine speed, and the codebase can move the goalposts under a harness that
+ * has not been touched in weeks.** Wait for the THING, never for the CLOCK.
+ *
+ * THE SUB-TRAP, WHICH IS ALREADY WRITTEN IN THE ROUND-7 DOC AND WHICH THE FIRST FIX HIT REGARDLESS:
+ * polling for STILLNESS alone reports "settled" at the OLD position, because immediately after
+ * `scrollTo` the rAF has not fired yet and two consecutive reads are identical. **Stillness cannot
+ * tell "not started" from "finished".** So this waits for MOVEMENT first and stillness second, and a
+ * camera that never moves is a HARNESS failure rather than a reading. Every stop is a large jump, so
+ * movement is guaranteed when the page is alive; if it is absent, the page is what is broken.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -50,11 +78,70 @@ if (!track) {
   process.exit(1);
 }
 
+/** camY, read off the one element that exposes it: the frame's viewBox is `0 <camY> W viewH`. */
+const camY = () =>
+  page.evaluate(() => {
+    const svg = document.querySelector('[data-timeline-frame]');
+    if (!svg) return null;
+    const vb = (svg.getAttribute('viewBox') || '').split(/\s+/);
+    const y = Number(vb[1]);
+    return Number.isFinite(y) ? y : null;
+  });
+
+/** How long to give the camera. Generous on purpose: the cost of waiting is seconds, the cost of
+ *  measuring early is a false PASS that gets quoted at Daniel. */
+const MOVE_TIMEOUT = 8000;
+const SETTLE_TIMEOUT = 25000;
+/** camY is in drawing units over thousands; sub-unit jitter is arrival, not motion. */
+const EPS = 0.5;
+/** Consecutive still reads before believing the lerp is done, not merely slow between frames. */
+const STILL_READS = 5;
+
+/**
+ * Seek, then WAIT FOR THE CAMERA — movement first, then stillness. Returns null if the camera never
+ * moved or never settled; the caller must treat null as a HARNESS failure and discard the stop, never
+ * degrade it to a pass. That asymmetry is the whole point: this file's previous verdict was produced
+ * by a camera that had not arrived.
+ */
+const seek = async (scrollY) => {
+  const before = await camY();
+  if (before === null) return { harness: 'no [data-timeline-frame] — cannot see the camera at all' };
+  await page.evaluate((y) => window.scrollTo(0, y), scrollY);
+
+  // 1. MOVEMENT. Without this, the two reads below are both the OLD value and "still" is a lie.
+  const moveDeadline = Date.now() + MOVE_TIMEOUT;
+  let moved = false;
+  while (Date.now() < moveDeadline) {
+    const c = await camY();
+    if (c !== null && Math.abs(c - before) > EPS) {
+      moved = true;
+      break;
+    }
+    await sleep(40);
+  }
+  if (!moved) return { harness: `camera never left ${before?.toFixed(1)} — it did not start` };
+
+  // 2. STILLNESS. The lerp snaps exactly to target and idles its rAF, so stillness IS arrival —
+  //    but only once we know it started.
+  const settleDeadline = Date.now() + SETTLE_TIMEOUT;
+  let last = null;
+  let still = 0;
+  while (Date.now() < settleDeadline) {
+    const c = await camY();
+    if (c === null) return { harness: 'camera disappeared mid-seek' };
+    if (last !== null && Math.abs(c - last) <= EPS) still++;
+    else still = 0;
+    last = c;
+    if (still >= STILL_READS) return { cam: c };
+    await sleep(40);
+  }
+  return { harness: `camera never settled (last ${last?.toFixed(1)}) in ${SETTLE_TIMEOUT}ms` };
+};
+
 /** Sample the ornament: every stem's growth state against its own position in the viewport. */
 const sampleAt = async (scrollY) => {
-  await page.evaluate((y) => window.scrollTo(0, y), scrollY);
-  // Let the camera's rAF lerp actually arrive before believing anything it says.
-  await sleep(450);
+  const s = await seek(scrollY);
+  if (s.harness) return { harness: s.harness };
   return page.evaluate(() => {
     const vh = window.innerHeight;
     const stems = [...document.querySelectorAll('[data-sub-branch]')];
@@ -74,35 +161,60 @@ const sampleAt = async (scrollY) => {
         if (!worst || rootF < worst.f) worst = { f: rootF, order: s.getAttribute('data-sub-branch') };
       }
     }
-    return { total: stems.length, growing, growingAboveHalfway, worst, scrollY: window.scrollY };
+    const svg = document.querySelector('[data-timeline-frame]');
+    const cam = svg ? Number((svg.getAttribute('viewBox') || '').split(/\s+/)[1]) : NaN;
+    return { total: stems.length, growing, growingAboveHalfway, worst, scrollY: window.scrollY, cam };
   });
 };
 
 const stops = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65];
 let violations = 0;
 let sampled = 0;
-console.log('camera stop | stems | growing | STILL GROWING ABOVE HALFWAY | worst');
+let discarded = 0;
+console.log('camera stop | camY | stems | growing | STILL GROWING ABOVE HALFWAY | worst');
 for (const p of stops) {
   const target = Math.round(track.top + track.height * p);
   const r = await sampleAt(target);
-  // GUARD THE PRECONDITION: if the scroll did not land, nothing below it means anything.
+  // A HARNESS FAULT IS NOT A PASS. `seek` already refused to return a reading from a camera that
+  // never started or never settled; the only correct thing to do with that is discard the stop
+  // loudly. Letting it fall through to "0 violations" is precisely how this file lied.
+  if (r.harness) {
+    console.log(`  ${p.toFixed(2)}      | HARNESS: ${r.harness} — reading discarded`);
+    discarded++;
+    continue;
+  }
+  // Still worth asking, though it was never sufficient on its own.
   if (Math.abs(r.scrollY - target) > 4) {
     console.log(`  ${p.toFixed(2)}      | HARNESS: asked for ${target}, landed at ${r.scrollY} — reading discarded`);
+    discarded++;
     continue;
   }
   if (r.total === 0) {
     console.log(`  ${p.toFixed(2)}      | HARNESS: no stems in the DOM at this stop — reading discarded`);
+    discarded++;
     continue;
   }
   sampled++;
   const worst = r.worst ? `order ${r.worst.order} at ${(r.worst.f * 100).toFixed(1)}% of the viewport` : '-';
-  console.log(`  ${p.toFixed(2)}      | ${String(r.total).padStart(5)} | ${String(r.growing).padStart(7)} | ${String(r.growingAboveHalfway).padStart(27)} | ${worst}`);
+  console.log(
+    `  ${p.toFixed(2)}      | ${String(Math.round(r.cam)).padStart(4)} | ${String(r.total).padStart(5)} | ${String(r.growing).padStart(7)} | ${String(r.growingAboveHalfway).padStart(27)} | ${worst}`,
+  );
   violations += r.growingAboveHalfway;
 }
 
 console.log('');
+// A PARTIAL SWEEP IS NOT A VERDICT EITHER. "5 of 6 stops passed" says nothing about the stop that
+// could not be measured, and a camera that stalls at one stop is exactly where a violation would hide.
 if (sampled === 0) {
   console.error('FAIL: every sample was discarded — this is a harness failure, not a verdict.');
+  await browser.close();
+  process.exit(1);
+}
+if (discarded > 0) {
+  console.error(
+    `\nHARNESS FAILURE: ${discarded} of ${stops.length} camera stops were discarded. This is NOT a verdict — ` +
+      `the unmeasured stops are exactly where a violation could hide. Fix the harness, then re-run.`,
+  );
   await browser.close();
   process.exit(1);
 }

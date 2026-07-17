@@ -2536,6 +2536,13 @@ export function CrossPathsTimeline({
             viewBox={viewBox}
             preserveAspectRatio="xMidYMid meet"
             className="h-full w-full"
+            /* THE CAMERA'S ONLY HANDLE. `viewBox`'s y IS camY, so this element is the one place the
+               camera's ACTUAL position is observable from outside React — which is what
+               qa/growth-timing.mjs must wait on. It cannot wait on `scrollY`: scrollY lands instantly
+               while camY is a rAF lerp (`current += (target-current)*0.1`, ~72 frames to settle), so a
+               harness that guards the scroll is guarding a proxy and will measure a camera that has not
+               arrived. It did exactly that, and reported a confident PASS on a stalled camera. */
+            data-timeline-frame
             role="img"
             aria-label="A timeline from 2021 to 2026 that travels downward as you scroll. At the top, two strands, Clay and Daniel, come in from off the frame and twist together into one line: the spine is born where they fuse in 2021. Each later event branches off the spine to a picture held in a small calyx: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. At the end the line leans off its axis and winds itself up into the Bower mark, with the wordmark, Bower, beneath it."
           >
