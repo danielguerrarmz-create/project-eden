@@ -141,8 +141,51 @@ reviews before any commit.
     only visible by comparing the IMAGE's rect to the **button's** rect: `qa/hero-clip.mjs`.
   - The clip depends on the REGION's ratio, which rises as the window shortens, which is why Daniel
     saw this and a 1440x900 harness never did. **Check a short viewport.**
+  - **`project-media.mjs` NO LONGER SAYS "crop" (round 10), because that word was the bug.** It is now
+    `heroRatioPct` (object-fit: the element's own rect vs natural) and `heroClipPct` (overflow: the
+    IMAGE's rect vs the **BUTTON's**). Two mechanisms; **neither implies the other**; name the question
+    in the variable or the next person quotes one answer for the other question. It takes a viewport
+    height and width now.
+  - **AND THE BANNED PATTERN WAS STILL LIVE ON MOBILE THE WHOLE TIME — reported THREE times, measured
+    zero times, fixed round 10.** `Gallery` passed its hero neither `fit` nor `fill`, so it hit
+    ProjectImg's default `object-cover` inside a hardcoded `aspect-[3/2]`. **Measured at 390x844:
+    ELEVEN of twelve heroes cropped, worst 28.4% (Patterns), Robotic Factory 22.6%, Flowerfield 21.4%
+    — MORE than the 21% Plentify loss that banned `cover` in the first place.** It survived because
+    every instrument on this page runs at 1440, where that tree is `lg:hidden` and its rects are
+    meaningless. **It was not hidden by subtlety. It was hidden by a viewport nobody measured.**
+    `qa/mobile-hero.mjs` now guards it and takes a width.
+  - **A HERO MAY CROP ONLY IF IT NAMES ITSELF: `ProjectImage.fillHero`, and exactly ONE asset has it**
+    (Robots' KUKA loop, 20.1% of width, licensed by Daniel twice, explicitly, to hold the uniform
+    region). **It is a LICENCE, NOT A PRECEDENT** — the number is a whisker off the banned 21%, so the
+    only thing separating them is that it stays on one asset. `projects.test.ts` pins it BY SRC (a
+    moved licence keeps the count at 1 — the count alone will not catch it), and
+    `data-licensed-crop` lets the probes allow it there and nowhere else. **A second one is Daniel's
+    decision, not yours.**
   - Before sizing any image region, check the aspect against the real asset — the ratios are
     authored in `projects.ts`, and `qa/` has probes.
+- **THE DIVIDER IS PINNED BY GEOMETRY, NOT BY A NUMBER (round 10, item 7).** The band is `shrink-0`
+  and the media region is the REMAINDER (`flex-1`), so `dividerY = detail.bottom − band.height` and
+  **no hero change can move it** — chasing it by cropping heroes is the fake fix. Every project's band
+  renders into ONE grid cell with the inactive ones `invisible` (NOT `display:none`, which collapses
+  the cell and pins nothing; NOT `min-h-[302px]`, because 302.1 was a measurement at ONE viewport and
+  re-wraps at any other width). Daniel ruled **pin at the longest, lose no text**, and accepted that
+  Archipedia's line rises ~74px from where he called it correct. **Clamping the band is FORBIDDEN** —
+  tried and reverted once; it hid 61px of awards behind an undiscoverable scrollbar. Guard:
+  `qa/divider.mjs` (takes a height AND a width; verified 0.00px spread at 1280/1440/1680/1920).
+- **`Project` HAS NO STABLE KEY.** `n` is display order and renumbers on merge; `title` is display
+  copy and has been rewritten twice. Round 10 wrote a bio guard keyed on **`p.id`, a field that does
+  not exist** — every lookup returned undefined and it passed green while checking nothing, inside the
+  file written to catch exactly that. **Match on `src`**, or author a real `id`. See the note above
+  `interface Project`.
+- **OPEN, AND `qa/project-media.mjs` IS RED ON IT RIGHT NOW: Origami's rail is EIGHT sheets at 53px.**
+  NEEDS DANIEL (editorial). `railWidth` divides the region by `sum(1/ratio)`, so eight ~1.29 sheets
+  give **53px cells at 900 and 30px at 760** — visually confirmed as illegible postage stamps. The
+  arithmetic is correct and the guard is right to fail; **the input is the problem** (eight assembly
+  sheets in one vertical rail cannot be legible at any width), so the fix is dropping sheets or a
+  different rail, not a smaller `MIN_CELL`. **The guard has failed since the commit that wrote it**
+  (`b96fc85` added the sheets and hardened the sliver check *in the same commit*), 17 commits ago.
+  **A guard nobody runs is not a guard** — this is the fourth variant of the session's trap: not a test
+  passing while measuring nothing, but a test failing while nobody looks.
 - **WHITE MARGINS AROUND A HERO MAY BE THE ASSET, NOT THE LAYOUT — measure before "fixing" it.**
   Measured on the real pixels: Plentify's 1920x1080 hero poster has 451 fully-white columns on the
   left and 478 on the right — **48.4% of the picture is white paper**. Resia's hero is **34.6%**,
