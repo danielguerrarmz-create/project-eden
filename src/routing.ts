@@ -42,4 +42,9 @@ export const routes = {
   sculpt: '#/sculpt',
   /** Isolated Phase-1 preview of the procedural botanical generator (not wired in). */
   botanicalLab: '#/lab/botanical',
+  /* The two About drafts (#/about/scroll, #/about/ascent) were retired on 2026-07-16.
+     Daniel's page at #/about stayed the shell and their generative engine was harvested
+     into it as ornament — see docs/handoffs/2026-07-16-about-hybrid.md. */
+  /** Curation room for the painterly gongbi engine (pin commission seeds here). */
+  gongbiLab: '#/lab/gongbi',
 } as const;

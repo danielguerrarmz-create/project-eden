@@ -4,7 +4,32 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Open task list — surface this at the start of a session
 
-The About page was reworked again to **round 3** on 2026-07-13 (spec:
+**LATEST (2026-07-16): the About HYBRID, ROUND 2, on branch `about-hybrid-sepia`** (handoff:
+`docs/handoffs/2026-07-16-about-hybrid.md` — round 2 is the second half of that file; read it before
+continuing). Seven commits, nothing on main, nothing pushed. Round 1's ruling stands (Daniel's About
+is the shell; Clay's retired drafts are harvested as ORNAMENT; the page is sepia; the pigment
+specimens are keepers). Round 2 is his next pass of notes:
+
+- **The founders are Clay's page, ported wholesale** from `about-v2-nonflowers:src/pages/ascent/AscentPage.tsx`.
+- **The work index is ROWS, not columns, and FLAT.** The hero was in a 505x557 PORTRAIT box against
+  natively-landscape images; it is now 735x414..509. The discipline headers and their frontispieces
+  are deleted (with `groupProjects` and three commissions).
+- **THE PROJECTS ARE DECOUPLED FROM THE TIMELINE.** Nothing holds them: the branches, the calyx
+  holders, and `unfurl()` are all gone (-298 lines). The entrance is a fade. The 2025 label collision
+  round 1 flagged is gone with the branch that caused it.
+- **The ornament is now an ENGINE**: space colonization (`src/pages/about/spaceColonization.ts`,
+  Runions et al. 2007) grows sub-branches into the negative space. **Read the direction rule below.**
+
+**THE ORNAMENT READS THE LAYOUT; THE LAYOUT NEVER READS THE ORNAMENT.** This is the load-bearing
+lesson of round 1 and the thing most likely to be undone by accident. The old branches were
+STRUCTURE — they carried the plates, so the layout depended on them, and every collision round 1
+fought existed because ornament was allowed to dictate layout. The sub-branches are ORNAMENT: they
+read `computePlates()` and nothing reads them back, they are painted before the clusters, and no
+attractor is ever scattered on an occupied rect. If a branch and a plate disagree, the branch loses
+by construction. Filling the whitespace and avoiding the plates are the SAME mechanism (a plate has
+no attractors on it), which is why there is no collision test in the engine and must not become one.
+
+The About page was reworked to **round 3** on 2026-07-13 (spec:
 `docs/2026-07-13-about-refinement-spec.md`; handoff: `docs/handoffs/2026-07-13-about-round3-*.md`).
 It builds on v2 (`docs/2026-07-13-timeline-v2-composition-spec.md`), keeping the one-spine + short
 branch-edges node graph, piecewise axis, seam fix, plate tiers, `packSide`, one-colour INK_BLUE.
@@ -63,9 +88,81 @@ reviews before any commit.
 
 - **This repo is PUBLIC.** Candid internal material (audits, stress tests, accelerator drafts,
   reviews of Clay's work) belongs in the private `bower-docs` repo. See `.gitignore`.
-- **The About page is one colour.** Blue, `INK_BLUE` in `CrossPathsTimeline.tsx`. The old
-  Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — do not reintroduce
-  colour-coding by person.
+- **The About page is one colour: SEPIA.** `INK_SEPIA` (`#8A6A4A`) in `CrossPathsTimeline.tsx`,
+  with `INK_SEPIA_TEXT` (`#6F5439`) for small text — the same colour at reading weight, because
+  `INK_SEPIA` does not clear AA on the selected list row's own 8% tint. Amended 2026-07-16: the
+  page was `INK_BLUE` (`#3E7CA8`), which appears nowhere in the splash hero (warm gold Austin
+  light, timber, green foliage, wisteria purple). **Nothing blue survives on About.**
+  - **PIGMENT is permitted on EVERY PAINTED BOTANICAL** — the founder specimens, the spine garland's
+    organs, the sub-branches' organs, the founders' arms and the coda garlands (the gongbi genome's
+    own palette). **RULED 2026-07-16**: this was "the botanical specimens only", and whether a
+    painted *vine* counted was flagged rather than widened quietly. Daniel extended it. If the
+    gongbi brush painted it, it may be in pigment.
+    - **STRUCTURE IS ALWAYS SEPIA** — the spine, the sub-branch stems, the founders' arms' stems,
+      the mark, rules, labels. That half is unchanged and is what the law is actually for. The line
+      is: *the composer's brush may have colour; the page's own pen may not.*
+    - The discipline frontispieces were deleted in round 2.
+  - The old Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — **do not
+    reintroduce colour-coding by person.** That prohibition stands unchanged.
+- **A seed is a design review, not a constant.** Every commission in `about/paintings.ts` and the
+  spine garland's `GARLAND_SEED` was curated by sweeping takes and comparing them, because
+  `passesGate` (`engine/gongbi/quality.ts`) is a FLOOR, not a parity check: two seeds can both
+  "pass" and still hang as a full plant next to a weed. Curate in `#/lab/gongbi` before pinning.
+- **A year label must fit its gutter.** `YEAR_LABEL_OFFSET + YEAR_LABEL_W <= OFFSET_X` in
+  `CrossPathsTimeline.tsx` (there is a test). When it didn't, every year with a plate on the
+  label's side put the numerals on the photograph and the label's vellum halo cut the branch
+  underneath in half. No choice of side can save a label wider than the space it lives in.
+- **STOP FORCING GEOMETRY ONTO SOMETHING THAT ALREADY KNOWS ITS OWN SHAPE.** This is the page's
+  most repeated bug and the answer has been the same every time: give the thing its own shape back.
+  It has now shipped five ways — the hero in a 505x557 portrait box (Daniel: "natively landscape but
+  displayed in portrait mode"); `unfurl()` opening every plate from `scale(0.92, 0.64)`; a founder
+  vine upscaled 1.8x by `object-cover`; every project hero on `fit: 'cover'` in a region of the
+  wrong ratio, silently cropping (Plentify lost **21% of its width** off the sides, and a cropped
+  photo still looks like a photo, so nobody notices); and a trunk with a hardcoded stroke that
+  matched the spine's position exactly and still stepped 46% in width at the join.
+  - The fix is never a better number. `fill` hands a picture a box and resolves the disagreement
+    with object-fit (cover crops, contain letterboxes); `FIT_FRAME` lets the replaced element size
+    itself from its intrinsic ratio under max-width/max-height, so the element IS the picture and
+    object-fit has nothing left to resolve. **Measured: hero crop 0% across all twelve.**
+  - Before sizing any image region, check the aspect against the real asset — the ratios are
+    authored in `projects.ts`, and `qa/` has probes.
+- **WHITE MARGINS AROUND A HERO MAY BE THE ASSET, NOT THE LAYOUT — measure before "fixing" it.**
+  Measured on the real pixels: Plentify's 1920x1080 hero poster has 451 fully-white columns on the
+  left and 478 on the right — **48.4% of the picture is white paper**. Resia's hero is **34.6%**,
+  Patterns 9.2%. No box can remove white that lives inside the image, and cropping it out is exactly
+  what "no cropping, do not lose context" forbids. This was diagnosed twice as a layout bug and is
+  not one. **It wants a re-export of the asset (Daniel's call, his files).** Do not "fix" it in CSS.
+- **A BOUNDING BOX IS NOT WHERE THE TEXT IS.** The no-go rule (ornament must not touch text) is only
+  as good as its idea of "occupied". "The founders." is a `<p>` in a full-width column — its box is
+  1100px wide for a ~110px string, so a box-based probe reports a vine "crossing text" while it
+  sails through empty paper a foot away, and would fail forever wherever the ornament went. Measure
+  the **glyph runs** (a `Range` over the text node, `getClientRects()`), as `qa/founder-frame.mjs`
+  does. With that, one reported collision was a false positive and exactly one was real.
+- **A grid row is as tall as its tallest column, and in the work detail that height comes out of the
+  hero.** So `ProjectInfoBand`'s column split is a height budget, not a style choice — and MORE
+  columns makes it taller, not shorter (narrower columns wrap more). Measured: 3 cols stacked wrong
+  = 319px, 4 cols = 465px, 3 cols balanced = ~195px.
+- **Do not overlay the BowerMark on a painting.** `matRect` (`engine/gongbi/quality.ts`)
+  base-anchors every plant so its densest region sits on the mat's bottom pixel row; anything
+  placed at the frame's bottom collides with it by construction, for every seed.
+- **THE FOUNDER BIOS RESTATE PROJECT FACTS BY HAND, AND NOTHING LINKS THEM TO THE LEDGER.** This is
+  live and it will bite again. `LLO: Dream Machine` was re-attributed to Clay in `projects.ts` on
+  2026-07-15; the sentence claiming it sat in **Daniel's** bio until round 5 found it. One fact, two
+  places, one owner. Misattributing a cofounder's work on the company's own About page is the worst
+  class of bug this page has, and it is silent — nothing fails, it just reads wrong.
+  - **Whenever you touch a `by:` attribution, grep `TEAM` for the project's nouns.**
+  - Cheap fix if it recurs (proposed, not built): a test asserting no `TEAM` fact mentions a project
+    whose `by:` excludes that founder — a noun list per project is enough to catch the class.
+  - The mirror of it is just as bad: wording a **shared** project (`by: 'clay+daniel'`, e.g.
+    `Plentify`) as sole authorship in one founder's bio. Say what someone did, not what they own.
+- **`toBlob` ON THE MAIN THREAD WILL EAT THE PAGE.** "The painting is in a worker" is not the same
+  as "the page is off-thread". Handing back an `ImageBitmap` made all four callers draw and
+  PNG-encode it themselves: **6,291ms of main-thread self time, 51.9% of everything**, while the
+  painters idled. The worker encodes now (`OffscreenCanvas.convertToBlob`) and `requestGarland`
+  returns a **URL**, which is session-cached and **must not be revoked by callers** — the next mount
+  would get a dead URL. Measured at 4x CPU throttle: blocking 23.3s → 7.3s, scroll 11fps → 48fps.
+  Profile with `qa/perf-about.mjs <throttle>` before optimising anything here; the CPU profile named
+  this in one run and no amount of guessing would have.
 - **Do not wrap the project detail panel in `AnimatePresence mode="wait"`.** It deadlocks against
   the `layoutId` shared-element images inside it: the exit never completes, the incoming panel
   never mounts, and the detail silently freezes on whichever project rendered first while the list

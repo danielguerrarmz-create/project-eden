@@ -37,6 +37,38 @@ import { RegisterInterest } from './splash/RegisterInterest';
 import { ritualSteps, STAYS_THE_SAME, PD_FACT } from './splash/copy';
 import { H2, BODY } from './typeScale';
 
+/**
+ * THE THREE SEASONS — one Eden, one camera, one ground, bare to bloom.
+ *
+ * The captions are the section's OWN SENTENCE, split across the three frames it describes ("a bare
+ * lattice and a young climber ... more leaf, more flower"). They are quoted rather than invented on
+ * purpose: anything else here would be a claim about time that nobody has made — "year one" / "year
+ * five" would be inventing a growth rate, and this page is careful about that everywhere else.
+ *
+ * Daniel's own work (confirmed 2026-07-16), so they carry no attribution note.
+ *
+ * Re-encoded from the 2400px JPEGs he supplied: 1600px on the long edge, WebP q82. The three
+ * together went 1,323KB -> 445KB (-66%). Measured for dead white first, the way the project heroes
+ * had to be: 0% on all three, so the Plentify problem does not repeat here.
+ */
+const SEASONS = [
+  {
+    src: '/hero/v4/eden-bare-frame.webp',
+    alt: 'The Eden gridshell the day it is built: a bare timber lattice with its oculus open to the sky, a young climber planted at the foot of the central mast',
+    caption: 'A bare lattice and a young climber',
+  },
+  {
+    src: '/hero/v4/eden-green-front.webp',
+    alt: 'The same gridshell after some seasons, the lattice carrying dense green foliage and ferns',
+    caption: 'More leaf',
+  },
+  {
+    src: '/hero/v4/eden-bloom-front.webp',
+    alt: 'The same gridshell in bloom, wisteria and white blossom hanging through the timber lattice',
+    caption: 'More flower',
+  },
+] as const;
+
 export function SplashPage() {
   const reduced = useReducedMotion();
   const outputs = useDesign((s) => s.outputs);
@@ -68,6 +100,40 @@ export function SplashPage() {
           Every Eden is planted the day it is built, a bare lattice and a young climber. Each season
           after, it holds more leaf, more flower, more shade than the one before.
         </p>
+
+        {/* THE SENTENCE ABOVE, SHOWN. One structure, one camera, one ground, three seasons — the
+            section stops asserting that an Eden keeps becoming and starts showing it.
+
+            THIS IS THE ONE PLACE THESE THREE CAN GO, and the copy is what says so rather than
+            taste: "a bare lattice and a young climber" IS eden-bare-frame (look for the seedling on
+            the mast), "more leaf" IS eden-green-front, "more flower" IS eden-bloom-front. The order
+            is the sentence's order. Nothing else on this page argues that a thing changes over time.
+
+            The images are the EVIDENCE, so they sit between the claim and the diagram: the paragraph
+            says it, these show it, SeasonalBecomingDiagram measures it.
+
+            No fixed-aspect box, no object-fit, no crop — each element is its own picture at its own
+            ratio (all three are 1.342, identical renders of the same view, so the row is even
+            without anything being forced). See CLAUDE.md: stop forcing geometry onto something that
+            already knows its own shape. */}
+        <figure className="mt-12">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {SEASONS.map((s) => (
+              <div key={s.src}>
+                <img
+                  src={s.src}
+                  alt={s.alt}
+                  loading="lazy"
+                  decoding="async"
+                  className="block h-auto w-full"
+                />
+                <figcaption className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] opacity-55">
+                  {s.caption}
+                </figcaption>
+              </div>
+            ))}
+          </div>
+        </figure>
 
         <div className="mt-12">
           <SeasonalBecomingDiagram outputs={outputs} />

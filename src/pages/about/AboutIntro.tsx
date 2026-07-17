@@ -11,29 +11,70 @@
  * (the page decides via shouldPlayAboutIntro; only reduced-motion opts out). SSR-safe:
  * never touches window at import.
  */
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 
 /** Layout effect on the client, plain effect on the server (no SSR warning). */
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 const EASE_TRAVEL = [0.2, 0.8, 0.2, 1] as const;
+const EASE_LINE = [0.16, 1, 0.3, 1] as const;
 
 /** How long the settle travel (page centre → header slot) takes, in seconds. Shared by the motion
  *  transition and the timeline below so `reveal` can wait for the title to actually LAND. */
 const TRAVEL_S = 0.9;
 
-/** Timeline (ms): a brief held veil, then the title enters big, flies onto the header, the
- *  content reveals, done. (The old "we built this in two weeks" setup beat was removed at Daniel's
- *  request; the title entering and settling into the header is the whole narration now.)
- *  `reveal` waits until the flying title has LANDED (settle + travel), so the veil only clears once
- *  the flying copy is exactly coincident with the real header title — otherwise the real title fades
- *  in while the copy is still mid-flight and you see a ghost/double. */
+/**
+ * THE SETUP LINE. The contrast IS the story: a new company, an old pursuit — and the payoff ("We've
+ * been chasing it for five years.") is the TITLE itself, which enters big and settles into the
+ * header, so the loading screen and the header are one thought.
+ *
+ * Restored 2026-07-16. The beat had been cut and the payoff was left standing with nothing to pay
+ * off. It reads:
+ *
+ *     Bower is new.
+ *     We've been chasing it for five years.
+ *
+ * NOT the original "We built this in two weeks." — that is a claim with a shelf life, and it stops
+ * being true the moment the site keeps getting worked on, which is exactly what has happened all
+ * day. "Bower is new." carries the same reversal with nothing to go stale, and it rhymes with the
+ * page's own coda ("The obsession is real, and it is old."): new company at the top, old obsession
+ * at the foot, one idea opening and closing the page.
+ */
+const SETUP = 'Bower is new.';
+
+/** How long the setup takes to lift out. The title's fade waits exactly this long — see the timeline. */
+const SETUP_OUT_S = 0.36;
+
+/**
+ * Timeline (ms): the setup reads, the title takes over, flies onto the header, the content reveals.
+ *
+ * NOT the original's numbers (title 1750, settle 2700, reveal 3350, done 3850). Those paced a
+ * seven-word sentence; this is three words, and the rest of the sequence was tightened deliberately
+ * since. Tuned by watching:
+ *
+ *   0     the setup rises in (550ms), legible from ~400
+ *   800   the setup lifts out (360ms) — `title`
+ *   1160  the title fades up, into the space the setup has just left (SETUP_OUT_S delay)
+ *   2000  the title flies to the header — `settle`
+ *   2960  it lands, the veil clears — `reveal`
+ *   3560  done
+ *
+ * THEY QUEUE, THEY DO NOT CROSS, and that is not a taste call. The setup and the title share ONE box
+ * (see below), so both render at that box's TOP — a crossfade puts "Bower is new." directly on top of
+ * "We've been chasing it for", and for ~360ms neither is readable. The original had the same overlap
+ * and got away with it because its lines were different lengths. The title's fade is delayed by
+ * exactly the setup's exit, so the payoff arrives in a space that has just been vacated.
+ *
+ * `reveal` waits until the flying title has LANDED (settle + travel), so the veil only clears once
+ * the flying copy is exactly coincident with the real header title — otherwise the real title fades
+ * in while the copy is still mid-flight and you see a ghost/double.
+ */
 const T = {
-  title: 350,
-  settle: 1300,
-  reveal: 1300 + TRAVEL_S * 1000 + 60, // 2260: just after the title lands
-  done: 1300 + TRAVEL_S * 1000 + 60 + 600, // 2860: after the 0.55s veil fade
+  title: 800,
+  settle: 2000,
+  reveal: 2000 + TRAVEL_S * 1000 + 60, // 2960: just after the title lands
+  done: 2000 + TRAVEL_S * 1000 + 60 + 600, // 3560: after the 0.55s veil fade
 } as const;
 
 /** Pure guard: only play on a fresh, non-reduced-motion tab. */
@@ -121,6 +162,27 @@ export function AboutIntro({
 
       {rect && (
         <>
+          {/* THE SETUP LINE — in the title's OWN box, at the title's own size and position, so the
+              title's first line lands exactly where this line was. That shared box is the whole
+              point: the setup lifts out and the payoff arrives in the same place, in the same voice,
+              which is what makes the two read as one sentence rather than two slides.
+              Rises in, holds, lifts out (the title fades up over the tail of it). */}
+          <AnimatePresence>
+            {phase === 'setup' && (
+              <motion.p
+                key="setup"
+                className={`absolute ${titleClassName}`}
+                style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: 'left' }}
+                initial={{ opacity: 0, x: centerX, y: centerY + 22 }}
+                animate={{ opacity: 1, x: centerX, y: centerY }}
+                exit={{ opacity: 0, y: centerY - 16, transition: { duration: SETUP_OUT_S, ease: 'easeIn' } }}
+                transition={{ duration: 0.55, ease: EASE_LINE }}
+              >
+                {SETUP}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
           {/* Title — appears in the header's exact box at scale 1, translated to the complete centre
               of the page (x: centerX, y: centerY), then travels back to (0,0) to nest exactly onto the
               real header title. Text stays LEFT-aligned throughout (matching the header) so the
@@ -133,7 +195,9 @@ export function AboutIntro({
               initial={{ opacity: 0, x: centerX, y: centerY }}
               animate={{ opacity: 1, x: settling ? 0 : centerX, y: settling ? 0 : centerY }}
               transition={{
-                opacity: { duration: 0.5, ease: 'easeOut' },
+                // Waits for the setup to leave: they share a box, so a crossfade stacks two lines of
+                // text on each other and neither is readable. See the timeline.
+                opacity: { duration: 0.5, ease: 'easeOut', delay: SETUP_OUT_S },
                 x: { duration: settling ? TRAVEL_S : 0, ease: EASE_TRAVEL },
                 y: { duration: settling ? TRAVEL_S : 0, ease: EASE_TRAVEL },
               }}
