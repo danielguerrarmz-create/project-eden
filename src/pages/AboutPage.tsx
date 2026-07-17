@@ -53,9 +53,19 @@ import {
 import { FanPainting } from './about/FanPainting';
 import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
-import { armPts, polyD, taperRuns, trunkPts, type ParenLayout } from './about/parenthesis';
+import { armPts, polyD, taperRuns, trunkPts, type ParenLayout, type TaperRun } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
-import { dashProps, growAt, ORGAN_DISC_R, organAt, polyLen, revealSpanPx } from './about/reveal';
+import {
+  CARD_LINE,
+  clamp01,
+  dashProps,
+  growAt,
+  ORGAN_DISC_R,
+  organAt,
+  polyLen,
+  readerLead,
+  revealSpanPx,
+} from './about/reveal';
 import { usePageCardLine, useTimelineFrameScale } from './about/usePageCardLine';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
@@ -1168,6 +1178,14 @@ const PAREN_STEM_FRAC = 0.78;
  *  as a fading line rather than a thin one, and the organs still have to hang off something. */
 const PAREN_TIP_FRAC = 0.25;
 
+/** How much of the parenthesis's one growth the TRUNK takes before the arms start. The line has to
+ *  ARRIVE before it opens — the same trunk → branch order the timeline gets from its `order` lag. */
+const PAREN_TRUNK_SHARE = 0.18;
+/** How long one arm run takes to draw, as a fraction of the arms' share. Bigger than the gap between
+ *  runs (1/10) ON PURPOSE: they overlap, so the arm reads as one line paying out rather than ten
+ *  segments switching on in sequence. */
+const PAREN_RUN_OVERLAP = 0.34;
+
 /** WHERE THE ORGANS SIT along each arm, 0 (root) .. 1 (tip). ONE list, read by the painter that
  *  stamps them and by the reveal that uncovers them — a disc keyed to a station the composer did not
  *  use is a hole in the drawing. None before t=0.34: before that the arm is still sweeping out of
@@ -1294,6 +1312,8 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
         // it does up there. See revealSpanPx: reusing the raw constant would be a different motion
         // wearing the same number.
         frameScale: tr ? tr.width / TIMELINE_W : 0.696,
+        viewH: window.innerHeight,
+        headerH: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 84,
         trunkX: contentCenter - hr.left,
         trunkY0,
         forkY: bandTop + (boxes[0].y0 - bandTop) * PAREN_FORK_FRAC,
@@ -1352,7 +1372,56 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   // The card line, in this overlay's own coordinates, and the reveal's span converted through the
   // timeline's scale so the founders grow over the same distance ON SCREEN that the timeline does.
   const localLine = layout ? pageLine - layout.pageTop : 0;
-  const span = layout ? revealSpanPx(layout.frameScale) : revealSpanPx(0.696);
+
+  /*
+   * THE PARENTHESIS GROWS AS ONE EVENT, AND IT IS FINISHED BEFORE THE READER ARRIVES.
+   *
+   * Daniel: "Let the flowers and vine make their loading animation earlier in the cycle, so they are
+   * fully visualized before being out of frame, like it currently is now."
+   *
+   * MEASURED, and it was worse than "late": the parenthesis first reached fully-grown at scrollY
+   * 10440, at which point its own top was 636px ABOVE the viewport. It never existed finished and
+   * on screen at the same time. The animation was playing to nobody.
+   *
+   * THE CAUSE WAS MINE. Each taper run was keyed to its OWN y, so a 650px arm's tail only drew when
+   * the card line reached the tail — by which time its head was long gone. That was a local fix for
+   * "a long arm should not shoot out whole", and it traded one failure for a worse one. The
+   * timeline's own rule is the right one after all: a stem draws root → tip as ONE event. The arm is
+   * simply a long stem.
+   *
+   * So: ONE progress for the whole ornament, and the fix is the START, not the duration (compressing
+   * it would trade "invisible" for "too fast to see", which is not what he asked for).
+   *   begins  when the wrapper's top first appears at the BOTTOM of the screen (readerLead)
+   *   ends    when the founders are framed — the reader looks up and it is already done
+   *
+   * Both ends are derived from the measured layout and the live viewport, not pinned: the span is
+   * whatever distance separates those two moments.
+   */
+  // The viewport's height, live — the lead and the completion point are both fractions of it.
+  const lead = layout ? readerLead(layout.viewH) : 0;
+  // "Framed" = the founders' first row parked just under the fixed header. The header is real and
+  // covers the top of every viewport, so it is part of where the reader is actually looking.
+  const doneAt = layout ? (layout.rows[0]?.y0 ?? 0) + layout.viewH * CARD_LINE - layout.headerH : 1;
+  const parenSpan = Math.max(1, doneAt + lead);
+  const parenGrow = layout ? growAt(localLine, -lead, parenSpan) : 0;
+
+  /* PARENTS BEFORE CHILDREN, out of one progress. The trunk takes the first PAREN_TRUNK_SHARE of the
+     event and the arms the rest, so the line arrives before it opens — the same trunk → branch order
+     the timeline gets from its `order` lag. Each arm run then pays out over its own slice of the
+     arms' share, which is what keeps a 650px arm growing along its length instead of appearing whole
+     while still preserving the one-event timing. */
+  const trunkGrow = clamp01(parenGrow / PAREN_TRUNK_SHARE);
+  const runGrow = (run: TaperRun) => {
+    const armsP = clamp01((parenGrow - PAREN_TRUNK_SHARE) / (1 - PAREN_TRUNK_SHARE));
+    // `t0` is where this run starts along its arm, so a run does not begin until the arm has paid
+    // out to it — root → tip, out of one progress. The overlap is what stops it reading as ten
+    // separate segments switching on: each run is still drawing while the next one starts.
+    //
+    // The `(1 + OVERLAP)` is not a fudge: without it the LAST run starts at t0 ~= 0.9 and has only
+    // OVERLAP (0.34) of runway left, so it tops out at 0.29 and the arm's tail NEVER finishes. The
+    // arm has to be complete when armsP hits 1, so the ramp is stretched to end there.
+    return clamp01((armsP * (1 + PAREN_RUN_OVERLAP) - run.t0) / PAREN_RUN_OVERLAP);
+  };
   useEffect(() => {
     if (!arms || !w || !h) return;
     let live = true;
@@ -1443,7 +1512,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
             </radialGradient>
             <mask id="paren-organ-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={layout.w} height={layout.h}>
               {marks.map((m, i) => {
-                const o = organAt(growAt(localLine, m.y, span), 0);
+                const o = organAt(parenGrow, m.t);
                 if (o <= 0.001) return null;
                 return <circle key={i} cx={m.x} cy={m.y} r={ORGAN_DISC_R} fill="url(#paren-organ-disc)" opacity={o} />;
               })}
@@ -1455,7 +1524,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
             data-paren-trunk
             d={polyD(arms.trunk)}
             strokeWidth={layout.trunkW}
-            {...dashProps(polyLen(arms.trunk), growAt(localLine, arms.trunk[0].y, span))}
+            {...dashProps(polyLen(arms.trunk), trunkGrow)}
           />
           {/* The arms TAPER root → tip. They are not a constant-width rail: they are the line
               thinning as it grows away from the trunk, and without this each one ends in a blunt
@@ -1472,7 +1541,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
                 strokeWidth={
                   layout.trunkW * (PAREN_STEM_FRAC + (PAREN_TIP_FRAC - PAREN_STEM_FRAC) * run.t)
                 }
-                {...dashProps(polyLen(run.pts), growAt(localLine, run.pts[0].y, span))}
+                {...dashProps(polyLen(run.pts), runGrow(run))}
               />
             )),
           )}

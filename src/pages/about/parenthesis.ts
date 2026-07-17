@@ -91,6 +91,10 @@ export interface ParenLayout {
   /** The timeline's rendered px-per-world-unit — what the reveal span is converted through so the
    *  founders grow over the same screen distance the timeline does. */
   frameScale: number;
+  /** The live viewport height and the fixed header's height. The growth's start and finish are both
+   *  fractions of the screen the reader actually has, so they are measured, not pinned to 900/84. */
+  viewH: number;
+  headerH: number;
   /**
    * The spine's stroke width where it arrives, in CSS px — MEASURED off the timeline's rendered
    * scale, not copied from its constant.
@@ -316,9 +320,13 @@ export interface TaperRun {
   d: string;
   /** Midpoint fraction along the whole arm — drives the stroke's taper. */
   t: number;
-  /** The run's own points, root-first. The reveal needs its ROOT y (where the card line reaches it)
-   *  and its LENGTH (to dash it), and deriving both from the same slice that draws it is what stops
-   *  the dash and the stroke describing different curves. */
+  /** Where this run STARTS along the arm, 0..1. The reveal pays the arm out root → tip against one
+   *  progress, so each run needs to know its own place in the queue rather than its position on the
+   *  page — that is the difference between an arm that grows along its length and one whose tail
+   *  waits for the reader to scroll to it. */
+  t0: number;
+  /** The run's own points, root-first. The reveal dashes it by its own LENGTH, derived from the same
+   *  slice that draws it — so the dash and the stroke cannot describe different curves. */
   pts: Pt[];
 }
 
@@ -330,7 +338,7 @@ export function taperRuns(pts: Pt[], n = 10): TaperRun[] {
     const end = Math.min(pts.length, i + per + 1); // +1 = the shared point
     if (end - i < 2) break;
     const slice = pts.slice(i, end);
-    runs.push({ d: polyD(slice), t: (i + (end - i) / 2) / pts.length, pts: slice });
+    runs.push({ d: polyD(slice), t: (i + (end - i) / 2) / pts.length, t0: i / pts.length, pts: slice });
   }
   return runs;
 }

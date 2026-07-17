@@ -18,6 +18,8 @@ const LAYOUT: ParenLayout = {
   rowRight: 1270,
   pageTop: 6190,
   frameScale: 1.061, // reduced motion's 1273px-for-1200-world-units frame
+  viewH: 900,
+  headerH: 84,
   rows: [
     { y0: 118, y1: 490 },
     { y0: 522, y1: 894 },

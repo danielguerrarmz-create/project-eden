@@ -97,6 +97,27 @@ export const ORGAN_FADE = 0.22;
  */
 export const ORGAN_DISC_R = 85;
 
+/**
+ * HOW FAR AHEAD OF THE READER A PAGE-FLOW REGION STARTS GROWING — the distance from the card line to
+ * the viewport's bottom edge, so a region begins the moment its top first appears at the bottom of
+ * the screen.
+ *
+ * Daniel: "Let the flowers and vine make their loading animation earlier in the cycle, so they are
+ * fully visualized before being out of frame, like it currently is now."
+ *
+ * The reveal is a LINE, not a trigger, so "start earlier" is a DISTANCE rather than a threshold —
+ * this is the card-line equivalent of an IntersectionObserver's `rootMargin`. The plant starts
+ * growing below the fold and is finished by the time the reader arrives.
+ *
+ * THE TIMELINE DOES NOT USE THIS AND MUST NOT. Its branches are short: each draws over UNFURL_SPAN
+ * as it crosses the card line and completes at ~38% of the frame, well inside. And its plates fade
+ * on exactly the same line, so pulling the branches earlier without the plates would break the one
+ * thing Daniel has been consistent about — "both of those emissions should match each other".
+ */
+export function readerLead(viewportH: number): number {
+  return viewportH * (1 - CARD_LINE);
+}
+
 /** Arc length of a polyline — the dash reveal needs it, and `getTotalLength()` would mean reading
  *  layout back out of the DOM for geometry we already have in hand. */
 export function polyLen(pts: ReadonlyArray<{ x: number; y: number }>): number {
