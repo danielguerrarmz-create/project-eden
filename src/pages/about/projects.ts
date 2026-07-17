@@ -946,34 +946,31 @@ export const PROJECTS: Project[] = [
         caption: 'Open and square the box',
         fit: 'contain',
       },
-      {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-03-04.png`,
-        ratio: 1.2936,
-        alt: 'Assembly steps 3 and 4: cutting the flattened box into two halves, then cutting a 20cm diagonal off each',
-        caption: 'Halve the blank and cut the diagonals to 20 cm',
-        fit: 'contain',
-      },
-      {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-05-06.png`,
-        ratio: 1.2936,
-        alt: 'Assembly steps 5 and 6: cutting the 2.5 by 5cm notches at the shoulders and pulling the tabs down',
-        caption: 'Mark and cut the fold lines to dimension',
-        fit: 'contain',
-      },
-      {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-07-08.png`,
-        ratio: 1.2936,
-        alt: 'Assembly steps 7 and 8: cutting a shirt open to make a cover, and raising the cardboard panels into the wedge',
-        caption: 'Cut the shirt to a cover, then raise the panels',
-        fit: 'contain',
-      },
-      {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-09-10.png`,
-        ratio: 1.2936,
-        alt: 'Assembly steps 9 and 10: trimming the overhanging panel, closing the wedge, and tying it shut with a reef knot',
-        caption: 'Trim the overhang, close the wedge, tie it off',
-        fit: 'contain',
-      },
+      /*
+       * FOUR ASSEMBLY SHEETS WERE CUT HERE (round 10). Steps 03-04, 05-06, 07-08 and 09-10.
+       * Recover with: git show d902d6b -- src/pages/about/projects.ts
+       *
+       * THEY ARE NOT CUT BECAUSE THEY DID NOT FIT, and that distinction is the only thing stopping
+       * the next agent restoring them the moment the rail gets wider. They are cut because a rail was
+       * the wrong place for them. The set is a TWELVE-STEP INSTRUCTION MANUAL — cut lines, 2.5cm and
+       * 5cm tab dimensions, A/B/C/D panel labels. A manual is not a portfolio image set, and it was
+       * never legible in a supporting rail at ANY width. It did not become wrong at 53px; it was
+       * always wrong and 53px is what made someone look.
+       *
+       * WHAT SURVIVES IS THE STORY THE RAIL IS FOR: flat sheet -> finished wedge (01-02 and 11-12),
+       * beside the object itself and the proof of it in use. The brochure hero already carries the
+       * whole method in one frame, which is what makes the middle of the manual redundant rather than
+       * merely small.
+       *
+       * HOW IT GOT HERE: the divider pin (item 7, Daniel's ruling) took Origami's band from 207.8 to
+       * 302.1, so its media row lost ~94px, and its rail — already the tightest on the page at 68.6px
+       * across 8 cells — fell through MIN_CELL. Raised to him as the invoice for that ruling rather
+       * than silenced by widening the guard, which would have been tuning the instrument to fit the
+       * result. He chose to cut. MIN_CELL stays 60.
+       *
+       * The four PNGs are now referenced NOWHERE. They are deletion candidates, not deletions: they
+       * are Daniel's files and CLAUDE.md already keeps an orphan list awaiting his call. See handoff.
+       */
       {
         src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-11-12.png`,
         ratio: 1.2936,
