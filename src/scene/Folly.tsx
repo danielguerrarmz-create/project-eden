@@ -161,7 +161,12 @@ export function Folly() {
         >
           {/* Fins, clamp plates, base plates, fish plates — S355 HDG. */}
           <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="#aab0b4" roughness={0.62} metalness={0.45} />
+          {/* Crisper than the old 0.62/0.45: with something in the environment
+              to reflect, a lower roughness and higher metalness turn the hubs
+              from flat grey discs into galvanized zinc that catches the light
+              as the turntable brings it round. Without an env map this trade
+              is a downgrade, so the two changes ship together. */}
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.58} />
         </instancedMesh>
       )}
 
@@ -174,7 +179,12 @@ export function Folly() {
         >
           {/* Core drums + bolts (unit Ø1 × h1, scaled per instance). */}
           <cylinderGeometry args={[0.5, 0.5, 1, 16]} />
-          <meshStandardMaterial color="#aab0b4" roughness={0.62} metalness={0.45} />
+          {/* Crisper than the old 0.62/0.45: with something in the environment
+              to reflect, a lower roughness and higher metalness turn the hubs
+              from flat grey discs into galvanized zinc that catches the light
+              as the turntable brings it round. Without an env map this trade
+              is a downgrade, so the two changes ship together. */}
+          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.58} />
         </instancedMesh>
       )}
     </>

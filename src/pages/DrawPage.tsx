@@ -39,10 +39,12 @@ import * as THREE from 'three';
 import { SplashHeader } from './splash/SplashHeader';
 import { DrawStage, type Tool } from './draw/DrawStage';
 import { useSpaceHeld } from './draw/useSpaceHeld';
+import { StudioEnvironment } from './draw/StudioEnvironment';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
 import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
 import { Folly } from '../scene/Folly';
+import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
 import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
 import { readDrawing, type Spine } from '../engine/fromDrawing';
@@ -265,7 +267,11 @@ export function DrawPage() {
           <div className="relative h-full w-full overflow-hidden rounded-2xl border border-inkBlack/12">
             {webglSupported() ? (
               <Canvas
-                shadows
+                // "soft" explicitly, not the bare boolean: the shadow's edge is
+                // a PCF filter kernel, and which kernel you get is the whole
+                // difference between an edge and a smear. Do not assume the
+                // boolean resolves to PCFSoft.
+                shadows="soft"
                 dpr={[1, 2]}
                 camera={{ position: [5.6, 3.6, 6.6], fov: 42 }}
                 className={`!absolute inset-0 ${cursor}`}
@@ -275,16 +281,48 @@ export function DrawPage() {
                 onContextMenu={(e) => e.preventDefault()}
               >
                 <color attach="background" args={['#F6F4EE']} />
-                <fog attach="fog" args={['#F6F4EE', 24, 54]} />
-                <ambientLight intensity={0.8} />
+                {/* Fog WAS configured and never rendered: near=24 sits beyond
+                    everything ever in frame (camera maxDistance 18, object
+                    ~9-11 m), so it was paid for and invisible. near=10 starts
+                    it past the object's own extent — the lattice must never
+                    fog, that reads as a bug — and far=30 lands inside the
+                    r=26 ground disc, so its outer edge dissolves into the
+                    vellum instead of ending at a hard rim. */}
+                <fog attach="fog" args={['#F6F4EE', 10, 30]} />
+                {/* THE RIG. Flat fill used to outweigh the key (0.8 ambient +
+                    0.7 hemisphere = 1.5 against 1.35), so the shadow the
+                    engine already computes never got to read as dark. This is
+                    scoped to this Canvas on purpose: HeroScene keeps the house
+                    rig. */}
+                <ambientLight intensity={0.32} />
                 <directionalLight
-                  position={[6, 10, 5]}
-                  intensity={1.35}
+                  // Raking, ~36° altitude: late-afternoon, and honest — the
+                  // repo's own sunpath peaks near 62° at noon, so this is the
+                  // shoulder of the day, not an invented angle. Near-overhead
+                  // (the old [6,10,5]) kills the shadow's length, which is the
+                  // most beautiful thing the lattice has to give.
+                  position={[9, 6.5, -3]}
+                  intensity={1.9}
                   castShadow
                   shadow-mapSize={[2048, 2048]}
-                  shadow-bias={-0.0002}
+                  // Sized to the object, not to Three's default ±5/far-500.
+                  // Same 2048 texels, spent on 11 m instead of scattered over
+                  // half a kilometre of empty space: this is most of why the
+                  // shadow was a blob.
+                  shadow-camera-left={-11}
+                  shadow-camera-right={11}
+                  shadow-camera-top={11}
+                  shadow-camera-bottom={-11}
+                  shadow-camera-near={1}
+                  shadow-camera-far={26}
+                  shadow-bias={-0.0004}
+                  shadow-normalBias={0.02}
                 />
+                {/* Rim: separates timber from vellum and catches member edges.
+                    No shadow map, so it costs one light and nothing else. */}
+                <directionalLight position={[-7, 4, 6]} intensity={0.35} />
                 <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
+                <StudioEnvironment />
 
                 <DrawStage
                   arcs={arcs}
@@ -297,9 +335,28 @@ export function DrawPage() {
                   onEdit={(e) => setEdits((xs) => [...xs, e])}
                 />
 
-                {/* The bake: soft surface out, real kit in. */}
+                {/* The bake: soft surface out, real kit in — and the ground
+                    resolves with it. The soft phase keeps its plain green
+                    disc deliberately: loose ground invites editing, polished
+                    ground stops it, which is the same law that makes bake a
+                    resolution rather than a jump-cut. DrawStage's own lawn is
+                    gated on !resolved so these two never sit coplanar. */}
                 {baked && <Folly />}
+                {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
 
+                {/* TWO passes, doing two different jobs. The wide soft one
+                    grounds the whole object in its setting; it is bad at
+                    contact, because a blur that wide has no idea where the
+                    foot actually meets the earth. The tight one is the
+                    ambient-occlusion stand-in: short `far`, small blur, so it
+                    only darkens where something is genuinely NEAR the ground.
+                    Two render-to-texture passes, no new dependency, no
+                    postprocessing pass to go black on the capture machine.
+
+                    Honest limit: this darkens the GROUND under the lattice,
+                    never member against member. Real AO would do both. At
+                    1440x900 for ten seconds the eye checks ground contact
+                    first and never gets to the second read. */}
                 <ContactShadows
                   position={[0, 0.015, 0]}
                   opacity={0.24}
@@ -307,6 +364,14 @@ export function DrawPage() {
                   blur={2.6}
                   far={8}
                   color="#5a5443"
+                />
+                <ContactShadows
+                  position={[0, 0.016, 0]}
+                  opacity={0.55}
+                  scale={5}
+                  blur={0.6}
+                  far={1.3}
+                  color="#4a4436"
                 />
                 <OrbitControls
                   makeDefault

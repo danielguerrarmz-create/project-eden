@@ -205,18 +205,27 @@ export function DrawStage({
   return (
     <group>
       {/* The lawn — and the drawing surface, when nothing is built yet. */}
-      {/* No onPointerUp/onPointerLeave: the window owns the release (above).
+      {/* GATED ON !resolved, and it must stay that way. At bake the page
+          mounts GardenContext, whose own lawn disc sits at this same y=0.
+          Two opaque coplanar discs in two near-identical greens z-fight for
+          every pixel they share, which on a slow turntable is a crawling
+          flicker across the whole ground — about the worst thing that can
+          happen to a hero frame. Baked, the garden is the only ground.
+
+          No onPointerUp/onPointerLeave: the window owns the release (above).
           onPointerLeave in particular used to COMMIT the gesture the instant
           the cursor crossed the lawn's edge, so a stroke drawn to the far side
           landed short, at the rim. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onPointerDown={down} onPointerMove={move}>
-        {/* Sized so a natural, comfortable stroke lands NEAR the buildable
-            family (12-18 m²) rather than 90 m². The lawn is the only scale cue
-            in the frame, so it quietly teaches how big to draw — and the bake
-            then nudges rather than shocking you with a 5x clamp. */}
-        <circleGeometry args={[6.5, 64]} />
-        <meshStandardMaterial color="#8fa06a" roughness={1} />
-      </mesh>
+      {!resolved && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onPointerDown={down} onPointerMove={move}>
+          {/* Sized so a natural, comfortable stroke lands NEAR the buildable
+              family (12-18 m²) rather than 90 m². The lawn is the only scale
+              cue in the frame, so it quietly teaches how big to draw — and the
+              bake then nudges rather than shocking you with a 5x clamp. */}
+          <circleGeometry args={[6.5, 64]} />
+          <meshStandardMaterial color="#8fa06a" roughness={1} />
+        </mesh>
+      )}
 
       {/* The soft thing. Also a drag target, so you sculpt ON it, not near it. */}
       {!resolved && arcs.length > 0 && (
