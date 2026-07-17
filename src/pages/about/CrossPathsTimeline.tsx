@@ -174,8 +174,67 @@ export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
  *  copy is how a year quietly gets ornamented but never labelled. */
 export const YEAR_TICKS: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026];
 
+/**
+ * THE AXIS, as authored. Since 2026-07-16 (round 8) this is NOT where the year labels go — see
+ * `yearLabelYs`. It still places the spine's own geometry (the converge point, the garland's
+ * station bands) and it is the fallback for a year that has no work on it.
+ */
 export const yearToY = (y: number) =>
   y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
+
+/**
+ * WHERE THE YEAR LABELS ACTUALLY GO: beside the work they name.
+ *
+ * RULED 2026-07-16 (round 8), Daniel. `spreadSide` shares out the lane's slack evenly, so a plate's
+ * y stopped meaning its date the moment it landed — a 2023 project can sit beside the "2024" label.
+ * The axis therefore stops being METRIC and becomes a SEQUENCE: same order, honest adjacency, no
+ * claim about interval. Nobody measures the pixel distance between two years; everybody reads which
+ * project a year is next to, and **a label beside the wrong project is a factual error a reader
+ * catches**.
+ *
+ * The rule: a year sits at the TOP of the first plate of that year, so it marks where that year's
+ * work begins — across BOTH sides, because the label names the year, not a lane.
+ *
+ * Two things this has to guarantee, and they are why it is not a one-liner:
+ *
+ *  - A YEAR WITH NO WORK KEEPS ITS AXIS POSITION. 2026 has no clusters at all (the spine converges
+ *    there and winds into the mark), so there is no plate to sit beside and `yearToY` is the only
+ *    honest answer left. Falling back is not a special case; it is the same rule reading an empty
+ *    set.
+ *  - THE ORDER IS ENFORCED, not hoped for, AND SO IS THE GAP. `spreadSide` lays each side
+ *    independently, so the per-year minimum across both sides is neither monotonic nor spaced:
+ *    measured, the first plate of 2021 lands at y=450 and the first of 2022 at y=457, and a label's
+ *    glyph box is 40 units tall — the two years would print on top of each other. Following the
+ *    plates cannot mean landing on another label. `YEAR_LABEL_MIN_GAP` is the floor.
+ *
+ *    The cost is real and it is the right way round: a year that gets pushed down sits a little
+ *    below its first plate instead of level with its top. It is still beside that year's work (a
+ *    plate is 200+ units tall), which is the thing the ruling is about — and the alternative is two
+ *    numerals in the same place, which is not a date at all.
+ */
+/** The least room two year labels may have between them: the glyph box (40) plus air. Below this
+ *  the numerals overlap and neither year is legible. */
+const YEAR_LABEL_MIN_GAP = 52;
+
+export function yearLabelYs(
+  laid: ReadonlyArray<{ year: number; plates: ReadonlyArray<{ y: number }> }>,
+  years: readonly number[] = YEAR_TICKS,
+): Map<number, number> {
+  const out = new Map<number, number>();
+  let floor = -Infinity;
+  for (const y of years) {
+    const tops = laid
+      .filter((c) => Math.floor(c.year) === y)
+      .flatMap((c) => c.plates.map((p) => p.y));
+    // A year with work sits at the first plate of that work; a year without keeps the axis.
+    const at = tops.length ? Math.min(...tops) : yearToY(y);
+    // ...and never above, or on top of, the year before it.
+    const clamped = Math.max(at, floor);
+    out.set(y, clamped);
+    floor = clamped + YEAR_LABEL_MIN_GAP;
+  }
+  return out;
+}
 
 /** An obstacle a year label must stay clear of: a plate. `computePlates()` returns exactly this
  *  shape, so the rule below scores the REAL layout rather than a parallel model of it.
@@ -204,8 +263,8 @@ function boxGapToRect(b: ReturnType<typeof yearLabelBox>, r: LabelObstacle['rect
 }
 
 /** How much room a year label has on one side: the tightest clearance to anything on that side. */
-export function yearLabelClearance(obstacles: readonly LabelObstacle[], y: number, side: Side): number {
-  const box = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+export function yearLabelClearance(obstacles: readonly LabelObstacle[], ty: number, side: Side): number {
+  const box = yearLabelBox(side === 'right' ? 1 : -1, ty);
   let best = Infinity;
   for (const o of obstacles) {
     if (o.side !== side) continue;
@@ -227,9 +286,9 @@ export function yearLabelClearance(obstacles: readonly LabelObstacle[], y: numbe
  * plates ACTUALLY are, which is the only model that cannot drift from the drawing. See the contract
  * test, which asserts the chosen side against the real layout.
  */
-export function yearLabelSide(obstacles: readonly LabelObstacle[], y: number): Side {
-  const right = yearLabelClearance(obstacles, y, 'right');
-  const left = yearLabelClearance(obstacles, y, 'left');
+export function yearLabelSide(obstacles: readonly LabelObstacle[], ty: number): Side {
+  const right = yearLabelClearance(obstacles, ty, 'right');
+  const left = yearLabelClearance(obstacles, ty, 'left');
   return left > right ? 'left' : 'right';
 }
 
@@ -1129,9 +1188,11 @@ export function subBranchObstacles(): WRect[] {
       );
     }
   }
-  for (const y of YEAR_TICKS) {
-    const side = yearLabelSide(plates, y);
-    const b = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+  // The labels' REAL positions — they follow the plates now, so an obstacle computed off the axis
+  // would reserve empty paper and leave the actual numerals open to be grown through.
+  for (const [, ty] of yearLabelPositions()) {
+    const side = yearLabelSide(plates, ty);
+    const b = yearLabelBox(side === 'right' ? 1 : -1, ty);
     out.push(padRect({ x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 }, SUB_PLATE_PAD));
   }
   return out;
@@ -1517,6 +1578,9 @@ function SpineGarland({ reduced }: { reduced: boolean }) {
 /** Per-cluster layout result: the shared branch anchor on the spine, and each plate's box. */
 interface LaidCluster {
   id: string;
+  /** The AUTHORED year. Kept through the layout because the year labels follow the plates now
+   *  (see yearLabelYs) and need to know which year a laid-out plate belongs to. */
+  year: number;
   side: Side;
   dir: number;
   hint: string;
@@ -1601,7 +1665,7 @@ function layoutClusters(spine: Strand): LaidCluster[] {
       y += h + CLUSTER_GAP_Y;
       return box;
     });
-    return { id: c.id, side: c.side, dir, hint: c.hint, spineX, anchorY, edgeX, plates };
+    return { id: c.id, year: c.year, side: c.side, dir, hint: c.hint, spineX, anchorY, edgeX, plates };
   });
 }
 
@@ -1615,6 +1679,17 @@ function layoutClusters(spine: Strand): LaidCluster[] {
  * Was `computeBranches`, which also sampled each branch's polyline for a no-overlap contract; the
  * branches are gone and the contract with them.
  */
+/**
+ * WHERE THE YEAR LABELS ARE, resolved off the real layout — the counterpart to `computePlates()`.
+ *
+ * One entry point on purpose. The labels' positions are needed in three places (the render, the
+ * sub-branches' no-go rects, and the tests), and three call sites re-deriving them is how one of
+ * them quietly keeps using the old axis while the page uses the new one.
+ */
+export function yearLabelPositions(): Map<number, number> {
+  return yearLabelYs(layoutClusters(sample('spine', spinePts())));
+}
+
 export function computePlates(): Array<{
   clusterId: string;
   plateIndex: number;
@@ -1844,6 +1919,9 @@ export function CrossPathsTimeline({
   /** What the year labels must dodge: every plate, as actually laid out. The layout is static, so
    *  this is computed once per mount, not per scroll frame. */
   const labelObstacles = useMemo(() => computePlates(), []);
+  /** Where the year labels sit: beside the work they name (see yearLabelYs). Static layout, so it is
+   *  resolved once per mount rather than per camera frame. */
+  const labelYs = useMemo(() => yearLabelYs(laid), [laid]);
 
   // The two convergence strands (the twist-fuse). Sampled for a smooth over-under lay-up; drawn
   // solid because they ARE the structure, not a whisper. The viewBox pan clips their off-frame tops.
@@ -2104,10 +2182,11 @@ export function CrossPathsTimeline({
                 flip (yearLabelSide, unit-tested) puts each label on whichever side the laid-out
                 plates and branches actually leave room on. */}
             {YEAR_TICKS.map((y) => {
-              const ty = yearToY(y);
+              // Beside the work it names, not at its metric position. See yearLabelYs.
+              const ty = labelYs.get(y) ?? yearToY(y);
               const vis = reduced ? 1 : clamp01((camY + viewH + 40 - ty) / 60) * clamp01((ty - camY + 120) / 80);
               if (vis <= 0.01) return null;
-              const drawSide = yearLabelSide(labelObstacles, y);
+              const drawSide = yearLabelSide(labelObstacles, ty);
               const dir = drawSide === 'right' ? 1 : -1;
               return (
                 <g key={y} opacity={vis}>

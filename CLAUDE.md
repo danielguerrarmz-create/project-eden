@@ -93,13 +93,15 @@ reviews before any commit.
   `INK_SEPIA` does not clear AA on the selected list row's own 8% tint. Amended 2026-07-16: the
   page was `INK_BLUE` (`#3E7CA8`), which appears nowhere in the splash hero (warm gold Austin
   light, timber, green foliage, wisteria purple). **Nothing blue survives on About.**
-  - **PIGMENT is permitted on the BOTANICAL SPECIMENS ONLY** — the founder specimens, the spine
-    garland's organs, and (2026-07-16 round 2) the sub-branches' organs and the founder vines (the
-    gongbi genome's own palette). Structure — spine, sub-branch stems, the mark, rules, labels — is
-    always sepia. The discipline frontispieces were deleted in round 2.
-    - **TODO(Daniel): the founder vines are an EXTENSION of this law, not an application of it.** A
-      painted vine is a botanical in the specimens' own register, but it is a vine, not a specimen on
-      a mount. Flagged in the handoff; say the word and they go sepia.
+  - **PIGMENT is permitted on EVERY PAINTED BOTANICAL** — the founder specimens, the spine garland's
+    organs, the sub-branches' organs, the founders' arms and the coda garlands (the gongbi genome's
+    own palette). **RULED 2026-07-16**: this was "the botanical specimens only", and whether a
+    painted *vine* counted was flagged rather than widened quietly. Daniel extended it. If the
+    gongbi brush painted it, it may be in pigment.
+    - **STRUCTURE IS ALWAYS SEPIA** — the spine, the sub-branch stems, the founders' arms' stems,
+      the mark, rules, labels. That half is unchanged and is what the law is actually for. The line
+      is: *the composer's brush may have colour; the page's own pen may not.*
+    - The discipline frontispieces were deleted in round 2.
   - The old Clay-blue / Daniel-green / shared-olive split was removed on 2026-07-13 — **do not
     reintroduce colour-coding by person.** That prohibition stands unchanged.
 - **A seed is a design review, not a constant.** Every commission in `about/paintings.ts` and the

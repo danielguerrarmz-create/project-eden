@@ -3,6 +3,7 @@ import {
   spreadSide,
   MAX_CONCURRENT_STRANDS,
   yearLabelSide,
+  yearLabelPositions,
   CLUSTERS,
   spinePts,
   convArmPts,
@@ -112,9 +113,49 @@ describe('composition contract', () => {
 
 describe('yearLabelSide: the heavy year labels step aside from the real layout', () => {
   const YEARS = [2021, 2022, 2023, 2024, 2025, 2026];
+  /**
+   * THE LABELS' REAL Ys. These take a y COORDINATE, not a year — and they always did, but until the
+   * labels started following the plates (round 8) the two were close enough to conflate: every call
+   * site passed the year and `yearLabelClearance` converted it with `yearToY` internally. When that
+   * conversion moved out, these tests kept passing while measuring a label at y=2022px — the top of
+   * the drawing, where there is nothing to collide with, so "clears everything" was true and empty.
+   * Read them from the same function the page does.
+   */
+  const LABEL_Y = yearLabelPositions();
+  /** Authored year per cluster id, so a laid-out plate can be traced back to the year it belongs to. */
+  const CLUSTER_YEAR: Record<string, number> = Object.fromEntries(CLUSTERS.map((c) => [c.id, c.year]));
 
   it('defaults right when there is nothing to dodge', () => {
-    expect(yearLabelSide([], 2022)).toBe('right');
+    expect(yearLabelSide([], LABEL_Y.get(2022)!)).toBe('right');
+  });
+
+  it('THE RULING: a year sits beside the work it names, not at its metric position', () => {
+    // Daniel, round 8: the axis stops being metric and becomes a sequence. `spreadSide` moves
+    // plates, so a plate's y stopped meaning its date — a 2023 project could sit beside "2024".
+    // A label beside the wrong project is a factual error a reader catches; nobody measures the
+    // pixel distance between two years.
+    const plates = computePlates();
+    const laidYears = new Set(plates.map((p) => p.clusterId));
+    expect(laidYears.size).toBeGreaterThan(0);
+
+    for (const [year, ty] of LABEL_Y) {
+      const mine = plates.filter((p) => CLUSTER_YEAR[p.clusterId] !== undefined && Math.floor(CLUSTER_YEAR[p.clusterId]) === year);
+      if (mine.length === 0) continue; // 2026 has no work; it keeps the axis (see yearLabelYs)
+      // The label sits within its own year's band of plates — top of the first, bottom of the last.
+      const top = Math.min(...mine.map((p) => p.rect.y));
+      const bottom = Math.max(...mine.map((p) => p.rect.y + p.rect.h));
+      expect(ty, `${year} is not beside its own work`).toBeGreaterThanOrEqual(top - 1);
+      expect(ty, `${year} is past the end of its own work`).toBeLessThanOrEqual(bottom);
+    }
+  });
+
+  it('...and no two years print on top of each other', () => {
+    // Following the plates cannot mean landing on another label. Measured before the gap floor
+    // existed: 2021's first plate at y=450 and 2022's at y=457, with a 40-unit glyph box.
+    const ys = [...LABEL_Y.values()];
+    for (let i = 1; i < ys.length; i++) {
+      expect(ys[i] - ys[i - 1], `labels ${i - 1} and ${i} collide`).toBeGreaterThanOrEqual(40);
+    }
   });
 
   it('picks the side with more room, not the side away from the authored year', () => {
@@ -122,15 +163,16 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
     const obstacles = [
       { side: 'right' as const, rect: { x: 710, y: 1404, w: 320, h: 213 } },
     ];
-    expect(yearLabelSide(obstacles, 2024)).toBe('left');
+    expect(yearLabelSide(obstacles, 1500)).toBe('left');
   });
 
   it('always chooses the roomier side — it can never pick the worse one', () => {
     const obstacles = computePlates();
     for (const y of YEARS) {
-      const chosen = yearLabelClearance(obstacles, y, yearLabelSide(obstacles, y));
-      const other = yearLabelSide(obstacles, y) === 'right' ? 'left' : 'right';
-      expect(chosen).toBeGreaterThanOrEqual(yearLabelClearance(obstacles, y, other));
+      const ty = LABEL_Y.get(y)!;
+      const chosen = yearLabelClearance(obstacles, ty, yearLabelSide(obstacles, ty));
+      const other = yearLabelSide(obstacles, ty) === 'right' ? 'left' : 'right';
+      expect(chosen).toBeGreaterThanOrEqual(yearLabelClearance(obstacles, ty, other));
     }
   });
 
@@ -144,8 +186,9 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
     // exception here any more, and this asserts it rather than leaving the old allowance to rot.
     const obstacles = computePlates();
     for (const y of YEARS) {
-      const gap = yearLabelClearance(obstacles, y, yearLabelSide(obstacles, y));
-      expect(gap, `year ${y}`).toBeGreaterThan(0);
+      const ty = LABEL_Y.get(y)!;
+      const gap = yearLabelClearance(obstacles, ty, yearLabelSide(obstacles, ty));
+      expect(gap, `year ${y} (label at y=${Math.round(ty)})`).toBeGreaterThan(0);
     }
   });
 
@@ -161,7 +204,7 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
     const obstacles = computePlates();
     for (const y of YEARS) {
       for (const side of ['left', 'right'] as const) {
-        const box = yearLabelBox(side === 'right' ? 1 : -1, yearToY(y));
+        const box = yearLabelBox(side === 'right' ? 1 : -1, LABEL_Y.get(y)!);
         for (const o of obstacles) {
           if (o.side !== side) continue;
           const overlaps =

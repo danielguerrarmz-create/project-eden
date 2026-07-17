@@ -202,11 +202,19 @@ export const TEAM: TeamMember[] = [
        * a fact about a project lives in two places and only one of them has an owner. Flagged rather
        * than fixed structurally — worth doing if a third founder or a third re-attribution arrives.
        *
-       * TODO(Daniel): the composite is `Plentify` (n:10), which the ledger attributes `clay+daniel`,
-       * not `daniel`. You said "the biogenic composite I made", so it belongs in your bio — it is
-       * worded here as a thing you built rather than as sole authorship, and the work index credits
-       * "CLAY + DANIEL" on the project itself, so the page does not contradict itself. Say the word
-       * if you want it stated more strongly, or dropped.
+       * THE COMPOSITE, NOT THE PROJECT — and that distinction is the whole reason this wording is
+       * safe (RULED 2026-07-16, Daniel, shown the ledger and asked directly).
+       *
+       * `by: 'clay+daniel'` is on `Plentify` (n:10), THE PROJECT — a building, its walls, the
+       * material research, the tests. The composite is a COMPONENT inside it, and it is the part
+       * Daniel grew. So "I grew a load-bearing composite" and "Plentify is shared" are both true at
+       * once; they are claims about different things.
+       *
+       * KEEP THEM DIFFERENT THINGS. Do not let this sentence drift into naming Plentify, or into
+       * "the building", or into anything that reads as sole authorship of the project. The work
+       * index credits "CLAY + DANIEL" on Plentify itself a few hundred pixels away, and the moment
+       * this line claims the project rather than the material, the page contradicts itself about a
+       * cofounder's credit — which is the same error class as the desk lamp, pointed the other way.
        *
        * TODO(Daniel): CONFIRM THE FORSITE CLAUSE. "Forsite" appears nowhere in this repo, so there
        * was no fact to source and nothing here is invented beyond your own words ("the recent
@@ -216,7 +224,7 @@ export const TEAM: TeamMember[] = [
       {
         label: 'Also',
         value:
-          'A biogenic composite of bamboo and hemp, tested 30% stronger than hempcrete, and an AI operations layer for Forsite, an architecture studio.',
+          'Grew a load-bearing composite from bamboo and hemp, tested 30% stronger than hempcrete, and an AI operations layer for Forsite, an architecture studio.',
       },
       { label: 'This round', value: 'The engine, the demo, the numbers.' },
     ],
