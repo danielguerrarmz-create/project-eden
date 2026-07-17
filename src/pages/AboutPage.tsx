@@ -671,12 +671,49 @@ function LessonPill({ project }: { project: Project }) {
  * to protect the hero's height, and it silently hid the bottom of seven projects' awards and
  * collaborators (up to 61px of it) behind a scrollbar nobody would find in a band this short. The
  * band takes the height it needs; the hero absorbs the difference down to its floor.
+ *
+ * ---
+ *
+ * THE DIVIDER NEVER MOVES (round 10, item 7), AND THE BAND IS WHAT MOVES IT. Daniel: the line must
+ * sit at the same place on every project, only images above it, only text below.
+ *
+ * THE BRIEF'S PREMISE WAS INVERTED, and the measurement is what settled it. The media region does not
+ * push the divider down — the media region is the REMAINDER (`flex-1`), the band is `shrink-0`, and
+ * so `dividerY = detail.bottom − band.height`. The frame itself never moved: measured at 1440x900,
+ * `detailTop`/`detailBot` are identical on all twelve. The band was the only variable, and every
+ * divider position was an exact multiple of 20.6px — one line of `text-[15px] leading-snug`. The
+ * divider's y was literally "how many lines the tallest column wraps to". So no hero change could
+ * ever have fixed this, and cropping heroes to chase it would have been the fake fix the brief warns
+ * about.
+ *
+ * ARCHIPEDIA IS NOT THE MAX — it is 4th of 7 distinct values, which is the trap. Pinning the band at
+ * Archipedia's 228.4 would have cut 73.8px of real text off Hydraulic Commons and 71.1px off Robots,
+ * and capping with a scrollbar is the thing already tried and reverted (above). Put to Daniel with
+ * those numbers, he ruled: PIN AT THE LONGEST, LOSE NO TEXT, and accepted explicitly that Archipedia's
+ * own line rises ~74px from where he had called it correct.
+ *
+ * HOW IT IS PINNED, AND WHY NOT `min-h-[302px]`: 302.1 is a MEASUREMENT AT ONE VIEWPORT. The detail
+ * column's width changes with the window, text re-wraps, and the tallest band stops being 302 —
+ * so a hardcoded floor would pin the divider at 1440x900 and let it drift everywhere else, which is
+ * this page's most-repeated bug ("the fix is never a better number") wearing a ruling as cover.
+ * Instead EVERY project's band is rendered into the SAME grid cell, and the inactive ones are
+ * `invisible`. A grid row is as tall as its tallest child, so the row IS the longest band, measured
+ * by the browser, at whatever width it currently is. No constant to go stale.
+ *
+ * `visibility: hidden` rather than `display: none` or unmounting, and the distinction is the whole
+ * trick: a `hidden` element still occupies its grid cell (which is what holds the height) while being
+ * removed from the accessibility tree AND the tab order, so the twelve shadow bands cannot be read
+ * out, focused, or reached by a screen reader. `display:none` would collapse the cell and pin
+ * nothing; `aria-hidden` alone would leave their links tabbable.
  */
-function ProjectInfoBand({ project }: { project: Project }) {
+function ProjectInfoBand({ project, shadow = false }: { project: Project; shadow?: boolean }) {
   return (
     <div
-      data-project-band
-      className="grid shrink-0 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-7 border-t border-inkBlack/12 pt-4"
+      data-project-band={shadow ? 'shadow' : 'active'}
+      aria-hidden={shadow || undefined}
+      className={`col-start-1 row-start-1 grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-7 border-t border-inkBlack/12 pt-4 ${
+        shadow ? 'invisible' : ''
+      }`}
     >
       <div>
         <h3 className="font-serifDisplay text-[26px] leading-tight text-inkBlack">{project.title}</h3>
@@ -927,8 +964,17 @@ function ListView({ reduced }: { reduced: boolean }) {
                 </div>
               )}
             </div>
-            {/* ROW 2 — the project information. */}
-            <ProjectInfoBand project={project} />
+            {/* ROW 2 — the project information, AND THE DIVIDER THAT NEVER MOVES.
+                Every project's band is stacked into one grid cell so the row is always as tall as the
+                LONGEST band, measured by the browser at whatever width the window currently is. Only
+                the active one is visible; the rest hold the height and nothing else. That is Daniel's
+                ruling ("pin at the longest, lose no text") expressed as geometry rather than as a
+                number that would go stale the moment the window resized. See ProjectInfoBand. */}
+            <div className="grid shrink-0">
+              {items.map((p) => (
+                <ProjectInfoBand key={p.n} project={p} shadow={p.n !== project.n} />
+              ))}
+            </div>
           </motion.div>
         </div>
       </div>

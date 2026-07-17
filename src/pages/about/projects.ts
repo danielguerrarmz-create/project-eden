@@ -219,11 +219,15 @@ export const TEAM: TeamMember[] = [
        * shape without the dates. "Now" is deliberately relative: the Product Engineer stint is
        * current, and a bio that says "May 2026" goes stale silently.
        *
-       * TODO(Daniel) — SIX MONTHS OR SEVEN? You said "six months at Rogers" twice, out loud, and the
-       * resume says June to December 2025 and "over 7 months". Your six is used here because it is
-       * your own history and you said it twice. Flagged rather than split, because quietly averaging
-       * two sources is how a bio ends up saying something neither of them said. Correct it if the
-       * resume is right.
+       * SEVEN MONTHS, RULED 2026-07-16 — and the flag is gone because there is no longer a
+       * discrepancy, only a fact. He said "six months at Rogers" twice, out loud; the resume says
+       * June to December 2025 and "over 7 months". Round 10 shipped his six and flagged the conflict
+       * rather than splitting it. Put to him, he overruled himself: "seven, the resume is right." So
+       * the resume's span governs and the spoken six is retired. Do not restore it.
+       *
+       * (The reason this went to him rather than being averaged: quietly splitting two sources is how
+       * a bio ends up saying something neither of them said. It cost one question and it changed the
+       * answer, which is the argument for asking.)
        *
        * THE KENYA LINE IS CUT FROM THE BIO ONLY. Daniel: "I would probably remove the built medical
        * device in Kenya and talk more about Forsite." The Origami Medical Device project keeps it in
@@ -233,7 +237,7 @@ export const TEAM: TeamMember[] = [
       {
         label: 'Trained',
         value:
-          'Architecture, product design, and engineering. Six months at Rogers Partners in New York, on institutional and civic work under real regulatory constraint: Grasshopper concepts for Pupin Plaza at Columbia, and the landmarks package for a school expansion that was approved and went on to construction documents. Forsite Studio twice since, first drafting and now as a product engineer. It is a design-build firm of eight people, small and integrated enough that the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built the studio’s AI operations layer.',
+          'Architecture, product design, and engineering. Seven months at Rogers Partners in New York, on institutional and civic work under real regulatory constraint: Grasshopper concepts for Pupin Plaza at Columbia, and the landmarks package for a school expansion that was approved and went on to construction documents. Forsite Studio twice since, first drafting and now as a product engineer. It is a design-build firm of eight people, small and integrated enough that the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built the studio’s AI operations layer.',
       },
       /*
        * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
