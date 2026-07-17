@@ -1302,9 +1302,42 @@ function CodaBower({ reduced }: { reduced: boolean }) {
       className="pointer-events-none mx-auto block w-full max-w-[1000px]"
     >
       <defs>
+        {/*
+         * THE FLOWERS' BLUR IS THIS GRADIENT, AND IT IS PERMANENT — not the 900ms timer, not a
+         * filter, not DPR (2026-07-17). Read this before touching the stops.
+         *
+         * Mask alpha is LUMINANCE, so `offset 0.45 -> #fff, offset 1 -> #000` means the disc is fully
+         * opaque only inside r = 0.45 * ORGAN_DISC_R = 38.25, and ramps to nothing by 85. The painted
+         * organs are much bigger than 38.25. MEASURED AT STEADY STATE — camera settled, all organs at
+         * opacity 1, no stems growing, the reveal entirely over: mean applied mask alpha on flower
+         * pixels 0.65-0.68, only 36-43% of flower pixels fully opaque. TWO THIRDS OF EVERY FLOWER ON
+         * THIS PAGE HAS BEEN RENDERING SEMI-TRANSPARENT, FOREVER.
+         *
+         * TWO BUGS, TWO STOPS, AND BOTH HALVES ARE NEEDED — they fix different mechanisms:
+         *   - `0.45 -> 0.9` on the white stop: the core is opaque out to where the organ actually is,
+         *     so the feather is a rim rather than a wash across the whole flower.
+         *   - `stopOpacity=0` on the black stop: the rim was OPAQUE black, and mask children composite
+         *     source-over, so a later disc's black rim PAINTED OVER an earlier disc's revealed core.
+         *     Neighbouring organs were erasing each other.
+         * A/B measured within ONE load (PAGE_SPECIES rolls per load, so across loads you measure the
+         * species, not the fix): as shipped 0.684 mean / 42.9% opaque; rim only 0.861 / 43.5%; core
+         * only 0.926 / 84.8%; BOTH 0.974 / 85.7%.
+         *
+         * WHAT THIS SAYS ABOUT ROUND 6, and it is the useful part: `organAt` genuinely was keyed to a
+         * growth that saturates at 1 while asking for t + LAG + FADE, so 87 of 218 organs could never
+         * reach full opacity. That fix was CORRECT AND INCOMPLETE. The schedule is right — every organ
+         * does reach opacity 1 — and the residue is the disc's GEOMETRY, which no scheduling change
+         * could ever have reached. Daniel has therefore still never seen these flowers render
+         * properly. "Correct and incomplete" is the expensive kind, because the first fix makes the
+         * symptom look like taste rather than a bug.
+         *
+         * THREE COPIES OF THIS EXIST AND THEY ARE IDENTICAL — `#coda-organ-disc` here,
+         * `#paren-organ-disc` below, and `#sub-organ-disc` in CrossPathsTimeline.tsx. That is why
+         * Daniel said "our flowers" and not "the timeline's flowers". Fix one, fix all three.
+         */}
         <radialGradient id="coda-organ-disc">
-          <stop offset="0.45" stopColor="#fff" />
-          <stop offset="1" stopColor="#000" />
+          <stop offset="0.9" stopColor="#fff" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
         </radialGradient>
         <mask id="coda-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={CODA_BAND.w} height={CODA_BAND.h}>
           {CODA_VINES.map((path, i) => {
@@ -1759,9 +1792,12 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
               reveal.ts and SubBranches). The composer paints every organ into ONE bitmap, so there is
               no per-organ element to fade and the reveal has to be a mask of discs. */}
           <defs>
+            {/* The same two stops, and the same reasons — see the long note at `#coda-organ-disc`.
+                Three identical copies of this gradient exist; a fix to one that skips the others just
+                moves which flowers are blurred. */}
             <radialGradient id="paren-organ-disc">
-              <stop offset="0.45" stopColor="#fff" />
-              <stop offset="1" stopColor="#000" />
+              <stop offset="0.9" stopColor="#fff" />
+              <stop offset="1" stopColor="#000" stopOpacity="0" />
             </radialGradient>
             <mask id="paren-organ-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={layout.w} height={layout.h}>
               {marks.map((m, i) => {

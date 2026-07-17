@@ -278,10 +278,53 @@ export const TEAM: TeamMember[] = [
        * THE WORK, where it still reads in full. Recover this bio wording with:
        *   git show c2585c7 -- src/pages/about/projects.ts
        */
+      /*
+       * ROUND 10 CONTINUED (2026-07-17) — FOUR BLOCKS, CLAY'S BLOCKS. Daniel: "Organize Daniel's bio
+       * with the same subtitles as Clay: TRAINED, BUILT, PUBLISHED, THIS ROUND. Similar word count as
+       * well, while keeping my experience in there."
+       *
+       * MEASURED, BECAUSE "SIMILAR WORD COUNT" IS A NUMBER AND NOT A VIBE:
+       *
+       *              TRAINED   BUILT   PUBLISHED   THIS ROUND   TOTAL
+       *   Clay          19       21        26           6         72
+       *   Daniel was   107        —        —            6        126     (one 107-word TRAINED, 5.6x
+       *   Daniel now    28       34        33           6        101      Clay's, plus a 13-word ALSO)
+       *
+       * 101 against 72 is 1.4x, down from 1.75x. It is not parity and it is not meant to be: BUILT is
+       * the deliberate outlier at 1.6x because Daniel's own instruction last round was that Forsite
+       * gets the MOST weight, and the automation clause LESS. Everything else lands within 1.3x.
+       *
+       * THE TWO STINTS ARE CARRIED BY THE STRUCTURE NOW, WHICH IS WHY THE DATES ARE STILL GONE. He
+       * asked for the KIND of work, not the calendar. Forsite is two separate jobs (Architectural
+       * Design Intern May 2024 to May 2025; Product Engineer May 2026 to present), so the drafting
+       * stint sits in TRAINED and the product-engineer stint sits in BUILT — which is exactly the
+       * shape of Clay's TRAINED ("three years drafting at Rick Wright Architects" before UT). The
+       * split says "he went away and came back in a different seat" without printing a date that goes
+       * stale. "Now" is deliberately relative for the same reason.
+       *
+       * WHAT WAS CUT TO REACH THE COUNT, so nobody restores it thinking it was forgotten: the Rogers
+       * specifics (Grasshopper concepts for Pupin Plaza at Columbia; the Buckley School's ~15,000 SF
+       * LPC package, approved and advanced to construction documents). They are REAL and sourced from
+       * his resume and they are 11 words each in a block budgeted at 19. "Civic and institutional work
+       * under real regulatory constraint" is the same claim at a fifth of the cost. Recover the full
+       * wording with: git show 583b876 -- src/pages/about/projects.ts
+       *
+       * SEVEN MONTHS, and it is settled, not a discrepancy: he said "six" twice out loud, the resume
+       * says June to December 2025 and "over 7 months", and put to him he overruled himself — "seven,
+       * the resume is right." Do not restore the six.
+       *
+       * KENYA STAYS CUT FROM THE BIO, on his round-10 note, and still reads in full on the Origami
+       * project itself. The bio is not the only surface.
+       */
       {
         label: 'Trained',
         value:
-          'Architecture, product design, and engineering. Seven months at Rogers Partners in New York, on institutional and civic work under real regulatory constraint: Grasshopper concepts for Pupin Plaza at Columbia, and the landmarks package for a school expansion that was approved and went on to construction documents. Forsite Studio twice since, first drafting and now as a product engineer. It is a design-build firm of eight people, small and integrated enough that the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built the studio’s AI operations layer.',
+          'Architecture, product design, and engineering at UT Austin. A year drafting at Forsite Studio, then seven months on civic and institutional work at Rogers Partners in New York.',
+      },
+      {
+        label: 'Built',
+        value:
+          'Now a product engineer at Forsite Studio, a design-build firm of eight, where one project runs from concept through contractors and subcontractors to construction on site and permitting. Built the studio’s AI operations layer.',
       },
       /*
        * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
@@ -315,21 +358,44 @@ export const TEAM: TeamMember[] = [
        * if "an AI operations layer for an architecture studio" is wrong or says too much.
        */
       /*
-       * ROUND 10: the Forsite automation clause LEFT this line and moved up into Trained, where he
-       * asked for it, so this says only the composite now.
+       * `ALSO` IS NOW `PUBLISHED`, ON DANIEL'S RULING (2026-07-17), and the previous round's open
+       * question about this block is closed by it: "Organize Daniel's bio with the same subtitles as
+       * Clay: TRAINED, BUILT, PUBLISHED, THIS ROUND."
        *
-       * TODO(Daniel) — DOES THIS BLOCK SURVIVE AT ALL? His note reads "everything below lives inside
-       * the TRAINED block", which taken literally folds the composite up there too and retires
-       * `Also` entirely. The composite is the one fact he did NOT mention in that pass: he named
-       * Rogers, Forsite, the automation and the Kenya cut, and never this. So it is left standing,
-       * because deleting authored content he did not ask to delete is his call, not mine, and this is
-       * the only place the bamboo-and-hemp work appears in either bio. Say the word and it folds up
-       * or comes out.
+       * `Also` was a bin, not a subtitle. It held one fact — the composite — because the fact had
+       * nowhere else to go, and the block existed to hold it. The composite has a home now: it has a
+       * paper, and the paper is about the composite.
+       *
+       * HE HAS THREE PUBLICATIONS AND ALL THREE ARE SOURCED IN THIS REPO. Nothing here is inferred:
+       *   - The composite paper. "Biogenic Hempcrete-Bamboo Composite with Enhanced Mechanical
+       *     Performance", UT Austin School of Architecture, July 2025, SOLE-AUTHORED. It is wired to
+       *     Plentify (n:10) below — see the citation note there, including why Koehler is not on it.
+       *   - Archipedia, submitted to ACM DIS 2026 (Clay Seifert, Daniel Guerra, Armaan Kokan,
+       *     Patrick Danahy). In `paper` on Archipedia (n:01).
+       *   - Archipedia's methodology, ACCEPTED at CAADRIA 2026. Named in the resume handoff, and
+       *     already carried in Clay's PUBLISHED block as "a third is accepted at CAADRIA 2026".
+       *
+       * THE COMPOSITE, NOT THE PROJECT — and this wording is load-bearing, not stylistic. RULED
+       * 2026-07-16 with Daniel looking at the ledger: `by: 'clay+daniel'` is on `Plentify` (n:10), THE
+       * PROJECT — a building, its walls, the material research, the tests. The composite is a
+       * COMPONENT inside it and is the part Daniel grew, which is why "grown from bamboo and hemp,
+       * tested 30% stronger than hempcrete" and "Plentify is shared" are both true at once: they are
+       * claims about different things.
+       *
+       * SO DO NOT LET THIS SENTENCE DRIFT INTO NAMING PLENTIFY, or "the building", or anything that
+       * reads as sole authorship of the project. The work index credits "CLAY + DANIEL" on Plentify a
+       * few hundred pixels away. The moment this line claims the project rather than the material, the
+       * page contradicts itself about a cofounder's credit — the desk-lamp error class, pointed the
+       * other way. `bios-vs-ledger.test.ts` guards the direction it can see; this one is on you.
+       *
+       * NOTE Archipedia IS safe to name here and is not the same risk: it is `by: 'clay+daniel'` and
+       * Daniel is a named author on the submission, so the sentence claims a share, not a project.
+       * It is phrased passively ("Archipedia is submitted") for exactly that reason.
        */
       {
-        label: 'Also',
+        label: 'Published',
         value:
-          'Grew a load-bearing composite from bamboo and hemp, tested 30% stronger than hempcrete.',
+          'A paper on a load-bearing composite grown from bamboo and hemp, tested 30% stronger than hempcrete, at UT Austin. Archipedia is submitted to ACM DIS 2026, and its methodology accepted at CAADRIA 2026.',
       },
       { label: 'This round', value: 'The engine, the demo, the numbers.' },
     ],
@@ -834,12 +900,23 @@ export const PROJECTS: Project[] = [
      *   Daniel A. Guerra · The University of Texas at Austin, School of Architecture
      *   Dr. Daniel Koehler · July 2025
      *
-     * AUTHORS IS `Daniel Guerra` ALONE, AND THAT IS A DELIBERATE READ, NOT AN OVERSIGHT. Dr. Daniel
-     * Koehler sits below the affiliation on the title page, which is the supervisor's position, not a
-     * byline. TODO(Daniel): confirm whether Koehler should be credited as an author or named as the
-     * advisor. Under-crediting is a correction; putting a real professor's name on a company's public
-     * page as author of something he advised is the same misattribution class as the desk lamp, aimed
-     * at someone outside the company. If unsure, this stays as it is.
+     * AUTHORS IS `Daniel Guerra` ALONE, AND THAT IS NOW A RULING, NOT A READ. RESOLVED 2026-07-17 —
+     * Daniel, asked directly: "Koehler is my advisor, not co-author." So the citation below is
+     * correct and DELIBERATE, and Dr. Daniel Koehler's absence from it is a decision rather than an
+     * omission waiting to be helpfully corrected.
+     *
+     * KEEP THE REASONING THAT GOT IT RIGHT BEFORE HE ANSWERED, because it is what stops the next
+     * agent adding him back on seeing his name in the PDF: Koehler sits BELOW the affiliation on the
+     * title page, which is the supervisor's position, not a byline.
+     *
+     * DO NOT NAME HIM IN `venue` OR `authors` IN ANY FORM. He is not a co-author, `ProjectPaper` has
+     * no advisor field, and inventing one to fit him in would put a real professor's name on a
+     * company's public page in a role nobody asked for — the desk-lamp misattribution class, aimed at
+     * someone outside the company, where the cost of being wrong is highest.
+     *
+     * (Written as a resolved ruling rather than deleted to silence, because a TODO that HAS been
+     * answered but still reads as a question is an invitation for someone to answer it differently
+     * later.)
      *
      * THE CITATION IS SOLE-AUTHORED WHILE THE PROJECT IS `by: 'clay+daniel'`, AND BOTH ARE TRUE. Read
      * the note above at `by`: Plentify the project is shared; the composite inside it is the part
