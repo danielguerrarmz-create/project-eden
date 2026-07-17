@@ -49,10 +49,14 @@ import { CinematicCamera } from './draw/CinematicCamera';
 import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
-  COMMISSION_DEMO_FIGURE,
   COMMISSION_DEMO_LABEL,
+  commissionDemoFigureGBP,
+  commissionDemoLabel,
   priceMetaLine,
 } from '../ui/priceCopy';
+import { useCountUp } from '../ui/useCountUp';
+import { getSpecies } from '../engine/species';
+import { SpeciesRow } from './draw/SpeciesRow';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
@@ -225,6 +229,18 @@ export function DrawPage() {
     const t = setTimeout(() => setDissolving(false), (REVEAL_S + 0.1) * 1000);
     return () => clearTimeout(t);
   }, [baked]);
+
+  // --- The commission figure, made dynamic (demo-only, priceCopy.ts §6). Reads
+  // live off the baked kit and the selected species, so a species swap or a
+  // different draw moves it. Longer tween right after bake (settles as the
+  // lattice finishes sweeping up, 1100 ms sits just under REVEAL_S), quicker
+  // 550 ms for a later species change. Reuses the existing `dissolving` flag.
+  const commissionTarget = commissionDemoFigureGBP({
+    footprintM2: outputs.geometry.params.footprintM2,
+    pieceCount: outputs.geometry.pieces.length,
+    speciesStemLoad01: getSpecies(outputs.geometry.params.speciesId).stemLoad01,
+  });
+  const commissionDisplay = useCountUp(commissionTarget, dissolving ? 1100 : 550);
 
   // --- Camera. The object should fill the frame, and it should move once baked.
   const [framing, setFraming] = useState<Framing>(HOME);
@@ -564,6 +580,10 @@ export function DrawPage() {
               </div>
             )}
 
+            {/* The same slot, baked: tools become plant options. Hidden while
+                exploded or dissolving so it never sits over the cascade. */}
+            {baked && !exploded && !dissolving && <SpeciesRow />}
+
             {/* What it is, while it's still soft. Two numbers, both true. */}
             {soft && (
               <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
@@ -618,7 +638,11 @@ export function DrawPage() {
                       machinery (priceCopy.ts, costAttribution.ts) is kept and
                       still tested; rollup drops the now-unused exports. */}
                   <div className="flex items-baseline gap-2.5">
-                    <p className="font-serif text-[26px] leading-none">{COMMISSION_DEMO_FIGURE}</p>
+                    {/* tabular-nums so the figure holds its width while the
+                        count-up ticks; without it the digits jitter. */}
+                    <p className="font-serif text-[26px] leading-none tabular-nums">
+                      {commissionDemoLabel(Math.round(commissionDisplay))}
+                    </p>
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
                       {COMMISSION_DEMO_LABEL}
                     </p>
