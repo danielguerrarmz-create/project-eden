@@ -681,3 +681,121 @@ the coda), `src/pages/about/parenthesis.ts` (`rowLeft`/`rowRight`, `TEXT_CLEARAN
 
 **Contested files touched:** none. `src/engine/*`, `src/scene/*`, `src/routing.ts`, `src/Root.tsx`
 untouched this round.
+
+---
+
+# ROUND 6 — one motion everywhere, and the low-compute pass
+
+**Branch:** `about-hybrid-sepia`. **`main` untouched, nothing pushed.** **Author:** Edward.
+Rounds 1–5 preserved above, unedited.
+
+Two commits: `83a8f42` one motion · `c8d7ed6` the painters encode their own work.
+
+## 1. One motion, in one place (`83a8f42`)
+
+Daniel: *"Make sure that all flowers on site, the founder ones and the ones below, appear in the same
+motion as the timeline ones."*
+
+The reveal now lives in **`about/reveal.ts`** and the three regions call it. Not copied into three
+call sites — that is how they drift on the next change, and the page's whole claim is that it is one
+plant growing. `growAt(cardLine, y, span, lag)` is the one expression; the timeline reads it against
+its camera's card line, the founders and the coda against the **viewport's** (`usePageCardLine`).
+Same 52% fraction, same span, same ramp.
+
+**Three things this had to get right, each the same rule in a different shape:**
+
+- **The span is not 175 on the page.** The timeline draws in world units and scales them into its
+  frame, so its 175-unit reveal is ~122 CSS px on screen. A page region reusing the raw constant
+  reveals over a visibly longer stretch — the same number, a **different motion**. `revealSpanPx`
+  converts through the timeline's measured scale.
+- **The founders' arms read PER-RUN.** An arm is ~650px; keyed to its root it would shoot out whole
+  the moment the line cleared the fork. Safe because the arms are monotone in y — unlike the
+  space-colonization branches.
+- **The coda reads PER-VINE, and that is the point.** Its vines are horizontal swags: every point at
+  nearly one height, so a y-driven reveal uncovers the whole thing in one frame. It would **pop** —
+  precisely the defect. Root-keying (what the timeline's branches already do) draws each vine
+  root → tip: a stem growing sideways.
+
+The coda's stems are **painted** (`tube: true`), so there is no path to dash — the stem is revealed by
+dashing a **mask stroke** along the vine's own polyline instead. Same expression, different layer.
+
+Station lists are hoisted so the painter that stamps an organ and the reveal that uncovers it read
+**one array** — a disc keyed to a station the composer did not use is a hole in the drawing.
+
+`usePageCardLine` coalesces to one rAF (this drives a mask with hundreds of discs; a scroll listener
+calling setState re-renders the ornament far more often than the compositor can paint). Reduced
+motion returns **Infinity**, so every `growAt` saturates to 1 and the page settles instantly, fully
+grown — expressed once instead of at every call site.
+
+**`qa/motion-one.mjs`** pins the claim that matters: each region must be caught **mid-growth**. A
+region that is 0 then 1 with nothing between is popping. All three caught partial.
+
+## 2. The low-compute pass (`c8d7ed6`)
+
+**MEASURED FIRST, and the profile named the culprit in one run:** `toBlob` was **6,291ms of
+main-thread self time — 51.9% of everything**.
+
+The painting was already off-thread. **The page was not.** Every caller wanted a URL, so a worker
+handing back an `ImageBitmap` made all four draw and PNG-encode it by hand — four garlands, up to
+1200x3525, encoded on the thread that answers the scroll, while the painters idled.
+`OffscreenCanvas.convertToBlob` does the identical encode in the worker. `requestGarland` returns a
+**URL** now; the main thread's whole job is `createObjectURL`.
+
+**Measured, same harness both sides (`qa/perf-about.mjs <throttle>`):**
+
+| throttle | main-thread blocked | scroll FPS | ornament ready |
+|---|---|---|---|
+| 1x (this machine) | 4722 → **1571ms** (−67%) | 138 → 200 | 5672 → 6783 |
+| **4x (mid laptop)** | 23336 → **7342ms** (−69%) | 10.9 → **48.2** | 25003 → **12339** (−51%) |
+| 6x (phone) | 36270 → **23310ms** (−36%) | 6.1 → 3.6 | 37611 → **24148** (−36%) |
+
+**4x is the one that matters and it is transformed** — 23s of blocking to 7s, 11fps to 48. Same
+seeds, same pixels, same determinism, so it is invisible at the top end, which was the constraint.
+
+**Method note, honestly:** these are **dev-server** numbers, before/after on the same harness, so the
+comparison is fair. A clean production before/after was not obtained — the first attempt measured a
+**stale app on an already-occupied port** (caught it; `vite preview` had failed to start and
+something else answered). Production absolutes on a real preview are 1x ready≈11.6s / blocked≈1.0s,
+4x blocked≈14.8s, 6x blocked≈25.2s, and they are noisy run to run. **6x is still not good.**
+
+## THE BAKE — measured, not built. This is the next move and it wants your call.
+
+The lead's instinct is right and the numbers support it. Positions are deterministic and only the
+**species** rolls, so the sub-branch garland is a **fixed, finite set of images**:
+
+| species | canvas | paint | as PNG |
+|---|---|---|---|
+| `bower/spine-2` | 1200x3525 | **7,084ms** | **685 KB** |
+| `bower/pool-a` | 1200x3525 | **7,567ms** | **859 KB** |
+| `bower/pool-k` | 1200x3525 | **7,217ms** | **593 KB** |
+
+**The trade: ~7.2s of CPU on every single load, against ~700KB downloaded once.** And the asymmetry
+that makes it a rout — **the paint cache is `new Map()`, in-memory, per session, so a visitor pays
+the 7.2s on every reload forever. An HTTP-cached PNG is paid once, ever.** A visitor rolls ONE
+species per visit, so it is ~700KB per visit, not 2.1MB.
+
+**What is bakeable and what is not** (this is the part that needs care):
+- **The sub-branch garland — yes, and it is the whole prize.** Its geometry is `subBranchPolylines()`,
+  deterministic, on a fixed 1200x3525 canvas. 3 PNGs.
+- **The coda — yes.** Fixed 1000x300 band, hand-authored vines. Cheap either way.
+- **The spine garland — yes.** Fixed `GARLAND_BOX`.
+- **The founders' parenthesis — NO.** Its arms are derived from the **measured founder rows**, which
+  move with the viewport and with the text. It cannot be baked without pinning the layout, and
+  pinning the layout would invert the page's load-bearing rule (ornament reads layout; layout never
+  reads ornament). It is only 378ms, so it does not matter.
+
+Not built because it is a real pipeline (a build step, an asset budget, a fallback when a bake is
+missing) and an architectural commitment — the kind of thing to decide, not to slip in at the end of
+a session.
+
+## Left (open)
+
+1. **6x (phone) is still ~23s of blocking.** The bake is the answer; nothing else on the list moves
+   it by an order of magnitude. Levers already checked and NOT worth taking: the worker pool is
+   already hardware-aware (`min(3, cores-2)`, so it scales *down* correctly and raising the cap only
+   helps big machines, which are not the problem); the garlands are painted at fixed canvas sizes,
+   not DPR-scaled, so there is no DPR cap to take.
+2. `SUB_ATTRACTOR_STEP` (52) remains a legitimate device-aware cost dial — fewer organs on weak
+   hardware is a better failure mode than jank. Not taken: it is visible, and the constraint was that
+   the optimisation must not cost the look.
+3. Everything from rounds 4–5 still open (the asset re-export, Forsite clause, year labels).

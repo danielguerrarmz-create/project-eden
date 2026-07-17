@@ -110,11 +110,32 @@ reviews before any commit.
   `CrossPathsTimeline.tsx` (there is a test). When it didn't, every year with a plate on the
   label's side put the numerals on the photograph and the label's vellum halo cut the branch
   underneath in half. No choice of side can save a label wider than the space it lives in.
-- **An image in a box the wrong shape is this page's recurring bug.** It has now shipped three ways:
-  the hero in a 505x557 portrait box (Daniel: "natively landscape but displayed in portrait mode"),
-  `unfurl()` opening every plate from `scale(0.92, 0.64)`, and a founder vine upscaled 1.8x by
-  `object-cover`. Before sizing any image region, check the aspect against the real asset — the
-  ratios are authored in `projects.ts` and there are QA probes in the round-2 handoff.
+- **STOP FORCING GEOMETRY ONTO SOMETHING THAT ALREADY KNOWS ITS OWN SHAPE.** This is the page's
+  most repeated bug and the answer has been the same every time: give the thing its own shape back.
+  It has now shipped five ways — the hero in a 505x557 portrait box (Daniel: "natively landscape but
+  displayed in portrait mode"); `unfurl()` opening every plate from `scale(0.92, 0.64)`; a founder
+  vine upscaled 1.8x by `object-cover`; every project hero on `fit: 'cover'` in a region of the
+  wrong ratio, silently cropping (Plentify lost **21% of its width** off the sides, and a cropped
+  photo still looks like a photo, so nobody notices); and a trunk with a hardcoded stroke that
+  matched the spine's position exactly and still stepped 46% in width at the join.
+  - The fix is never a better number. `fill` hands a picture a box and resolves the disagreement
+    with object-fit (cover crops, contain letterboxes); `FIT_FRAME` lets the replaced element size
+    itself from its intrinsic ratio under max-width/max-height, so the element IS the picture and
+    object-fit has nothing left to resolve. **Measured: hero crop 0% across all twelve.**
+  - Before sizing any image region, check the aspect against the real asset — the ratios are
+    authored in `projects.ts`, and `qa/` has probes.
+- **WHITE MARGINS AROUND A HERO MAY BE THE ASSET, NOT THE LAYOUT — measure before "fixing" it.**
+  Measured on the real pixels: Plentify's 1920x1080 hero poster has 451 fully-white columns on the
+  left and 478 on the right — **48.4% of the picture is white paper**. Resia's hero is **34.6%**,
+  Patterns 9.2%. No box can remove white that lives inside the image, and cropping it out is exactly
+  what "no cropping, do not lose context" forbids. This was diagnosed twice as a layout bug and is
+  not one. **It wants a re-export of the asset (Daniel's call, his files).** Do not "fix" it in CSS.
+- **A BOUNDING BOX IS NOT WHERE THE TEXT IS.** The no-go rule (ornament must not touch text) is only
+  as good as its idea of "occupied". "The founders." is a `<p>` in a full-width column — its box is
+  1100px wide for a ~110px string, so a box-based probe reports a vine "crossing text" while it
+  sails through empty paper a foot away, and would fail forever wherever the ornament went. Measure
+  the **glyph runs** (a `Range` over the text node, `getClientRects()`), as `qa/founder-frame.mjs`
+  does. With that, one reported collision was a false positive and exactly one was real.
 - **A grid row is as tall as its tallest column, and in the work detail that height comes out of the
   hero.** So `ProjectInfoBand`'s column split is a height budget, not a style choice — and MORE
   columns makes it taller, not shorter (narrower columns wrap more). Measured: 3 cols stacked wrong
@@ -122,6 +143,24 @@ reviews before any commit.
 - **Do not overlay the BowerMark on a painting.** `matRect` (`engine/gongbi/quality.ts`)
   base-anchors every plant so its densest region sits on the mat's bottom pixel row; anything
   placed at the frame's bottom collides with it by construction, for every seed.
+- **THE FOUNDER BIOS RESTATE PROJECT FACTS BY HAND, AND NOTHING LINKS THEM TO THE LEDGER.** This is
+  live and it will bite again. `LLO: Dream Machine` was re-attributed to Clay in `projects.ts` on
+  2026-07-15; the sentence claiming it sat in **Daniel's** bio until round 5 found it. One fact, two
+  places, one owner. Misattributing a cofounder's work on the company's own About page is the worst
+  class of bug this page has, and it is silent — nothing fails, it just reads wrong.
+  - **Whenever you touch a `by:` attribution, grep `TEAM` for the project's nouns.**
+  - Cheap fix if it recurs (proposed, not built): a test asserting no `TEAM` fact mentions a project
+    whose `by:` excludes that founder — a noun list per project is enough to catch the class.
+  - The mirror of it is just as bad: wording a **shared** project (`by: 'clay+daniel'`, e.g.
+    `Plentify`) as sole authorship in one founder's bio. Say what someone did, not what they own.
+- **`toBlob` ON THE MAIN THREAD WILL EAT THE PAGE.** "The painting is in a worker" is not the same
+  as "the page is off-thread". Handing back an `ImageBitmap` made all four callers draw and
+  PNG-encode it themselves: **6,291ms of main-thread self time, 51.9% of everything**, while the
+  painters idled. The worker encodes now (`OffscreenCanvas.convertToBlob`) and `requestGarland`
+  returns a **URL**, which is session-cached and **must not be revoked by callers** — the next mount
+  would get a dead URL. Measured at 4x CPU throttle: blocking 23.3s → 7.3s, scroll 11fps → 48fps.
+  Profile with `qa/perf-about.mjs <throttle>` before optimising anything here; the CPU profile named
+  this in one run and no amount of guessing would have.
 - **Do not wrap the project detail panel in `AnimatePresence mode="wait"`.** It deadlocks against
   the `layoutId` shared-element images inside it: the exit never completes, the incoming panel
   never mounts, and the detail silently freezes on whichever project rendered first while the list
