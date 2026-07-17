@@ -90,8 +90,17 @@ describe('THE RULE: growth is finished by the halfway mark', () => {
     const runs = subBranchPolylines();
     expect(runs.length, 'no runs — the probe is measuring nothing').toBeGreaterThan(40);
 
+    /*
+     * The tree must be DEEP enough for the stagger to be worth testing — that is all this guards, and
+     * it was `> 10` because the tree measured 21 the day it was written. The depth is EMERGENT: space
+     * colonization grows into whatever the layout leaves, so every axis change moves it (item 9's
+     * uniform axis took it to 10-13 depending on SLOPE). Pinning it at yesterday's measurement makes
+     * a probe guard fail for a reason that has nothing to do with the property under test — the same
+     * mistake as the lane test's `> 100`, one file over. 5 is "deep enough that a per-order stagger
+     * means something", which is the actual precondition.
+     */
     const maxOrder = Math.max(...runs.map((r) => r.order));
-    expect(maxOrder, 'the tree is deep; that is the whole point of this test').toBeGreaterThan(10);
+    expect(maxOrder, 'the tree is too shallow for a per-order stagger to be worth asserting').toBeGreaterThan(5);
 
     for (const viewH of [1000, 1293, 1500]) {
       const stagger = subBranchStagger(viewH);

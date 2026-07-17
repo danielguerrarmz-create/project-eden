@@ -237,16 +237,39 @@ const FUSE_Y = 150;
  */
 const Y_2021 = FUSE_Y + 120;
 /**
- * Units per year, every year. Sized to the DENSEST year, not chosen: 2024 carries five clusters
- * (three of them on the right), and a band that cannot hold the worst year makes plates overlap
- * rather than spread. Measured, 2024's right side needs ~884 units of plate plus its inner gaps.
+ * Units per year, every year. SIZED TO THE DENSEST YEAR — measured, not chosen — AND IT IS A FLOOR,
+ * NOT A DIAL. Read this before anyone tries to make the drawing tighter here again.
  *
- * THE COST IS REAL AND IT IS THE POINT: 2021 and 2026 carry one cluster each and now get the same
- * band as 2024's five, so they hold open paper. That is what "constant growth" costs, and Daniel
- * asked for it with his eyes open. The drawing is much taller than the piecewise axis made it, and
- * the scroll is longer to match (see the track height).
+ * THE FLOOR IS 2024 LEFT: resia + dougherty stack 1120 units, and with `flushTop` the slack pays out
+ * over 2 slots, so the band must exceed 1120 + 2 x 80 = 1280 to keep both gaps clear of the
+ * no-crowding bar (2 x CLUSTER_GAP_Y — "far wider than packSide's 40"). Swept against the real
+ * geometry: 1150 -> 15.1px, 1280 -> 80.1px, 1300 -> 90.1px, 1400 -> 140.1px. 1300 is the floor with
+ * a hair of margin; 1280 clears by 0.1px, which is the same "calibrated to today's content" trap in
+ * a smaller hat.
+ *
+ * IT SHIPPED AT 1150 FOR ONE COMMIT AND THAT WAS A BUG — 15.1px between resia and dougherty, worse
+ * crowding than the packSide floor of 40 that this whole rework existed to replace. It survived
+ * because the no-crowding test screened its own evidence out: it skipped any gap under 41 as "must be
+ * one cluster's own stack", which is true of a healthy lane and false of precisely the failure it
+ * guards. It could not fail. Fixed (a sibling is a sibling by clusterId, not by magnitude) and it now
+ * catches this immediately.
+ *
+ * SO THE BANDS CANNOT BE TIGHTENED. Daniel asked for exactly that, having seen the drawing at the
+ * broken 1150, and it is not available: 1150 was never a legitimate value. The triangle is EQUAL
+ * BANDS + NO CROWDING + LESS PAPER, and only two can hold while the years carry 1, 2, 3, 5, 2, 1
+ * clusters. The remaining levers are his, not ours: cut content from 2024, or give up equal bands.
+ *
+ * THE COST IS REAL AND IT IS THE POINT: 2021 and 2026 carry one cluster each and get the same band as
+ * 2024's five, so they hold open paper. That is what "constant growth" costs. The drawing is much
+ * taller than the piecewise axis made it and the scroll is longer to match (the track derives itself).
+ *
+ * TODO: this wants to be DERIVED from CLUSTERS rather than pinned — `max over (year, side) of
+ * (stack + n * MIN_INTER_GAP)` — which would make it self-tightening and incapable of crowding, the
+ * same lesson as `min-h-[302px]` and `items-stretch`. Not done here only because CONVERGE_Y and the
+ * dozen consts below it are evaluated at module init, above CLUSTERS, so it needs a reshuffle rather
+ * than an expression. The test is what holds the line meanwhile.
  */
-const SLOPE = 1150;
+const SLOPE = 1300;
 /** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
 export const CONVERGE_Y = Y_2021 + (MAX_YEAR - 2021) * SLOPE;
 

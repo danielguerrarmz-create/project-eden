@@ -122,12 +122,29 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
       const ps = computePlates()
         .filter((p) => p.side === side)
         .sort((a, b) => a.rect.y - b.rect.y);
-      const gaps: Array<{ g: number; sameYear: boolean }> = [];
+      const gaps: Array<{ g: number; sameYear: boolean; year: number }> = [];
       for (let i = 1; i < ps.length; i++) {
-        const g = ps[i].rect.y - (ps[i - 1].rect.y + ps[i - 1].rect.h);
-        // Siblings inside one cluster keep CLUSTER_GAP_Y (40); only BETWEEN clusters is spread.
-        if (g <= GAP + 1) continue;
-        gaps.push({ g, sameYear: CLUSTER_YEAR.get(ps[i].clusterId) === CLUSTER_YEAR.get(ps[i - 1].clusterId) });
+        const prev = ps[i - 1];
+        const cur = ps[i];
+        /*
+         * SKIP A SIBLING BY ITS CLUSTER ID, NEVER BY ITS SIZE — and this line was the bug.
+         *
+         * It read `if (g <= GAP + 1) continue;`, i.e. "a gap of 40-ish must be one cluster's own
+         * internal stack". That is true of a HEALTHY lane and false of exactly the lane this test
+         * exists to catch: a CROWDED inter-cluster gap is also small, so the filter threw away every
+         * gap that was too tight and kept only the ones that were already fine. The test could not
+         * fail. It passed green while 2024's left band sat at 15.1px between resia and dougherty —
+         * crowding worse than the packSide floor of 40 that this whole rework replaced, shipped by me
+         * one commit earlier, and invisible because the guard screened its own evidence out.
+         *
+         * A sibling is a sibling because it shares a clusterId. That is a fact, not a magnitude, and
+         * it cannot be confused with a failure.
+         */
+        if (prev.clusterId === cur.clusterId) continue;
+        const g = cur.rect.y - (prev.rect.y + prev.rect.h);
+        const py = CLUSTER_YEAR.get(prev.clusterId)!;
+        const cy = CLUSTER_YEAR.get(cur.clusterId)!;
+        gaps.push({ g, sameYear: py === cy, year: cy });
       }
       const shown = `${side} gaps: ${gaps.map((x) => x.g.toFixed(2)).join(', ')}`;
 
@@ -137,10 +154,25 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
       // 1. NO CROWDING — against packSide's own measured floor, which is what the sentence names.
       for (const { g } of gaps) expect(g, `${shown} — crowding is back`).toBeGreaterThan(2 * GAP);
 
-      // 2. EQUAL WITHIN A YEAR — spreadSide's contract, scoped to the band it now governs.
-      const within = gaps.filter((x) => x.sameYear).map((x) => x.g);
-      if (within.length > 1) {
-        for (const g of within) expect(g, `${shown} — a year's own band is not evenly set`).toBeCloseTo(within[0], 3);
+      /*
+       * 2. EQUAL WITHIN A YEAR — spreadSide's contract, scoped to the band it now governs.
+       *
+       * GROUPED BY YEAR, and the first draft was not, which made it wrong the moment two years both
+       * had inner gaps: it pooled every same-year gap on a side into one list and compared them all
+       * to the first. 2023's three clusters share a band at 173.83 and 2024's at 90.06 — both are
+       * "within a year", neither is comparable to the other, and the test failed reporting an uneven
+       * lane at the exact moment every lane was even. `spreadSide` promises equality inside ONE band;
+       * comparing across bands is asking it for something it never claimed.
+       */
+      const byYear = new Map<number, number[]>();
+      for (const x of gaps.filter((v) => v.sameYear)) {
+        byYear.set(x.year, [...(byYear.get(x.year) ?? []), x.g]);
+      }
+      for (const [year, within] of byYear) {
+        if (within.length < 2) continue;
+        for (const g of within) {
+          expect(g, `${shown} — ${year}'s own band is not evenly set`).toBeCloseTo(within[0], 3);
+        }
       }
     }
   });
