@@ -366,6 +366,37 @@ export function stackRatio(images: readonly { ratio: number }[]): number {
   return inv > 0 ? 1 / inv : 1;
 }
 
+/** The gap between the rail's cells, px. It is `gap-3` in the markup and a term in `railWidth` —
+ *  those two must agree, which is why it is a constant and not a literal in a class string. */
+export const RAIL_GAP = 12;
+
+/**
+ * THE RAIL'S WIDTH, from the height it actually has.
+ *
+ * Daniel: "every project seems to make the same mistake with the images overlapping and passing
+ * their dedicated boundary." He was right, and it was every project with more than one supporting
+ * image — measured, the rail ran 24px past its region on five of them (12px into the WHAT WE
+ * LEARNED pill) and 84px past on Origami.
+ *
+ * THE BUG WAS THAT `stackRatio` FORGOT THE GAPS. It solves `W * sum(1/ratio) = H` — the cells fill
+ * the height exactly — and then the flexbox adds `(n-1) * RAIL_GAP` of gap between them and pushes
+ * the last cell straight out of the box. The overflow was exactly (n-1)*12 on every project, which
+ * is how the cause identified itself: 2 images 12px, 3 images 24px, 8 images 84px.
+ *
+ * The gaps have to be in the arithmetic:
+ *      W * sum(1/ratio) + (n-1) * gap = H      ->      W = (H - (n-1) * gap) / sum(1/ratio)
+ *
+ * WHICH IS WHY THIS TAKES A HEIGHT AND `aspectRatio` COULD NOT. An aspect ratio is a pure number; it
+ * cannot subtract pixels from a height it is never told. That is the whole reason the rail is
+ * measured now instead of declared — the constraint stopped being expressible as a ratio the moment
+ * the gaps counted.
+ */
+export function railWidth(images: readonly { ratio: number }[], height: number, gap = RAIL_GAP): number {
+  const inv = images.reduce((s, im) => s + 1 / im.ratio, 0);
+  if (inv <= 0 || height <= 0) return 0;
+  return Math.max(0, (height - Math.max(0, images.length - 1) * gap) / inv);
+}
+
 /** Mobile: the hero at 3:2, then the rest as a justified row below. */
 function Gallery({
   project,
@@ -722,6 +753,26 @@ function ListView({ reduced }: { reduced: boolean }) {
 
   // The lightbox works on the ACTIVE project's REAL image set — pending placeholders have no asset, so
   // they are excluded here and never enter the arrow-key walk.
+  // THE MEDIA ROW'S HEIGHT, measured. The rail's width is a function of it (see railWidth), and it
+  // is a flex-1 remainder of a viewport-locked panel, so nothing static knows it.
+  const mediaRowRef = useRef<HTMLDivElement>(null);
+  const [mediaRowH, setMediaRowH] = useState(0);
+  // RE-BOUND ON EVERY PROJECT, because the row lives inside a `key={project.n}` subtree that
+  // REMOUNTS on each switch. With `[]` deps the observer keeps watching the detached old element
+  // and the height freezes at whatever the first project measured — or at 0.
+  useEffect(() => {
+    const el = mediaRowRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setMediaRowH(h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [project.n]);
+
   const lightboxImages = project.images.filter((im) => !im.pending);
   const [shot, setShot] = useState<number | null>(null);
   const closeShot = useCallback(() => setShot(null), []);
@@ -824,18 +875,24 @@ function ListView({ reduced }: { reduced: boolean }) {
           >
             {/* ROW 1 — the pictures. REGION 1: the hero, alone. REGION 2: every supporting image.
                 See the MEDIA comment. */}
-            <div className="flex min-h-0 flex-1 gap-3">
+            <div ref={mediaRowRef} className="flex min-h-0 flex-1 gap-3">
               {/* REGION 1 — the hero, alone, as large as the region allows and never cropped. The
                   flex box is the REGION; the picture inside is its own size (see FIT_FRAME). */}
               <div data-project-hero className="flex min-h-0 flex-1 items-start justify-start">
                 <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fit />
               </div>
               {rest.length > 0 && (
-                /* REGION 2, and `stackRatio` is what makes it read as a designed column rather than
-                   a pile. The rail's WIDTH is derived from the stack it has to hold, so the cells
-                   share one width, each keeps its own exact height, and the stack lands flush with
-                   the hero's bottom edge — no sliver, no crop, no ragged rail. `max-w` caps it at
-                   its share; when that bites the cells just get shorter (still exact).
+                /* REGION 2, and `railWidth` is what makes it read as a designed column rather than
+                   a pile. The rail's WIDTH is derived from the stack it has to hold AND the height it
+                   has to hold it in, so the cells share one width, each keeps its own exact height,
+                   and the stack lands flush with the hero's bottom edge — no sliver, no crop, no
+                   ragged rail. `max-w` caps it at its share; when that bites the cells just get
+                   shorter (still exact).
+
+                   IT IS MEASURED, NOT DECLARED, and that is the fix for Daniel's "every project
+                   seems to make the same mistake": `aspectRatio: stackRatio(rest)` could not
+                   subtract the (n-1) gaps from a height it was never told, so the cells filled the
+                   height and the gaps pushed the last one out of the box. See railWidth.
 
                    It is a real trade and worth knowing: the rail gets NARROWER the more images a
                    project has, because it is the height that is fixed. Three supporting images make
@@ -845,7 +902,7 @@ function ListView({ reduced }: { reduced: boolean }) {
                 <div
                   data-project-rail
                   className="flex h-full shrink-0 flex-col justify-start gap-3"
-                  style={{ aspectRatio: stackRatio(rest), maxWidth: `${MEDIA.supportW}%` }}
+                  style={{ width: railWidth(rest, mediaRowH), maxWidth: `${MEDIA.supportW}%` }}
                 >
                   {rest.map((img) => (
                     <div key={img.src} className="relative w-full" style={{ aspectRatio: img.ratio }}>

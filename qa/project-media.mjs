@@ -47,10 +47,15 @@ for (let i = 0; i < names.length; i++) {
       const hb = r(heroEl);
       const nat = heroEl ? (heroEl.tagName === 'IMG' ? heroEl.naturalWidth / heroEl.naturalHeight : (heroEl.videoWidth || 0) / (heroEl.videoHeight || 1)) : 0;
       if (!rail) return { rail: 0, past: 0, intoBand: -999, minCell: 999, heroCropPct: nat && hb ? +((Math.abs(hb.width / hb.height - nat) / nat) * 100).toFixed(1) : 0 };
-      const rb = r(rail);
       const rowB = r(rail.parentElement);
       const bb = r(band);
-      const cells = [...rail.children].map((c) => r(c).width);
+      const kids = [...rail.children].map((c) => r(c));
+      const cells = kids.map((c) => c.width);
+      // MEASURE THE CONTENT, NOT THE BOX. The rail is `h-full`, so its own rect is exactly the row's
+      // by definition and `rail.bottom - row.bottom` is 0 no matter how far the cells spill out of
+      // it. That reported "no overflow" on 72 readings while sheet 11-12 was visibly sitting on the
+      // WHAT WE LEARNED pill. The last CELL's bottom is the thing that overflows.
+      const rb = { bottom: kids.length ? Math.max(...kids.map((c) => c.bottom)) : r(rail).bottom };
       return {
         rail: cells.length,
         past: +(rb.bottom - rowB.bottom).toFixed(1),

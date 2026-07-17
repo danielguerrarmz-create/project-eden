@@ -29,7 +29,26 @@ const BUDGET = {
 } as const;
 
 /** The IMAGE BUDGET (Comment 4): every project shows the hero plus up to three — 1..4 images total. */
-const MAX_IMAGES = 4;
+/**
+ * 4 -> 9 (2026-07-16, round 8), and the reason the cap existed is now handled somewhere better.
+ *
+ * It was 4 because the rail could OVERFLOW: `stackRatio` sized the cells to fill the height and
+ * forgot the (n-1) gaps between them, so every extra image pushed the last one further out of the
+ * region and into the "WHAT WE LEARNED" pill. A count cap was the only lever anyone had. That is
+ * fixed at the root — `railWidth` puts the gaps in the arithmetic, so the stack fits BY
+ * CONSTRUCTION at any count and simply gets narrower.
+ *
+ * What a count cap can never see is the thing that actually matters now: whether a CELL is legible.
+ * That is a function of the height, the ratios and the count together, it only exists in a real
+ * layout, and `qa/project-media.mjs` measures it against the running page and fails on slivers.
+ * This number is a sanity bound on authored content, not a design rule.
+ *
+ * 9 is Origami: the hospital photograph, the staged prototype, and the seven-sheet assembly
+ * brochure Daniel asked to be wired in. TODO(Daniel): at 9 the rail's cells measure 69px — a
+ * legible INDEX (you can see six numbered steps and click any to full size) but not readable
+ * documentation. Flagged rather than silently accepted; see the handoff.
+ */
+const MAX_IMAGES = 9;
 
 /** The citation exactly as the panel renders it: `${venue} · ${authors}`. */
 function citationOf(p: (typeof PROJECTS)[number]): string {

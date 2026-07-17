@@ -81,8 +81,13 @@ export interface Project {
   /** Primary discipline, for the grouped project menu (Architecture / Product Design / Software). */
   discipline: Discipline;
   year: string;
-  /** Curated images, HERO first (1..4 total). The hero fills the top half of the media area; the
-   *  rest sit below it as a small tidy grid. Trimmed to the strongest — no hidden overflow. */
+  /** Curated images, HERO first. The hero fills REGION 1 alone; the rest stack in REGION 2's rail.
+   *  Trimmed to the strongest — no hidden overflow.
+   *
+   *  The old "1..4 total" cap is lifted (round 8): it existed because the rail overflowed its region
+   *  as the count rose, and `railWidth` fixes that at the root — the stack now fits by construction
+   *  at any count and simply gets narrower. The live guard is qa/project-media.mjs, which measures
+   *  real cells and fails on a sliver. Adding images is still a curation decision, not a free one. */
   images: ProjectImage[];
   /** Two to three sentence description with a clear outcome. */
   description: string;
@@ -727,7 +732,40 @@ export const PROJECTS: Project[] = [
     learned:
       'A constraint this hard, a device that has to cost cents and fold flat, is a design tool: it forces the idea down to the one move that matters.',
     // TODO(Daniel): collaborators/professors (AMPATH partner + the fourteen-student team — unnamed)
+    /*
+     * THE CONSTRUCTION DOCUMENTATION (2026-07-16, round 8). Daniel: "Origami Medical Device is
+     * missing some image documentation, refer to my personal portfolio for the construction images."
+     *
+     * It was not missing — it was ORPHANED. All seven sheets were already sitting in
+     * public/assets/projects/11-wound-care-kenya/ and nothing in src/ referenced them; only the two
+     * .webp photographs were ever wired. Bower in fact carries MORE than the portfolio does (six
+     * assembly sheets, 01-02 through 11-12, against the portfolio's three) — the fuller set was
+     * always here, just never hooked up. Renamed on the way in: they were bare numbers and one
+     * `Cover Page.png` with a SPACE in the filename.
+     *
+     * All seven are 793x613 (ratio 1.2936), measured off the files.
+     *
+     * THE HERO IS THE DEVICE IN THE HOSPITAL, not the studio shot. Daniel: "switch the Hero Image to
+     * that of the item being utilized in the hospital." The project's claim is "transferred for
+     * clinical deployment" — a real device under a real patient is the evidence for that; the staged
+     * prototype is illustration. Lead with the proof. (Same instinct as the garden photograph on the
+     * home page.)
+     *
+     * CAPTIONS: 01-02, 05-06, 11-12 and the cover are the portfolio's own words, reused verbatim
+     * because they are already right. 03-04, 07-08 and 09-10 are written to match that voice —
+     * short, imperative, what the step does — after LOOKING at each sheet. They are not inferred
+     * from the filenames: 03-04 halves the blank and cuts a 20cm diagonal, 07-08 cuts the shirt into
+     * a cover and raises the panels, 09-10 trims the overhang and ties the form shut with a reef
+     * knot. You cannot get any of that from "7-8.png".
+     */
     images: [
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
+        ratio: 1.2125,
+        alt: 'The device in use under a patient at Moi Teaching Hospital, Kenya',
+        caption: 'In use at Moi Teaching Hospital, Kenya',
+        hero: true,
+      },
       {
         src: `${A}/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp`,
         ratio: 1.2795,
@@ -735,10 +773,53 @@ export const PROJECTS: Project[] = [
         caption: 'The folded cardboard wedge, prototyped to cost cents',
       },
       {
-        src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
-        ratio: 1.2125,
-        alt: 'The device tested in hospital at Moi Teaching Hospital, Kenya',
-        caption: 'Tested in hospital at Moi Teaching Hospital, Kenya',
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-brochure-cover.png`,
+        ratio: 1.2936,
+        alt: 'The brochure cover: the finished wedge, the materials needed (a box, scissors, a ruler, a shirt), the two-hour turning interval, and the device in use under a patient',
+        caption: 'The single-sheet brochure, what to build, from what, and why',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-01-02.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 1 and 2: opening the box flaps and squaring the box out flat',
+        caption: 'Open and square the box',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-03-04.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 3 and 4: cutting the flattened box into two halves, then cutting a 20cm diagonal off each',
+        caption: 'Halve the blank and cut the diagonals to 20 cm',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-05-06.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 5 and 6: cutting the 2.5 by 5cm notches at the shoulders and pulling the tabs down',
+        caption: 'Mark and cut the fold lines to dimension',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-07-08.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 7 and 8: cutting a shirt open to make a cover, and raising the cardboard panels into the wedge',
+        caption: 'Cut the shirt to a cover, then raise the panels',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-09-10.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 9 and 10: trimming the overhanging panel, closing the wedge, and tying it shut with a reef knot',
+        caption: 'Trim the overhang, close the wedge, tie it off',
+        fit: 'contain',
+      },
+      {
+        src: `${A}/11-wound-care-kenya/wound-care-kenya-assembly-step-11-12.png`,
+        ratio: 1.2936,
+        alt: 'Assembly steps 11 and 12: tucking the last flap and the two finished wedges, A-B and C-D',
+        caption: 'Fold to the finished wedge',
+        fit: 'contain',
       },
     ],
   },
