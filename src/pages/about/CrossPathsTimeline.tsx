@@ -58,6 +58,15 @@ import {
 } from './reveal';
 import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
 import { colonize, branches, seededRandom, type Vec2, type Branch } from './spaceColonization';
+import { CLUSTERS, CLUSTER_GAP_Y, MAX_YEAR, YEAR_TICKS, plateBox, type Plate, type Side } from './clusters';
+
+/* The content and its box now live in `about/clusters.ts` (see the note at the top of that file: the
+ * axis reads the content, so the content has to be evaluated first, and an import edge is the only way
+ * to say that which cannot be got wrong later). Re-exported here because this module is the page's
+ * public face and the contract tests read them from it — moving a file should not rewrite every
+ * import in the suite. */
+export { CLUSTERS, YEAR_TICKS, plateBox } from './clusters';
+export type { Cluster, Plate, PlateTier, Side } from './clusters';
 
 /**
  * The practice's ink: a warm sepia/timber, drawn from the splash hero's own structure.
@@ -93,56 +102,8 @@ export const VELLUM = '#FBF9F3';
  */
 export const MAX_CONCURRENT_STRANDS = 3;
 
-type Side = 'left' | 'right';
-type PlateTier = 'floor' | 'standard' | 'hero' | 'showcase';
-
-/** One picture on a plate: a still, or a looping video (webm + mp4 + poster). */
-interface Plate {
-  /** Public path to the image, or the POSTER still for a video. */
-  src: string;
-  /**
-   * Intrinsic aspect ratio (width / height), MEASURED from the file — never guessed, and never the
-   * shape you wish it were. The plate's box is derived from THIS (see TIER), which is the whole
-   * point: an image is never asked to fit a box, the box is built to fit the image.
-   *
-   * Measured 2026-07-16 by loading every asset and reading naturalWidth/naturalHeight; the twelve
-   * that also appear in projects.ts agreed with its authored ratios exactly, and a test pins that
-   * they keep agreeing. If an asset is swapped, re-measure.
-   */
-  ratio: number;
-  alt: string;
-  /** Renders and photos crop with 'cover'; figures, logos, UI and line drawings use 'contain'
-   *  so nothing with baked-in text ever gets cropped. */
-  fit?: 'cover' | 'contain';
-  /** Present when this plate is really a looping video. */
-  video?: { webm: string; mp4: string; rate?: number };
-  /** No picture yet: draws an honest empty plate instead of inventing one. */
-  pending?: boolean;
-}
-
-/** One node on the spine. clusterIndex 0 is the lead (hero or showcase); later indices stack below
- *  it as standard siblings sharing the same branch point. */
-interface Node {
-  tier: PlateTier;
-  media: Plate;
-}
-
-/** A cluster: one branch point on the spine (a fork) with one or more stacked plate nodes. */
-interface Cluster {
-  id: string;
-  /** True event year → the spine anchor this cluster's branch(es) fork from. */
-  year: number;
-  side: Side;
-  /** ONE-line hint, from the allowed set only. The specifics live in "The Work" list below. */
-  hint: string;
-  nodes: Node[];
-}
-
-const A = '/assets/projects';
-/** The timeline's own photographs — the five Daniel shot/supplied for the page itself (orientation,
- *  studio, DAC pin-up, Resia pitch, graduation) rather than for a project. They live apart from
- *  `/assets/projects` because they are not a project's documentation; they are the page's narrative. */
-const T = '/assets/about/timeline';
+/* `Side`, `PlateTier`, `Plate`, `Node`, `Cluster` and the asset path prefixes moved to
+ * `about/clusters.ts`. They are imported at the top of this file. */
 
 /* --------------------------------- geometry ------------------------------- */
 
@@ -152,7 +113,6 @@ const T = '/assets/about/timeline';
 export const TIMELINE_W = 1200;
 const W = TIMELINE_W;
 const CX = 600;
-const MAX_YEAR = 2026;
 /** The spine's stroke, in WORLD units — not CSS px. What it renders at depends on the frame's
  *  scale, which is why the parenthesis measures rather than copies the number. */
 /**
@@ -196,99 +156,188 @@ const MAX_YEAR = 2026;
 export const SPINE_W = 7.5;
 
 /**
- * THE TIME AXIS IS UNIFORM, AND IT IS A FICTION ON PURPOSE (round 10, item 9).
+ * THE TIME AXIS IS A PACKING, NOT A SCALE — and the years are DELIBERATELY UNEQUAL (2026-07-17).
  *
- * Daniel: 2021 through 2023 are bunched, and "I'd rather fake our exact timeline to make it seem like
- * constant growth." So every titled year gets the SAME vertical interval, whatever the real elapsed
- * time and whatever sits in it. The axis is now a COMPOSITION DEVICE, not a measurement. He knows it
- * is a fiction and he wants the fiction. Nothing on this page any longer claims the interval between
- * two years means anything, and no comment here should start claiming it again.
+ * Each year's band is exactly as long as its own content needs and no longer. Read this whole note
+ * before changing a number here, because it REVERSES two earlier rulings and the dead ones are still
+ * quoted in older docs.
  *
- * THIS REPLACES THE PIECEWISE AXIS RATHER THAN SITTING NEXT TO IT. It read: "Piecewise time axis:
- * 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1", with SLOPE_EARLY = 300 and
- * SLOPE_LATE = 975. Two slopes ARE the bunching: 2021 to 2023 got a third of the room per year that
- * 2023 to 2026 got. Uniform spacing is that mechanism with one slope, so the second concept is
- * deleted rather than left as two constants that happen to be equal.
+ * DANIEL, 2026-07-17, on the drawing that shipped with equal bands: "THERE IS TOO MUCH EMPTY SPACE
+ * BETWEEN YEAR BANDS. THE LENGTH OF THE YEAR BAND DOES NOT HAVE TO BE EQUAL TO THE REST, NOR DO THEY
+ * HAVE TO BE PROPORTIONATE IN ANY WAY. THEY MUST SIMPLY BE CLOSE TO EACH OTHER, LEAVE ROOM FOR
+ * FLOWERS, AND NOT HAVE STRANGE WHITE SPACES OR HUGE WALL OF FLOWERS. CURRENTLY IT IS FAR TOO LONG."
  *
- * WHAT THE MEASUREMENT ACTUALLY SAID, because the obvious fix would have done nothing. Round 8 moved
- * the year LABELS off the axis and onto the work they name (`yearLabelYs`), so retuning these slopes
- * could not have fixed Daniel's complaint on its own — the labels do not read them. Measured before:
- * label gaps of 52, 270, 604, 1182, 560 units. A 22.7x ratio between the tightest and the widest, and
- * 2021 to 2022 was FIFTY-TWO units. That is what he is seeing. The labels follow the plates, the
- * plates were spread evenly by COUNT across one lane, and the years carry 1, 2, 3, 5, 2, 1 clusters —
- * so the year spacing was really "how many projects happened to fall between these two dates".
+ * WHAT IS DEAD, so nobody restores it from an older comment:
+ *  - **EQUAL BANDS are dead.** He asked for them (item 9, "fake our exact timeline to make it seem
+ *    like constant growth"), saw them, and rejected them. `SLOPE` is deleted, not retuned.
+ *  - **PROPORTIONALITY is dead** — it was already dead, and stays dead. A band's length says nothing
+ *    about elapsed time. It never will again.
+ *  - **"TIGHTEN THE BANDS" is dead.** He ruled that on a screenshot of `SLOPE` 1150 — a value below
+ *    its own floor, crowding 2024 to 15.1px — so the honest answer at the time was LOOSER, and
+ *    complying would have made it worse on his own instruction. That refusal was correct and it is
+ *    now moot: with equal bands gone, tighter and uncrowded stop being opposites.
  *
- * The axis earns its keep again by owning the LANE: each year gets the band between its own tick and
- * the next (see layoutClusters), so a uniform slope is a uniform band is an evenly spaced year.
+ * THE TRIANGLE DISSOLVED RATHER THAN GOT SOLVED, and that is the lesson worth keeping. Round 10 proved
+ * EQUAL BANDS + NO CROWDING + LESS PAPER cannot all hold while the years carry 1, 2, 3, 5, 2, 1
+ * clusters: a uniform band sized to the densest year hands a one-cluster year the same room as a
+ * five-cluster year, and there is nothing to put in it, so the void either fills with vine (a wall of
+ * flowers) or stays empty (a strange white space). Both of Daniel's complaints were the SAME defect
+ * seen from its two ends. **The proof was sound and the conclusion — "the levers are his" — was
+ * wrong**, because a three-way constraint has three levers and only two had been offered back to him.
+ * He took the third. When you hand someone an impossibility, hand them ALL of its escapes.
+ *
+ * SO A UNIFORM SLOPE IS GONE AND THE FLOOR IT WAS SIZED TO WENT WITH IT. `SLOPE` 1300 was
+ * `max over years of (that year's need)` — 2024's five clusters — applied to EVERY year. That is
+ * precisely the "same room for a one-cluster year as a five-cluster year" defect, and carrying 1300 (or
+ * its 1280 floor) forward as a per-band minimum would have rebuilt it under a new name. **The floor is
+ * per-band and content-derived. There is no global one.**
+ *
+ * WHAT IS ACTUALLY INVARIANT, and it is the only thing that was: `packSide`'s measured gap floor of 40
+ * (`CLUSTER_GAP_Y`), which the no-crowding test doubles to 80. That number is about two photographs
+ * being too close together to read as separate. It is content-independent and axis-independent, which
+ * is exactly why it survived a rework that killed everything around it.
  */
 /** The fuse: where the two strands lay up and the spine is born. Not a year — the drawing's own top. */
 const FUSE_Y = 150;
 /**
  * THE AXIS ORIGIN, AND IT IS DELIBERATELY THE LANE'S TOP, NOT THE FUSE.
  *
- * The plates cannot start at the fuse (they need `LANE_TOP`'s clearance below it), so an axis
- * anchored at the fuse puts 2021's tick 120 units ABOVE the band its work can actually occupy, and
- * the band gets clamped. Measured with the origin at the fuse: label gaps of 1030, 1150, 1150, 1150,
- * 1150 — every year even except the first, which came up 120 short. That is the clearance, showing
- * up as exactly the inequality item 9 exists to remove.
+ * The plates cannot start at the fuse (they need `LANE_TOP`'s clearance below it), so an axis anchored
+ * at the fuse puts 2021's tick 120 units ABOVE the band its work can actually occupy, and the band gets
+ * clamped. Measured with the origin at the fuse: label gaps of 1030, 1150, 1150, 1150, 1150 — every
+ * year even except the first, which came up 120 short.
  *
  * So the axis starts where the work can start. `LANE_TOP` is defined from this rather than the other
  * way round, which keeps the two from disagreeing by construction.
  */
 const Y_2021 = FUSE_Y + 120;
-/**
- * Units per year, every year. SIZED TO THE DENSEST YEAR — measured, not chosen — AND IT IS A FLOOR,
- * NOT A DIAL. Read this before anyone tries to make the drawing tighter here again.
- *
- * THE FLOOR IS 2024 LEFT: resia + dougherty stack 1120 units, and with `flushTop` the slack pays out
- * over 2 slots, so the band must exceed 1120 + 2 x 80 = 1280 to keep both gaps clear of the
- * no-crowding bar (2 x CLUSTER_GAP_Y — "far wider than packSide's 40"). Swept against the real
- * geometry: 1150 -> 15.1px, 1280 -> 80.1px, 1300 -> 90.1px, 1400 -> 140.1px. 1300 is the floor with
- * a hair of margin; 1280 clears by 0.1px, which is the same "calibrated to today's content" trap in
- * a smaller hat.
- *
- * IT SHIPPED AT 1150 FOR ONE COMMIT AND THAT WAS A BUG — 15.1px between resia and dougherty, worse
- * crowding than the packSide floor of 40 that this whole rework existed to replace. It survived
- * because the no-crowding test screened its own evidence out: it skipped any gap under 41 as "must be
- * one cluster's own stack", which is true of a healthy lane and false of precisely the failure it
- * guards. It could not fail. Fixed (a sibling is a sibling by clusterId, not by magnitude) and it now
- * catches this immediately.
- *
- * SO THE BANDS CANNOT BE TIGHTENED. Daniel asked for exactly that, having seen the drawing at the
- * broken 1150, and it is not available: 1150 was never a legitimate value. The triangle is EQUAL
- * BANDS + NO CROWDING + LESS PAPER, and only two can hold while the years carry 1, 2, 3, 5, 2, 1
- * clusters. The remaining levers are his, not ours: cut content from 2024, or give up equal bands.
- *
- * THE COST IS REAL AND IT IS THE POINT: 2021 and 2026 carry one cluster each and get the same band as
- * 2024's five, so they hold open paper. That is what "constant growth" costs. The drawing is much
- * taller than the piecewise axis made it and the scroll is longer to match (the track derives itself).
- *
- * TODO: this wants to be DERIVED from CLUSTERS rather than pinned — `max over (year, side) of
- * (stack + n * MIN_INTER_GAP)` — which would make it self-tightening and incapable of crowding, the
- * same lesson as `min-h-[302px]` and `items-stretch`. Not done here only because CONVERGE_Y and the
- * dozen consts below it are evaluated at module init, above CLUSTERS, so it needs a reshuffle rather
- * than an expression. The test is what holds the line meanwhile.
- */
-const SLOPE = 1300;
-/** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
-export const CONVERGE_Y = Y_2021 + (MAX_YEAR - 2021) * SLOPE;
-
-/** The years the drawing ticks and labels. Was written out at three separate call sites (the
- *  garland's station bands, the year rail's render, and now the sub-branch obstacles); a fourth
- *  copy is how a year quietly gets ornamented but never labelled. */
-export const YEAR_TICKS: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026];
 
 /**
- * THE AXIS, as authored — now uniform, and now load-bearing again.
+ * THE GAP BETWEEN TWO PHOTOGRAPHS — the one number this layout is tuned by, and it is DERIVED.
  *
- * Round 8 moved the year LABELS off this and onto the work they name (`yearLabelYs`), which left the
- * axis placing only the spine's own geometry and standing as the fallback for a year with no work.
- * Round 10 gives it the LANE back: each year owns the band between its tick and the next (see
- * layoutClusters), so this function is once more what decides where a year's work sits. The label
- * still goes beside the work — that ruling stands — but the work is now inside its own year's band,
- * so the two agree instead of drifting.
+ * Daniel, same ruling: "the distance between photos in our timeline" is part of the empty-space
+ * complaint. Uniform, close, deliberate. So it is one constant for the whole drawing rather than a
+ * per-year leftover, which is what it used to be — under equal bands a sparse year's gap WAS its
+ * leftover, so 2021 got 974 units between plates and 2023 got 124. That spread is the "strange white
+ * space", and it is gone by construction: the band is sized FROM this gap instead of the gap falling
+ * out of the band.
+ *
+ * WHY THREE TIMES `CLUSTER_GAP_Y` AND NOT A NUMBER THAT LOOKED RIGHT. Two plates in ONE cluster sit 40
+ * apart; two DIFFERENT clusters must read as separate groups, and proximity is the only thing on the
+ * page saying which is which — there is no rule, no box and no label between them. So the between-group
+ * gap has to be visibly larger than the within-group gap, and 3x is the ratio that makes the grouping
+ * unambiguous rather than arguable. It also clears the no-crowding bar (2 x CLUSTER_GAP_Y = 80) by 40,
+ * so the guard has real margin instead of passing by a hair — 1280 cleared it by 0.1px, which is the
+ * "calibrated to today's content" trap in a smaller hat.
+ *
+ * IT IS A FLOOR, NOT THE GAP EVERYWHERE, and that asymmetry is the packing's one honest cost. A band is
+ * as tall as its BUSIER side needs, so the busier side gets exactly this and the quieter side shares the
+ * difference out evenly (see `spreadSide`). Measured: 2024 left is the busier side at exactly 120.0;
+ * 2024 right spreads to 158.9. Close, not equal. Equal on both sides at once is not available without
+ * moving a cluster to the other side of the spine, which is Daniel's composition, not ours.
  */
-export const yearToY = (y: number) => Y_2021 + (y - 2021) * SLOPE;
+export const BAND_GAP = 3 * CLUSTER_GAP_Y;
+
+/** The least room two year labels may have between them: the glyph box (40) plus air. Below this the
+ *  numerals overlap and neither year is legible. It lives here rather than down with the label rules
+ *  because it is also a BAND's floor — an empty year would otherwise pack to zero height and print its
+ *  numerals on the next year's. The label rule that consumes it is `yearLabelYs`, below. */
+const YEAR_LABEL_MIN_GAP = 52;
+
+/**
+ * WHAT ONE YEAR'S WORK NEEDS, on one side, in world units. Pure — this is the whole packing.
+ *
+ * `spreadSide(flushTop)` divides a band's slack over n slots (one between each pair of clusters, one
+ * below the last), so a band of `stacks + n * BAND_GAP` pays out at exactly `BAND_GAP` per slot. Invert
+ * that and the band's height IS the content's demand. Nothing to sweep, nothing to calibrate, and no
+ * value of the content can crowd it — the same lesson as `items-stretch` and the divider's `invisible`
+ * cell: **stop asserting a number, let the constraint resolve itself.**
+ */
+function sideNeed(year: number, side: Side): number {
+  const items = CLUSTERS.filter((c) => c.side === side && Math.floor(c.year) === year);
+  const stacks = items.reduce((sum, c) => {
+    const hs = c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h);
+    return sum + hs.reduce((s, h) => s + h, 0) + Math.max(0, hs.length - 1) * CLUSTER_GAP_Y;
+  }, 0);
+  return stacks + items.length * BAND_GAP;
+}
+
+/**
+ * EVERY YEAR'S BAND HEIGHT, derived once from the content. Both sides share a band boundary — that
+ * register is what keeps a 2023 plate on the left level with 2023's work on the right — so a band is as
+ * tall as its BUSIER side and the quieter side spreads into the rest.
+ *
+ * MEASURED, 2026-07-17: 2021 = 328.2, 2022 = 585.3, 2023 = 1138.5, 2024 = 1359.9, 2025 = 580.3,
+ * 2026 = 368.9. Against the equal axis's 1300 x 5. **The ratio between the longest and the shortest
+ * band is 4.1x and that is not a defect — it is the shape of the work**, and it is the thing Daniel
+ * gave up equality to get.
+ *
+ * A YEAR WITH NO WORK ON EITHER SIDE would compute 0 and print two numerals on top of each other, so
+ * the floor is `YEAR_LABEL_MIN_GAP`. No year exercises it today (every year carries at least one
+ * cluster); it is here because the empty-year branch in `yearLabelYs` is live and the moment one is
+ * added this is what stops it collapsing.
+ */
+const BAND_H: ReadonlyMap<number, number> = new Map(
+  YEAR_TICKS.map((y) => [y, Math.max(YEAR_LABEL_MIN_GAP, sideNeed(y, 'left'), sideNeed(y, 'right'))]),
+);
+
+/** Where each year's band starts: the previous bands, stacked. The bands are unequal, so this is a
+ *  running sum rather than a multiplication — which is the entire difference from `SLOPE`. */
+const BAND_TOP: ReadonlyMap<number, number> = (() => {
+  const out = new Map<number, number>();
+  let y = Y_2021;
+  for (const year of YEAR_TICKS) {
+    out.set(year, y);
+    y += BAND_H.get(year)!;
+  }
+  return out;
+})();
+
+/** The foot of the last year's band: where the work ends, and so where the drawing's finale begins.
+ *  Under the equal axis the last year's tick WAS the converge point, which put 2026's graduation plate
+ *  entirely below it, in the lean — the lane's own "no plate crowds the lean into the mark" rule,
+ *  broken by the axis that was supposed to enforce it, and invisible because 2026 has one plate and a
+ *  single plate never collides with a sibling. The finale now starts where the work stops.
+ *
+ *  Exported so the packing contract can be measured rather than restated: the LAST year's band has no
+ *  year below it, so its slack is not observable as a gap between two plates. Without this the test
+ *  would silently cover five years out of six and report a pass. */
+export const LANE_END = BAND_TOP.get(MAX_YEAR)! + BAND_H.get(MAX_YEAR)!;
+
+/**
+ * THE SPINE RUNS PLUMB TO HERE; below it, the line leans off-axis and winds into the mark.
+ *
+ * IT IS NOT THE LAST YEAR'S TICK ANY MORE, and that was a real bug rather than a change of taste.
+ * `CONVERGE_Y = yearToY(MAX_YEAR)` put the converge point exactly at 2026's tick — and 2026's work
+ * hangs BELOW its tick, so the graduation plate sat 249 units into the lean, past `LANE_BOTTOM`, in the
+ * stretch the lane exists to keep clear. Nothing caught it: `spreadSide` was handed an INVERTED band
+ * (top 6770, bottom 6610) and quietly laid its one item at the top anyway, because `flushTop` starts at
+ * `laneTop` and a negative gap has nothing to divide when there is only one cluster. **A single-item
+ * container cannot fail a spacing check, so the one year the axis mistreated is the one year no spacing
+ * guard could see.** Now the converge follows the work: the finale starts below the last plate, by the
+ * same clearance the lane always claimed.
+ */
+export const CONVERGE_Y = LANE_END + 160;
+
+/**
+ * THE AXIS: where a year's band begins. Not a scale any more — a lookup into the packing.
+ *
+ * It used to be `Y_2021 + (y - 2021) * SLOPE`, and the shape of that expression was the claim Daniel
+ * rejected: multiplying a year by a constant is what makes every band equal. A running sum over the
+ * content is the same idea with the constant taken out.
+ *
+ * IT STILL TAKES A YEAR AND STILL RETURNS A WORLD Y, so every call site is unchanged — but it is now
+ * only defined on the TITLED years. A fractional year (`c.year` is a true event date like 2023.55, and
+ * clusters carry them) floors to its band: the anchor a cluster forks from is its year's tick, which is
+ * what it always resolved to in practice once the plates stopped sitting at their true dates (round 3).
+ * An out-of-range year clamps to the ends rather than extrapolating off a slope that no longer exists.
+ */
+export const yearToY = (y: number): number => {
+  const year = Math.floor(y);
+  const at = BAND_TOP.get(year);
+  if (at !== undefined) return at;
+  return year < YEAR_TICKS[0] ? Y_2021 : LANE_END;
+};
 
 /**
  * WHERE THE YEAR LABELS ACTUALLY GO: beside the work they name.
@@ -322,9 +371,8 @@ export const yearToY = (y: number) => Y_2021 + (y - 2021) * SLOPE;
  *    plate is 200+ units tall), which is the thing the ruling is about — and the alternative is two
  *    numerals in the same place, which is not a date at all.
  */
-/** The least room two year labels may have between them: the glyph box (40) plus air. Below this
- *  the numerals overlap and neither year is legible. */
-const YEAR_LABEL_MIN_GAP = 52;
+/* `YEAR_LABEL_MIN_GAP` is declared up with the axis, because the band packing needs it as an empty
+ * year's floor and the packing is evaluated first. */
 
 export function yearLabelYs(
   laid: ReadonlyArray<{ year: number; plates: ReadonlyArray<{ y: number }> }>,
@@ -675,72 +723,29 @@ export function spineLeanPtsTo(targetX: number): Array<{ x: number; y: number }>
  * Recover any of it from git: `git show fa87d33 -- src/pages/about/CrossPathsTimeline.tsx`.
  */
 
-/**
- * Plate tiers. The FLOOR is a reference only (nothing is built at it); the smallest plate actually
- * drawn is STANDARD. Images dominate.
- *
- * A TIER IS AN AREA BUDGET, NOT A BOX (2026-07-16, round 3). Daniel: "Some of the timeline images
- * are not displayed properly. For example the one testing the Plentify prototype has white spaces on
- * the left and right side. I want you to scale to fit the image properly so it shows in full without
- * getting rid of the context."
- *
- * These used to be literal `{ w, h }` boxes at 3:2, and EVERY plate was forced into its tier's shape:
- * `fit:'contain'` letterboxed the image inside the box against a white rect (Plentify's compression
- * test is 976x975 — square — in a 320x213 box, hence his white bars), and `fit:'cover'` sliced the
- * image to fill (which is the fix he explicitly ruled out: "without getting rid of the context").
- * Same disease as the detail hero's old 505x557 portrait box, in a different organ.
- *
- * So the box is now DERIVED from the plate's own measured ratio, and the tier only says how much
- * PAPER that plate is worth: `plateBox` gives every plate in a tier the same area at its own shape.
- * A square and a 16:9 in the same tier read as equally important, which a fixed box cannot do — it
- * makes one of them small or crops it. The w/h below are kept as the reference box the area is taken
- * from (they are the old values, so 3:2 plates are sized exactly as before and nothing that already
- * looked right moved).
- */
-const TIER: Record<PlateTier, { w: number; h: number }> = {
-  floor: { w: 240, h: 150 }, // reference size only — the hard minimum, never instantiated
-  standard: { w: 264, h: 176 },
-  hero: { w: 320, h: 213 },
-  // The biggest tier, and ROUND 10 ANSWERED WHAT IT IS FOR — by elimination, which is worth writing
-  // down because the answer is the opposite of what the tier was reserved for.
-  //
-  // It read "reserved for the two bookends: ut-austin and the NYC door". Round 9 cashed that in with
-  // the 2021 orientation call and added the 2026 graduation to close the drawing, so three nodes
-  // claimed it. Then Daniel looked at the page and sent both BOOKENDS down: the orientation plate
-  // "smaller" (-> hero, item 10) and the graduation "much smaller" (-> standard, item 11).
-  //
-  // So the showcase tier now belongs to the NYC door ALONE — the one plate that never asked for it,
-  // and the only one still holding it from when it was the last plate in the drawing. The old
-  // TODO(Daniel) asked whether to drop the door to `hero` so the tier would mean "the bookends"
-  // again; that question is dead, because the bookends left. It is now a tier with one member, which
-  // is a tier that has stopped being a tier. TODO(Daniel): either the door earns 400 on its own
-  // merit, or showcase folds into `hero` and this row goes. Not guessed here — it is a look call and
-  // he is about to look at the page anyway.
-  showcase: { w: 400, h: 267 },
-};
-
-/**
- * A plate's real box: its tier's AREA, at the image's own ratio. Pure and exported for the contract
- * test, which is the one that matters here — every plate's box ratio equals its image's ratio, so
- * nothing is ever letterboxed or cropped again.
- */
-export function plateBox(tier: PlateTier, ratio: number): { w: number; h: number } {
-  const area = TIER[tier].w * TIER[tier].h;
-  return { w: Math.sqrt(area * ratio), h: Math.sqrt(area / ratio) };
-}
+/* The plate box (`TIER`, `plateBox`) moved to `about/clusters.ts` with the content it measures:
+ * a plate's box is derived from its own image's ratio, so the box and the list of images are one
+ * fact. `plateBox` is re-exported below for the contract test. */
 
 /** The fixed perpendicular gap from the spine to a plate's near (inner) edge. */
 export const OFFSET_X = 110;
-/** Minimum vertical gap between two stacked siblings in one cluster (their bounding boxes never
- *  come closer than this — the no-overlap contract). */
-const CLUSTER_GAP_Y = 40;
-/** The plate lane. It starts below the fuse (so the twist-fuse reads clean before the first project)
- *  and ends above the converge point (so the last plate never crowds the spine's lean into the mark).
- *  `spreadSide` shares whatever is left between the clusters. */
-// The lane starts where the axis does, so 2021's band is never clamped and every year's band is
-// exactly SLOPE tall. Was `CONV_JUNCTION_Y + 120`, which is the same number by construction — Y_2021
-// IS the fuse plus that clearance — but saying it this way makes the axis and the lane one fact
-// instead of two that have to be kept equal by hand.
+/* `CLUSTER_GAP_Y` (the minimum gap between two stacked siblings in one cluster) is declared in
+ * `about/clusters.ts` with the content it measures, because `BAND_GAP` is derived from it and the
+ * packing runs before this point in the file. */
+
+/**
+ * THE PLATE LANE, and it is now a CONSEQUENCE of the packing rather than a frame the packing fits into.
+ *
+ * It starts below the fuse (so the twist-fuse reads clean before the first project) and ends above the
+ * converge point (so the last plate never crowds the spine's lean into the mark). Both ends used to be
+ * pinned against an axis that was pinned against nothing: `LANE_BOTTOM = CONVERGE_Y - 160` where
+ * `CONVERGE_Y` was the last year's tick, which is why 2026's plate hung below it (see CONVERGE_Y).
+ * `CONVERGE_Y` is `LANE_END + 160` now, so this is `LANE_END` — the two agree by construction instead
+ * of by arithmetic that happened to line up.
+ *
+ * These stay as names because the clamps in `layoutClusters` read them, and a clamp that can never fire
+ * is still the thing that says it can never fire.
+ */
 const LANE_TOP = Y_2021;
 const LANE_BOTTOM = CONVERGE_Y - 160;
 /* CROSS_GAP (the minimum clearance between two clusters in one lane) was deleted with `packSide` on
@@ -847,405 +852,10 @@ const easeInOutCubic = (t: number) => {
 
 /* --------------------------------- the graph ------------------------------ */
 
-/**
- * The content graph, node by node. `nodes[0]` is the lead (hero, or showcase for the two bookends);
- * later nodes stack below as standard siblings. The clusters are agnostic to the winding finale and
- * twist-fuse beginning — this list is content only, and the geometry above holds it whatever it is.
- */
-export const CLUSTERS: Cluster[] = [
-  {
-    /**
-     * THE FIRST PLATE, and half of the page's bracket. Daniel: "put this image as our FIRST, our
-     * school orientation." It is a UT orientation Zoom grid — forty-odd strangers in forty-odd
-     * boxes, hook-'em hands, nobody having met anybody. The page opens on the paths NOT crossed
-     * yet and closes on the two of them graduating (see `graduation` at the foot of this list),
-     * which is the same bracket the copy makes with "Bower is new." / "The obsession is real, and
-     * it is old." The showcase tier was already reserved for exactly this (see TIER) — the bookend
-     * it names as "ut-austin" had been waiting for an asset since the tier was written.
-     *
-     * SHIPPED BY DANIEL'S EXPLICIT RULING, 2026-07-16. This is the DECISION, recorded — not a
-     * justification for it, and the difference is the point. Round 9 left a note here claiming the
-     * names are illegible at 640; round 10 measured it and it is overstated; and a false rationale
-     * left in the code is how the next agent either "re-mitigates" something already decided, or
-     * trusts the claim and reuses it somewhere it is not true. So, what is actually true:
-     *
-     *   - The photograph shows ~40 identifiable UT students with their NAMES printed under their
-     *     faces. THIS REPO IS PUBLIC (`danielguerrarmz-create/project-eden`), so `git add` is
-     *     `publish` — the line is `git push`, not the merge — and a public push is effectively
-     *     permanent, because it can be cached and indexed even if later deleted.
-     *   - MEASURED, by cropping the caption strip out of both files and upscaling 6x nearest (what a
-     *     determined viewer actually does): at 828 the names read outright; at 640 they are badly
-     *     degraded but a few stay partly guessable. "Harder" is not "illegible".
-     *   - AND LEGIBILITY IS LARGELY A RED HERRING. With every name unreadable this is still ~40
-     *     identifiable FACES on a company's public About page. The face is the personal data; the
-     *     name only compounds it.
-     *
-     * Daniel was told all of that, in those terms, and was offered: crop to the two of them, drop it,
-     * ship knowingly, or assert consent. He did not claim consent. He chose to ship the full frame.
-     * It is his photograph, his classmates, his company's page, and his call to make. Do not
-     * re-litigate it here; if it ever needs revisiting that is a conversation with him, not a commit.
-     *
-     * IT SHIPS AT 640, NOT THE 828, and that stays deliberate even though the downscale is no longer
-     * load-bearing for the ruling: it costs nothing visually and it is a real, if partial, reduction
-     * in exposure, so there is no reason to upgrade the resolution now. The 828 original stays out of
-     * the repo, at `restless-egg/_photo-originals/timeline/`.
-     */
-    id: 'origin-2021',
-    year: 2021.1,
-    side: 'right',
-    hint: '',
-    nodes: [
-      {
-        // SMALLER (round 10, item 10). `showcase` -> `hero`, one tier down: 400 wide to 320, a 20%
-        // cut. One tier, not two — he said "smaller" of this and "much smaller" of the graduation
-        // plate, and those are different words.
-        //
-        // A SIDE EFFECT WORTH NAMING AND NOT ACTING ON: a smaller plate also renders ~40 identifiable
-        // faces smaller, which is a happy consequence of a composition note. It is NOT a reason to
-        // shrink it further than he asked, and NOT a reason to reopen the ruling — he has ruled
-        // twice, knowingly, on the faces-and-consent framing. See the note at the head of this
-        // cluster. Do not quietly re-mitigate a decision by tuning a number.
-        tier: 'hero',
-        media: {
-          src: `${T}/2021-orientation-zoom.webp`,
-          ratio: 1.5725,
-          alt: 'A UT Austin orientation call in 2021: a grid of some forty new students in their own boxes, hook-’em hands raised, none of them having met yet',
-        },
-      },
-    ],
-  },
-  {
-    // The studio, before the first project: the two of them at one desk at night, one rendering,
-    // one watching over his shoulder. Daniel called it "one of our beginning placeholder images".
-    // Which founder is which is NOT asserted here — the filename says both names and does not say
-    // who sits where, and this page has already misattributed a founder once (see the TEAM/ledger
-    // note in CLAUDE.md). "The two cofounders" is what the picture actually supports.
-    id: 'early-2022',
-    year: 2022.0,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'standard',
-        media: {
-          src: `${T}/studio-desks.webp`,
-          ratio: 1.5009,
-          alt: 'The two cofounders at a shared architecture-studio desk late at night, one at the monitor mid-render, the other standing behind it, the desk buried in drawings and drink cups',
-        },
-      },
-    ],
-  },
-  {
-    id: 'medical',
-    year: 2022.6,
-    side: 'right',
-    hint: '',
-    nodes: [
-      /*
-       * THE DRAWING LEADS HERE TOO (round 10, item 12). Daniel: the Origami Device rendering comes
-       * out of the timeline, the main brochure drawing goes in.
-       *
-       * READ THIS WITH THE PROJECT HERO SWAP, NOT AS A SECOND DECISION. He moved the same asset to
-       * the front of BOTH surfaces in the same review: this plate and the project's hero in
-       * projects.ts. The drawing is the face of the project now and the hospital photograph is
-       * supporting evidence, in both places, consistently. It only looks like churn (and like
-       * reversing round 8 twice in one night) if you read the two commits apart.
-       *
-       * `fit: 'contain'` because it is a paper sheet and wants a white ground under it, same as the
-       * assembly sheets on the project. Ratio 1.2936 MEASURED off the file (793x613, ffprobe) rather
-       * than inherited from the photograph it replaces — the outgoing staged shot is 1.2795, close
-       * enough to look right and wrong enough to letterbox.
-       */
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/11-wound-care-kenya/wound-care-kenya-brochure-cover.png`,
-          ratio: 1.2936,
-          fit: 'contain',
-          alt: 'The brochure cover: the finished wedge, the materials needed, the two-hour turning interval, and the device in use under a patient',
-        },
-      },
-      {
-        tier: 'standard',
-        media: {
-          src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
-          ratio: 1.2125,
-          alt: 'The device tested in hospital at Moi Teaching Hospital, Kenya',
-        },
-      },
-    ],
-  },
-  {
-    id: 'testfit',
-    year: 2023.0,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/15-testfit/testfit-backlit-logo-sign-late-night.webp`,
-          ratio: 0.5637,
-          alt: 'The backlit TestFit logo sign on an office wall at 12:56 in the morning, the late nights of a startup',
-        },
-      },
-    ],
-  },
-  {
-    id: 'together',
-    year: 2023.4,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/01-synergy/synergy-cosmos-growth-loop-poster.webp`,
-          ratio: 1.7778,
-          alt: 'The Plentify building growing from bare structure to fully planted',
-          video: {
-            webm: `${A}/01-synergy/synergy-cosmos-growth-loop.webm`,
-            mp4: `${A}/01-synergy/synergy-cosmos-growth-loop.mp4`,
-            rate: 0.72,
-          },
-        },
-      },
-    ],
-  },
-  {
-    id: 'research',
-    year: 2023.55,
-    side: 'left',
-    hint: 'Research Paper',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/08-synthetic-vision/synthetic-vision-patch-probe-saliency-heatmaps.webp`,
-          ratio: 1.2344,
-          alt: 'Saliency heatmaps over architectural fragments, warm colour marking each geometric primitive the model reads',
-          fit: 'contain',
-        },
-      },
-    ],
-  },
-  {
-    id: 'making',
-    year: 2024.0,
-    side: 'right',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/01-synergy/synergy-cosmos-compression-test.webp`,
-          ratio: 1.001,
-          alt: 'A Plentify sample under compression on the MTS Insight testing machine, tested +30% stronger than hempcrete',
-          fit: 'contain',
-        },
-      },
-    ],
-  },
-  {
-    id: 'robotics',
-    year: 2024.2,
-    side: 'right',
-    hint: '',
-    nodes: [
-      {
-        // The KUKA robot (Daniel's freshly-shot loop) leads the robotics moment; Clay's Texas robot
-        // is its companion below. Both are the mains of the "Robots as Instruments" project.
-        tier: 'hero',
-        media: {
-          src: `${A}/06-kuka-robotics/kuka-robotics-robot-loop-poster.webp`,
-          ratio: 1.7778,
-          alt: 'A KUKA robot arm sanding an aluminium sheet, tooling an ornamented surface',
-          video: {
-            webm: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.webm`,
-            mp4: `${A}/06-kuka-robotics/kuka-robotics-robot-loop.mp4`,
-            rate: 1,
-          },
-        },
-      },
-      {
-        tier: 'standard',
-        media: {
-          src: `${A}/13-texas-robotics/texas-robotics-robot-device-loop-poster.webp`,
-          ratio: 1.7937,
-          alt: 'A Texas Robotics mock-up robot device in motion',
-          video: {
-            webm: `${A}/13-texas-robotics/texas-robotics-robot-device-loop.webm`,
-            mp4: `${A}/13-texas-robotics/texas-robotics-robot-device-loop.mp4`,
-            rate: 0.85,
-          },
-        },
-      },
-    ],
-  },
-  {
-    id: 'llo',
-    year: 2024.5,
-    side: 'right',
-    hint: 'LLO: Dream Machine',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/14-large-language-object/large-language-object-lamp.webp`,
-          ratio: 1.3389,
-          alt: 'The Large Language Object, a plywood articulated desk lamp on a wooden base with pulleys and a control box',
-        },
-      },
-    ],
-  },
-  {
-    id: 'resia',
-    year: 2024.5,
-    side: 'left',
-    hint: 'Resia: AI-Remodel Software',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/12-resia/resia-product-screenshot-1.webp`,
-          ratio: 1.8397,
-          alt: 'The Resia landing page, a one-stop remodeling solution to generate, estimate, contract, and manage a renovation',
-        },
-      },
-      {
-        // Daniel: "next to Resia." Clay presenting the pitch — and this one IS named, because three
-        // things agree: the ledger has Resia as `by: 'clay'`, Daniel's own filename said `clay`, and
-        // only one person is in frame. The deck on the screen reads "Resi.AI", not "Resia"; the alt
-        // says what the slide says rather than quietly correcting the ledger's name onto it.
-        tier: 'standard',
-        media: {
-          src: `${T}/resia-pitch.webp`,
-          ratio: 0.75,
-          alt: 'Clay Seifert presenting the Resia startup pitch deck, its title slide reading “Resi.AI — Removing the Waste from Home Renovation”',
-        },
-      },
-    ],
-  },
-  {
-    id: 'dougherty',
-    year: 2024.6,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/05-dougherty/dougherty-arts-center-catenary-entrance-skyline-money-shot.webp`,
-          ratio: 1.7778,
-          alt: 'The catenary arch entrances of the Dougherty Arts Center, the Austin skyline behind',
-        },
-      },
-      {
-        tier: 'standard',
-        media: {
-          src: `${A}/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp`,
-          ratio: 1.4997,
-          alt: 'The cardboard physical model of the Dougherty Arts Center, its white catenary arches standing in the round',
-        },
-      },
-      {
-        // Daniel: "around our DAC project." The pin-up wall itself — the sheets (A002–A014, all
-        // stamped DAC) and both physical models in one frame, with the two of them standing either
-        // end of it. It earns its place beside the render and the model because it is the only plate
-        // that shows the WORK as it was actually presented: on a wall, defended in a room.
-        tier: 'standard',
-        media: {
-          src: `${T}/dac-pinup.webp`,
-          ratio: 1.3333,
-          alt: 'The Dougherty Arts Center pin-up: a studio wall of DAC drawing sheets and renders with both cardboard models on stands, the two cofounders standing at either end',
-        },
-      },
-    ],
-  },
-  {
-    id: 'factory',
-    year: 2025.3,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/10-robotic-factory/robotic-factory-section-assembly-poster.webp`,
-          ratio: 1.9375,
-          alt: 'The robotic factory long section assembling itself, vaulted halls, chimneys and planted terraces building up in sequence',
-          video: {
-            webm: `${A}/10-robotic-factory/robotic-factory-section-assembly-loop.webm`,
-            mp4: `${A}/10-robotic-factory/robotic-factory-section-assembly-loop.mp4`,
-            rate: 0.85,
-          },
-        },
-      },
-    ],
-  },
-  {
-    id: 'newyork',
-    year: 2025.0,
-    side: 'right',
-    hint: 'NYC: Rogers Partners',
-    nodes: [
-      {
-        tier: 'showcase',
-        media: {
-          src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-door-elevation-drawing.webp`,
-          ratio: 1.597,
-          alt: 'A Rogers Partners door elevation drawing, an arched double door with ironwork tracery, dimensioned',
-          fit: 'contain',
-        },
-      },
-      {
-        tier: 'standard',
-        media: {
-          src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-office-desk-selfie.webp`,
-          ratio: 1.7778,
-          alt: 'Daniel at his dual-monitor desk in the Rogers Partners office in New York',
-        },
-      },
-    ],
-  },
-  {
-    /**
-     * THE LAST PLATE, and the other half of the bracket. Daniel: "put this image as our LAST, we
-     * just graduated." Orientation (2021, `origin-2021`) opens on strangers who have not met; this
-     * closes on them graduating. Both bookends are `showcase` and both sit RIGHT, so they rhyme
-     * across the length of the drawing — which is also what balances the lanes at 7 clusters a side.
-     *
-     * THIS IS THE FIRST CLUSTER 2026 HAS EVER HAD, and it changes a documented invariant: the
-     * `yearLabelYs` note used to say 2026 has no work to sit beside, so its label fell back to the
-     * axis. Now the 2026 label follows this plate like every other year follows its first plate.
-     * The fallback is still live and still correct — it is just no longer 2026 that exercises it.
-     *
-     * FOUR people are in the frame, not two, and only the two cofounders are Bower's. The alt says
-     * "four graduates" and names nobody: naming them would mean identifying two people who are not
-     * part of this company on the company's own About page.
-     */
-    id: 'graduation',
-    year: 2026.0,
-    side: 'right',
-    hint: '',
-    nodes: [
-      {
-        // MUCH SMALLER (round 10, item 11). `showcase` -> `standard`, two tiers down: 400 wide to 264,
-        // a 34% cut. Daniel said "much smaller" here and only "smaller" of the orientation plate, so
-        // the two are deliberately different magnitudes rather than one shared constant — the
-        // orientation drops one tier, this drops two. It is a PORTRAIT plate at 0.75, so at showcase
-        // it stood 356 tall against the drawing's other bookend and read as the loudest thing on the
-        // page; the tier change takes it to ~235.
-        tier: 'standard',
-        media: {
-          src: `${T}/2026-graduation.webp`,
-          ratio: 0.75,
-          alt: 'Four graduates in Texas stoles at the 2026 UT Austin commencement, arms around each other in the packed stadium, fireworks over the jumbotron behind them',
-        },
-      },
-    ],
-  },
-];
+/* The content graph — every cluster, every plate, every measured ratio — now lives in
+ * `about/clusters.ts`, and the move is load-bearing rather than cosmetic: the AXIS reads the
+ * content now (each year's band is as long as its own work needs), and the axis is evaluated at
+ * module init, above where this list used to sit. See the note at the top of that file. */
 
 /* ------------------------------ strand builders --------------------------- */
 
@@ -2017,30 +1627,32 @@ export function spreadSide(
 function layoutClusters(spine: Strand): LaidCluster[] {
   const tops = new Map<string, number>();
   /*
-   * EACH YEAR OWNS AN EQUAL BAND (round 10, item 9). Daniel: equal spacing between the titled years,
-   * "fake our exact timeline to make it seem like constant growth."
+   * EACH YEAR OWNS A BAND AS LONG AS ITS OWN WORK NEEDS (2026-07-17). Daniel, after seeing the equal
+   * bands he had asked for: the bands "DO NOT HAVE TO BE EQUAL... NOR PROPORTIONATE IN ANY WAY. THEY
+   * MUST SIMPLY BE CLOSE TO EACH OTHER, LEAVE ROOM FOR FLOWERS, AND NOT HAVE STRANGE WHITE SPACES."
    *
-   * IT USED TO BE ONE LANE PER SIDE, spread evenly by COUNT — `spreadSide(items, LANE_TOP,
-   * LANE_BOTTOM, ...)` over every cluster on that side at once. That is what bunched the years, and
-   * the mechanism is worth understanding because it is not obvious: the labels sit beside their work
-   * (round 8), the work was spread by count, and the years carry 1, 2, 3, 5, 2, 1 clusters. So the
-   * distance between "2021" and "2022" was really "how many projects happened to fall between those
-   * two dates" — measured, 52 units, against 1182 between 2024 and 2025. A 22.7x ratio.
+   * THIS FUNCTION BARELY CHANGED, AND THAT IS THE POINT. It still lays each year's side flush to its
+   * band's top and spreads the leftover below. What changed is upstream: `yearToY` reads a packing
+   * instead of multiplying by `SLOPE`, so the band it asks for is already the size of the content. The
+   * previous two axes both died here without this code moving — which is the argument for keeping the
+   * band boundary and the band CONTENT in different files.
    *
-   * Now each year is laid inside its own band, and the bands are equal because the axis is uniform.
-   * The year label lands at the top of its first plate, which is the band's top, so the labels come
-   * out exactly SLOPE apart by construction rather than by tuning.
+   * FLUSH TO THE BAND'S TOP is still the trick, for a different reason each time. Under equal bands it
+   * kept the labels exactly SLOPE apart. Now it is what makes the gap UNIFORM: `spreadSide` pays the
+   * band's slack out over n slots, `BAND_H` sizes the band at `stacks + n * BAND_GAP` for the busier
+   * side, so that side's slots come out at exactly `BAND_GAP` and the gap between the last plate of one
+   * year and the first plate of the next is the same `BAND_GAP` — the band boundary is invisible in the
+   * spacing, which is what "close to each other" means. It is not a special case at the seam; it falls
+   * out of the arithmetic.
    *
-   * FLUSH TO THE BAND'S TOP, and that is the whole trick. Spreading a year's clusters across its band
-   * would put a margin above the first one, and the margin differs per year (it is a share of that
-   * year's leftover), so the labels would drift by up to ~300 units — better than 22.7x and still not
-   * equal. `flushTop` pays the leftover out BETWEEN the clusters and below the last one only, so the
-   * first plate is AT the tick. A sparse year's leftover becomes open paper at the foot of its band,
-   * which is exactly the fiction Daniel asked for.
+   * THE CLAMPS BELOW CAN NO LONGER FIRE and are kept anyway. `bandTop` cannot precede `LANE_TOP` (the
+   * packing starts there) and `bandBottom` cannot pass `LANE_BOTTOM` (the packing ends there and the
+   * converge is derived from it). They used to be load-bearing and they used to be WRONG: 2026's band
+   * came out INVERTED (top 6770, bottom 6610) because the converge sat on the last year's tick, and
+   * `spreadSide` laid the graduation plate at the top of an impossible band without complaining.
    */
-  const YEARS = [...new Set(CLUSTERS.map((c) => Math.floor(c.year)))].sort((a, b) => a - b);
   (['left', 'right'] as Side[]).forEach((side) => {
-    for (const year of YEARS) {
+    for (const year of YEAR_TICKS) {
       const items = CLUSTERS.filter((c) => c.side === side && Math.floor(c.year) === year)
         // Sorted by YEAR within the band, so the sequence inside a year is still the year's own. The
         // heights are the DERIVED ones, not the tier's reference box — that is what a plate actually
@@ -2051,8 +1663,8 @@ function layoutClusters(spine: Strand): LaidCluster[] {
           heights: c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h),
         }));
       if (!items.length) continue;
-      // The band is this year's tick to the next one, clamped into the lane so the first and last
-      // bands cannot push the plates past the fuse above or the converge below.
+      // The band is this year's tick to the next one. `yearToY(year + 1)` past the last titled year
+      // clamps to the lane's end, which is where the last band stops.
       const bandTop = Math.max(LANE_TOP, yearToY(year));
       const bandBottom = Math.min(LANE_BOTTOM, yearToY(year + 1));
       spreadSide(items, bandTop, bandBottom, CLUSTER_GAP_Y, true).forEach((v, k) => tops.set(k, v));
@@ -2541,8 +2153,15 @@ export function CrossPathsTimeline({
                qa/growth-timing.mjs must wait on. It cannot wait on `scrollY`: scrollY lands instantly
                while camY is a rAF lerp (`current += (target-current)*0.1`, ~72 frames to settle), so a
                harness that guards the scroll is guarding a proxy and will measure a camera that has not
-               arrived. It did exactly that, and reported a confident PASS on a stalled camera. */
-            data-timeline-frame
+               arrived. It did exactly that, and reported a confident PASS on a stalled camera.
+
+               NAMED `-camera`, NOT `-frame`, AND THE NEAR-MISS IS WORTH THE LINE: this first shipped as
+               `data-timeline-frame`, which is ALREADY TAKEN by the founders' parenthesis on the row div
+               above. `querySelector` returns the FIRST match, so the probe silently got that div, which
+               has no viewBox, and read camY as null. My own smoke check (`!!querySelector(...)`) said
+               "frame: true" while matching the WRONG ELEMENT — a presence check that cannot say WHICH
+               thing it found is not a check. Grep before you claim a data attribute. */
+            data-timeline-camera
             role="img"
             aria-label="A timeline from 2021 to 2026 that travels downward as you scroll. At the top, two strands, Clay and Daniel, come in from off the frame and twist together into one line: the spine is born where they fuse in 2021. Each later event branches off the spine to a picture held in a small calyx: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. At the end the line leans off its axis and winds itself up into the Bower mark, with the wordmark, Bower, beneath it."
           >

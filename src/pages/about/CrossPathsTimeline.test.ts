@@ -28,6 +28,7 @@ import {
   GARLAND_BOX,
   GARLAND_REACH,
   CONVERGE_Y,
+  BAND_GAP,
   INK_SEPIA,
   INK_SEPIA_TEXT,
   VELLUM,
@@ -177,26 +178,150 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
     }
   });
 
-  it('ITEM 9: the titled years are evenly spaced, because the axis is a fiction now', () => {
+  /**
+   * RETIRED, 2026-07-17: "ITEM 9: the titled years are evenly spaced, because the axis is a fiction
+   * now". It asserted every year-label gap equalled the first (they came out 1150 x 5, exactly), and
+   * it passed until the moment it was deleted. **It is not being removed because it failed. It is
+   * being removed because Daniel looked at the thing it was guarding and rejected it**, and a test
+   * that pins a retired ruling is worse than no test: it is a green check defending a decision nobody
+   * holds any more, and the next agent will read it as law.
+   *
+   * His words, on the drawing that test kept honest: "THE LENGTH OF THE YEAR BAND DOES NOT HAVE TO BE
+   * EQUAL TO THE REST, NOR DO THEY HAVE TO BE PROPORTIONATE IN ANY WAY."
+   *
+   * Recover it: `git show 583b876 -- src/pages/about/CrossPathsTimeline.test.ts`.
+   *
+   * **It is replaced, not just deleted**, and the replacement guards the property he asked for INSTEAD
+   * of equality. That exchange is the point — a contract this file gives up has to be traded for the
+   * contract that took its place, or the property quietly stops being guarded at all and nobody
+   * notices until he does. This one has now been traded twice: "every gap on a side is equal" ->
+   * "equal within a year" + "the years are evenly spaced" (round 10) -> this (2026-07-17).
+   */
+  it('THE RULING: a band is as long as its own work needs, and no longer', () => {
     /**
-     * Daniel: 2021 through 2023 are bunched, and "I'd rather fake our exact timeline to make it seem
-     * like constant growth." So this asserts the fiction holds.
+     * Daniel, 2026-07-17: "THERE IS TOO MUCH EMPTY SPACE BETWEEN YEAR BANDS... THEY MUST SIMPLY BE
+     * CLOSE TO EACH OTHER, LEAVE ROOM FOR FLOWERS, AND NOT HAVE STRANGE WHITE SPACES OR HUGE WALL OF
+     * FLOWERS. CURRENTLY IT IS FAR TOO LONG."
      *
-     * MEASURED BEFORE: label gaps of 52, 270, 604, 1182, 560 — a 22.7x ratio, and 2021 to 2022 was
-     * FIFTY-TWO units. The labels sit beside their work (round 8) and the work was spread by COUNT
-     * across one lane, so the gap between two years was really "how many projects happened to fall
-     * between those dates". Retuning the old piecewise slopes could not have fixed it: the labels do
-     * not read the axis. Each year owning an equal band is what fixes it. After: 1150 x 5, exactly.
+     * THE DEFECT, STATED AS A MEASURABLE: a band is PADDED — longer than the work in it requires. That
+     * is what a uniform `SLOPE` did to every year that was not the densest, and it is the single cause
+     * of both halves of his complaint (the void either sits empty, or the ornament colonises it and
+     * becomes the wall of flowers). So: every band's BUSIER side must pay its slack out at exactly
+     * `BAND_GAP` — not more. One unit more anywhere is a unit of paper the content did not ask for.
+     *
+     * WHY THIS IS MEASURED FROM `computePlates()` AND NOT FROM `BAND_H`. Asserting `BAND_H(y) === max
+     * over sides of sideNeed(y)` would restate the implementation in the test's own words and pass for
+     * any implementation, including a broken one — the same shape as the `p.id` bio guard that checked
+     * a field that does not exist and went green. This reads the plates the page actually lays out and
+     * measures the paper between them.
+     *
+     * IT MEASURES THE BAND'S OWN FOOT, NOT THE GAP TO THE NEXT YEAR — AND THE FIRST DRAFT DID THE
+     * LATTER AND WAS WRONG IN THE EXACT WAY THIS FILE KEEPS BEING WRONG. Reading a band's slack as
+     * "the gap between its last plate and the next year's first plate" needs the next year to HAVE a
+     * plate on that side. 2023 has no right-hand work at all, so 2022's right lane — **the busier
+     * side, the one sitting exactly on the floor, the whole proof that 2022 is not padded** — produced
+     * no observation, and the probe saw only the quieter left side's 409.4 and reported 2022 padded.
+     * The filter that skipped "a gap spanning an empty year" (correctly: that is a void, not a
+     * spacing) was throwing away the evidence of innocence. **A guard that filters its inputs can
+     * always be discarding the proof, and it is not enough to filter by a fact — the fact has to be
+     * the right one.** Asking the band directly needs no filter at all: `yearToY(y)` to `yearToY(y+1)`
+     * is the band, `yearToY` past the last year clamps to the lane's end, and every year and every
+     * side answers.
      */
-    const pos = yearLabelPositions();
-    const ys = YEAR_TICKS.map((y) => pos.get(y)!);
-    expect(ys.every((v) => typeof v === 'number'), 'a titled year has no position — measuring nothing').toBe(true);
-    const gaps: number[] = [];
-    for (let i = 1; i < ys.length; i++) gaps.push(ys[i] - ys[i - 1]);
-    expect(gaps.length).toBeGreaterThan(3);
-    for (const g of gaps) {
-      expect(g, `year gaps: ${gaps.map((x) => x.toFixed(1)).join(', ')} — the titled years are not evenly spaced`).toBeCloseTo(gaps[0], 3);
+    const CLUSTER_YEAR = new Map(CLUSTERS.map((c) => [c.id, Math.floor(c.year)]));
+    const plates = computePlates();
+    /** Per year: how much paper is left at the foot of each side's run, inside that side's own band. */
+    const slack = new Map<number, Array<{ side: string; g: number }>>();
+
+    for (const y of YEAR_TICKS) {
+      const bandBottom = yearToY(y + 1);
+      for (const side of ['left', 'right'] as const) {
+        // Filtered by a FACT — which year authored this cluster, and which side it was placed on.
+        // Never by a magnitude: the magnitude is the thing under test.
+        const mine = plates.filter((p) => p.side === side && CLUSTER_YEAR.get(p.clusterId) === y);
+        if (!mine.length) continue; // this side has no work this year: a void, and it is not slack
+        const foot = Math.max(...mine.map((p) => p.rect.y + p.rect.h));
+        slack.set(y, [...(slack.get(y) ?? []), { side, g: bandBottom - foot }]);
+      }
     }
+
+    // COVERAGE, ASSERTED. A year that quietly produced no observation is a year this test says nothing
+    // about, and it would pass by saying nothing — which is how the `p.id` bio guard went green while
+    // checking a field that does not exist.
+    const missing = YEAR_TICKS.filter((y) => !slack.has(y));
+    expect(missing, `no slack observed for ${missing.join(', ')} — those bands are unguarded`).toEqual([]);
+
+    const shown = YEAR_TICKS.map(
+      (y) => `${y}: ${(slack.get(y) ?? []).map((s) => `${s.side} ${s.g.toFixed(1)}`).join(' / ')}`,
+    ).join(' | ');
+
+    for (const y of YEAR_TICKS) {
+      // THE BUSIER SIDE LANDS ON THE FLOOR. It is the side that sized the band, so its foot is the
+      // band's own definition made visible. One unit more is a unit of paper nobody asked for.
+      const tight = Math.min(...slack.get(y)!.map((s) => s.g));
+      expect(tight, `${y}'s band is padded — ${shown}`).toBeCloseTo(BAND_GAP, 3);
+    }
+  });
+
+  it('...and no photograph is nearer its neighbour than the floor, with the floor actually setting the layout', () => {
+    /**
+     * Daniel, same ruling: "the distance between photos in our timeline" is part of the same
+     * complaint. Uniform, close, deliberate.
+     *
+     * BEFORE (equal bands): the gap between two plates was a year's LEFTOVER, so it ran 974.1 in 2021
+     * and 123.8 in 2023 on the same lane — a 7.9x spread with no meaning behind it. That spread IS the
+     * "strange white space". Now the band is sized FROM the gap, so the gap cannot vary with how empty
+     * a year happens to be.
+     *
+     * **THIS TEST HAD A CEILING AND THE CEILING WAS A WISH.** It asserted every spacing under
+     * `2 * BAND_GAP`, on the strength of one measurement (2024's quieter side at 158.9) generalised
+     * into a law — the file's most repeated mistake, committed here while writing the comment that
+     * warns about it. It fails at 409.4 (2022's left lane), and 409.4 is CORRECT: a band is as tall as
+     * its BUSIER side needs, so the quieter side has that much more paper to share among that many
+     * fewer gaps. 2022's right lane carries a two-plate stack and its left lane carries one plate, so
+     * the left plate has 409.4 under it and the layout is doing exactly what it promises.
+     *
+     * **So there is no ceiling to assert, and pinning today's 409.4 as one would only re-arm the same
+     * trap.** The quieter side's gap is not a free variable — it is `(bandH - sideSum) / sideN`,
+     * decided entirely by content the moment the busier side sets the band. The contract that IS
+     * checkable is this test's floor plus "a band is as long as its own work needs" above; together
+     * they say no gap is too small and no band is too big, which is the whole of what the layout
+     * controls. **Everything left over is content imbalance — a year with more work on one side of the
+     * spine than the other — and the only lever on it is moving a cluster across the spine, which is
+     * Daniel's composition and not a number anybody here should be tuning.**
+     *
+     * Measured 2026-07-17, so the next person knows what "left over" costs: open paper at 2021 left
+     * (328.2, no left-hand work that year), 2022 left (409.4), 2026 left (761.6) and 2023 right
+     * (1258.5, no right-hand work that year). The 1258.5 is the biggest single piece and it is the one
+     * worth showing him.
+     */
+    const CLUSTER_YEAR = new Map(CLUSTERS.map((c) => [c.id, Math.floor(c.year)]));
+    const gaps: Array<{ g: number; where: string }> = [];
+    for (const side of ['left', 'right'] as const) {
+      const ps = computePlates()
+        .filter((p) => p.side === side)
+        .sort((a, b) => a.rect.y - b.rect.y);
+      for (let i = 1; i < ps.length; i++) {
+        const prev = ps[i - 1];
+        const cur = ps[i];
+        if (prev.clusterId === cur.clusterId) continue; // a fact, not a magnitude
+        const py = CLUSTER_YEAR.get(prev.clusterId)!;
+        const cy = CLUSTER_YEAR.get(cur.clusterId)!;
+        gaps.push({ g: cur.rect.y - (prev.rect.y + prev.rect.h), where: `${side} ${py}->${cy}` });
+      }
+    }
+    expect(gaps.length, 'no gaps measured — the probe is measuring nothing').toBeGreaterThan(8);
+    const shown = gaps.map((x) => `${x.where} ${x.g.toFixed(1)}`).join(', ');
+
+    // THE FLOOR: no photograph is closer to the next than the derived gap. Same claim the no-crowding
+    // test makes against `2 * GAP`, one notch stricter, and content-independent.
+    for (const { g, where } of gaps) {
+      expect(g, `${where} is below the gap floor — ${shown}`).toBeGreaterThanOrEqual(BAND_GAP - 1e-6);
+    }
+    // ...AND THE FLOOR IS LIVE. Without this the test passes just as well on a drawing three times too
+    // long, which is the defect Daniel is actually complaining about: a floor nothing touches is not
+    // setting the layout, it is just failing to stop it.
+    expect(Math.min(...gaps.map((x) => x.g)), `nothing sits on the floor — ${shown}`).toBeCloseTo(BAND_GAP, 3);
   });
 });
 
