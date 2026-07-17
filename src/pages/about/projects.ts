@@ -185,15 +185,40 @@ export const TEAM: TeamMember[] = [
     role: 'Cofounder · engine & systems',
     image: '/assets/about/daniel-headshot.jpg',
     facts: [
+      /*
+       * ROUND 10 (2026-07-16) — REWRITTEN ON DANIEL'S NOTE, AND IT IS NOT FINISHED. Two TODO(Daniel)
+       * gaps below, both of which are "he has to say it, nobody else can".
+       *
+       * What he asked for: everything inside TRAINED; keep Rogers' six months but drop the dates
+       * ("the dates are not the point"); give Forsite Studio the MOST weight because it is a
+       * design-build firm, integrated and small (eight people), and that is why he saw a project go
+       * concept -> development -> contractors and subcontractors -> construction on site ->
+       * permitting; make it obvious he knows the construction process, not only design; mention the
+       * automation, with less room than Forsite; cut the Kenya medical device line.
+       *
+       * THE KENYA LINE IS CUT FROM THE BIO ONLY. Daniel: "I would probably remove the built medical
+       * device in Kenya and talk more about Forsite." The Origami Medical Device project keeps it in
+       * THE WORK, where it still reads in full. Recover this bio wording with:
+       *   git show c2585c7 -- src/pages/about/projects.ts
+       *
+       * TODO(Daniel) #1 — HOW LONG AT FORSITE, and is it current? He asked for the duration in the
+       * copy and it cannot be invented, so the clause simply does not claim one. Add it here.
+       *
+       * TODO(Daniel) #2 — WHAT KIND OF WORK IS ROGERS PARTNERS? He said the dates do not matter and
+       * "what matters is the kind of work / the kind of projects Rogers Partners does. Convey the
+       * industry work, not the calendar." He never said WHAT that work is, and it appears nowhere in
+       * this repo, so there was nothing to source and the line still says only the six months. Round
+       * 10 declined to look the firm up and write it: that would be a fact about Rogers Partners
+       * asserted on Bower's About page on the strength of a search result, and the standing rule here
+       * is that every fact came from his mouth. One sentence from him closes it.
+       *
+       * The Forsite clause remains unverified in the older sense too: "Forsite" appears nowhere else
+       * in the repo. Everything in it below is his own words, and nothing is embroidered.
+       */
       {
         label: 'Trained',
         value:
-          'Architecture, product design, and engineering. Six months at Rogers Partners in New York, June to December 2025.',
-      },
-      {
-        label: 'Built',
-        value:
-          'A $0.25 folded medical device for a teaching hospital in Kenya, transferred for clinical deployment, directing a team of fourteen students to get it there.',
+          'Architecture, product design, and engineering. Six months at Rogers Partners in New York. Then Forsite Studio, a design-build firm of eight people. Small and integrated, so the work ran from concept and development, through the contractor and subcontractor relationships, to construction on site and permitting: the whole building process, not only the drawing of it. Also built Forsite’s AI operations layer.',
       },
       /*
        * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
@@ -226,10 +251,22 @@ export const TEAM: TeamMember[] = [
        * automation work for Forsite"): no dates, no scale, no client detail. Correct the description
        * if "an AI operations layer for an architecture studio" is wrong or says too much.
        */
+      /*
+       * ROUND 10: the Forsite automation clause LEFT this line and moved up into Trained, where he
+       * asked for it, so this says only the composite now.
+       *
+       * TODO(Daniel) — DOES THIS BLOCK SURVIVE AT ALL? His note reads "everything below lives inside
+       * the TRAINED block", which taken literally folds the composite up there too and retires
+       * `Also` entirely. The composite is the one fact he did NOT mention in that pass: he named
+       * Rogers, Forsite, the automation and the Kenya cut, and never this. So it is left standing,
+       * because deleting authored content he did not ask to delete is his call, not mine, and this is
+       * the only place the bamboo-and-hemp work appears in either bio. Say the word and it folds up
+       * or comes out.
+       */
       {
         label: 'Also',
         value:
-          'Grew a load-bearing composite from bamboo and hemp, tested 30% stronger than hempcrete, and an AI operations layer for Forsite, an architecture studio.',
+          'Grew a load-bearing composite from bamboo and hemp, tested 30% stronger than hempcrete.',
       },
       { label: 'This round', value: 'The engine, the demo, the numbers.' },
     ],
