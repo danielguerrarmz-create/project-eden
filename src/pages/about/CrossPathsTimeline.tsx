@@ -772,37 +772,32 @@ export const CLUSTERS: Cluster[] = [
      * it is old." The showcase tier was already reserved for exactly this (see TIER) — the bookend
      * it names as "ut-austin" had been waiting for an asset since the tier was written.
      *
-     * HELD — TODO(Daniel): this slot is deliberately `pending` and its asset is deliberately NOT in
-     * the repo. It is waiting on a privacy ruling, and round 10 did not ship past it.
+     * SHIPPED BY DANIEL'S EXPLICIT RULING, 2026-07-16. This is the DECISION, recorded — not a
+     * justification for it, and the difference is the point. Round 9 left a note here claiming the
+     * names are illegible at 640; round 10 measured it and it is overstated; and a false rationale
+     * left in the code is how the next agent either "re-mitigates" something already decided, or
+     * trusts the claim and reuses it somewhere it is not true. So, what is actually true:
      *
-     * The photograph shows ~40 identifiable UT students, each with their NAME printed under their
-     * face. **This repo is PUBLIC** (`danielguerrarmz-create/project-eden`), so committing the file
-     * to any branch publishes it — the line is `git push`, not the merge.
+     *   - The photograph shows ~40 identifiable UT students with their NAMES printed under their
+     *     faces. THIS REPO IS PUBLIC (`danielguerrarmz-create/project-eden`), so `git add` is
+     *     `publish` — the line is `git push`, not the merge — and a public push is effectively
+     *     permanent, because it can be cached and indexed even if later deleted.
+     *   - MEASURED, by cropping the caption strip out of both files and upscaling 6x nearest (what a
+     *     determined viewer actually does): at 828 the names read outright; at 640 they are badly
+     *     degraded but a few stay partly guessable. "Harder" is not "illegible".
+     *   - AND LEGIBILITY IS LARGELY A RED HERRING. With every name unreadable this is still ~40
+     *     identifiable FACES on a company's public About page. The face is the personal data; the
+     *     name only compounds it.
      *
-     * Round 9 downscaled the source 828 -> 640 as the mitigation and recorded here that the names
-     * were then "illegible". Round 10 re-measured that claim instead of inheriting it, by cropping
-     * the caption strip out of both files and upscaling 6x nearest (what a determined viewer
-     * actually does). It is OVERSTATED: at 828 the names read outright; at 640 they are badly
-     * degraded but a few remain partially guessable. "Harder" is not "illegible".
+     * Daniel was told all of that, in those terms, and was offered: crop to the two of them, drop it,
+     * ship knowingly, or assert consent. He did not claim consent. He chose to ship the full frame.
+     * It is his photograph, his classmates, his company's page, and his call to make. Do not
+     * re-litigate it here; if it ever needs revisiting that is a conversation with him, not a commit.
      *
-     * And legibility is close to a red herring, which is the part worth carrying forward: with every
-     * name perfectly unreadable this is still ~40 identifiable FACES on a company's public About
-     * page without their consent. The face is the personal data; the name only compounds it. So the
-     * mitigation was aimed at the lesser half of the problem, and "the full-res original is not in
-     * the repo" protects the wrong artifact — the 640 file is the one that gets served.
-     *
-     * To reinstate once ruled: restore the `showcase` node below (ratio 1.5725, measured), and
-     * `git add public/assets/about/timeline/2021-orientation-zoom.webp`. One line plus one add.
-     *
-     *   { tier: 'showcase', media: { src: `${T}/2021-orientation-zoom.webp`, ratio: 1.5725,
-     *     alt: 'A UT Austin orientation call in 2021: a grid of some forty new students in their
-     *           own boxes, hook-’em hands raised, none of them having met yet' } }
-     *
-     * THE FIRST PLATE, and half of the page's bracket — which is why it is held rather than dropped.
-     * Daniel: "put this image as our FIRST, our school orientation." The page opens on the paths NOT
-     * crossed yet and closes on the two of them graduating (see `graduation` at the foot of this
-     * list), the same bracket the copy makes with "Bower is new." / "The obsession is real, and it
-     * is old." Losing it costs the opening of the arc, so it wants a ruling, not a quiet deletion.
+     * IT SHIPS AT 640, NOT THE 828, and that stays deliberate even though the downscale is no longer
+     * load-bearing for the ruling: it costs nothing visually and it is a real, if partial, reduction
+     * in exposure, so there is no reason to upgrade the resolution now. The 828 original stays out of
+     * the repo, at `restless-egg/_photo-originals/timeline/`.
      */
     id: 'origin-2021',
     year: 2021.1,
@@ -811,7 +806,11 @@ export const CLUSTERS: Cluster[] = [
     nodes: [
       {
         tier: 'showcase',
-        media: { src: '', ratio: 1.5725, alt: 'The 2021 orientation photograph, pending a privacy ruling', pending: true },
+        media: {
+          src: `${T}/2021-orientation-zoom.webp`,
+          ratio: 1.5725,
+          alt: 'A UT Austin orientation call in 2021: a grid of some forty new students in their own boxes, hook-’em hands raised, none of them having met yet',
+        },
       },
     ],
   },
