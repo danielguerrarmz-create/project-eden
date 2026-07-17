@@ -31,6 +31,11 @@ import {
   GARLAND_REACH,
   CONVERGE_Y,
   BAND_GAP,
+  MARK_RING_R,
+  markGarlandPath,
+  markGarlandStations,
+  MARK_ORGAN_SCALE,
+  GARLAND_SCALE,
   INK_SEPIA,
   INK_SEPIA_TEXT,
   VELLUM,
@@ -355,6 +360,63 @@ describe('composition contract', () => {
     // ...and the finale's geometry hangs off the same scale, so it moves with the size and not with
     // the ink. MARK_R is what TAIL_LEN (2*pi*r, the winding tail's conserved arc length) is built from.
     expect(MARK_R).toBeCloseTo(30 * MARK_K, 6);
+  });
+
+  it('ITEM 3: the mark flowers ON its own linework, evenly, and small', () => {
+    /**
+     * Daniel asked for leaves and flowers on the logo, with four constraints: small, balanced, feels
+     * part of nature, original logo geometry undeformed, does not obstruct.
+     *
+     * THE TWO THAT A TEST CAN HOLD are asserted here; the other two are structural and are held by
+     * WHERE the code sits, which is worth saying because it is why they are not asserted:
+     *  - **undeformed** is by construction — the foliage is a separate <image> and the mark is SVG
+     *    circles solved by `solveMark`; nothing in the ornament feeds back into the geometry. There is
+     *    no number to check, and a test asserting "the circles did not move" would pass forever while
+     *    checking nothing, which is this file's most-repeated defect.
+     *  - **does not obstruct** is document order — the garland is painted BEFORE the circles, so the
+     *    linework is drawn over its own flowers. Also not a number.
+     */
+    // ON THE MARK'S OWN STROKE. The path must ride the ring the mark's circles actually reach —
+    // `15 * MARK_K` (the artwork's centre-ring, CENTERS orbit (50,50) at r=15) plus `MARK_R`. Derived
+    // from the same constants the render uses, so a change to either moves both or fails here.
+    expect(MARK_RING_R).toBeCloseTo(15 * MARK_K + MARK_R, 6);
+    const path = markGarlandPath();
+    expect(path.length, 'the ring path is too coarse to read as a circle').toBeGreaterThan(48);
+    const cx = MARK_RING_R + GARLAND_REACH; // the ring's centre in strip coordinates
+    for (const [x, y] of path) {
+      expect(Math.hypot(x - cx, y - cx), 'an organ path point has left the mark ring').toBeCloseTo(MARK_RING_R, 3);
+    }
+    // ...and it closes: root and tip meet, so the vine rings the mark rather than ending mid-air.
+    expect(Math.hypot(path[0][0] - path[path.length - 1][0], path[0][1] - path[path.length - 1][1])).toBeCloseTo(0, 6);
+
+    /*
+     * BALANCED, and by ARITHMETIC rather than by a seed — even spacing on a circle IS the balance,
+     * which is why there is no seed here to curate.
+     *
+     * THE WRAP GAP IS THE ASSERTION THAT MATTERS, AND WITHOUT IT THIS TEST WAS VACUOUS. My own
+     * sabotage caught it: bunching every organ into the first 60% of the ring (`t = 0.1 + i*0.6/n`)
+     * left the inner gaps EQUAL — 0.6/n each — so "evenly spaced" passed while the foliage sat in an
+     * arc and two thirds of the mark was bare. **Equal spacing is a property the failure also has.**
+     * On a CLOSED path, balance is only balance if the seam gap matches the rest; that is the whole
+     * difference between an even ring and an even clump. Same shape as every filter on this page that
+     * screened out its own evidence, arrived at from the opposite direction: not a filter throwing the
+     * proof away, but an assertion too weak to tell the two states apart.
+     */
+    const st = markGarlandStations();
+    expect(st.length, 'no stations — the probe would assert nothing below').toBeGreaterThan(2);
+    const inner = st.slice(1).map((s, i) => s.t - st[i].t);
+    const wrap = 1 - st[st.length - 1].t + st[0].t; // across the seam, where root and tip meet
+    const shown = st.map((s) => s.t.toFixed(3)).join(', ');
+    for (const g of inner) expect(g, `the mark's foliage is not evenly spaced: ${shown}`).toBeCloseTo(inner[0], 9);
+    expect(wrap, `the foliage bunches on one side — it does not ring the mark: ${shown}`).toBeCloseTo(inner[0], 9);
+    // No organ on the path's seam, where root and tip meet and an organ reads as a join.
+    for (const s of st) {
+      expect(s.t).toBeGreaterThan(0);
+      expect(s.t).toBeLessThan(1);
+    }
+    // SMALL: the mark's foliage must never outweigh the trunk's. Pinned as a RELATION to the spine
+    // garland, not as a number, so tuning one cannot silently invert the hierarchy.
+    expect(MARK_ORGAN_SCALE, "the mark's foliage now outweighs the spine's").toBeLessThan(GARLAND_SCALE);
   });
 
   it('ITEM 1a: the spine, the branches and the mark are all one weight, so no join steps', () => {

@@ -967,7 +967,7 @@ export const GARLAND_REACH = 90;
  * 1.5 puts the leaves at roughly eight times the spine's width — ornament ON the structure,
  * which is Sai's weight budget, rather than a second plant competing with it.
  */
-const GARLAND_SCALE = 1.5;
+export const GARLAND_SCALE = 1.5;
 /** A station must clear this much y from a branch anchor, so foliage never fouls a fork or the
  *  node dot drawn there. */
 const GARLAND_ANCHOR_CLEAR = 46;
@@ -1572,6 +1572,97 @@ export const GARLAND_BOX = {
   h: CONVERGE_Y - CONV_JUNCTION_Y,
 };
 
+/* ------------------------------ item 3: the mark flowers ------------------- */
+
+/**
+ * ORNAMENT ON THE BOWER MARK (item 3, 2026-07-17). Daniel: the mark should carry leaves and flowers
+ * too — "include leaves and flowers" was said of the spine AND the logo in the same breath.
+ *
+ * THE RULE QUESTION, VERIFIED HERE RATHER THAN INHERITED. CLAUDE.md forbids overlaying the BowerMark
+ * on a painting, and the reason is mechanical: `matRect` (engine/gongbi/quality.ts) crops a whole
+ * plant SPECIMEN with `sy = bounds.ymax + padding - side`, which base-anchors it so its densest region
+ * sits on the mat's bottom pixel row — so anything at the frame's base collides with it by
+ * construction, for every seed. **That is a fact about matting a specimen.** `requestGarland` /
+ * `paintGarland` never call `matRect`: a `GarlandVine` is `{ path, stations }` and the composer walks
+ * an arbitrary polyline, growing organs at the stations it is given and nothing else. Checked the
+ * import graph, not the claim. **No collision — provided this uses the garland mechanism and never
+ * composites a specimen behind the mark.** That proviso is the rule; it is not a formality.
+ *
+ * THE PATH IS THE MARK'S OWN STROKE, which is the whole point of "grown along it" rather than "placed
+ * near it". The Oculus is eight circles of `MARK_R` whose centres ring `MARK_CENTER` at 15 * MARK_K,
+ * so the rosette's outer envelope is a circle of `MARK_RING_R`. The vine walks that envelope: every
+ * organ sits exactly where the mark's own linework runs, and the foliage reads as growing ON the
+ * drawn circles rather than floating around them.
+ *
+ * WHAT KEEPS IT INSIDE DANIEL'S FOUR CONSTRAINTS (small, balanced, part of nature, geometry
+ * undeformed, does not obstruct):
+ *  - **UNDEFORMED, BY CONSTRUCTION.** This is a separate painted layer under its own <image>. It
+ *    cannot move a circle: the mark is SVG `<circle>`s solved by `solveMark`, drawn after this, and
+ *    nothing here feeds back into them. The ornament reads the geometry; the geometry never reads the
+ *    ornament — the page's oldest rule, and the reason the sub-branches were safe to add.
+ *  - **BALANCED**, because the stations are placed by ARITHMETIC and not by a seed: `MARK_STATIONS`
+ *    evenly spaced around the ring. A seed would need curating (CLAUDE.md: "a seed is a design review,
+ *    not a constant"), and there is nothing to curate here — even spacing on a circle IS the balance.
+ *  - **SMALL**: `MARK_ORGAN_SCALE` sits below the spine garland's 1.5, so the mark's foliage never
+ *    outweighs the trunk's.
+ *  - **DOES NOT OBSTRUCT**: it is painted BEFORE the mark's circles in document order, so the linework
+ *    is always on top of its own flowers. If an organ ever lands over a stroke, the stroke wins.
+ *  - **PART OF NATURE**: `PAGE_SPECIES`, the same roll the spine and the sub-branches use, so it is
+ *    the same plant. A second species here would read as decoration stuck onto the logo, which is the
+ *    exact complaint ("not a rule with plants glued to it") one organ down.
+ */
+/** The rosette's outer envelope: the ring the mark's circles actually reach. 15 * MARK_K is the
+ *  circle-centre ring (CENTERS orbit (50,50) at radius 15 in the artwork's own 100-unit box). */
+export const MARK_RING_R = 15 * MARK_K + MARK_R;
+/** How many organs ring the mark. Small and even — Daniel asked for "a small balanced number". Six on
+ *  a circle reads as deliberate rather than scattered, and leaves the ring mostly bare linework. */
+const MARK_STATIONS = 6;
+/** Below the spine garland's GARLAND_SCALE (1.5): the mark is the page's smallest structure and its
+ *  foliage must not out-shout the trunk's. */
+export const MARK_ORGAN_SCALE = 0.85;
+/** The fraction of the wind at which the mark starts to flower. Late, so the ring closes and blooms as
+ *  one event rather than the foliage arriving on a circle that is still an arc. */
+const MARK_BLOOM_FROM = 0.75;
+/** The strip the mark's garland paints into: the rosette plus the reach its organs need. */
+export const MARK_GARLAND_BOX = {
+  x: MARK_CENTER_X - MARK_RING_R - GARLAND_REACH,
+  y: MARK_CENTER_Y - MARK_RING_R - GARLAND_REACH,
+  w: 2 * (MARK_RING_R + GARLAND_REACH),
+  h: 2 * (MARK_RING_R + GARLAND_REACH),
+};
+
+/** The mark's envelope as a root-first polyline in strip px. Pure and exported: the contract test
+ *  asserts it closes on the ring the mark's circles actually reach, rather than trusting the radius. */
+export function markGarlandPath(): Array<[number, number]> {
+  const N = 96;
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * 2 * Math.PI - Math.PI / 2; // start at the top, walk clockwise
+    pts.push([
+      MARK_CENTER_X + MARK_RING_R * Math.cos(a) - MARK_GARLAND_BOX.x,
+      MARK_CENTER_Y + MARK_RING_R * Math.sin(a) - MARK_GARLAND_BOX.y,
+    ]);
+  }
+  return pts;
+}
+
+/**
+ * Where the organs sit along that ring, and which ones: evenly, by arithmetic. Exported so the
+ * contract test can assert the balance rather than eyeball it. `t` is position along the path,
+ * 0 (root) to 1 (tip).
+ *
+ * THE ORGAN CYCLE IS THE SPINE GARLAND'S OWN, deliberately: `garlandStations` walks
+ * `['leaf', 'bloom', 'leaf', 'bud', 'leaf', 'bloom']`, so the mark ends up dressed in the same rhythm
+ * as the line that winds into it — leaf-heavy, blooms apart. A different mix here would read as a
+ * logo decorated to match a drawing rather than as the end of one plant.
+ */
+export function markGarlandStations(n: number = MARK_STATIONS): GarlandStation[] {
+  const ORGANS: GarlandOrgan[] = ['leaf', 'bloom', 'leaf', 'bud', 'leaf', 'bloom'];
+  // Offset by half a step so no organ lands exactly on the path's own seam at t=0/1, where the
+  // composer's root and tip meet and an organ would read as a join rather than as growth.
+  return Array.from({ length: n }, (_, i) => ({ t: (i + 0.5) / n, organ: ORGANS[i % ORGANS.length] }));
+}
+
 /** The spine's polyline in STRIP-local pixels (the composer paints into its own canvas). */
 export function garlandPath(): Array<[number, number]> {
   return spinePts().map((p) => [p.x - GARLAND_BOX.x, p.y - GARLAND_BOX.y] as [number, number]);
@@ -1582,6 +1673,68 @@ export function garlandPath(): Array<[number, number]> {
  * NOT part of the scroll-reveal choreography: the reveal gates the STRUCTURE (the spine draws
  * itself as you descend), and a raster cannot be dash-offset. It fades in when it arrives.
  */
+/**
+ * The mark's foliage. Painted like every other garland; revealed by the WIND, not by a clock.
+ *
+ * `windW` IS THE GATE, AND THAT IS DELIBERATE RATHER THAN CONVENIENT. The mark does not exist until
+ * the line has wound itself into it — at `windW` < 1 the tail is still a partial arc, so foliage on a
+ * finished ring would be flowers on a circle that has not closed. It opens over the last of the wind
+ * (`MARK_BLOOM_FROM` → 1) so the mark finishes and flowers as one event, and it closes again on the
+ * unravel because `windW` runs backwards there — the ornament unwinds with the thing it grows on
+ * instead of hanging in the air over an opening ray.
+ *
+ * IT IS NOT ON A TIMER, AND THE ONE NEXT DOOR TAUGHT ME WHY. `SpineGarland` fades on
+ * `transition: opacity 900ms` — which is DEAD: its `opacity: url ? 1 : 0` sits after `if (!url) return
+ * null`, so `url` is always truthy, opacity is always 1, and a freshly-mounted element has nothing to
+ * fade from. The whole spine garland therefore appears the instant its bitmap finishes painting
+ * (~7.7s), independent of scroll and of where the camera is. **A CSS transition cannot reveal
+ * something on scroll; only a scroll-driven value can.** So this one takes `windW` as a prop.
+ */
+function MarkGarland({ reduced, windW }: { reduced: boolean; windW: number }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    requestGarland({
+      // The same roll as the spine and the sub-branches: one page, one plant.
+      seed: PAGE_SPECIES,
+      voice: 'pigment',
+      width: MARK_GARLAND_BOX.w,
+      height: MARK_GARLAND_BOX.h,
+      path: markGarlandPath(),
+      stations: markGarlandStations(),
+      scale: MARK_ORGAN_SCALE,
+      tube: false, // the mark's circles ARE the stem, and they are drawn in SVG over this.
+    })
+      .then((painted) => {
+        if (live) setUrl(painted);
+      })
+      .catch((err: unknown) => {
+        // The mark is the page's climax and it is SVG: a failed garland costs it flowers, not itself.
+        console.error('gongbi mark garland failed:', err);
+      });
+    // NOTHING TO REVOKE — the URL belongs to the painter's session cache. See requestGarland.
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!url) return null;
+  const bloom = reduced ? 1 : clamp01((windW - MARK_BLOOM_FROM) / (1 - MARK_BLOOM_FROM));
+  if (bloom <= 0.001) return null;
+  return (
+    <image
+      href={url}
+      x={MARK_GARLAND_BOX.x}
+      y={MARK_GARLAND_BOX.y}
+      width={MARK_GARLAND_BOX.w}
+      height={MARK_GARLAND_BOX.h}
+      opacity={bloom}
+      style={{ pointerEvents: 'none' }}
+    />
+  );
+}
+
 function SpineGarland({ reduced }: { reduced: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -2470,6 +2623,13 @@ export function CrossPathsTimeline({
                 from the mark's bounding box (which is NOT the same point, and is what "not the mark's
                 bbox" in his spec rules out). */}
             <circle data-mark-center cx={MARK_CENTER_X} cy={MARK_CENTER_Y} r={0} fill="none" stroke="none" />
+
+            {/* ITEM 3: THE MARK FLOWERS. Painted HERE — before the circles — on purpose: document
+                order is the whole of "does not obstruct". The linework is drawn over its own foliage,
+                so if an organ ever lands on a stroke the stroke wins, without a mask, a z-index or a
+                clearance rule to maintain. The satellites bloom across windW 0.58..0.94, so
+                MARK_BLOOM_FROM (0.75) opens the foliage inside that same event rather than after it. */}
+            <MarkGarland reduced={reduced} windW={windW} />
 
             {/* THE UNRAVEL. The other seven circles bloom outward from the wound one as the tail
                 closes; circle 0 is NOT drawn here because the winding tail below IS circle 0. */}
