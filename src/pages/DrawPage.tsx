@@ -40,6 +40,7 @@ import { SplashHeader } from './splash/SplashHeader';
 import { DrawStage, type Tool } from './draw/DrawStage';
 import { useSpaceHeld } from './draw/useSpaceHeld';
 import { StudioEnvironment } from './draw/StudioEnvironment';
+import { PlacedScaleFigure } from './draw/PlacedScaleFigure';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
 import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
@@ -343,6 +344,9 @@ export function DrawPage() {
                     gated on !resolved so these two never sit coplanar. */}
                 {baked && <Folly />}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
+                {/* A dome renders identically at 3 m and at 30 m. One person
+                    and it snaps to human scale. Bake only: see the file. */}
+                {baked && <PlacedScaleFigure />}
 
                 {/* TWO passes, doing two different jobs. The wide soft one
                     grounds the whole object in its setting; it is bad at
