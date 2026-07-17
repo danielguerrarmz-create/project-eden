@@ -878,7 +878,22 @@ function ListView({ reduced }: { reduced: boolean }) {
             <div ref={mediaRowRef} className="flex min-h-0 flex-1 gap-3">
               {/* REGION 1 — the hero, alone, as large as the region allows and never cropped. The
                   flex box is the REGION; the picture inside is its own size (see FIT_FRAME). */}
-              <div data-project-hero className="flex min-h-0 flex-1 items-start justify-start">
+              {/* `items-stretch`, NOT `items-start`, AND IT IS THE WHOLE FIX (round 10, item 8).
+                  MEASURED: at 1440x760 all TWELVE heroes were clipped, worst 47.7% of Synthetic
+                  Vision's picture; at 900, three were (Origami 22.3%, Synthetic Vision 15.8%, LLO
+                  9.6%). Not cropped by object-fit — CLIPPED, by the button's own `overflow-hidden`.
+
+                  The chain: FIT_FRAME puts `max-h-full` on the <img>, which resolves against the
+                  BUTTON. `items-start` stops the button stretching, so its height is `auto` — and a
+                  percentage max-height against an indefinite containing block computes to `none`.
+                  The image then ignores the constraint entirely, takes its full natural height, and
+                  the button paints only as much of it as fits. Stretching the button makes its height
+                  definite, `max-h-full` resolves, and the picture sizes itself to the region under
+                  its own ratio, which is what FIT_FRAME was written to do all along.
+
+                  This is why Daniel saw it and the harness did not: the clip depends on the region's
+                  ratio, which rises as the window shortens. His window is shorter than 900. */}
+              <div data-project-hero className="flex min-h-0 flex-1 items-stretch justify-start">
                 <ProjectImg image={hero} onOpen={openShot} reduced={reduced} fit />
               </div>
               {rest.length > 0 && (

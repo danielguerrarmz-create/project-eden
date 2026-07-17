@@ -123,7 +123,24 @@ reviews before any commit.
   - The fix is never a better number. `fill` hands a picture a box and resolves the disagreement
     with object-fit (cover crops, contain letterboxes); `FIT_FRAME` lets the replaced element size
     itself from its intrinsic ratio under max-width/max-height, so the element IS the picture and
-    object-fit has nothing left to resolve. **Measured: hero crop 0% across all twelve.**
+    object-fit has nothing left to resolve.
+  - **THIS LINE USED TO SAY "Measured: hero crop 0% across all twelve" AND IT WAS FALSE FOR ROUNDS.**
+    It was true about object-fit, which is genuinely 0, and the word it used was "crop". Round 10
+    measured the other way the page can hide a picture and found **all TWELVE heroes clipped at
+    1440x760, worst 47.7% of Synthetic Vision; three at 900, worst 22.3% of Origami.** Not by
+    object-fit. By the button's own `overflow-hidden`: `FIT_FRAME`'s `max-h-full` resolves against the
+    button, `items-start` left the button's height `auto`, and **a percentage max-height against an
+    indefinite containing block computes to `none`** — so the constraint silently evaporated and the
+    image took its full natural height behind a clip. Fixed by stretching the button (`items-stretch`
+    on `[data-project-hero]`); verified 0 clipped and 0 ratio deviation at both heights.
+  - **AND THE PROBE AGREED WITH THE COMMENT, WHICH IS WHY IT SURVIVED.** `qa/project-media.mjs`
+    computes crop from `|rect.width/rect.height − naturalRatio|`, and **a clipped `<img>` keeps its
+    natural ratio in `getBoundingClientRect()`** — the element reports the size it wants to be and
+    the clip happens on an ancestor's paint. So the instrument was not broken; it was answering a
+    different question and its answer was quoted for the question nobody asked. Overflow clipping is
+    only visible by comparing the IMAGE's rect to the **button's** rect: `qa/hero-clip.mjs`.
+  - The clip depends on the REGION's ratio, which rises as the window shortens, which is why Daniel
+    saw this and a 1440x900 harness never did. **Check a short viewport.**
   - Before sizing any image region, check the aspect against the real asset — the ratios are
     authored in `projects.ts`, and `qa/` has probes.
 - **WHITE MARGINS AROUND A HERO MAY BE THE ASSET, NOT THE LAYOUT — measure before "fixing" it.**
