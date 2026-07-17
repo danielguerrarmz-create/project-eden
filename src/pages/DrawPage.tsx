@@ -44,6 +44,7 @@ import { PlacedScaleFigure } from './draw/PlacedScaleFigure';
 import { BakeReveal, REVEAL_S } from './draw/BakeReveal';
 import { makeRevealUniforms } from '../scene/revealShader';
 import { CinematicCamera } from './draw/CinematicCamera';
+import { RAIL_LINES, TOOLS } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
   COMMISSION_LABEL,
@@ -79,19 +80,10 @@ function download(name: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
-const TOOLS: { id: Tool; label: string; hint: string }[] = [
-  // The draw hint is what you are told once the canopy is already standing, so
-  // it cannot be the opening instruction. It used to be, and the caption
-  // reverted to "drag a line across the lawn" with two lines drawn and a
-  // canopy up: the one state where that sentence is plainly false. The two
-  // sentences the opening needs are special-cased below, by line count.
-  { id: 'draw', label: 'draw', hint: 'another line grows it' },
-  // "push/pull", not "lift", and the hint names BOTH directions. The tool has
-  // been bidirectional since it was written; the old label and its floor-pinned
-  // handle were the only reasons nobody knew. See gesture.ts.
-  { id: 'pushpull', label: 'push/pull', hint: 'press on it and drag up or down' },
-  { id: 'hole', label: 'excavate', hint: 'press on it and drag out a hole' },
-];
+// The toolbar's words and the rail's live in `draw/toolCopy.ts`, where the
+// DOM-free suite can pin them. The sculpt hint in particular is the
+// highest-leverage sentence in the product and was wrong for months; that
+// module's header carries the reasoning.
 
 /** The opening shot. Authored, not derived: it frames the empty lawn. */
 const HOME: Framing = { kind: 'pose', position: [5.6, 3.6, 6.6], target: [0, 1.0, 0] };
@@ -282,10 +274,19 @@ export function DrawPage() {
 
   // Start over: back to the opening shot, so the next take opens where the
   // last one did. The lawn has no object to fit, so this pose is authored.
+  //
+  // THE RAIL RE-ARMS HERE, AND THAT IS A FILM-DAY BUG FIX, not tidiness.
+  // `hintShown` latches true forever and nothing ever cleared it, so the guidance
+  // appeared on the FIRST take of a session and never again — a second take shot
+  // without a page reload silently lost it. Daniel takes more than one take. This
+  // is the same reason the hint is not persisted to localStorage: a take has to
+  // be reproducible, and "reproducible" has to include the second one.
   useEffect(() => {
     if (arcs.length === 0 && !baked) {
       setFraming(HOME);
       setTurntable(false);
+      setHintShown(false);
+      setHintUp(false);
     }
   }, [arcs.length, baked]);
 
@@ -447,7 +448,22 @@ export function DrawPage() {
                   // The turntable yields to the person, instantly and for good.
                   // OrbitControls fires this on the pointer going down, before
                   // any movement, so the object never fights the first drag.
-                  onStart={() => setTurntable(false)}
+                  //
+                  // The rail goes with it: guidance that has been OBEYED should
+                  // stop talking. That is `fromDrawing.ts:205-207`'s rule for the
+                  // engine's nudges ("an engine that only talks when it overrules
+                  // you reads as a validator") applied to chrome — it answers to
+                  // being followed, not only to a clock, so a confident take
+                  // clears the frame the instant the viewer acts.
+                  //
+                  // `onStart` and NOT `onChange`: onStart fires only on real
+                  // pointer/wheel input, never on the programmatic camera moves
+                  // the framing effects make. onChange fires on those too, and
+                  // would dismiss the rail before anyone had read it.
+                  onStart={() => {
+                    setTurntable(false);
+                    setHintUp(false);
+                  }}
                 />
                 {/* After OrbitControls on purpose: it must exist before this
                     can read it. */}
@@ -472,20 +488,31 @@ export function DrawPage() {
               </p>
             )}
 
-            {/* How to look at the thing you just made. Said once, quietly, then
-                never again. Both paths are named because they are not the same
-                user: right-drag is the mouse's, space is the trackpad's, where
-                two-finger drag is a wheel event and already means zoom. */}
+            {/* THE GUIDANCE RAIL. How to LOOK at the thing you just made, said
+                once, quietly, on the left edge, then never again.
+
+                It is the same hint that used to sit bottom-center, relocated and
+                given a second line — not a new mechanism. It deliberately is NOT
+                the nudge panel: that is the engine's read of YOUR DRAWING, and it
+                only speaks after bake. Operating instructions are neither, and
+                folding them in would make one panel speak in two registers and
+                arrive too late to help anyone sculpt.
+
+                Both turn paths are named because they are not the same user:
+                right-drag is the mouse's, space is the trackpad's, where
+                two-finger drag is a wheel event and already means zoom. "Scroll
+                to zoom" is direction-agnostic on purpose — it covers in, out, and
+                the trackpad pinch that arrives as the same wheel event. */}
             {hintShown && !baked && (
-              <p
-                // max-w is generous on purpose: `ch` under-measures tracked
-                // text, and at 44ch this line wrapped its last word alone.
-                className={`pointer-events-none absolute inset-x-0 bottom-16 mx-auto max-w-[60ch] text-center font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/40 transition-opacity duration-700 ${
+              <div
+                className={`pointer-events-none absolute left-4 top-1/2 max-w-[24ch] -translate-y-1/2 space-y-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/40 transition-opacity duration-700 ${
                   hintUp ? 'opacity-100' : 'opacity-0'
                 }`}
               >
-                right-drag, or hold space, to turn it
-              </p>
+                {RAIL_LINES.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
             )}
 
             {/* Tools. Only once there's something to work on. */}
