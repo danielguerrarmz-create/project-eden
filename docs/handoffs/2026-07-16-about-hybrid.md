@@ -876,9 +876,25 @@ there.** Sampling against wall-clock-from-navigation reports the wrong beat enti
 clock.** The sibling of it: a screenshot costs ~300ms, so sampling a single page load drifts late and
 every frame after the first lies about when it was taken — take one fresh load per sample.
 
-This is the third time this session a confident measurement has been wrong in a way that looked
-right (see also: the stale preview port, and the bounding-box text probe). The pattern: **when a
-number surprises you, check the instrument before you change the code.**
+And a fourth, found while running the suite at the end of this very round: **`qa/hero-lockup.mjs`
+reported the mark 750-925px off the words, with camY at 2486 / 2619 / 2739 / 2944 of the pin's 3806 —
+a different number every run.** It read exactly like a layout regression from round 7. It was not.
+The camera is a rAF lerp and **the cold paint starves it**: the harness was seeking at ~1s and
+measuring at ~6s, straight into the busiest part of the page's life. Every other harness here already
+waits for the paint; this was the only one that drives the camera, and the only one that did not
+wait. Two sub-bugs in the same file, both of which produced confident wrong numbers: it waited on a
+**wall clock for a mount-relative event** (Shift at 800ms, mount at ~1.8s, so it cancelled nothing
+and the autoplay fought the seek), and it **polled for stillness to detect "settled"** — which cannot
+tell "not started" from "finished", because the scroll event, the kick and the first rAF all land
+after `scrollTo` returns.
+
+**The pin guard is what saved it**: "NOT AT THE PIN ... this is a harness failure, not a layout one —
+nothing below is meaningful." Four false readings, correctly labelled, none of them acted on.
+**Guarding a probe's preconditions is worth as much as its assertion.**
+
+That is FOUR confident measurements wrong in one session, each in a way that looked right (the stale
+preview port; the bounding-box text probe; the wall-clock intro sampling; this). The pattern is now
+unmistakable: **when a number surprises you, check the instrument before you change the code.**
 
 ## Left (open)
 
