@@ -820,6 +820,22 @@ const YEAR_LABEL_CLEAR = 20; // label baseline sits this far above the tick
 const DRAW_AHEAD = 0.35;
 /** The spine is top-clipped this far above the top edge, so it never shows a top terminus in frame. */
 const TOP_CLIP = 60;
+/**
+ * ITEM 1c: how far the drawing dissolves at the frame's top, in CSS px.
+ *
+ * `TOP_CLIP` already keeps the spine's TERMINUS out of the viewBox, and that was never the complaint —
+ * the line was being sliced flat by the frame's own top EDGE, which is a different thing and is why
+ * `revealProps` could not fix it ("both terminals sit off-frame and the line runs edge to edge" is
+ * true of the viewBox and false of the screen). This is in px because it is about the SCREEN: a fade
+ * measured in world units would get longer or shorter with the camera's scale, and the reader's eye
+ * does not know what a world unit is.
+ *
+ * 72 rather than a rounder number: the frame's top sits 16px below the header, so the fade has 16px of
+ * clearance to finish in and 56 more to work with before it starts eating the drawing. It is deep
+ * enough that the sliced edge stops reading as an edge, and shallow enough not to ghost the first
+ * plate. This is a look call and it is the one number here Daniel may want to move.
+ */
+const TOP_FADE_PX = 72;
 
 const lineGen = d3line<{ x: number; y: number }>()
   .x((d) => d.x)
@@ -1781,19 +1797,42 @@ export function computePlates(): Array<{
 
 /* ------------------------------- the graphic ------------------------------ */
 
-function useFrameAspect(ref: React.RefObject<HTMLElement>): number {
-  const [aspect, setAspect] = useState(16 / 9);
+/**
+ * The frame's aspect AND its height in CSS px. The height is what item 1b needs: the drawing bleeds
+ * below the frame, and converting that bleed from px into world units needs the frame's real scale
+ * (`viewH / frameH`), which an aspect alone cannot give.
+ */
+function useFrameBox(ref: React.RefObject<HTMLElement>): { aspect: number; h: number; bleed: number } {
+  const [box, setBox] = useState({ aspect: 16 / 9, h: 0, bleed: 0 });
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setAspect(width / height);
+      if (width <= 0 || height <= 0) return;
+      /*
+       * HOW FAR THE DRAWING MUST BLEED TO REACH THE SCREEN — MEASURED, NOT THE NUMBER 136.
+       *
+       * The frame is `flex-1` inside a row that is exactly the viewport below the header, so the paper
+       * between the frame's bottom and the screen's IS that row's bottom padding. Reading it back is
+       * what makes the two one fact: the padding is `calc(var(--header-h) + 3.25rem)`, `--header-h` is
+       * re-measured at runtime by SplashHeader, and `3.25rem` is a lockup value Daniel tuned by eye and
+       * may tune again. **Hardcoding today's 136 would pin a measurement as a law and go quietly wrong
+       * the first time the header changed height** — which is this page's most repeated bug, and
+       * `min-h-[302px]` is the round-10 example of it shipping.
+       *
+       * The parent, not the window: `window.innerHeight - rect.bottom` is the same distance while the
+       * row is STUCK and a different one before and after, so it would make the bleed a function of
+       * scroll. The padding is the same at every scroll position, which is what the bleed has to be.
+       */
+      const row = el.parentElement;
+      const pad = row ? parseFloat(getComputedStyle(row).paddingBottom) || 0 : 0;
+      setBox({ aspect: width / height, h: height, bleed: pad });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
-  return aspect;
+  return box;
 }
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
@@ -1809,7 +1848,7 @@ export function CrossPathsTimeline({
   const trackRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [p, setP] = useState(0); // 0 to 1, the SMOOTHED camera progress
-  const aspect = useFrameAspect(frameRef);
+  const { aspect, h: frameH, bleed: BLEED_PX } = useFrameBox(frameRef);
   // Page-centre expressed in the frame's viewBox-x (see the descD comment). The frame sits in the
   // right column, so its axis (CX=600) is NOT the page centre; this measures the gap so the finale's
   // descending line can exit exactly above the founders' node below.
@@ -2022,7 +2061,38 @@ export function CrossPathsTimeline({
   // mid-event with the twigs, which is "both of those emissions should match each other" holding.
   const cardLineY = reduced ? H : cardLineAt(camY, viewH, UNFURL_SPAN, stagger);
 
-  const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH}`;
+  /**
+   * ITEM 1b: THE LINE GROWS IN FROM BELOW THE SCREEN, AND THE CAMERA DOES NOT MOVE TO ALLOW IT.
+   *
+   * Daniel: "Make sure our timeline is rendered flushed with the bottom of the screen (currently not)
+   * so it creates continuity." Measured before: the SVG's rect is top 100, **bottom 764 in a 900px
+   * viewport** — the line stops 136px above the screen and shows a terminus, which is the "abrupt
+   * stop". Reproduced identically at 1280/1440/1728, because the gap is not a rounding error:
+   *
+   * **THE 136px IS THE HERO LOCKUP'S LIFT.** It is `lg:pb-[calc(var(--header-h)+3.25rem)]` on the row,
+   * and it exists so the words come to rest 18px proud of the screen's centre — a position Daniel
+   * called "perfectly aligned", which makes it a FIXED POINT, not a leftover. `qa/hero-lockup.mjs`
+   * drives a real scroll to the pin and pins both halves. So "just remove the bottom padding" trades
+   * one of his rulings for another, and "make the frame taller" re-frames the camera (`viewH` is the
+   * camera's window; `pinCamY = MARK_CENTER_Y - viewH/2`), which moves the mark out of that lockup.
+   * **Both were correctly refused. The way out is that neither is necessary.**
+   *
+   * THE FRAME WAS DOING TWO JOBS — the same shape as `MARK_K` setting the mark's size, and it hid for
+   * the same reason. The frame box is (1) the CAMERA's window, which decides `viewH`, `pinCamY` and so
+   * the mark's place in the lockup, and (2) the CLIP region, which decides where the ink stops. Only
+   * the first is load-bearing. So the camera keeps its frame, and the CANVAS bleeds past it: the SVG
+   * element grows `BLEED` px downward on a negative margin (taking no layout space, so nothing above
+   * it moves), and the viewBox grows by the SAME distance converted to world units.
+   *
+   * WHY THE SCALE AND THE MARK CANNOT MOVE, which is the whole reason this is safe: the element and
+   * the viewBox grow by the same physical distance, so `worldPerPx` is unchanged —
+   * `(viewH + bleedWorld) / (frameH + BLEED)` = `viewH / frameH` by construction. The viewBox's TOP
+   * edge is still `camY` at the element's top, so every world point renders at the pixel it already
+   * did. **`viewH`, `pinCamY`, the camera and the lockup are all untouched: strictly more drawing is
+   * visible below, and nothing that was visible moved.**
+   */
+  const bleedWorld = frameH > 0 ? BLEED_PX * (viewH / frameH) : 0;
+  const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH + bleedWorld}`;
 
   /** The middle-segment reveal for the spine: draw only from the top clip to the draw-ahead front,
    *  so both terminals sit off-frame and the line runs edge to edge.
@@ -2186,11 +2256,51 @@ export function CrossPathsTimeline({
           </dl>
         </div>
 
-        <div ref={frameRef} className="min-h-0 min-w-0 flex-1">
+        {/* THE CAMERA'S WINDOW, and since item 1b it is NO LONGER THE SVG ELEMENT'S BOX — which is why
+            it needs a handle of its own. This div is what `viewH` and `pinCamY` are computed from, so
+            its centre is where the mark comes to rest at the pin; the <svg> inside it now bleeds
+            `BLEED_PX` further down (item 1b), so the ELEMENT's centre sits BLEED_PX/2 = 68px below the
+            camera's. Measured at 1440x900: this box is 100..764 (centre 432, where the mark and the
+            words both are), the svg element is 100..900 (centre 500, where nothing is).
+
+            `qa/hero-lockup.mjs` guards the pin by asserting the mark sits on "the frame's centre" and
+            reads that off the <svg>, so it must read this instead or it measures a box the camera does
+            not use. NAMED `-viewport`, NOT `-frame`: `data-timeline-frame` is ALREADY TAKEN by the
+            sticky row above (the founders' parenthesis needs the row's bottom edge), and
+            `querySelector` returns the FIRST match — the same near-miss `data-timeline-camera` records.
+            Grepped before claiming it. */}
+        <div ref={frameRef} data-timeline-viewport className="min-h-0 min-w-0 flex-1">
           <svg
             viewBox={viewBox}
             preserveAspectRatio="xMidYMid meet"
-            className="h-full w-full"
+            className="w-full"
+            style={
+              reduced
+                ? undefined
+                : {
+                    /* ITEM 1b + 1c — the drawing's two ends, and they are DELIBERATELY ASYMMETRIC.
+                       Daniel wants the bottom to come out of the screen and the top to dissolve.
+
+                       THE BLEED (1b): the canvas grows past the camera's frame on a NEGATIVE MARGIN,
+                       so it takes no layout space and nothing above it moves — the hero lockup, which
+                       is the thing this padding exists for, never hears about it. Paired with the
+                       viewBox's matching growth (see `bleedWorld`), the scale is identical and the
+                       line simply keeps going, through the bottom of the screen, with no terminus in
+                       frame. `DRAW_AHEAD` (0.35 of viewH) already draws well past this, so the reveal
+                       front is never what the viewer sees down there. */
+                    height: `calc(100% + ${BLEED_PX}px)`,
+                    marginBottom: -BLEED_PX,
+                    /* THE TOP FADE (1c): the line dissolves rather than showing a cut end, and it is
+                       finished well before the header. Daniel: the top should fade, not cut, and stay
+                       clear of the header. `TOP_CLIP` already puts the terminus off-frame — but "off
+                       the viewBox" is not "off the screen" (the frame is inset 100px), so what he sees
+                       is the line being sliced flat by the frame's own edge. A mask cannot be undone
+                       by the frame being inset: it is measured from the element's own top, which IS
+                       where the slice was happening. */
+                    maskImage: `linear-gradient(to bottom, transparent 0, black ${TOP_FADE_PX}px)`,
+                    WebkitMaskImage: `linear-gradient(to bottom, transparent 0, black ${TOP_FADE_PX}px)`,
+                  }
+            }
             /* THE CAMERA'S ONLY HANDLE. `viewBox`'s y IS camY, so this element is the one place the
                camera's ACTUAL position is observable from outside React — which is what
                qa/growth-timing.mjs must wait on. It cannot wait on `scrollY`: scrollY lands instantly
