@@ -39,6 +39,7 @@ import { SplashHeader } from './splash/SplashHeader';
 import { DrawStage, type Tool } from './draw/DrawStage';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
+import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
 import { Folly } from '../scene/Folly';
 import { webglSupported } from '../ui/webgl';
 import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
@@ -323,13 +324,24 @@ export function DrawPage() {
                 </div>
 
                 <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
-                  <p className="font-serif text-[26px] leading-none">
-                    £{outputs.price.fixedTotalGBP.toLocaleString()}
-                  </p>
+                  {/* The qualifier rides the figure's own baseline rather than
+                      sitting under it: it costs no extra line, and nobody reads
+                      the number without reading what kind of number it is. */}
+                  <div className="flex items-baseline gap-2.5">
+                    <p className="font-serif text-[26px] leading-none">
+                      £{outputs.price.fixedTotalGBP.toLocaleString()}
+                    </p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
+                      {PRICE_QUALIFIER}
+                    </p>
+                  </div>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
-                    fixed · {outputs.geometry.params.footprintM2.toFixed(1)} m² ·{' '}
-                    {outputs.geometry.feetCount} feet · {outputs.geometry.pieces.length} pieces ·{' '}
-                    {outputs.geometry.nodes.length} nodes
+                    {priceMetaLine({
+                      footprintM2: outputs.geometry.params.footprintM2,
+                      feetCount: outputs.geometry.feetCount,
+                      pieceCount: outputs.geometry.pieces.length,
+                      nodeCount: outputs.geometry.nodes.length,
+                    })}
                   </p>
                 </div>
               </>

@@ -2,17 +2,20 @@
 
 Session 3b. Scope was deliberately narrow: **make the existing flow filmable, do not
 touch the engine.** The pointer-scheme rework (session-3 task 1) stays deferred and
-untouched.
+untouched. Lift and excavate are out of the filmed shot, so their known bugs were left
+alone deliberately.
 
 **Branch `engine-draw`**, worktree `restless-egg/engine-session`, off `main`.
 **Nothing pushed. `main` untouched.**
 
 Gates, all green:
-**`npx tsc --noEmit` = 0 · `npx vitest run` = 409/409 · `npm run build` clean.**
-(Baseline was 387 at session start; +22, none deleted.)
+**`npx tsc --noEmit` = 0 · `npx vitest run` = 416/416 · `npm run build` clean.**
+(Baseline was 387 at session start; +29, none deleted.)
 
 ## What
 
+0. **The price panel stopped calling the number "fixed".** Daniel's call, 2026-07-17. It
+   now reads `£17,000  INDICATIVE · PRE-QUOTE` over the unchanged BOM line. See below.
 1. **Zoom-to-fit framing** (`src/pages/draw/framing.ts`, `CinematicCamera.tsx`). The camera
    glides to a distance that fills the frame when the canopy appears, again on bake, and
    back to the opening pose on "start over" so takes are repeatable. Smoothstep over 1.6 s;
@@ -25,6 +28,37 @@ Gates, all green:
 4. **Caption bug** fixed: the draw tool's hint was the OPENING instruction, so with two
    lines drawn and a canopy standing the caption read "drag a line across the lawn". Now
    "another line grows it".
+
+## Why the price label changed (task 0)
+
+The panel read `£17,000` over `FIXED · 14.3 M² · 4 FEET · 194 PIECES · 108 NODES`.
+"Fixed" is a claim of certainty, and the number cannot support it: `pricing.ts` builds the
+figure line-by-line off the real BOM, so it MOVES correctly, but its own header carries the
+loudest TODO in the demo, that **every unit rate in PRICING is a PLACEHOLDER until fab
+quotes land**. The quotes never arrived. Meanwhile the deck says ~£100k. So the one word on
+camera asserting exactness was the least defensible thing in the frame.
+
+Now: `£17,000  INDICATIVE · PRE-QUOTE`, with the qualifier riding the figure's own baseline
+rather than sitting under it, so it costs no extra line and nobody reads the number without
+reading what kind of number it is. The BOM line below is untouched, because **the
+decomposition is the credible part**: 194 pieces and 108 nodes are counted off the actual
+kit and are true right now. It is the MAGNITUDE that is pre-quote, not the object.
+
+**The figure did not move: £17,000 before, £17,000 after, from the identical drawing.** No
+rate in `data/config.ts` was touched and `engine/pricing.ts` was not touched. Moving a rate
+to make the figure look more like the deck would be reverse-engineering evidence to fit a
+marketing claim, and is explicitly forbidden.
+
+The copy lives in `src/pages/draw/priceCopy.ts` rather than inline in the JSX for one
+reason: this suite runs in a bare node environment with no DOM (`vitest.config.ts`), so
+copy inside `DrawPage` (which pulls in R3F) is untestable. One import buys 7 tests pinning
+the sentence that carries the honesty claim, including a guard against a later edit
+reaching for "guaranteed" / "final" / "quoted".
+
+**Residual, for Daniel, not actionable by me:** the label makes the panel honest, but it
+does not close the ~6x gap between £17,000 on camera and the ~£75-150k installed in the
+deck. Anyone who has read the deck and then watches the film will notice. That is a
+pricing/messaging question, not a HUD question.
 
 ## Why the framing is the shape it is (three wrong answers, each caught by measurement)
 
@@ -74,6 +108,13 @@ frame, camera-independent. Fractions are of the canvas.
   clicked a panel, not the object.)
 - **Full revolution, 14 frames over 28 s:** headroom 0.089–0.096, footroom 0.047–0.222,
   never clipped at any azimuth.
+- **Price panel:** reads `£17,000  INDICATIVE · PRE-QUOTE` on one baseline (verified
+  `sameLine: true` by comparing the two elements' bounding rects), over the unchanged BOM
+  line `14.3 M² · 4 FEET · 194 PIECES · 108 NODES`. The word "fixed" no longer appears
+  anywhere in the rendered page (`/\bfixed\b/i` over `document.body.innerText` = false).
+  The panel got slightly NARROWER, since the BOM line lost its `FIXED · ` prefix: no
+  height or width cost. Before/after crops taken at identical coordinates from the
+  identical drawing.
 - **Caption at 2 lines with the canopy up:** now "another line grows it" (was "drag a line
   across the lawn").
 - **Dashes:** zero em/en dashes in any nudge the engine can emit, pinned by a test that
@@ -96,6 +137,8 @@ been lived with during a long sculpting session. Lift/excavate deliberately do N
 
 ## Files
 
+- `src/pages/draw/priceCopy.ts` + `priceCopy.test.ts` — NEW. The price qualifier and the
+  BOM line, extracted so a DOM-less suite can pin them. 7 tests.
 - `src/pages/draw/framing.ts` — NEW. Pure fit math: `fitDistanceM`, `fitCamera`,
   `surfaceSamples`. No THREE, no React, so it is tested by numbers not screenshots.
 - `src/pages/draw/framing.test.ts` — NEW. 20 tests, incl. an independent re-projection
@@ -104,7 +147,8 @@ been lived with during a long sculpting session. Lift/excavate deliberately do N
 - `src/pages/draw/CinematicCamera.tsx` — NEW. Tween + turntable. Not `autoRotate`: drei
   calls `update()` without a delta, making autoRotate refresh-rate dependent (26 s at
   60 Hz becomes 13 s at 120 Hz), and a filmed shot needs real seconds.
-- `src/pages/DrawPage.tsx` — framing state/effects, damping, `onStart`, caption fix.
+- `src/pages/DrawPage.tsx` — framing state/effects, damping, `onStart`, caption fix, price
+  panel qualifier.
 - `src/engine/fromDrawing.ts` — four nudge strings de-dashed.
 - `src/engine/fromDrawing.test.ts` — +2: the dash rule, and a coverage guard so the dash
   test cannot pass over prose it never read.
@@ -122,3 +166,9 @@ been lived with during a long sculpting session. Lift/excavate deliberately do N
   let the other state's caption count as object and reported 3% headroom for a 2 m arch.
 - **Use percentiles, not min/max, for a bbox.** A few stray pixels on a chip edge defined
   the whole box.
+- **Backticks inside a double-quoted bash string are evaluated by BASH, not passed
+  through.** Editing this very file via `python -c "..."` from bash silently deleted every
+  `code span` in the replacement text (bash ran them as commands and substituted the empty
+  output), and it committed that way. The "command not found" spam was the only tell, and
+  it is easy to read as harmless noise. Use the Edit/Write tools for prose containing
+  backticks, or a quoted heredoc.
