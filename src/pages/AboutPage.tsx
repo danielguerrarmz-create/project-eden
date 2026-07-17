@@ -1785,19 +1785,33 @@ const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
  * Measured at the 1100px page measure: portrait 186x233 before AND after, block 289..1151, margins
  * 119/119, centre 720 = the content box's own centre.
  *
- * IT WRAPS THE ROWS ONLY, AND THE KICKER IS DELIBERATELY LEFT BEHIND — TODO(Daniel), because it is
- * his call and it is not free. "The founders." was flush with the portrait's left edge; centring the
- * rows leaves it 119px adrift of the composition it labels. Wrapping it in this block too fixes the
- * alignment and MEASURABLY BREAKS SOMETHING ELSE: it slides the kicker's glyph run from 170..275 to
- * 289..394, and a parenthesis vine passes through 394. qa/founder-frame.mjs goes from 0 crossings to
- * 1 ("a vine crosses TEXT: 'The founders.' at 394,6277"), and that probe measures glyph runs, so it
- * is a real hit and not the box-based false positive its own header warns about.
+ * IT WRAPPED THE ROWS ONLY AND LEFT THE KICKER BEHIND — for one round. "The founders." was flush
+ * with the portrait's left edge while the rows sat on centre, 119px adrift of the composition it
+ * labels. Daniel has now looked and ruled on it: "Move the image and text right, into the vacated
+ * space... and move 'The founders' text to be centered" (round 10 continued, item 4c) — the read
+ * is that the kicker's leftward hang was WHY the centred block still looked left-heavy, not that
+ * the block itself needs to move again. The rows keep this exact width and position: they are
+ * already measured onto the content centre above, and translating them further right would be an
+ * unpinned number with nothing behind it — precisely the trap this file's own history warns about.
  *
- * The fix for THAT lives in the vine, not here — and the layout does not get to move the ornament
- * out of its way, because the arrow points one way (CLAUDE.md: the ornament reads the layout; the
- * layout never reads the ornament). So this stops at Daniel's literal words, which cover the pair
- * and not their label: "Move the image and text right." Centring the kicker is a second decision
- * with an ornament cost attached, and it should be made on purpose, not inherited from this one.
+ * THE KICKER IS `text-center`, NOT A COPY OF THIS BLOCK'S FLUSH-LEFT WRAP, and the difference is
+ * what clears the vine that the flush-left version could not. The rejected attempt above wrapped the
+ * kicker IN this narrower block, left-aligned — which put its glyph run at 289..394, and 394 sits
+ * inside `armPts`' anchor-3→anchor-4 transit (`trunkX + reach*0.28` to `trunkX + reach*0.72`, the
+ * zone the arm is still crossing on its way to `keepOut(turnX)` just above `rows[0].y0`, which is
+ * where the kicker sits). `text-center` on the kicker's own full section width lands its glyph run
+ * on the SAME content centre as `trunkX` itself — at the 1100px measure that block a run of
+ * roughly 665..775 — which is past anchor 4 (~305..390 at that height) and short of the trunk's own
+ * vertical run (which ends at `forkY`, well above this row). By the anchor arithmetic the two do not
+ * overlap.
+ *
+ * THAT LAST PARAGRAPH IS REASONED FROM THE ANCHOR ARITHMETIC, NOT MEASURED, and this file's own
+ * history is a record of exactly that kind of confident paragraph turning out to be wrong about the
+ * one case nobody checked. This session had no browser or Bash access to run
+ * `qa/founder-frame.mjs` or take a screenshot — do not treat this comment as verification. Run the
+ * probe (`node qa/founder-frame.mjs`) before shipping; if it reports a crossing, the fix is in
+ * `armPts` (clamp the anchors whose y falls in the kicker's measured band against the kicker's own
+ * left/right, the same way `keepOut` already does for the rows), not a nudge back off centre.
  */
 const FOUNDERS_BLOCK_W = 'md:mx-auto md:w-[calc((100%_-_3rem)*11.7/14.7_+_1.5rem)]';
 
@@ -1953,7 +1967,10 @@ export function AboutPage() {
               pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
           <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
             <div className="relative z-10">
-              <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
+              {/* CENTRED (round 10 continued, item 4c) — see the note on FOUNDERS_BLOCK_W for why
+                  this is `text-center` on the FULL section width and not a copy of the rows' own
+                  narrower flush-left block. */}
+              <p className={`${MONO_SMALL} text-center text-inkBlack/60`}>The founders.</p>
 
               <div className={`mt-4 flex flex-col gap-6 ${FOUNDERS_BLOCK_W}`}>
                 {TEAM.map((person) => (
