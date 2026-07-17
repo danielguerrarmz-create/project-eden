@@ -16,8 +16,8 @@
  * questions from the drawing instead of from the grammar.
  */
 import {
+  fairedRadius,
   footprintHull,
-  hullRadiusAtM,
   isHole,
   planCentre,
   surfaceHeight,
@@ -25,6 +25,10 @@ import {
 } from './surface';
 import { bearingDeg } from './fromDrawing';
 import type { ShapeField } from './geometry';
+
+// The faired plan lives in surface.ts now — the SOFT surface is built on the
+// same plan, and skin, preview mesh and baked net must agree on the boundary.
+export { fairedRadius };
 
 /**
  * Build the ShapeField for a drawing.
@@ -35,44 +39,6 @@ import type { ShapeField } from './geometry';
  * root its feet in the right pattern in the wrong place, which is the sort of
  * bug that looks like "the engine ignored me" all over again.
  */
-/**
- * Angular half-width used to FAIR the plan. See below for why this exists.
- */
-const FAIRING_RAD = 0.42;
-const FAIRING_TAPS = 9;
-
-/**
- * The plan radius, faired.
- *
- * The raw hull is a polygon, and a polar net laid straight onto a polygon is
- * unbuildable at the corners: the radius jumps between adjacent spokes, so bays
- * next to a vertex collapse to centimetres. Those members come out SHORTER THAN
- * THEIR OWN END CUTS — the first version of this produced a piece of length
- * -0.20 m, which is the engine cheerfully quoting for a strut that cannot exist.
- *
- * So the plan is smoothed with a cosine kernel over bearing. The feet stay put
- * (a foot's own bearing still returns its own distance, near enough) but the
- * boundary between them becomes a fair curve instead of a chord with a kink.
- * That is both the buildable answer and the honest one: an Eden's plan is a
- * fair closed curve, not a polygon, and pretending otherwise would ship a
- * cut list nobody can cut.
- */
-export function fairedRadius(hull: ReturnType<typeof footprintHull>, centre: { x: number; y: number }) {
-  return (bearingRad: number): number => {
-    let sum = 0;
-    let wsum = 0;
-    for (let k = -FAIRING_TAPS; k <= FAIRING_TAPS; k++) {
-      const t = (k / FAIRING_TAPS) * FAIRING_RAD;
-      const w = 0.5 * (1 + Math.cos((Math.PI * k) / (FAIRING_TAPS + 1)));
-      const r = hullRadiusAtM(hull, centre, bearingRad + t);
-      if (r > 0) {
-        sum += w * r;
-        wsum += w;
-      }
-    }
-    return wsum > 0 ? sum / wsum : 0;
-  };
-}
 
 export function shapeFromDrawing(input: SurfaceInput): ShapeField {
   const { arcs } = input;

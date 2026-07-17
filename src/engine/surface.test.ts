@@ -9,10 +9,23 @@ import {
   surfacePeakM,
   arcRiseM,
   arcReachM,
+  fairedRadius,
+  footprintHull,
+  planCentre,
   type SurfaceInput,
 } from './surface';
 import { GRAMMAR } from '../data/config';
 import { convexHull, polygonAreaM2, type Spine } from './fromDrawing';
+
+/** Boundary-ish point at a bearing: fraction f of the faired plan radius. */
+function atBearing(arcs: Spine[], bearingRad: number, f: number) {
+  const centre = planCentre(arcs);
+  const R = fairedRadius(footprintHull(arcs), centre)(bearingRad);
+  return {
+    x: centre.x + f * R * Math.sin(bearingRad),
+    y: centre.y + f * R * Math.cos(bearingRad),
+  };
+}
 
 const arcEW: Spine = { a: { x: -2, y: 0 }, b: { x: 2, y: 0 } };
 const arcNS: Spine = { a: { x: 0, y: -2 }, b: { x: 0, y: 2 } };
@@ -61,11 +74,26 @@ describe('tentHeight: one arc is a tent over its chord', () => {
       expect(h).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('nearestOnArc reports the ribbon height itself on the chord — one curve, two callers', () => {
+    // The drawn ribbon (DrawStage.archPoints) and this must be one function,
+    // or the line you drew floats off the arch it became.
+    for (const x of [-1.2, 0, 1.4]) {
+      const p = { x, y: 0 };
+      const { ribHeight, distM } = nearestOnArc(arcEW, p);
+      expect(distM).toBeCloseTo(0, 6);
+      expect(tentHeight(arcEW, p)).toBeCloseTo(ribHeight, 6);
+    }
+  });
 });
 
-describe('surfaceHeight: a skin stretched OVER the ribs', () => {
+describe("surfaceHeight: the ENGINE'S canopy over the plan your lines claim", () => {
+  // Feet at (±2,0) and (0,±2): bearings 90/270/0/180. Both spans are 4, so the
+  // drawn rise is arcRiseM(4) ≈ 1.68 — below headroom, so the canopy crowns at
+  // GRAMMAR.minHeadroomM. The same holding readDrawing applies to riseM.
   const two: SurfaceInput = { arcs: [arcEW, arcNS], edits: [] };
   const one: SurfaceInput = { arcs: [arcEW], edits: [] };
+  const H = Math.max(GRAMMAR.minHeadroomM, arcRiseM(4));
 
   it('ONE line encloses no plan, so there is no surface yet — a rib is not a vault', () => {
     // Deliberate: the first stroke gives you an arch and nothing else. The
@@ -75,38 +103,49 @@ describe('surfaceHeight: a skin stretched OVER the ribs', () => {
     expect(surfaceHeight(one, { x: 0, y: 0 })).toBe(0);
   });
 
-  it('PASSES THROUGH the rib — the line you drew is still on the surface', () => {
-    // The whole reason this isn't a p-norm blend of tents: that buried the
-    // drawn arcs inside a mound. On a rib, the skin must BE the rib.
-    // Sampled along the EW rib, inside the hull and clear of the eave easing.
-    for (const x of [-0.8, 0, 0.8]) {
-      const p = { x, y: 0 };
-      const { ribHeight } = nearestOnArc(arcEW, p);
-      expect(surfaceHeight(two, p)).toBeCloseTo(ribHeight, 1);
-    }
+  it('CROWNS at the height the tallest line implies, held to headroom', () => {
+    // The arcs are the gesture: the longest line says how high. At the crown
+    // the cap profile is 1 and no foot reaches, so the height IS the crown.
+    expect(surfaceHeight(two, { x: 0, y: 0 })).toBeCloseTo(H, 6);
   });
 
-  it('still passes through each rib when several cross', () => {
-    // On the EW rib, away from the crossing: the skin follows THAT rib to
-    // within a centimetre. Not exactly — a taller neighbouring rib tensions
-    // the skin a hair above this one, which is what a stretched skin does —
-    // but nowhere near enough to lift the drawn line off its own surface.
-    const p = { x: 1.5, y: 0 };
-    const { ribHeight } = nearestOnArc(arcEW, p);
-    expect(surfaceHeight(two, p)).toBeCloseTo(ribHeight, 2);
+  it('the EAVE stays up between the legs — open sides, not tent walls', () => {
+    // The whole reason the ribs-are-the-surface model died: a rib is at zero
+    // near its own foot, so interpolating ribs dove the WHOLE boundary to the
+    // lawn and the thing read as a tent. The canopy's free edge holds the
+    // eave height between feet and dives only at them.
+    const p = atBearing(two.arcs, Math.PI / 4, 0.995); // midway between feet
+    expect(surfaceHeight(two, p)).toBeGreaterThan(0.5 * H);
   });
 
-  it('never balloons above the tallest rib — a skin does not levitate', () => {
-    const peak = surfacePeakM(two);
-    expect(peak).toBeLessThanOrEqual(arcRiseM(4) + 1e-6);
+  it('DIVES to the lawn at a drawn foot — the legs still root where you drew', () => {
+    const footBearing = Math.PI / 2; // the foot at (2, 0)
+    const p = atBearing(two.arcs, footBearing, 0.99);
+    expect(surfaceHeight(two, p)).toBeLessThan(0.25);
   });
 
-  it('SAGS between ribs rather than creasing or spiking', () => {
-    // Midway between the two ribs, off both: below the ribs, above the ground.
+  it('the eave LIFTS toward the opening the legs leave over', () => {
+    // Four symmetric feet leave four equal gaps; apertureFromFeet picks the
+    // first (mid-bearing 45°). Same r, feet equally far in bearing from both
+    // samples — only the aperture lift distinguishes them.
+    const towardOpening = surfaceHeight(two, atBearing(two.arcs, Math.PI / 4, 0.9));
+    const awayFromIt = surfaceHeight(two, atBearing(two.arcs, Math.PI / 4 + Math.PI, 0.9));
+    expect(towardOpening).toBeGreaterThan(awayFromIt);
+  });
+
+  it('the boundary is the FAIRED plan — the same one the preview and the bake use', () => {
+    // A hair inside the faired radius is eave; a hair outside is lawn. If the
+    // skin used a different plan than the net, they would disagree at exactly
+    // the place people look.
+    expect(surfaceHeight(two, atBearing(two.arcs, Math.PI / 4, 0.99))).toBeGreaterThan(0.5);
+    expect(surfaceHeight(two, atBearing(two.arcs, Math.PI / 4, 1.01))).toBe(0);
+  });
+
+  it('SAGS from crown to eave — between them it is below the crown, above the lawn', () => {
     const p = { x: 0.9, y: 0.9 };
     const h = surfaceHeight(two, p);
     expect(h).toBeGreaterThan(0);
-    expect(h).toBeLessThan(arcRiseM(4));
+    expect(h).toBeLessThan(H);
   });
 
   it('a second line GROWS the thing rather than parking another object', () => {
@@ -236,9 +275,10 @@ describe('bounds / area / peak', () => {
     expect(surfaceAreaM2({ arcs: [], edits: [] })).toBe(0);
   });
 
-  it('peak matches the blended crown and respects the cap', () => {
+  it('peak matches the crown the tallest line implies and respects the cap', () => {
     const peak = surfacePeakM(two);
-    expect(peak).toBeGreaterThan(arcRiseM(4) * 0.9);
+    const H = Math.max(GRAMMAR.minHeadroomM, arcRiseM(4));
+    expect(peak).toBeGreaterThan(H * 0.95);
     expect(peak).toBeLessThanOrEqual(GRAMMAR.pdHeightCapM + 1e-9);
   });
 });

@@ -20,12 +20,14 @@
  * Everything the grammar decides is said out loud, because an engine that
  * silently snaps your line to its bounds is a slider wearing a costume.
  *
- * DEMO SCOPE, stated rather than implied: bake runs the surface's footprint and
- * the arcs' bearings through the REAL engine (generateGeometry -> nesting ->
- * pricing), but generateGeometry still roots on its own grammar-derived feet
- * rather than the exact bearings you drew, and the lattice does not yet follow
- * your lifts and holes. That is the next engine step and it is the honest gap.
- * NOT faked: the surface, the sculpt, and every number the bake reports.
+ * THE MODEL (settled 2026-07-16): the arcs are the GESTURE, not the ribs. Your
+ * lines answer where it lands, how much ground it claims and how high it goes;
+ * the engine raises its own canopy over that plan with the rules the built
+ * thing obeys — eave up between the legs, diving only at the feet. Bake runs
+ * the drawing through the REAL engine (generateGeometry -> nesting -> pricing)
+ * with a ShapeField, so the lattice roots at your bearings, fills your plan,
+ * lies on the sculpted surface and loses members to your holes. NOT faked:
+ * the surface, the sculpt, and every number the bake reports.
  *
  * The site step is parked (engine/site.ts + draw/SiteMap.tsx still exist, and
  * still have their tests) — scaffold to come back to.

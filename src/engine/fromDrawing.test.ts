@@ -10,6 +10,7 @@ import {
 } from './fromDrawing';
 import { ENVELOPE } from '../data/config';
 import { generateGeometry } from './geometry';
+import { shapeFromDrawing } from './shapeFromDrawing';
 
 /** A rough square blob of a given side, centred on the origin. */
 const blob = (side: number) => [
@@ -136,35 +137,31 @@ describe('readDrawing: dumb linework -> buildable params', () => {
     expect(r.nudges.some((n) => n.kind === 'held' && /planning/.test(n.text))).toBe(true);
   });
 
-  it('flags too many ground contacts against what the grammar will root', () => {
-    const r = readDrawing({
-      ...twoSpines,
-      spines: [
-        { a: { x: -2, y: 0 }, b: { x: 2, y: 0 } },
-        { a: { x: 0, y: -2 }, b: { x: 0, y: 2 } },
-        { a: { x: -1, y: -1 }, b: { x: 1, y: 1 } },
-      ],
-    });
+  it('OFFERS the grammar-count opinion on extra contacts without applying it', () => {
+    const spines = [
+      { a: { x: -2, y: 0 }, b: { x: 2, y: 0 } },
+      { a: { x: 0, y: -2 }, b: { x: 0, y: 2 } },
+      { a: { x: -1, y: -1 }, b: { x: 1, y: 1 } },
+    ];
+    const r = readDrawing({ ...twoSpines, spines });
     expect(r.footBearingsDeg).toHaveLength(6);
-    expect(r.nudges.some((n) => n.kind === 'held' && /roots on/.test(n.text))).toBe(true);
+    // The drawn path roots what you drew; the grammar's view is advice only.
+    expect(r.nudges.some((n) => n.kind === 'offered' && /usually stands on/.test(n.text))).toBe(true);
+    const g = generateGeometry(r.params, shapeFromDrawing({ arcs: spines, edits: [] }));
+    expect(g.feetCount).toBe(6);
   });
 
   it('NEVER contradicts the readout beside it: the feet it names are the feet it roots', () => {
-    // "4 ground contacts" printed next to a 3-footed structure reads as a bug.
-    // Whatever the nudge claims must be what generateGeometry actually does.
+    // "rooted 4" printed next to a 6-footed structure reads as a bug. The
+    // engine roots the DRAWN bearings, so the nudge must count those.
     for (const outline of [blob(3.6), blob(4), blob(4.6)]) {
       const r = readDrawing({ ...twoSpines, outline });
-      const g = generateGeometry(r.params);
-      expect(r.engineFeetCount).toBe(g.feetCount);
+      const g = generateGeometry(r.params, shapeFromDrawing({ arcs: twoSpines.spines, edits: [] }));
+      expect(g.feetCount).toBe(r.footBearingsDeg.length);
 
-      const claim = r.nudges.find((n) => /ground contacts|roots on/.test(n.text))!;
-      if (r.engineFeetCount !== r.footBearingsDeg.length) {
-        // It must own the difference, not paper over it.
-        expect(claim.kind).toBe('held');
-        expect(claim.text).toContain(`roots on ${g.feetCount}`);
-      } else {
-        expect(claim.kind).toBe('read');
-      }
+      const claim = r.nudges.find((n) => /ground contacts/.test(n.text))!;
+      expect(claim.kind).toBe('read');
+      expect(claim.text).toContain(`${g.feetCount} ground contacts`);
     }
   });
 

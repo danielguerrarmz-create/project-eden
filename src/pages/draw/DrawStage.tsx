@@ -190,11 +190,14 @@ export function DrawStage({
         </group>
       )}
 
-      {/* The arcs you drew, riding on the surface. */}
+      {/* The arcs you drew. Full-weight while they are the only thing standing;
+          once the canopy rises from them they GHOST — the arcs are the gesture,
+          not the ribs, and a solid ribbon buried in the skin pokes through it
+          in random tips and reads as debris. */}
       {!resolved &&
         arcs.map((s, i) => (
           <group key={i}>
-            <ArchRibbon a={s.a} b={s.b} />
+            <ArchRibbon a={s.a} b={s.b} ghost={arcs.length >= 2} />
             {[s.a, s.b].map((p, j) => (
               <mesh key={j} position={[p.x, 0.02, p.y]} rotation={[-Math.PI / 2, 0, 0]}>
                 <circleGeometry args={[0.14, 20]} />

@@ -5,28 +5,46 @@
  * gridshell, which meant the interesting part — making — lasted about four
  * seconds. Baking is the LAST move, not the second. Between the first line and
  * the cut list there has to be something you can keep working: a surface that
- * appears from the lines, swells between them, and takes more lines, lifts and
- * holes without ever once asking for a number.
+ * appears from the lines and takes more lines, lifts and holes without ever
+ * once asking for a number.
  *
- * THE MODEL. Every arc is a tent over its own chord: height follows the arch
- * along the chord and falls off to either side. The surface is those tents
- * BLENDED, not unioned — a p-norm (not a max) so that where two arcs are near
- * each other the surface swells above both instead of creasing along the seam.
- * That swell is the whole point: it is what makes two lines read as one vault
- * rather than two ribs, and it is why you can draw a third line and watch the
- * thing grow toward it.
+ * THE MODEL: the arcs are the GESTURE, not the ribs. Your lines answer the
+ * questions only you can answer — where it lands (the feet), how much ground
+ * it claims (the plan), how high it goes (the tallest line). The engine then
+ * raises ITS OWN canopy over that plan, with the same rules the built thing
+ * obeys (geometry.ts): the eave stays UP between the legs and lifts toward
+ * the opening; the surface dives to the lawn only AT the feet. One rule, two
+ * resolutions — the soft skin and the baked lattice are the same surface, so
+ * bake is a resolution rather than a jump-cut.
  *
- * Then edits, in the same language: a LIFT is a smooth bump added to the field,
- * a HOLE is a region removed from it. Both are 2D gestures — a point and a
- * radius — evaluated over a 3D surface. That hybrid is deliberate: people can
- * reason about "here, this big" on a picture, and cannot reason about a
- * trivariate control lattice.
+ * An earlier model treated the drawn arcs as literal ribs and interpolated
+ * them (Shepard). It was faithful and it was wrong: a rib is at zero near its
+ * own foot, and the hull edges run BETWEEN feet, so the boundary dove to the
+ * lawn all the way round and the thing read as a tent with steep walls. It
+ * threw away the eave and the open sides — the two things that make an Eden
+ * an Eden — and only a render caught it.
  *
- * Everything here is a pure height field over the plan: f(x,y) -> height, plus
- * a mask. No three.js, no React. The mesh is somebody else's problem.
+ * Then edits, in the same language: a LIFT is a smooth bump added to the
+ * field, a HOLE is a region removed from it. Both are 2D gestures — a point
+ * and a radius — evaluated over a 3D surface. That hybrid is deliberate:
+ * people can reason about "here, this big" on a picture, and cannot reason
+ * about a trivariate control lattice.
+ *
+ * Everything here is a pure height field over the plan: f(x,y) -> height,
+ * plus a mask. No three.js, no React. The mesh is somebody else's problem.
  */
 import { GRAMMAR } from '../data/config';
-import { convexHull, type Pt, type Spine } from './fromDrawing';
+import {
+  apertureFromFeet,
+  arcRiseM,
+  bearingDeg,
+  convexHull,
+  type Pt,
+  type Spine,
+} from './fromDrawing';
+import { capProfile, eaveHeightAtM, footPullAt } from './geometry';
+
+export { arcRiseM };
 
 /** One sculpt edit. Both are "a place and a size" — nothing to type. */
 export interface Edit {
@@ -42,14 +60,9 @@ export interface SurfaceInput {
   edits: Edit[];
 }
 
-/** Rise of a drawn arc — shared with the drawn ribbon so they agree exactly. */
-export function arcRiseM(span: number): number {
-  return Math.min(GRAMMAR.pdHeightCapM, Math.max(1.2, span * 0.42));
-}
-
 /**
- * How far to either side of its chord an arc's tent reaches. Scales with span
- * so a long arc makes a broad vault and a short one makes a tight hoop.
+ * How far to either side of its chord a drawn arc's ribbon-tent reaches.
+ * Scales with span so a long arc reads broad and a short one reads tight.
  */
 export function arcReachM(span: number): number {
   return Math.max(0.9, span * 0.5);
@@ -59,9 +72,10 @@ export function arcReachM(span: number): number {
  * Where p sits relative to one arc: the arc's own height at the nearest
  * station along its chord, and how far off the chord p is.
  *
- * `ribHeight` is the height of the ARC ITSELF there — not a decayed version of
- * it. That distinction is the whole model: the skin interpolates the ribs, so
- * on a rib it equals the rib.
+ * This describes the DRAWN LINE itself (the ribbon you see standing on the
+ * lawn), not the canopy — under the gesture model the skin no longer
+ * interpolates the arcs, but the arcs still render, and their curve and the
+ * ribbon's must be one function.
  */
 export function nearestOnArc(arc: Spine, p: Pt): { ribHeight: number; distM: number } {
   const dx = arc.b.x - arc.a.x;
@@ -80,7 +94,7 @@ export function nearestOnArc(arc: Spine, p: Pt): { ribHeight: number; distM: num
   return { ribHeight, distM: Math.hypot(p.x - cx, p.y - cy) };
 }
 
-/** Kept for the tent's original meaning: rib height decayed by the skirt. */
+/** One arc as a tent over its own chord: its height decayed by the skirt. */
 export function tentHeight(arc: Spine, p: Pt): number {
   const { ribHeight, distM } = nearestOnArc(arc, p);
   const span = Math.hypot(arc.b.x - arc.a.x, arc.b.y - arc.a.y);
@@ -93,32 +107,6 @@ export function tentHeight(arc: Spine, p: Pt): number {
 /** The plan the drawing claims: the hull through the feet of every arc. */
 export function footprintHull(arcs: Spine[]): Pt[] {
   return convexHull(arcs.flatMap((a) => [a.a, a.b]));
-}
-
-/**
- * Distance from p to the inside of a convex hull. Positive inside, negative
- * outside, in metres. Degenerate hulls (< 3 points) fall back to the distance
- * from the segment/point itself, negated, so a single line still behaves.
- */
-export function insideHullM(hull: Pt[], p: Pt): number {
-  if (hull.length < 3) {
-    if (hull.length === 0) return -Infinity;
-    let best = Infinity;
-    for (const q of hull) best = Math.min(best, Math.hypot(p.x - q.x, p.y - q.y));
-    return -best;
-  }
-  let best = Infinity;
-  for (let i = 0; i < hull.length; i++) {
-    const a = hull[i];
-    const b = hull[(i + 1) % hull.length];
-    const ex = b.x - a.x;
-    const ey = b.y - a.y;
-    const len = Math.hypot(ex, ey) || 1e-9;
-    // Left of every edge = inside, for a CCW hull. Signed distance to the line.
-    const s = ((p.x - a.x) * ey - (p.y - a.y) * ex) / len;
-    best = Math.min(best, -s);
-  }
-  return best;
 }
 
 /**
@@ -165,47 +153,120 @@ export function hullRadiusAtM(hull: Pt[], centre: Pt, bearingRad: number): numbe
   return Number.isFinite(best) ? best : 0;
 }
 
+/** Angular half-width / tap count used to FAIR the plan. See fairedRadius. */
+const FAIRING_RAD = 0.42;
+const FAIRING_TAPS = 9;
+
 /**
- * The surface height at p — a CANOPY over the plan your lines claim.
+ * The plan radius, faired.
  *
- * Shepard interpolation of the ribs' heights (inverse-square weights). On a rib
- * the weight blows up and the skin equals that rib exactly; between ribs it's
- * their weighted average, so the skin sags across the spans.
+ * The raw hull is a polygon, and a polar net laid straight onto a polygon is
+ * unbuildable at the corners: the radius jumps between adjacent spokes, so bays
+ * next to a vertex collapse to centimetres. Those members come out SHORTER THAN
+ * THEIR OWN END CUTS — the first version of this produced a piece of length
+ * -0.20 m, which is the engine cheerfully quoting for a strut that cannot exist.
  *
- * NOTE WHAT IS NOT HERE: there is no skirt down to the lawn at the hull edge.
- * That is the difference between a canopy and a igloo. The ribs already reach
- * the ground at their own feet, so the skin dives to the lawn THERE and nowhere
- * else; along the hull between two feet it stays up, and that lifted free edge
- * IS the eave. An earlier version skirted the whole boundary to zero and the
- * result sat on the ground all the way round — which looked fine in isolation
- * and was completely wrong: it threw away the legs and the open sides, the two
- * things that make an Eden an Eden, and it meant baking the drawing could only
- * ever produce something the product doesn't build.
+ * So the plan is smoothed with a cosine kernel over bearing. The feet stay put
+ * (a foot's own bearing still returns its own distance, near enough) but the
+ * boundary between them becomes a fair curve instead of a chord with a kink.
+ * That is both the buildable answer and the honest one: an Eden's plan is a
+ * fair closed curve, not a polygon, and pretending otherwise would ship a
+ * cut list nobody can cut.
  *
- * Outside the hull is lawn; callers cut there (see hullRadiusAtM).
+ * Lives here (not in the adapter) because the SOFT surface uses the same plan:
+ * the skin, the preview mesh and the baked net must all agree on the boundary.
+ */
+export function fairedRadius(hull: Pt[], centre: Pt) {
+  return (bearingRad: number): number => {
+    let sum = 0;
+    let wsum = 0;
+    for (let k = -FAIRING_TAPS; k <= FAIRING_TAPS; k++) {
+      const t = (k / FAIRING_TAPS) * FAIRING_RAD;
+      const w = 0.5 * (1 + Math.cos((Math.PI * k) / (FAIRING_TAPS + 1)));
+      const r = hullRadiusAtM(hull, centre, bearingRad + t);
+      if (r > 0) {
+        sum += w * r;
+        wsum += w;
+      }
+    }
+    return wsum > 0 ? sum / wsum : 0;
+  };
+}
+
+const DEG = Math.PI / 180;
+
+/** Everything the canopy needs, read once from the arcs. */
+interface CanopyCtx {
+  centre: Pt;
+  radiusAt: (bearingRad: number) => number;
+  footRad: number[];
+  /** Crown height: the tallest drawn line, held to headroom and the cap. */
+  H: number;
+  apertureRad: number;
+}
+
+/**
+ * Read the drawing's canopy: feet, plan and height from the lines; everything
+ * else from the engine's own rules. Null until two lines enclose a plan —
+ * one line makes no surface; a rib is not a vault.
+ */
+function canopyCtx(arcs: Spine[]): CanopyCtx | null {
+  if (arcs.length < 2) return null;
+  const centre = planCentre(arcs);
+  const hull = footprintHull(arcs);
+  if (hull.length < 3) return null;
+
+  const footDeg = arcs.flatMap((a) => [a.a, a.b]).map((p) => bearingDeg(centre, p));
+  const spans = arcs.map((a) => Math.hypot(a.b.x - a.a.x, a.b.y - a.a.y));
+  // The tallest line sets the crown — held to the same bounds readDrawing
+  // holds riseM to, so the soft thing and the baked params agree on "tall".
+  const H = Math.min(
+    GRAMMAR.pdHeightCapM,
+    Math.max(GRAMMAR.minHeadroomM, Math.max(...spans.map(arcRiseM))),
+  );
+
+  return {
+    centre,
+    radiusAt: fairedRadius(hull, centre),
+    footRad: footDeg.map((d) => d * DEG),
+    H,
+    apertureRad: apertureFromFeet(footDeg) * DEG,
+  };
+}
+
+/**
+ * The surface height at p — the ENGINE'S canopy over the plan your lines claim.
  *
- * Two earlier versions were wrong in instructive ways. A p-norm blend of tents
- * lifted the surface ABOVE every arc and BURIED the lines you drew inside a
- * mound — you made a mark and it vanished. Decaying from each rib instead fixed
- * that but spread the skin metres past your feet, so the thing read as a sand
- * dune and claimed 54 m² when you'd drawn a 15 m² pavilion.
+ * Same construction as geometry.ts's analytic cap, evaluated over the drawn
+ * plan: eave height at the bearing, cap profile toward the crown, foot pull
+ * diving the edge to the lawn at each drawn foot. On the boundary between two
+ * feet the surface stays UP — that lifted free edge IS the eave, and it is
+ * the difference between a canopy and a tent.
+ *
+ * Outside the faired plan is lawn. The plan is the FAIRED radius — the same
+ * one the preview mesh and the baked net use — not the raw hull polygon, so
+ * all three agree on where the thing ends.
  */
 export function surfaceHeight(input: SurfaceInput, p: Pt): number {
-  let h = 0;
-  if (input.arcs.length > 0) {
-    const hull = footprintHull(input.arcs);
-    if (insideHullM(hull, p) < 0) return 0; // off the plan: lawn
+  const ctx = canopyCtx(input.arcs);
+  if (!ctx) return 0;
 
-    let wsum = 0;
-    let hw = 0;
-    for (const arc of input.arcs) {
-      const { ribHeight, distM } = nearestOnArc(arc, p);
-      const w = 1 / (distM * distM + 1e-4);
-      wsum += w;
-      hw += w * ribHeight;
-    }
-    h = wsum > 0 ? hw / wsum : 0;
-  }
+  const dx = p.x - ctx.centre.x;
+  const dy = p.y - ctx.centre.y;
+  // Bearing convention: 0 = north = +y, 90 = east = +x.
+  const thetaRad = Math.atan2(dx, dy);
+  const R = ctx.radiusAt(thetaRad);
+  if (R <= 1e-9) return 0;
+  // The boundary tolerance is not fussiness: the preview mesh puts its last
+  // ring EXACTLY at r=1, and without it float noise flips boundary vertices
+  // between eave and lawn — the edge renders as a row of torn teeth.
+  const rRaw = Math.hypot(dx, dy) / R;
+  if (rRaw > 1 + 1e-6) return 0; // off the plan: lawn
+  const r = Math.min(1, rRaw);
+
+  const E = eaveHeightAtM(ctx.H, ctx.apertureRad, thetaRad);
+  let h = E + (ctx.H - E) * capProfile(r);
+  h *= 1 - footPullAt(ctx.footRad, thetaRad) * Math.pow(r, 5);
 
   // Lifts: a smooth bump. Excavation is a mask, not a dent — see isHole.
   for (const e of input.edits) {

@@ -51,8 +51,13 @@ const DEG = Math.PI / 180;
 const TWO_PI = Math.PI * 2;
 const round = (x: number, step: number) => Math.round(x / step) * step;
 
-/** Catenary-ish cap profile: 1 at the crown (r=0), 0 at the edge (r=1). */
-function capProfile(r: number): number {
+/**
+ * Catenary-ish cap profile: 1 at the crown (r=0), 0 at the edge (r=1).
+ * Exported (with eaveHeightAtM / footPullAt) because the soft drawn surface
+ * (surface.ts) raises the SAME canopy over the drawn plan — one rule, two
+ * resolutions, so bake is a resolution rather than a jump-cut.
+ */
+export function capProfile(r: number): number {
   const k = 1.1;
   return (Math.cosh(k) - Math.cosh(k * r)) / (Math.cosh(k) - 1);
 }
@@ -92,7 +97,6 @@ interface SurfaceCtx {
   a: number;
   b: number;
   H: number;
-  eaveBaseM: number;
   apertureRad: number;
   footAnglesRad: number[];
   shape?: ShapeField;
@@ -136,25 +140,37 @@ function surfaceCtx(p: DesignParams, snapToSpokes?: number, shape?: ShapeField):
     );
   }
 
-  return { a, b, H, eaveBaseM: 0.62 * H, apertureRad, footAnglesRad, shape };
+  return { a, b, H, apertureRad, footAnglesRad, shape };
 }
 
-/** Free-edge (eave) height at bearing θ: lifts toward the aperture. */
-function eaveHeightM(ctx: SurfaceCtx, thetaRad: number): number {
-  const toward = Math.max(0, Math.cos(angDiff(thetaRad, ctx.apertureRad)));
-  const lifted = ctx.eaveBaseM * (1 + 0.5 * Math.pow(toward, 1.5));
-  return Math.min(lifted, ctx.H - 0.25);
+/**
+ * Free-edge (eave) height at bearing θ: stays UP between the legs and lifts
+ * toward the aperture. This — with footPullAt — is what makes an Eden read as
+ * a canopy with an eave and open sides rather than a tent.
+ */
+export function eaveHeightAtM(H: number, apertureRad: number, thetaRad: number): number {
+  const toward = Math.max(0, Math.cos(angDiff(thetaRad, apertureRad)));
+  const lifted = 0.62 * H * (1 + 0.5 * Math.pow(toward, 1.5));
+  return Math.min(lifted, H - 0.25);
 }
 
 /** How strongly bearing θ is pulled to ground by the nearest foot (0..1). */
-function footPull(ctx: SurfaceCtx, thetaRad: number): number {
+export function footPullAt(footAnglesRad: number[], thetaRad: number): number {
   const sigma = 0.32; // angular half-width of a foot sweep (rad)
   let w = 0;
-  for (const f of ctx.footAnglesRad) {
+  for (const f of footAnglesRad) {
     const d = angDiff(thetaRad, f);
     w += Math.exp(-(d * d) / (sigma * sigma));
   }
   return Math.min(1, w);
+}
+
+function eaveHeightM(ctx: SurfaceCtx, thetaRad: number): number {
+  return eaveHeightAtM(ctx.H, ctx.apertureRad, thetaRad);
+}
+
+function footPull(ctx: SurfaceCtx, thetaRad: number): number {
+  return footPullAt(ctx.footAnglesRad, thetaRad);
 }
 
 /**

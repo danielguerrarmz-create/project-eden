@@ -17,7 +17,7 @@
  *
  * Pure. No React, no three.js. Testable in a plain node repl.
  */
-import { ENVELOPE, SITE } from '../data/config';
+import { ENVELOPE, GRAMMAR, SITE } from '../data/config';
 import { feetCountFor } from './grammar';
 import type { DesignParams, JointSystem } from './types';
 
@@ -70,6 +70,14 @@ export interface ReadDrawing {
 }
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+/**
+ * Rise of a drawn arc, from its span alone. Shared by the drawn ribbon, the
+ * soft canopy and readDrawing, so all three agree on how tall a line is.
+ */
+export function arcRiseM(span: number): number {
+  return Math.min(GRAMMAR.pdHeightCapM, Math.max(1.2, span * 0.42));
+}
 
 /** Signed area of a polygon (shoelace). Sign tells winding; we only want size. */
 export function polygonAreaM2(pts: Pt[]): number {
@@ -209,23 +217,22 @@ export function readDrawing(d: Drawing): ReadDrawing {
     .map((p) => Math.round(bearingDeg(centre, p)))
     .sort((a, b) => a - b);
 
-  // What the ENGINE will actually root on, which is not always what you drew.
-  // Say the true number here or the panel contradicts the readout beside it —
-  // "4 ground contacts" next to "3 feet" reads as a bug, and the honest version
-  // is more interesting anyway: the grammar has a view about how many legs a
-  // canopy this size needs, and it is willing to say so.
+  // The grammar's OPINION about how many legs a canopy this size needs. The
+  // drawn path roots every contact you drew (generateGeometry takes the drawn
+  // bearings when a ShapeField is passed), so this is advice, never applied —
+  // an earlier version claimed "so it rooted 4" while the engine rooted all 6,
+  // and the panel contradicted the readout beside it.
   const engineFeet = feetCountFor(footprintM2);
 
   if (d.spines.length > 0) {
-    if (engineFeet === footBearingsDeg.length) {
+    nudges.push({
+      kind: 'read',
+      text: `${d.spines.length} ${d.spines.length === 1 ? 'line' : 'lines'} → ${footBearingsDeg.length} ground contacts, each rooted where you drew it on a driven screw.`,
+    });
+    if (engineFeet !== footBearingsDeg.length) {
       nudges.push({
-        kind: 'read',
-        text: `${d.spines.length} ${d.spines.length === 1 ? 'line' : 'lines'} → ${footBearingsDeg.length} ground contacts. The lattice is interpolated between them; each lands on a driven screw.`,
-      });
-    } else {
-      nudges.push({
-        kind: 'held',
-        text: `You marked ${footBearingsDeg.length} contacts. At ${footprintM2.toFixed(1)} m² the validated family roots on ${engineFeet} — so it rooted ${engineFeet}, and read your lines for where it opens.`,
+        kind: 'offered',
+        text: `At ${footprintM2.toFixed(1)} m² this family usually stands on ${engineFeet} legs. Fewer, wider-spaced feet make a calmer canopy — yours if you want it.`,
       });
     }
   }
@@ -248,19 +255,26 @@ export function readDrawing(d: Drawing): ReadDrawing {
     });
   }
 
-  // --- Rise: default, plus however far the crown was pulled.
-  const riseM = clamp(
-    ENVELOPE.riseM.default + (d.crownPullM ?? 0),
-    ENVELOPE.riseM.min,
-    ENVELOPE.riseM.max,
-  );
-  if ((d.crownPullM ?? 0) !== 0 && Math.abs(ENVELOPE.riseM.default + (d.crownPullM ?? 0) - riseM) > 0.01) {
+  // --- Rise: the DRAWN ARCS set it. The arcs are the gesture, and the tallest
+  // line says how high — asking for a rise after somebody drew one would be
+  // asking twice. No lines (or a crown pull) adjusts from there.
+  const spans = d.spines.map((s) => Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y));
+  const drawnRiseM =
+    spans.length > 0 ? Math.max(...spans.map(arcRiseM)) : ENVELOPE.riseM.default;
+  const askedRiseM = drawnRiseM + (d.crownPullM ?? 0);
+  const riseM = clamp(askedRiseM, ENVELOPE.riseM.min, ENVELOPE.riseM.max);
+  if (Math.abs(askedRiseM - riseM) > 0.01) {
     nudges.push({
       kind: 'held',
       text:
         riseM >= ENVELOPE.riseM.max
           ? `Held at ${ENVELOPE.riseM.max} m — above that you'd need a planning application, not a delivery.`
-          : `Held at ${ENVELOPE.riseM.min} m — below that people stop being able to walk under it.`,
+          : `Your lines imply ${askedRiseM.toFixed(1)} m of rise. Below ${ENVELOPE.riseM.min} m people stop being able to walk under it, so it crowns at ${ENVELOPE.riseM.min} m.`,
+    });
+  } else if (d.spines.length >= 2) {
+    nudges.push({
+      kind: 'read',
+      text: `Your longest line sets the height: the canopy crowns at ${riseM.toFixed(1)} m and holds its eave up between the legs, diving only at your feet.`,
     });
   }
 
