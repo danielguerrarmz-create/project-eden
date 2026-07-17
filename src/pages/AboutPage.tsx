@@ -56,7 +56,7 @@ import { requestGarland } from '../engine/gongbi/painter';
 import { armPts, polyD, taperRuns, trunkPts, type ParenLayout, type TaperRun } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
 import {
-  CARD_LINE,
+  GROWN_BY,
   clamp01,
   dashProps,
   growAt,
@@ -1026,7 +1026,10 @@ const CODA_ORGAN_R = 58;
 function CodaBower({ reduced }: { reduced: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const pageLine = usePageCardLine(reduced);
+  // The frame scale is read BEFORE the card line because the line is now placed against the span,
+  // and the span is measured off the timeline's frame. See cardLineAt.
+  const codaFrameScale = useTimelineFrameScale();
+  const pageLine = usePageCardLine(reduced, revealSpanPx(codaFrameScale));
   // The band's own page position and scale, measured: the card line is a PAGE coordinate and the
   // drawing is in BAND units, which are 1:1 only while the band is not scaled down.
   const [box, setBox] = useState({ top: 0, scale: 1 });
@@ -1050,7 +1053,8 @@ function CodaBower({ reduced }: { reduced: boolean }) {
   const bandTop = box.top;
   const bandScale = box.scale || 1;
   // The timeline's px-per-world-unit, so this band's reveal spans the same distance ON SCREEN.
-  const frameScale = useTimelineFrameScale();
+  // Read once at the top of the component (the card line needs it too) and aliased here.
+  const frameScale = codaFrameScale;
   useEffect(() => {
     let live = true;
     requestGarland({
@@ -1286,11 +1290,12 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   const [layout, setLayout] = useState<ParenLayout | null>(null);
   const [url, setUrl] = useState<string | null>(null);
 
-  // THE PAGE'S CARD LINE — the founders' equivalent of the timeline camera's. Same fraction, same
-  // span, same ramp; the only difference is that the frame here is the viewport rather than a
-  // panning camera. See reveal.ts. Reduced motion hands back Infinity, so every `growAt` below
-  // saturates to 1 and the whole thing settles instantly, fully grown.
-  const pageLine = usePageCardLine(reduced);
+  // THE PAGE'S CARD LINE — the founders' equivalent of the timeline camera's. Same rule, same span,
+  // same ramp; the only difference is that the frame here is the viewport rather than a panning
+  // camera. See reveal.ts. Reduced motion hands back Infinity, so every `growAt` below saturates to
+  // 1 and the whole thing settles instantly, fully grown.
+  const parenFrameScale = useTimelineFrameScale();
+  const pageLine = usePageCardLine(reduced, revealSpanPx(parenFrameScale));
 
   // MEASURE. Re-measured on resize and on any layout change inside the founders (a ResizeObserver on
   // the rows, not just the window: the rows' height moves with text wrapping at a fixed width too).
@@ -1458,7 +1463,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   const lead = layout ? readerLead(layout.viewH) : 0;
   // "Framed" = the founders' first row parked just under the fixed header. The header is real and
   // covers the top of every viewport, so it is part of where the reader is actually looking.
-  const doneAt = layout ? (layout.rows[0]?.y0 ?? 0) + layout.viewH * CARD_LINE - layout.headerH : 1;
+  const doneAt = layout ? (layout.rows[0]?.y0 ?? 0) + layout.viewH * GROWN_BY - layout.headerH : 1;
   const parenSpan = Math.max(1, doneAt + lead);
   const parenGrow = layout ? growAt(localLine, -lead, parenSpan) : 0;
 

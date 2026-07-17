@@ -29,16 +29,63 @@
  * ---
  *
  * TWO CARD LINES, ONE RULE. The timeline is a sticky frame with a panning camera, so its line is the
- * camera's: `camY + viewH * CARD_LINE`. The founders and the coda are in normal page flow and have
- * no camera, so their line is the viewport's own: `scrollY + innerHeight * CARD_LINE`. Same
- * fraction, same span, same ramp — the difference is only which frame the reader is looking through,
- * and in both cases the answer to "how grown is this?" is "how far is it past 52% of the frame".
+ * camera's, placed against `camY`. The founders and the coda are in normal page flow and have no
+ * camera, so their frame is the viewport and their line is placed against `scrollY`. Same rule, same
+ * span, same ramp — the difference is only which frame the reader is looking through. See
+ * `cardLineAt`, which is the one place either of them is decided.
  */
 
 export const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** The reveal line sits at 52% of the frame; a thing grows as the line passes it. */
-export const CARD_LINE = 0.52;
+/**
+ * GROWTH IS FINISHED BY THE TIME A THING HAS RISEN TO THE MIDDLE OF ITS FRAME.
+ *
+ * Daniel, 2026-07-16, and it was the single most repeated note of the round: "it's already too
+ * late... the animation must be fully COMPLETE by the halfway mark, not starting near it."
+ *
+ * A frame-fraction: 1 is the bottom edge, 0 the top, and an element rises from 1 towards 0 as the
+ * reader scrolls. This is the moment growth must be OVER, not the moment it starts.
+ *
+ * THIS REPLACES `CARD_LINE = 0.52`, and the difference is not the number, it is the KIND of thing.
+ * 0.52 pinned where growth BEGAN and let the ending fall wherever the arithmetic put it — which was
+ * 33% of the frame at a 700px viewport and 43% at 1440px, because the span is a DISTANCE and the
+ * line was a PROPORTION, so the gap between them scaled with the window. There is no value of
+ * CARD_LINE that finishes at the middle of every frame. Naming the END and solving for the line is
+ * the only way the rule can hold everywhere, so that is what `cardLineAt` does.
+ */
+export const GROWN_BY = 0.5;
+
+/**
+ * The dead zone: a thing does not begin growing the instant the line touches it.
+ *
+ * It was an unnamed `- 10` inside `growAt`. It matters here only because `cardLineAt` has to add it
+ * back: the two cancel, which is what makes completion land EXACTLY on GROWN_BY rather than ten
+ * units past it. Naming it is what makes that cancellation legible instead of looking like a fudge.
+ */
+const LINE_NUDGE = 10;
+
+/**
+ * WHERE TO PUT THE REVEAL LINE so that growth is over by `GROWN_BY`. The whole of item 2 is this
+ * function, and every frame on the page gets its line from here.
+ *
+ * Solve `growAt(...) = 1` for the line, given where the thing must be when it finishes:
+ *
+ *     grow = (line - y - LINE_NUDGE - lag) / span = 1   at   y = frameTop + frameH * GROWN_BY
+ *     =>   line = frameTop + frameH * GROWN_BY + LINE_NUDGE + span + lag
+ *
+ * `maxLag` is the LARGEST lag anything in this frame carries, so that the LAST thing to finish still
+ * finishes by GROWN_BY. Everything less lagged finishes earlier, which is what "by" means and is
+ * also what keeps a plate and the branch beside it reading as one event rather than two.
+ *
+ * The event therefore occupies a band of `span + maxLag` below the halfway mark. That band has to
+ * FIT INSIDE THE FRAME, and this is the constraint that bites: "complete by halfway" is satisfiable
+ * trivially and uselessly by making the band so tall that growth begins below the bottom edge and
+ * the reader never sees it happen. See SUB_ORDER_STAGGER, which is bounded for exactly this reason,
+ * and the test that pins it.
+ */
+export function cardLineAt(frameTop: number, frameH: number, span: number, maxLag = 0): number {
+  return frameTop + frameH * GROWN_BY + LINE_NUDGE + span + maxLag;
+}
 
 /**
  * How much travel a thing takes to arrive, in the units of whatever line it is read against.
@@ -70,7 +117,7 @@ export function revealSpanPx(frameScale: number): number {
  * read against a line rather than a clock.
  */
 export function growAt(cardLine: number, y: number, span: number, lag = 0): number {
-  return clamp01((cardLine - y - 10 - lag) / span);
+  return clamp01((cardLine - y - LINE_NUDGE - lag) / span);
 }
 
 /**
@@ -109,13 +156,22 @@ export const ORGAN_DISC_R = 85;
  * this is the card-line equivalent of an IntersectionObserver's `rootMargin`. The plant starts
  * growing below the fold and is finished by the time the reader arrives.
  *
- * THE TIMELINE DOES NOT USE THIS AND MUST NOT. Its branches are short: each draws over UNFURL_SPAN
- * as it crosses the card line and completes at ~38% of the frame, well inside. And its plates fade
- * on exactly the same line, so pulling the branches earlier without the plates would break the one
- * thing Daniel has been consistent about — "both of those emissions should match each other".
+ * THE TIMELINE DOES NOT USE THIS, and the reason is that its plates fade on the same line as its
+ * branches, so pulling the branches ahead of the reader without the plates would break the one thing
+ * Daniel has been consistent about: "both of those emissions should match each other". It gets to
+ * the same place by a different route — `cardLineAt` places its line so the whole event lands in the
+ * frame's bottom half.
+ *
+ * THIS PARAGRAPH USED TO SAY THE TIMELINE WAS FINE AND IT WAS WRONG, which is worth leaving on the
+ * record because the comment is what stopped anyone measuring. It read: "Its branches are short:
+ * each draws over UNFURL_SPAN as it crosses the card line and completes at ~38% of the frame, well
+ * inside." True of order 0, and only order 0 — 38 of 195 runs. It reasoned about the span and forgot
+ * the order lag stacked on top of it, which ran to 1155 units against a span of 175. Measured, 195
+ * of 195 runs were unfinished at halfway and 64 finished after leaving the top of the screen. A
+ * confident comment is not a measurement, and this file had no tests until round 10 (reveal.test.ts).
  */
 export function readerLead(viewportH: number): number {
-  return viewportH * (1 - CARD_LINE);
+  return viewportH * (1 - GROWN_BY);
 }
 
 /** Arc length of a polyline — the dash reveal needs it, and `getTotalLength()` would mean reading

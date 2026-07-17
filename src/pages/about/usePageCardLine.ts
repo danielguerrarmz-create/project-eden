@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CARD_LINE } from './reveal';
+import { cardLineAt } from './reveal';
 import { TIMELINE_W } from './CrossPathsTimeline';
 
 /**
@@ -33,10 +33,15 @@ export function useTimelineFrameScale(): number {
  * THE PAGE'S OWN CARD LINE, in page coordinates — the founders' and the coda's equivalent of the
  * timeline camera's `cardLineY`.
  *
- * The timeline reveals against a line 52% down its frame, which its camera provides. Regions in
- * normal page flow have no camera, so their frame is the viewport and their line is 52% down that.
- * Same fraction, same span, same ramp: the reader is looking through a different frame at the same
- * motion. See reveal.ts.
+ * The timeline places its line against its camera so growth finishes by the middle of its frame.
+ * Regions in normal page flow have no camera, so their frame is the viewport and their line is placed
+ * against `scrollY` by the same rule. Same rule, same span, same ramp: the reader is looking through
+ * a different frame at the same motion. See reveal.ts and `cardLineAt`.
+ *
+ * IT NEEDS THE SPAN NOW, which is why this takes an argument it did not used to. The line's whole
+ * job is to be `span` ahead of where growth must END, so a line that does not know the span cannot
+ * place itself — it can only pin where growth begins and let the ending land where it may, which is
+ * precisely the bug (see GROWN_BY). Pass the page-flow span, in CSS px: `revealSpanPx(frameScale)`.
  *
  * REDUCED MOTION RETURNS INFINITY, not a scroll position. Everything is "infinitely far past the
  * line", so every `growAt` saturates to 1 and the whole page settles instantly, fully grown — the
@@ -48,7 +53,7 @@ export function useTimelineFrameScale(): number {
  * the thing affordable; the value is read from `window.scrollY` in the frame that will paint it, so
  * it is never stale.
  */
-export function usePageCardLine(reduced: boolean): number {
+export function usePageCardLine(reduced: boolean, spanPx: number): number {
   const [line, setLine] = useState(() => (reduced ? Infinity : 0));
   const raf = useRef(0);
 
@@ -60,7 +65,7 @@ export function usePageCardLine(reduced: boolean): number {
     let queued = false;
     const read = () => {
       queued = false;
-      setLine(window.scrollY + window.innerHeight * CARD_LINE);
+      setLine(cardLineAt(window.scrollY, window.innerHeight, spanPx));
     };
     const kick = () => {
       if (queued) return;
@@ -75,7 +80,11 @@ export function usePageCardLine(reduced: boolean): number {
       window.removeEventListener('resize', kick);
       cancelAnimationFrame(raf.current);
     };
-  }, [reduced]);
+    // `spanPx` belongs here: the line is placed relative to the span, so a span that changes (the
+    // frame scale is measured, and re-measured on resize) has to re-place the line. Leaving it out
+    // would pin the line to whatever the scale was on first paint and quietly break the invariant at
+    // exactly the moment it is most visible, which is mid-resize.
+  }, [reduced, spanPx]);
 
   return line;
 }

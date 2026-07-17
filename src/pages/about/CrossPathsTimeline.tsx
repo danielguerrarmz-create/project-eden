@@ -46,7 +46,8 @@ import { useAutoplayVideo } from './useAutoplayVideo';
 import { requestGarland } from '../../engine/gongbi/painter';
 import { PAGE_SPECIES } from './species';
 import {
-  CARD_LINE,
+  cardLineAt,
+  GROWN_BY,
   dashProps,
   growAt,
   ORGAN_DISC_R,
@@ -1450,11 +1451,62 @@ export function subBranchWidth(order: number): number {
   return Math.max(0.9, SUB_BRANCH_W * Math.pow(0.72, order));
 }
 
-/** How far behind its parent a branch waits before it starts drawing, in world units of card-line
- *  travel, per order. Trunk -> branch -> twig, in that order, rather than a tree that fades in
- *  uniformly (which is just a fade). Tuned by looking. This one is the timeline's own: the founders'
- *  arms have no botanical order to stagger by. */
-const SUB_GROW_ORDER_LAG = 55;
+/**
+ * THE WHOLE ORNAMENT'S stagger, root to deepest twig, in world units of card-line travel — a TOTAL,
+ * not a per-order rate. Trunk -> branch -> twig, in that order, rather than a tree that fades in
+ * uniformly (which is just a fade). This one is the timeline's own: the founders' arms have no
+ * botanical order to stagger by.
+ *
+ * IT WAS `SUB_GROW_ORDER_LAG = 55`, PER ORDER, AND UNBOUNDED — which is the round 10 defect. Space
+ * colonization grows a tree 21 orders deep, so the deepest twigs waited 21 x 55 = 1155 units behind
+ * the trunk, against an UNFURL_SPAN of 175. Nobody chose 1155; it fell out of a per-order rate
+ * meeting a tree whose depth is an emergent property of the layout. Measured at viewH 1293: 195 of
+ * 195 runs unfinished at the halfway mark, median completion 16.4% of the frame, and 64 of them
+ * still growing after they had scrolled off the top. The reveal was staggered over most of a screen
+ * height and the tail of it played to nobody.
+ *
+ * A TOTAL cannot run away, and that is the only reason it is one: the depth may change with any
+ * layout edit (it is emergent), and the budget must not change with it.
+ *
+ * 350 is what the motion WANTS: the event then occupies `span + stagger` = 525 units below the
+ * halfway mark, ~41% of a 1293-unit frame (a 900px viewport), so growth begins at ~91% of the frame
+ * and is over by 50%. The reader watches the whole thing happen in the bottom half of the screen.
+ *
+ * It is a CEILING, not the value — see `subBranchStagger`. 525 units do not fit a 1000-unit frame
+ * (a ~700px viewport), which has only 500 below the halfway mark, and the test caught 350 doing
+ * exactly that. An absolute distance measured against a frame that varies is the same mistake
+ * CARD_LINE made one constant ago; the answer is the same too, which is to fit it to the frame.
+ */
+export const SUB_ORDER_STAGGER = 350;
+
+/**
+ * The stagger this frame can actually afford: what the motion wants, or what fits, whichever is less.
+ *
+ * The event has `frameH * (1 - GROWN_BY)` of room below the halfway mark and the span is spent first,
+ * so the stagger gets the remainder. On a short viewport the ornament staggers less and the whole
+ * event compresses — which is the right failure: a flatter trunk-to-twig read is a small loss, and
+ * growth beginning below the bottom edge is a total one, because "complete by halfway" would then be
+ * true only by being invisible. Degrade the thing the reader can barely see, never the thing the
+ * rule is for.
+ */
+export function subBranchStagger(frameH: number): number {
+  return Math.max(0, Math.min(SUB_ORDER_STAGGER, frameH * (1 - GROWN_BY) - UNFURL_SPAN));
+}
+
+/**
+ * How far behind the root a branch of `order` waits, given the tree's actual depth and the stagger
+ * this frame can afford.
+ *
+ * Normalising by `maxOrder` is what turns a rate into a budget: the depth is EMERGENT (space
+ * colonization grows whatever the layout leaves room for, and it reached 21), so a per-order rate
+ * hands the reveal's total length to the ornament to decide. That is how it got to 1155 units.
+ *
+ * Exported because reveal.test.ts measures the real geometry through it. A copy of this arithmetic
+ * in the test would pass happily while the page did something else.
+ */
+export function subBranchOrderLag(order: number, maxOrder: number, stagger: number): number {
+  return maxOrder > 0 ? (order / maxOrder) * stagger : 0;
+}
 
 /** One organ's reveal disc: where it sits, and which branch's growth it waits on. */
 interface OrganMark {
@@ -1509,7 +1561,7 @@ function subOrganMarks(runs: readonly Branch[]): OrganMark[] {
  * along its own path distorts nothing: the geometry is final before the first frame, and only how
  * much of it is inked changes.
  */
-function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: number }) {
+function SubBranches({ reduced, cardLineY, stagger }: { reduced: boolean; cardLineY: number; stagger: number }) {
   const runs = useMemo(() => subBranchPolylines(), []);
   const lens = useMemo(() => runs.map((b) => polyLen(b.pts)), [runs]);
   const marks = useMemo(() => subOrganMarks(runs), [runs]);
@@ -1550,8 +1602,15 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
   // exactly when the card line reaches where it leaves its parent, on the plates' own line, span and
   // ramp. The order lag is what keeps the traversal botanical: a twig cannot draw before the branch
   // carrying it.
+  //
+  // The lag is normalised by the tree's REAL depth (see subBranchOrderLag) rather than being a rate
+  // per order, so the whole stagger is a fixed budget the card line can be placed against. The depth
+  // is emergent — it comes out of space colonization reading the layout — so a rate here means the
+  // reveal's length is decided by whatever the ornament happens to grow into. That is how it reached
+  // 1155 units.
+  const maxOrder = useMemo(() => runs.reduce((m, b) => Math.max(m, b.order), 0), [runs]);
   const growOf = (b: Branch) =>
-    reduced ? 1 : growAt(cardLineY, b.pts[0].y, UNFURL_SPAN, b.order * SUB_GROW_ORDER_LAG);
+    reduced ? 1 : growAt(cardLineY, b.pts[0].y, UNFURL_SPAN, subBranchOrderLag(b.order, maxOrder, stagger));
   const grows = runs.map(growOf);
 
   /*
@@ -1596,6 +1655,12 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
         return (
           <path
             key={i}
+            // A probe handle, and it is cheap because the state is already legible from the DOM: a
+            // stem still growing carries a stroke-dasharray, and a finished one carries none at all
+            // (see dashProps, which returns {} at full growth on purpose). So "is anything still
+            // growing above the halfway line?" — Daniel's rule, exactly — is answerable from the
+            // rendered page without instrumenting the motion. qa/growth-timing.mjs asks it.
+            data-sub-branch={b.order}
             d={lineGen(b.pts) ?? ''}
             fill="none"
             stroke={INK_SEPIA}
@@ -2069,7 +2134,16 @@ export function CrossPathsTimeline({
       : lerp(pinCamY, camYEnd, easeInOutCubic(clamp01((q - 0.4) / 0.6)));
   const frontY = camY + viewH * (1 + DRAW_AHEAD);
   const topY = camY - TOP_CLIP;
-  const cardLineY = reduced ? H : camY + viewH * CARD_LINE;
+  // THE STAGGER AND THE LINE COME FROM THE SAME viewH, IN ONE PLACE, ON PURPOSE. The line is placed
+  // to finish the most-lagged thing by the halfway mark, so it is only correct if it is placed
+  // against the SAME stagger the branches are actually lagged by. Computing them apart is how they
+  // drift, and the drift would be silent — the ornament would simply finish at the wrong height.
+  // `stagger` is handed to SubBranches rather than recomputed there for exactly that reason.
+  const stagger = subBranchStagger(viewH);
+  // Placed so the LAST thing in this frame to finish — the deepest twig, carrying the full stagger —
+  // is done by the halfway mark. The plates, which carry no lag, finish earlier and are still
+  // mid-event with the twigs, which is "both of those emissions should match each other" holding.
+  const cardLineY = reduced ? H : cardLineAt(camY, viewH, UNFURL_SPAN, stagger);
 
   const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH}`;
 
@@ -2285,7 +2359,7 @@ export function CrossPathsTimeline({
                 and never feeds back into it. Painted BEFORE the clusters, so that if the ornament and
                 a project ever do disagree, the project is simply drawn on top — the paint order is
                 the last expression of "the branch loses". */}
-            <SubBranches reduced={reduced} cardLineY={cardLineY} />
+            <SubBranches reduced={reduced} cardLineY={cardLineY} stagger={stagger} />
 
             {/* THE GARLAND. Clay's gongbi organs grown along the spine's own polyline, in full
                 pigment. Painted after the spine so foliage sits ON the line, and before the
