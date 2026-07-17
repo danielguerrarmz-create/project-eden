@@ -144,8 +144,47 @@ const MOVE_TIMEOUT = 8000;
 const SETTLE_TIMEOUT = 25000;
 /** camY is in drawing units over thousands; sub-unit jitter is arrival, not motion. */
 const EPS = 0.5;
-/** Consecutive still reads before believing the lerp is done, not merely slow between frames. */
+/** Consecutive still FRAMES before believing the lerp is done. Frames, not polls — see camYNextFrame. */
 const STILL_READS = 5;
+
+/**
+ * READ camY ON A PAINTED FRAME, NOT ON A WALL-CLOCK TICK. This is the third form of the same trap and
+ * it bit ME, in the file I wrote to fix the first two.
+ *
+ * The settle loop polled every 40ms and called it settled after 5 identical reads. But this page is
+ * heavy: a frame can take longer than 5 * 40ms. When it does, **five consecutive polls read the same
+ * value because NO FRAME HAS PAINTED** — which is indistinguishable from "the lerp has arrived". So
+ * "still" meant "I sampled faster than the page could move". Measured: a seek to 72% of the track
+ * reported settled at **camY 577** when the pin is **4934** — off by a factor of eight, and it would
+ * have been reported as data.
+ *
+ * The rule this file already states, arriving a third time: **stillness cannot tell "arrived" from
+ * "not started"** — and it cannot tell "arrived" from "not yet rendered" either. Both are fixed the
+ * same way: make the sample interval a FRAME. Two rAFs guarantee a painted frame between reads, so
+ * five still reads are five still FRAMES, and the lerp (which snaps to target and stops its rAF) is
+ * genuinely done.
+ *
+ * Gojo2 hit this same asymptotic-tail bug in his own screenshot probe and correctly refused to quote
+ * its camY. Two agents, two files, one wall — which is why it is written here rather than in a log.
+ */
+const camYNextFrame = () =>
+  safeEval(
+    () =>
+      new Promise((res) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            const explicit = document.querySelectorAll('[data-timeline-camera]');
+            const fb = document.querySelectorAll('[data-timeline-track] svg[viewBox]');
+            const set = explicit.length ? explicit : fb;
+            if (set.length !== 1) return res(set.length > 1 ? 'AMBIGUOUS' : null);
+            const vb = (set[0].getAttribute('viewBox') || '').trim().split(/\s+/);
+            if (vb.length !== 4) return res(null);
+            const y = Number(vb[1]);
+            res(Number.isFinite(y) ? y : null);
+          }),
+        );
+      }),
+  );
 
 /**
  * Seek, then WAIT FOR THE CAMERA — movement first, then stillness. Returns null if the camera never
@@ -167,14 +206,13 @@ const seek = async (scrollY) => {
   const moveDeadline = Date.now() + MOVE_TIMEOUT;
   let moved = false;
   while (Date.now() < moveDeadline) {
-    const c = await camY();
+    const c = await camYNextFrame();
     if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to start' };
     if (c === 'AMBIGUOUS') return { harness: 'camera selector became ambiguous mid-seek' };
     if (c !== null && Math.abs(c - before) > EPS) {
       moved = true;
       break;
     }
-    await sleep(40);
   }
   if (!moved) return { harness: `camera never left ${before?.toFixed(1)} — it did not start` };
 
@@ -184,7 +222,9 @@ const seek = async (scrollY) => {
   let last = null;
   let still = 0;
   while (Date.now() < settleDeadline) {
-    const c = await camY();
+    // ONE PAINTED FRAME PER SAMPLE. A wall-clock poll on a slow page reads the same value twice
+    // because nothing rendered between them, and calls that "settled". See camYNextFrame.
+    const c = await camYNextFrame();
     if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to settle' };
     if (c === 'AMBIGUOUS') return { harness: 'camera selector became ambiguous mid-settle' };
     if (c === null) return { harness: 'camera disappeared mid-seek' };
@@ -192,7 +232,6 @@ const seek = async (scrollY) => {
     else still = 0;
     last = c;
     if (still >= STILL_READS) return { cam: c };
-    await sleep(40);
   }
   return { harness: `camera never settled (last ${last?.toFixed(1)}) in ${SETTLE_TIMEOUT}ms` };
 };
