@@ -88,11 +88,23 @@ describe('the commissioning surfaces do not claim a price nobody has quoted', ()
     }
   });
 
-  it('leads with the stated commission range on both', () => {
+  it('leads with the stated commission floor on both', () => {
+    // Was `£75k to £150k` this morning. Daniel superseded that ladder himself
+    // on 2026-07-17: £150k is the FLOOR now, not the ceiling. The assertion
+    // moved because the FACT moved.
     for (const html of [panel, sheet]) {
-      expect(html).toContain('£75k to £150k');
-      expect(html.toLowerCase()).toContain('indicative range');
+      expect(html).toContain('from £150k');
+      expect(html.toLowerCase()).toContain('indicative');
       expect(html.toLowerCase()).toContain('pre-quote');
+    }
+  });
+
+  it('surfaces stewardship on both, which the demo never mentioned before', () => {
+    // Recurring revenue that exists BECAUSE the thing is alive. It was invisible
+    // until 2026-07-17 despite being the most on-thesis number in the model.
+    for (const html of [panel, sheet]) {
+      expect(html.toLowerCase()).toContain('stewardship');
+      expect(html).toContain('6 to 10%');
     }
   });
 

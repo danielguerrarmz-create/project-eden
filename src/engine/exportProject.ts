@@ -17,6 +17,23 @@
  *              downstream the moment anyone shipped an importer.
  *
  * Pure. Callers own the download.
+ *
+ * ---------------------------------------------------------------------------
+ * NO CALLER TODAY, AND THAT IS DELIBERATE. The two chips that drove this
+ * ("export drawing" / "export everything") were removed from `#/draw` on
+ * 2026-07-17 — Daniel: "we will have that later." Deferred, not cancelled.
+ *
+ * This module and its tests are kept rather than deleted because: it is pure,
+ * so nothing imports it and rollup drops it — the retained cost is **zero
+ * bundle bytes**; the drawing format is VERSIONED and is the contract a future
+ * importer has to read, so throwing it away means re-deriving it later; and its
+ * tests pin that round trip, which is the part that is genuinely hard to get
+ * right (tolerant parsing, junk lines dropped rather than the file thrown away,
+ * a missing crown pull defaulting instead of yielding NaN).
+ *
+ * If it is still unused when the feature is genuinely dropped rather than
+ * deferred, delete it then. Do not wire it back into the UI without Daniel.
+ * ---------------------------------------------------------------------------
  */
 import type { Drawing, Nudge, ReadDrawing } from './fromDrawing';
 import type { SiteAnalysis } from './site';

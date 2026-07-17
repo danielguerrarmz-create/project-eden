@@ -15,20 +15,35 @@
  * THE TWO KINDS OF NUMBER. This is the whole reason the module exists, and the
  * distinction it enforces is the thing to preserve:
  *
- *   COMMISSION RANGE (£75k to £150k) is STATED. It is the pricing ladder's
- *   core-product tier, a business decision about what an Eden is sold for. No
- *   code computes it. It does not move when you shape the form.
+ *   COMMISSION FLOOR (from £150k) is STATED, and it is a PRICE. Daniel's own
+ *   ladder — a business decision about what an Eden is sold for. No code
+ *   computes it. It does not move when you shape the form.
  *
- *   COST BUILD-UP (~£17k) is COMPUTED. `pricing.ts` builds it line-by-line
- *   from the real BOM, so it MOVES correctly, and its own header carries the
- *   loudest TODO in the demo: every unit rate in PRICING is a PLACEHOLDER
- *   until fab quotes land. It is the cost of a kit and its install at invented
- *   rates. It is NOT a commission price, and the two differ by ~6x because
- *   they measure different things: one is cost-plus, one is value-based.
+ *   COST TO CONSTRUCT (~£15k) is COMPUTED, and it is a COST. `pricing.ts`
+ *   builds it line-by-line from the real BOM, so it MOVES correctly, and its
+ *   own header carries the loudest TODO in the demo: every unit rate in
+ *   PRICING is a PLACEHOLDER until fab quotes land.
  *
  * They must never be rendered as the same kind of number, and neither is a
- * quote. Keeping them apart, and saying which is which, is the honest position
- * available right now.
+ * quote. A cost and a price are ALLOWED to differ — the difference is the
+ * business. What is not allowed is presenting one as evidence for the other.
+ *
+ * THE GAP IS NOW ~10x, AND IT IS ON SCREEN ON PURPOSE (2026-07-17). Daniel
+ * asked for the cost to construct to be visible and expandable; the commission
+ * floor sits beside it. They visibly disagree, and they always have. That is a
+ * real thing for Daniel to see, not a rendering bug to hide in a disclosure:
+ * ~£15k of construction against a £150k floor implies ~90% gross margin, while
+ * the brief's own target is 35-45%. Something is wrong and it is NOT resolvable
+ * from this file: either the placeholder rates are far too low (most likely —
+ * nobody has quoted them), or the cost base and the ladder were built from
+ * different assumptions. Flagged, not papered.
+ *
+ * Do not "fix" it by moving a rate in PRICING until the total looks like the
+ * ladder. Choosing rates so the output matches the marketing number and then
+ * showing that output as evidence FOR the number is circular, and it is the one
+ * move that dies to a single question from a technical reader. Daniel
+ * authorised fake numbers; he did not authorise fabricated evidence, and he is
+ * the one who would be holding it on camera.
  * ---------------------------------------------------------------------------
  *
  * WHY THE LABEL IS NOT "FIXED". It said "fixed" until 2026-07-17, and that word
@@ -53,27 +68,57 @@
 export const PRICE_QUALIFIER = 'indicative · pre-quote';
 
 /**
- * The commission range, quoted from the pricing ladder's core-product tier
- * (pavilion / studio / sauna, installed and planted). STATED, not computed.
+ * The commission FLOOR. STATED, not computed. Daniel's own ladder, 2026-07-17:
+ * "core commissions from £150k, landmark and hospitality pieces into the mid
+ * six figures."
  *
- * The ladder itself is still marked "proposed, DECISION open", which is why
- * every string here says "typically" and none says "your price". If Daniel
- * settles the ladder, this is the one place the bounds live.
+ * It said `£75k to £150k` this morning, taken from the written ladder in the
+ * evaluator brief. **The founder superseded that ladder.** £150k is now the
+ * FLOOR, not the ceiling, and the £25-50k entry tier is gone from his model
+ * entirely — do not reintroduce tier logic to chase it.
+ *
+ * A floor, not a single figure, and that distinction is load-bearing: "from
+ * £150k" is open-ended and cannot be mistaken for a quote, which is the same
+ * property the old range had and the reason neither ever says "your price".
+ * This is the one place the number lives.
  */
-export const COMMISSION_RANGE = '£75k to £150k';
+export const COMMISSION_FROM = 'from £150k';
 
-/** What the range is a range OF. Sits with it, never with a computed figure. */
+/** What the floor is a floor OF. Sits with it, never with a computed figure. */
 export const COMMISSION_LABEL = 'commission, installed and planted';
 
-/** The qualifier for the STATED range: a range, and no quote behind it yet. */
-export const COMMISSION_QUALIFIER = 'indicative range · pre-quote';
+/** The qualifier for the STATED floor: indicative, and no quote behind it. */
+export const COMMISSION_QUALIFIER = 'indicative · pre-quote';
 
-/** The range in a sentence, for surfaces with room for one. */
+/** The floor in a sentence, for surfaces with room for one. */
 export const COMMISSION_NOTE =
-  'What an Eden of this kind typically commissions for, installed and planted. Your own figure is set after a site survey and a fabrication quote, not before.';
+  'What an Eden of this kind commissions from, installed and planted. Landmark and hospitality pieces run into the mid six figures. Your own figure is set after a site survey and a fabrication quote, not before.';
+
+/**
+ * STEWARDSHIP — a revenue line the demo never mentioned, and the most on-thesis
+ * number in the model: recurring income that exists BECAUSE the thing is alive.
+ * A pavilion does not need stewarding; a living structure does.
+ *
+ * Daniel, 2026-07-17: "for stewardship, the ongoing care that keeps the living
+ * structure thriving, at roughly 6-10% of install value each year."
+ */
+export const STEWARDSHIP_LABEL = 'stewardship';
+export const STEWARDSHIP_NOTE =
+  '6 to 10% of install value each year: the ongoing care that keeps the living structure thriving.';
+
+/**
+ * The summary Daniel asked for: "a summary cost to construct, and then the user
+ * can expand it and see their itemized costs."
+ *
+ * "Cost to construct" is the honest name for what `pricing.ts` computes, and it
+ * is a DIFFERENT KIND OF NUMBER from the commission floor above — a cost, not a
+ * price. Note it includes the margin line, which is normal: a builder's price to
+ * construct includes the builder's margin.
+ */
+export const COST_SUMMARY_LABEL = 'cost to construct';
 
 /** The disclosure that opens the computed build-up. Deliberately not "price". */
-export const COST_BUILDUP_LABEL = 'how this design costs out';
+export const COST_BUILDUP_LABEL = 'itemized';
 
 /**
  * The admission that has to travel with the computed figure everywhere it is

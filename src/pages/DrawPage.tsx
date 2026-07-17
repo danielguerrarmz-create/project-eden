@@ -47,11 +47,18 @@ import { CinematicCamera } from './draw/CinematicCamera';
 import { RAIL_LINES, TOOLS } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
+  COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_QUALIFIER,
-  COMMISSION_RANGE,
+  COST_BUILDUP_LABEL,
+  COST_BUILDUP_NOTE,
+  COST_SUMMARY_LABEL,
+  PRICE_QUALIFIER,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
   priceMetaLine,
 } from '../ui/priceCopy';
+import { deDash } from '../ui/text';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
@@ -67,18 +74,7 @@ import {
   type SurfaceInput,
 } from '../engine/surface';
 import { shapeFromDrawing } from '../engine/shapeFromDrawing';
-import { buildProjectExport, buildDrawingExport, exportFilename } from '../engine/exportProject';
 import { useDesign } from '../state/store';
-
-function download(name: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // The toolbar's words and the rail's live in `draw/toolCopy.ts`, where the
 // DOM-free suite can pin them. The sculpt hint in particular is the
@@ -570,45 +566,81 @@ export function DrawPage() {
                   </ul>
                 </div>
 
-                <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
-                  {/* The hero is the KIT, not a figure. The engine's real claim
-                      here is "your two drags became this many true pieces", and
-                      that claim is the one it can actually support: the counts
-                      are read off the baked geometry. The computed ~£17k used to
-                      stand in this slot and was dropped on 2026-07-17 — at this
-                      size, in a hero shot, a number IS a price claim no 9px
-                      qualifier can scope, and it is ~6x off what an Eden is
-                      actually commissioned for. The build-up still exists and is
-                      inspectable on /studio, where a reader has room to read
-                      what kind of number it is. */}
+                <div className="absolute bottom-4 left-4 max-w-[300px] rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
+                  {/* SUMMARY COST TO CONSTRUCT, EXPANDABLE. Daniel's ask,
+                      2026-07-17: "a summary cost to construct, and then the user
+                      can expand it and see their itemized costs."
+
+                      This slot held the computed figure until this morning, when
+                      it was dropped for being a price claim no 9px qualifier
+                      could scope. It is back, and the reason that is not a
+                      reversal is the LABEL: "cost to construct" is a different
+                      KIND of claim from "your price". A cost may sit beside a
+                      price and differ from it — the difference is the business.
+                      What was indefensible was a bare £17,000 in a serif hero
+                      reading as what the client pays.
+
+                      The itemisation is the credible half and it is real: every
+                      line is built off the actual BOM. Only the MAGNITUDES are
+                      pre-quote. */}
                   <div className="flex items-baseline gap-2.5">
                     <p className="font-serif text-[26px] leading-none">
-                      {outputs.geometry.pieces.length} pieces
+                      £{outputs.price.costBuildUpGBP.toLocaleString()}
                     </p>
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
-                      cut list, live
+                      {COST_SUMMARY_LABEL}
                     </p>
                   </div>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
-                    {priceMetaLine({
+                    {PRICE_QUALIFIER} · {priceMetaLine({
                       footprintM2: outputs.geometry.params.footprintM2,
                       feetCount: outputs.geometry.feetCount,
                       pieceCount: outputs.geometry.pieces.length,
                       nodeCount: outputs.geometry.nodes.length,
                     })}
                   </p>
+
+                  <details className="group mt-2">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/50 hover:text-inkBlack">
+                      <span className="transition group-open:rotate-90">›</span>
+                      <span>{COST_BUILDUP_LABEL}</span>
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      {outputs.price.lines.map((l) => (
+                        <div key={l.label} className="flex justify-between gap-3 text-[10px]">
+                          <span className="text-inkBlack/60">{deDash(l.label)}</span>
+                          <span className="shrink-0 font-mono tabular-nums text-inkBlack/80">
+                            £{l.valueGBP.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                      <p className="pt-1 text-[9px] leading-relaxed text-inkBlack/45">
+                        {COST_BUILDUP_NOTE}
+                      </p>
+                    </div>
+                  </details>
+
                   {/* Below the rule: STATED, and nothing above the rule moves it.
-                      The divider is the whole point — it is what stops the range
-                      reading as another thing the engine just worked out. */}
+                      The divider is the whole point — it is what stops the floor
+                      reading as another thing the engine just worked out.
+
+                      The two visibly disagree by ~10x. That is deliberate and
+                      it is Daniel's to see: a cost of construction is not a
+                      commission price, and the gap between them IS the business
+                      model. See ui/priceCopy.ts's header for what the gap
+                      implies and why no rate was moved to close it. */}
                   <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
                       {COMMISSION_LABEL}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] tracking-[0.02em] text-inkBlack/70">
-                      {COMMISSION_RANGE}{' '}
+                      {COMMISSION_FROM}{' '}
                       <span className="text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
                         {COMMISSION_QUALIFIER}
                       </span>
+                    </p>
+                    <p className="mt-1.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-inkBlack/45">
+                      {STEWARDSHIP_LABEL} · {STEWARDSHIP_NOTE}
                     </p>
                   </div>
                 </div>
@@ -641,26 +673,10 @@ export function DrawPage() {
               )}
               {baked && (
                 <>
-                  <Chip
-                    onClick={() =>
-                      download(
-                        exportFilename('drawing', null),
-                        buildDrawingExport({ spines: arcs }, 0, null),
-                      )
-                    }
-                  >
-                    export drawing
-                  </Chip>
-                  <Chip
-                    onClick={() =>
-                      download(
-                        exportFilename('project', null),
-                        buildProjectExport({ spines: arcs }, 0, null, read, outputs),
-                      )
-                    }
-                  >
-                    export everything
-                  </Chip>
+                  {/* The two export chips lived here until 2026-07-17. Removed on
+                      Daniel's call: "we will have that later." The engine side
+                      (`engine/exportProject.ts`) is deliberately KEPT — see its
+                      header. Nothing imports it now, so it costs zero bundle. */}
                   <Chip
                     onClick={() => {
                       setBaked(false);

@@ -1,22 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import {
+  COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_NOTE,
   COMMISSION_QUALIFIER,
-  COMMISSION_RANGE,
   COST_BUILDUP_LABEL,
   COST_BUILDUP_NOTE,
+  COST_SUMMARY_LABEL,
   PRICE_QUALIFIER,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
   priceMetaLine,
 } from './priceCopy';
 
 /** Everything this module ships onto a screen. New export => add it here. */
 const ALL_COPY = [
   PRICE_QUALIFIER,
-  COMMISSION_RANGE,
+  COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_QUALIFIER,
   COMMISSION_NOTE,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
+  COST_SUMMARY_LABEL,
   COST_BUILDUP_LABEL,
   COST_BUILDUP_NOTE,
 ];
@@ -59,29 +65,35 @@ describe('the price label does not claim more than the price knows', () => {
   });
 });
 
-describe('the stated commission range is stated, and says so', () => {
-  it('carries the ladder bounds, so a drift toward the computed figure fails here', () => {
-    // The one test that would catch the forbidden "fix": moving the range down
-    // toward the engine's ~£17k (or a rate up toward the range) so the two
+describe('the stated commission floor is stated, and says so', () => {
+  it('carries Daniel s floor, so a drift toward the computed figure fails here', () => {
+    // The one test that would catch the forbidden "fix": moving the floor down
+    // toward the engine's ~£15k (or a rate up toward the floor) so the two
     // agree. They do not agree, they are not the same kind of number, and the
-    // ~6x gap is real until fab quotes land. See the module header.
-    expect(COMMISSION_RANGE).toContain('75k');
-    expect(COMMISSION_RANGE).toContain('150k');
-    expect(COMMISSION_RANGE).not.toContain('17');
+    // ~10x gap is real until fab quotes land. See the module header.
+    //
+    // CHANGED 2026-07-17: was `£75k to £150k`, from the evaluator brief's
+    // written ladder. Daniel superseded that ladder himself — £150k is the
+    // FLOOR now, not the ceiling. The assertion moved because the FACT moved,
+    // which is the only reason it is allowed to move.
+    expect(COMMISSION_FROM).toContain('150k');
+    expect(COMMISSION_FROM).not.toContain('75k'); // the superseded ceiling
+    expect(COMMISSION_FROM).not.toContain('15,'); // never the cost build-up
   });
 
-  it('is a range and never a single figure', () => {
-    // A range that collapses to one number is a price, and there is no price.
-    expect(COMMISSION_RANGE.toLowerCase()).toContain(' to ');
-    expect(COMMISSION_QUALIFIER.toLowerCase()).toContain('range');
+  it('is open-ended, and never a single definite figure', () => {
+    // The property that survived the ladder change. A floor cannot be mistaken
+    // for a quote, the same way the old range could not: both say "at least
+    // this", neither says "this". The moment it reads as one exact number it is
+    // a price, and there is no price.
+    expect(COMMISSION_FROM.toLowerCase()).toContain('from');
   });
 
   it('admits no quote stands behind it', () => {
     expect(COMMISSION_QUALIFIER.toLowerCase()).toContain('pre-quote');
-    expect(COMMISSION_NOTE.toLowerCase()).toContain('typically');
-    // The ladder is still marked "proposed, DECISION open" in the brief, so the
-    // copy may say what an Eden typically commissions for. It may not tell the
-    // reader that this is THEIR price.
+    expect(COMMISSION_QUALIFIER.toLowerCase()).toContain('indicative');
+    // It may say what an Eden commissions FROM. It may not tell the reader that
+    // this is THEIR price.
     expect(COMMISSION_NOTE.toLowerCase()).not.toContain('your price');
     for (const word of ['fixed', 'guaranteed', 'commitment']) {
       expect(COMMISSION_NOTE.toLowerCase()).not.toContain(word);
@@ -89,19 +101,70 @@ describe('the stated commission range is stated, and says so', () => {
     }
   });
 
-  it('says what the range includes, since "installed" is the load-bearing word', () => {
-    // £75k for a kit and £75k installed and planted are different claims. The
+  it('does not imply an entry tier that no longer exists', () => {
+    // The £25-50k entry piece is gone from Daniel's ladder entirely. Nothing
+    // here should imply a cheaper way in.
+    //
+    // Anchored on the currency symbol, and that is not fussiness: a bare '50k'
+    // is a SUBSTRING of '£150k', so the naive assertion failed against the very
+    // floor it was written to protect. It would have been just as wrong in the
+    // other direction later, quietly passing on '£250k'.
+    for (const s of [COMMISSION_FROM, COMMISSION_NOTE, COMMISSION_LABEL]) {
+      expect(s).not.toContain('£25k');
+      expect(s).not.toContain('£50k');
+      expect(s.toLowerCase()).not.toContain('entry');
+    }
+  });
+
+  it('says what the floor includes, since "installed" is the load-bearing word', () => {
+    // £150k for a kit and £150k installed and planted are different claims. The
     // ladder's tier is the installed one.
     expect(COMMISSION_LABEL.toLowerCase()).toContain('installed');
     expect(COMMISSION_NOTE.toLowerCase()).toContain('installed');
   });
 });
 
+describe('stewardship, the recurring line the demo never mentioned', () => {
+  it('states the rate and what it is a rate OF', () => {
+    // "6 to 10%" of nothing in particular is not a business model. Install
+    // value is the base, and it has to be on screen with the number.
+    expect(STEWARDSHIP_NOTE).toContain('6 to 10%');
+    expect(STEWARDSHIP_NOTE.toLowerCase()).toContain('install value');
+  });
+
+  it('is recurring, and says so', () => {
+    expect(STEWARDSHIP_NOTE.toLowerCase()).toContain('each year');
+  });
+
+  it('names what the money is FOR, which is the whole thesis', () => {
+    // Recurring revenue that exists BECAUSE the thing is alive. A pavilion does
+    // not need stewarding. If this ever reads as a maintenance contract on a
+    // shed, the most on-thesis number in the model has been thrown away.
+    expect(STEWARDSHIP_NOTE.toLowerCase()).toContain('living');
+  });
+
+  it('never hardens into a quote either', () => {
+    for (const word of ['fixed', 'guaranteed', 'your price']) {
+      expect(STEWARDSHIP_NOTE.toLowerCase()).not.toContain(word);
+    }
+  });
+});
+
 describe('the computed build-up never passes itself off as the price', () => {
   it('is not labelled a price', () => {
     // "how this price is built" was the old label, and it conceded the whole
-    // point: it is not the price, it is what the kit costs out at.
+    // point: it is not the price, it is what the thing costs to construct.
     expect(COST_BUILDUP_LABEL.toLowerCase()).not.toContain('price');
+    expect(COST_SUMMARY_LABEL.toLowerCase()).not.toContain('price');
+  });
+
+  it('names itself a COST, which is what keeps it apart from the floor', () => {
+    // Daniel's own words, and they are the reason the summary can sit on the
+    // hero panel at all: a cost to construct is a different kind of claim from
+    // a commission price, so showing it is not the overclaim that "£17,000"
+    // under a serif hero was.
+    expect(COST_SUMMARY_LABEL.toLowerCase()).toContain('cost');
+    expect(COST_SUMMARY_LABEL.toLowerCase()).toContain('construct');
   });
 
   it('admits the rates are invented', () => {

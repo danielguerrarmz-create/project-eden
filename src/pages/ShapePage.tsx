@@ -20,7 +20,7 @@ import { useDesign, type SliderKey } from '../state/store';
 import {
   COMMISSION_LABEL,
   COMMISSION_QUALIFIER,
-  COMMISSION_RANGE,
+  COMMISSION_FROM,
   PRICE_QUALIFIER,
 } from '../ui/priceCopy';
 import { deDash } from '../ui/text';
@@ -110,7 +110,7 @@ export function ShapePage() {
             </p>
           </div>
           <p className="mt-2 border-t border-inkBlack/12 pt-2 font-mono text-[10px] leading-snug tracking-[0.02em] text-inkBlack/55">
-            {COMMISSION_LABEL} {COMMISSION_RANGE}, {COMMISSION_QUALIFIER}
+            {COMMISSION_LABEL} {COMMISSION_FROM}, {COMMISSION_QUALIFIER}
           </p>
           <div className="mt-2.5 space-y-1 border-t border-inkBlack/12 pt-2">
             {notes.map((n) => (

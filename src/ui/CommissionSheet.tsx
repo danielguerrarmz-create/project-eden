@@ -20,11 +20,14 @@ import { Frame } from './Frame';
 import { useDesign } from '../state/store';
 import { NestingPreview } from './NestingPreview';
 import {
+  COMMISSION_FROM,
   COMMISSION_NOTE,
   COMMISSION_QUALIFIER,
-  COMMISSION_RANGE,
   COST_BUILDUP_NOTE,
+  COST_SUMMARY_LABEL,
   PRICE_QUALIFIER,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
 } from './priceCopy';
 import { ReserveCTA } from './ReserveCTA';
 import { deDash } from './text';
@@ -84,12 +87,12 @@ export function CommissionSheet() {
         {/* Commission hero. Until 2026-07-17 this read "{figure} FIXED" over the
             sentence "the number is a commitment, not an estimate" — the strongest
             claim anywhere in the demo, resting on rates nobody has quoted. The
-            hero is now the STATED range; the computed build-up keeps its place in
-            the sheet below, as evidence about the kit rather than as the price. */}
+            hero is now the STATED floor; the computed build-up keeps its place in
+            the sheet below, as a COST rather than as the price. */}
         <div className="mb-6 rounded-lg border border-inkBlack/12 bg-white/45 p-6">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="font-serifDisplay text-[clamp(2.25rem,5vw,3rem)] font-semibold tabular-nums leading-none text-inkBlack">
-              {COMMISSION_RANGE}
+              {COMMISSION_FROM}
             </span>
             <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">
               {COMMISSION_QUALIFIER}
@@ -100,10 +103,19 @@ export function CommissionSheet() {
             allowance. Every reachable form compiles to components, an assembly sequence and a cut
             list, which is what makes a firm figure possible quickly once the quote is in.
           </p>
+          {/* Stewardship: the recurring line, and the one that only exists
+              because the structure is alive. Sits with the commission because it
+              is the same KIND of number — stated, a rate, not computed. */}
+          <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-inkBlack/60">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accentOlive">
+              {STEWARDSHIP_LABEL}
+            </span>{' '}
+            {STEWARDSHIP_NOTE}
+          </p>
           <div className="mt-4 border-t border-inkBlack/12 pt-3">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/55">
-                this design, kit and install
+                this design, {COST_SUMMARY_LABEL}
               </span>
               <span className="font-mono text-[15px] font-medium tabular-nums text-inkBlack">
                 {gbp(price.costBuildUpGBP)}
