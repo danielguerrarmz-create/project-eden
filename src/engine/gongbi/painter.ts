@@ -136,18 +136,37 @@ function geoHash(opts: GarlandOpts): string {
   return (h >>> 0).toString(36);
 }
 
-/** Request a garland strip (growth along a path). Cached like every commission. */
-export function requestGarland(opts: GarlandOpts): Promise<ImageBitmap> {
+/**
+ * Request a garland strip (growth along a path), as an OBJECT URL ready for an `<img>`/`<image>`.
+ * Cached like every commission.
+ *
+ * IT RETURNS A URL, NOT PIXELS, AND THAT IS THE POINT. Every caller wanted a URL, so handing back
+ * an ImageBitmap made each of them do the same thing by hand on the main thread: draw it into a
+ * canvas and PNG-encode it. Measured on the About page, that was `toBlob` at 6,291ms of main-thread
+ * self time — 51.9% of everything — for four garlands, while the painters sat idle. The worker
+ * encodes now (see paintWorker), so the main thread's whole job is `createObjectURL`.
+ *
+ * THE URL IS SESSION-SCOPED AND DELIBERATELY NEVER REVOKED. It lives in the same cache as the
+ * painting, so it is minted once per distinct garland and every caller shares it. Callers must NOT
+ * revoke it on unmount: the next mount would resolve the same cached Promise to a dead URL and the
+ * ornament would silently vanish. (The old per-caller blob was theirs to revoke; this one is not.)
+ */
+export function requestGarland(opts: GarlandOpts): Promise<string> {
   const key = `g|${opts.seed}|${opts.voice}|${opts.width}x${opts.height}|${geoHash(opts)}`;
   return throughCache(key, async () => {
     if (canWork()) {
       const r = await post({ type: 'garland', opts });
       if (r.type !== 'garland') throw new Error('paint worker replied with the wrong job type');
-      return r.bitmap;
+      return URL.createObjectURL(r.blob);
     }
+    // No OffscreenCanvas-in-worker: paint and encode here, deferred to an idle moment. Slower,
+    // identical pixels — determinism is the contract either way.
     await idle();
     const { paintGarland } = await import('./garland');
-    return createImageBitmap(paintGarland(opts) as HTMLCanvasElement);
+    const canvas = paintGarland(opts) as HTMLCanvasElement;
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('garland encode failed');
+    return URL.createObjectURL(blob);
   });
 }
 

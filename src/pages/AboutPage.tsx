@@ -986,7 +986,6 @@ function CodaBower({ reduced }: { reduced: boolean }) {
   const frameScale = useTimelineFrameScale();
   useEffect(() => {
     let live = true;
-    let objectUrl: string | null = null;
     requestGarland({
       // The coda grows the page's plant too. It used to pin `bower/spine-2/coda` — a suffix, so a
       // THIRD species — while the page's comments claimed it grew one plant. See about/species.ts.
@@ -1002,22 +1001,17 @@ function CodaBower({ reduced }: { reduced: boolean }) {
       rootWidth: 3,
       tube: true,
     })
-      .then(async (bitmap) => {
-        const c = document.createElement('canvas');
-        c.width = bitmap.width;
-        c.height = bitmap.height;
-        c.getContext('2d')?.drawImage(bitmap, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
-        if (!blob || !live) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
+      .then((painted) => {
+        if (live) setUrl(painted);
       })
       .catch((err: unknown) => {
         console.error('gongbi coda bower failed:', err);
       });
+    // NOTHING TO REVOKE. The object URL belongs to the painter's session cache and is shared by
+    // every caller of this garland — revoking it here would hand the next mount a dead URL and the
+    // ornament would silently vanish. See requestGarland.
     return () => {
       live = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, []);
   if (!url) return null;
@@ -1362,7 +1356,6 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   useEffect(() => {
     if (!arms || !w || !h) return;
     let live = true;
-    let objectUrl: string | null = null;
     requestGarland({
       // THE PAGE'S SPECIES FOR THIS VISIT — the same plant the spine and the sub-branches grow.
       //
@@ -1383,24 +1376,19 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
       scale: PAREN_ORGAN_SCALE,
       tube: false,
     })
-      .then(async (bitmap) => {
-        const c = document.createElement('canvas');
-        c.width = bitmap.width;
-        c.height = bitmap.height;
-        c.getContext('2d')?.drawImage(bitmap, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
-        if (!blob || !live) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
+      .then((painted) => {
+        if (live) setUrl(painted);
       })
       .catch((err: unknown) => {
         // The founders read fine with stems and no flowers; a broken painting room must not look
         // like taste.
         console.error('gongbi founder parenthesis failed:', err);
       });
+    // NOTHING TO REVOKE. The object URL belongs to the painter's session cache and is shared by
+    // every caller of this garland — revoking it here would hand the next mount a dead URL and the
+    // ornament would silently vanish. See requestGarland.
     return () => {
       live = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // `arms` is a fresh object every render; key the effect on the measured size instead, or it
     // re-runs forever, each pass minting a blob URL and revoking the last. That bug shipped once

@@ -2,14 +2,24 @@
  * paintWorker.ts — the studio's painting room. A module worker (Vite bundles it
  * via `new Worker(new URL(...), { type: 'module' })` in painter.ts) that grows
  * quality-gated gongbi paintings and path-following garlands off the main
- * thread, posting them back as transferable ImageBitmaps so a 2-second
- * commission never janks the scroll.
+ * thread, so a 2-second commission never janks the scroll.
+ *
+ * A GARLAND COMES BACK AS AN ENCODED BLOB, NOT AN ImageBitmap, and that is the difference
+ * between "the painting is off-thread" and "the page is off-thread". Every caller wants a URL
+ * for an <img>/<image>, so an ImageBitmap made each of them drag the pixels back onto the main
+ * thread to draw and PNG-encode them by hand. Measured on the About page: `toBlob` was 6,291ms
+ * of main-thread self time — 51.9% of everything — for four garlands, while the workers sat
+ * idle. `OffscreenCanvas.convertToBlob` does the same encode here, in parallel, on threads that
+ * are already painting. The main thread's whole job is now `URL.createObjectURL`.
+ *
+ * A PLANT still comes back as an ImageBitmap: FanPainting draws it into a canvas it owns (it
+ * mattes and composites), so it never encodes anything and has nothing to gain.
  *
  * Protocol (see painter.ts, the only client):
  *   in:  { id, type: 'plant', seed, kind, size, voice }
  *      | { id, type: 'garland', opts }
- *   out: { id, ok: true, type: 'plant', bitmap, chosenSeed, stats, bounds }
- *      | { id, ok: true, type: 'garland', bitmap }        (bitmap transferred)
+ *   out: { id, ok: true, type: 'plant', bitmap, chosenSeed, stats, bounds }   (bitmap transferred)
+ *      | { id, ok: true, type: 'garland', blob }
  *      | { id, ok: false, error }
  */
 import { paintGarland, type GarlandOpts } from './garland';
@@ -30,7 +40,7 @@ export type PaintReply =
       stats: PlantStats;
       bounds: PlantBounds | null;
     }
-  | { id: number; ok: true; type: 'garland'; bitmap: ImageBitmap }
+  | { id: number; ok: true; type: 'garland'; blob: Blob }
   | { id: number; ok: false; error: string };
 
 self.onmessage = async (e: MessageEvent<PaintJob>) => {
@@ -50,9 +60,12 @@ self.onmessage = async (e: MessageEvent<PaintJob>) => {
       };
       (self as unknown as Worker).postMessage(reply, [bitmap]);
     } else {
-      const bitmap = await createImageBitmap(paintGarland(job.opts));
-      const reply: PaintReply = { id: job.id, ok: true, type: 'garland', bitmap };
-      (self as unknown as Worker).postMessage(reply, [bitmap]);
+      // Painted AND encoded here. See the header: handing back a bitmap made every caller
+      // re-encode it on the main thread, which was over half of the page's blocking time.
+      const canvas = paintGarland(job.opts) as unknown as OffscreenCanvas;
+      const blob = await canvas.convertToBlob({ type: 'image/png' });
+      const reply: PaintReply = { id: job.id, ok: true, type: 'garland', blob };
+      (self as unknown as Worker).postMessage(reply);
     }
   } catch (err) {
     const reply: PaintReply = {

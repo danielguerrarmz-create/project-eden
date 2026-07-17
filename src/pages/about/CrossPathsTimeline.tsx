@@ -1336,7 +1336,6 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
 
   useEffect(() => {
     let live = true;
-    let objectUrl: string | null = null;
     requestGarland({
       // ONLY THE SPECIES ROLLS. SUB_SEED still seeds the colonization, the scatter and the
       // stations, so the structure and every growth station are identical on every load — that is
@@ -1350,24 +1349,19 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
       scale: SUB_ORGAN_SCALE,
       tube: false, // the stems are drawn below, in sepia; the composer only brings foliage.
     })
-      .then(async (bitmap) => {
-        const c = document.createElement('canvas');
-        c.width = bitmap.width;
-        c.height = bitmap.height;
-        c.getContext('2d')?.drawImage(bitmap, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
-        if (!blob || !live) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
+      .then((painted) => {
+        if (live) setUrl(painted);
       })
       .catch((err: unknown) => {
         // The stems still draw: a failed garland costs the page its flowers, not its drawing. But a
         // broken painting room must never look like a design choice.
         console.error('gongbi sub-branch garland failed:', err);
       });
+    // NOTHING TO REVOKE. The object URL belongs to the painter's session cache and is shared by
+    // every caller of this garland — revoking it here would hand the next mount a dead URL and the
+    // ornament would silently vanish. See requestGarland.
     return () => {
       live = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [runs]);
 
@@ -1472,7 +1466,6 @@ function SpineGarland({ reduced }: { reduced: boolean }) {
 
   useEffect(() => {
     let live = true;
-    let objectUrl: string | null = null;
     requestGarland({
       // THE SPECIES VARIES PER LOAD; the stations do not. GARLAND_SEED still pins WHERE the
       // foliage sits (garlandStations is seeded off it) — only which plant grows there is rolled.
@@ -1486,26 +1479,19 @@ function SpineGarland({ reduced }: { reduced: boolean }) {
       scale: GARLAND_SCALE,
       tube: false, // Daniel's spine is the stem; the composer only brings foliage.
     })
-      .then(async (bitmap) => {
-        // The worker hands back an ImageBitmap; SVG <image> needs a URL, so draw it once to a
-        // canvas and keep the blob. Bitmaps are cached in painter.ts, so a remount is cheap.
-        const c = document.createElement('canvas');
-        c.width = bitmap.width;
-        c.height = bitmap.height;
-        c.getContext('2d')?.drawImage(bitmap, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
-        if (!blob || !live) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
+      .then((painted) => {
+        if (live) setUrl(painted);
       })
       .catch((err: unknown) => {
         // A failed garland must leave the page intact — the spine is the load-bearing thing and
         // it is drawn in SVG — but a broken painting room must not look like a design choice.
         console.error('gongbi spine garland failed:', err);
       });
+    // NOTHING TO REVOKE. The object URL belongs to the painter's session cache and is shared by
+    // every caller of this garland — revoking it here would hand the next mount a dead URL and the
+    // ornament would silently vanish. See requestGarland.
     return () => {
       live = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, []);
 
