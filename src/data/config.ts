@@ -190,8 +190,11 @@ export const SITE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// PRICING — price = Σ components × rate + install + groundwork + planting
-//           + margin, shown as ONE fixed figure (demo-spec §2.3).
+// PRICING — cost build-up = Σ components × rate + install + groundwork
+//           + planting + margin (demo-spec §2.3). Shown as a cost build-up for
+//           the kit and its install, NEVER as the commission price: the ladder's
+//           stated range lives in ui/priceCopy.ts and is ~6x this. Read that
+//           module's header before touching a rate here.
 // ---------------------------------------------------------------------------
 export const PRICING = {
   /**
@@ -238,14 +241,18 @@ export const PRICING = {
   plantingPerPlantGBP: 55,
 
   /**
-   * Margin + fixed-price guarantee. Covers the designer channel fee, VAT
-   * treatment and contingency in one stated line so the on-screen figure can
-   * honestly read "fixed", not "estimate". Shown in the decomposition — hiding
-   * it would be the overclaim the application warns against.
+   * Margin + contingency. Covers the designer channel fee, VAT treatment and
+   * contingency in one stated line. Shown in the decomposition — hiding it
+   * would be the overclaim the application warns against.
+   *
+   * This comment used to say the margin line is what lets the on-screen figure
+   * "honestly read 'fixed', not 'estimate'". It does not. A margin on top of
+   * placeholder rates is a placeholder with a margin on it, and no on-screen
+   * copy has said "fixed" since 2026-07-17. See ui/priceCopy.ts.
    */
   marginRate: 0.28,
 
-  /** The fixed figure is rounded to this so it reads as a commitment. */
+  /** The total is rounded to this. Rounding is legibility, not confidence. */
   roundTotalToGBP: 100,
 } as const;
 

@@ -278,8 +278,13 @@ export interface PriceBreakdown {
   plantingGBP: number;
   subtotalGBP: number;
   marginGBP: number;
-  /** The fixed figure on screen, rounded to a commitment-shaped number. */
-  fixedTotalGBP: number;
+  /**
+   * What this kit and its install cost out at, rounded up. NOT the commission
+   * price, and not a quote: every rate behind it is a placeholder (pricing.ts).
+   * Named `fixedTotalGBP` until 2026-07-17, which is how "fixed" kept finding
+   * its way back into the copy. See ui/priceCopy.ts.
+   */
+  costBuildUpGBP: number;
   /** Human-readable decomposition lines for the price panel + spec sheet. */
   lines: { label: string; valueGBP: number; note?: string }[];
 }

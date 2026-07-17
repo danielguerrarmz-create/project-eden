@@ -91,7 +91,7 @@ describe('project export: everything on screen is in the file', () => {
     expect(p.site!.address).toBe(site.parcel.address);
     expect(p.drawing.spines).toHaveLength(2);
     expect(p.read.params).toEqual(read.params);
-    expect(p.price.fixedTotalGBP).toBe(outputs.price.fixedTotalGBP);
+    expect(p.price.costBuildUpGBP).toBe(outputs.price.costBuildUpGBP);
   });
 
   it('carries the reasoning, not just the answers', () => {

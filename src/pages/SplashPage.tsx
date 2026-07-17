@@ -114,10 +114,12 @@ export function SplashPage() {
         {/* Honesty coda: lead with what's automated, then the moat, then the honest caveat. */}
         <div className="mt-12 border-t border-inkBlack/15 pt-8">
           <p className="max-w-[62ch] text-[17px] leading-relaxed opacity-90">
-            The price is computed from the same cut list a fabricator would quote from, and every
-            shape you can reach is buildable. Widening that family takes a chartered engineer, and
-            each commission widens it, so the engine compounds with every Eden it makes. The ecology
-            figures are honest rules of thumb, not a survey.
+            Every shape you can reach is buildable, and it compiles to the same cut list a
+            fabricator would quote from. The costing runs off that cut list, so it moves with the
+            form, but the rates behind it are placeholders until the fabrication quotes land: treat
+            the figures as indicative, not as a quote. Widening that family takes a chartered
+            engineer, and each commission widens it, so the engine compounds with every Eden it
+            makes. The ecology figures are honest rules of thumb, not a survey.
           </p>
         </div>
 

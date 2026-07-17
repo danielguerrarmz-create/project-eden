@@ -45,7 +45,12 @@ import { BakeReveal, REVEAL_S } from './draw/BakeReveal';
 import { makeRevealUniforms } from '../scene/revealShader';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
-import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
+import {
+  COMMISSION_LABEL,
+  COMMISSION_QUALIFIER,
+  COMMISSION_RANGE,
+  priceMetaLine,
+} from '../ui/priceCopy';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
@@ -536,15 +541,22 @@ export function DrawPage() {
                 </div>
 
                 <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
-                  {/* The qualifier rides the figure's own baseline rather than
-                      sitting under it: it costs no extra line, and nobody reads
-                      the number without reading what kind of number it is. */}
+                  {/* The hero is the KIT, not a figure. The engine's real claim
+                      here is "your two drags became this many true pieces", and
+                      that claim is the one it can actually support: the counts
+                      are read off the baked geometry. The computed ~£17k used to
+                      stand in this slot and was dropped on 2026-07-17 — at this
+                      size, in a hero shot, a number IS a price claim no 9px
+                      qualifier can scope, and it is ~6x off what an Eden is
+                      actually commissioned for. The build-up still exists and is
+                      inspectable on /studio, where a reader has room to read
+                      what kind of number it is. */}
                   <div className="flex items-baseline gap-2.5">
                     <p className="font-serif text-[26px] leading-none">
-                      £{outputs.price.fixedTotalGBP.toLocaleString()}
+                      {outputs.geometry.pieces.length} pieces
                     </p>
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
-                      {PRICE_QUALIFIER}
+                      cut list, live
                     </p>
                   </div>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
@@ -555,6 +567,20 @@ export function DrawPage() {
                       nodeCount: outputs.geometry.nodes.length,
                     })}
                   </p>
+                  {/* Below the rule: STATED, and nothing above the rule moves it.
+                      The divider is the whole point — it is what stops the range
+                      reading as another thing the engine just worked out. */}
+                  <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
+                      {COMMISSION_LABEL}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] tracking-[0.02em] text-inkBlack/70">
+                      {COMMISSION_RANGE}{' '}
+                      <span className="text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
+                        {COMMISSION_QUALIFIER}
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </>
             )}

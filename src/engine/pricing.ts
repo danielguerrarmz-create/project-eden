@@ -1,8 +1,13 @@
 /**
- * pricing.ts — price built line-by-line from the REAL kit:
+ * pricing.ts — a COST BUILD-UP, line-by-line from the REAL kit:
  * stock actually ordered (linear lengths + LVL sheets, waste included),
  * fabrication ops (sheet CNC + docking programs), the hardware schedule from
- * joints.ts, install, planting, margin — shown as ONE FIXED figure.
+ * joints.ts, install, planting, margin.
+ *
+ * It is NOT the commission price and must never be presented as one: it is what
+ * this kit and its install cost out at, and the stated commission range is ~6x
+ * it. See ui/priceCopy.ts for the distinction. This header said "shown as ONE
+ * FIXED figure" until 2026-07-17; nothing about it was fixed.
  *
  * Every rate is a named constant in data/config.ts — not one magic number in
  * this file. The decomposition is shown on the panel because decomposition =
@@ -44,8 +49,8 @@ export function priceDesign(
   const subtotalGBP = componentsGBP + fabricationGBP + installGBP + plantingGBP;
   const marginGBP = subtotalGBP * PRICING.marginRate;
 
-  // Rounded UP to the commitment step: a fixed price must never round below cost.
-  const fixedTotalGBP =
+  // Rounded UP: a figure shown to a client must never round below its own cost.
+  const costBuildUpGBP =
     Math.ceil((subtotalGBP + marginGBP) / PRICING.roundTotalToGBP) * PRICING.roundTotalToGBP;
 
   const r = (x: number) => Math.round(x);
@@ -73,9 +78,9 @@ export function priceDesign(
     },
     { label: `Planting allowance — ${plantCount}× ${species.common}`, valueGBP: r(plantingGBP) },
     {
-      label: 'Margin & fixed-price guarantee',
+      label: 'Margin & contingency',
       valueGBP: r(marginGBP),
-      note: 'shown, not hidden — this is what makes the figure fixed',
+      note: 'shown, not hidden — a margin over placeholder rates is still a placeholder',
     },
   ];
 
@@ -86,7 +91,7 @@ export function priceDesign(
     plantingGBP: r(plantingGBP),
     subtotalGBP: r(subtotalGBP),
     marginGBP: r(marginGBP),
-    fixedTotalGBP,
+    costBuildUpGBP,
     lines,
   };
 }

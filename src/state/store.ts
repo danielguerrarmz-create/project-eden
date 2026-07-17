@@ -190,7 +190,7 @@ export const useDesign = create<DesignState>((set, get) => {
       console.log('[RESERVE] commission intent captured', {
         email: reserveEmail,
         species: outputs.species.common,
-        fixedPriceGBP: outputs.price.fixedTotalGBP,
+        costBuildUpGBP: outputs.price.costBuildUpGBP,
         dimensions: `${outputs.geometry.spanM} m span × ${outputs.geometry.riseM} m rise`,
         componentCount: outputs.components.totalCount,
         sheets: outputs.nesting.sheets.length,
