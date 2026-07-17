@@ -133,6 +133,21 @@ POINTER; the round log is the record.*
     twice. **Wait for MOVEMENT first, then stillness**, and discard as a HARNESS failure if it never
     moves. This sentence was already in the round-7 doc and was read the same session and walked into
     anyway: **reading the warning does not inoculate you.**
+  - **AND THE FALSE-POSITIVE HALF IS THE DANGEROUS ONE, which is why `divider.mjs` mattered more than
+    its bug.** A guard that intermittently cries wolf does not get investigated — **it gets WEAKENED**,
+    because the natural response to a flaky failure is to raise a tolerance or delete the check. That
+    is the exact mechanism by which a good guard silently becomes a bad one, and it is how a threshold
+    gets relaxed for the wrong reason. So a flake is never cosmetic: **an intermittent FAIL is a bug in
+    the instrument, and it must be fixed at the wait, not at the threshold.**
+- **A SINGLE GREEN RUN IS NOT EVIDENCE FOR A SUITE COVERING PROCEDURAL OUTPUT. Re-run before you quote
+  a number.** "vitest 388" was written into ~20 commit messages tonight as a verdict; measured, the
+  suite failed **1 run in 3-4**. `reveal.test.ts` asserted an emergent space-colonization depth
+  `toBeGreaterThan(10)` and `maxOrder` landed *exactly* on 10, so the assert was a coin flip nobody had
+  flipped twice. **This is the same proxy error one level up:** "this run passed" was checked, "the
+  suite passes" was claimed. Anything covering emergent/seeded/procedural output (space colonization,
+  the gongbi genome, generated geometry) needs **3-5 runs before its number means anything** — and any
+  assert whose threshold came from observing one run (`> 10`, `> 100`, `> 1.5`) is a latent flake **even
+  while green**, because it pinned a MEASUREMENT as a LAW.
 - **IF A GUARD FILTERS ITS INPUTS, CHECK WHETHER THE SCREEN CAN THROW AWAY THE PROOF.** The
   no-crowding test filtered `if (g <= GAP + 1) continue` — "a ~40px gap must be one cluster's own
   stack". True of a healthy lane, **false of exactly the lane it guards**, because a *crowded* gap is
