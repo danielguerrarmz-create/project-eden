@@ -50,8 +50,6 @@ import {
   SPINE_W,
   TIMELINE_W,
 } from './about/CrossPathsTimeline';
-import { FanPainting } from './about/FanPainting';
-import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
 import { armPts, polyD, taperRuns, trunkPts, PAREN_STATIONS, PAREN_ORGANS, type ParenLayout, type TaperRun } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
@@ -1645,24 +1643,43 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
 const MONO_SMALL = 'font-mono text-[12px] uppercase tracking-[0.08em]';
 
 /**
- * One founder, as a three-band specimen sheet: PORTRAIT · FACTS · SPECIMEN, read across.
+ * THE FOUNDERS SIT ON CENTRE (round 10, item 4b), and this width is the whole mechanism. Daniel:
+ * "Move the image and text right, into the vacated space, so the composition sits on centre" — with
+ * "the size is right, change nothing else here" over the top of it.
+ *
+ * THE OBVIOUS FIX IS THE WRONG ONE, AND THIS WAS MEASURED, NOT REASONED. Deleting the specimen and
+ * leaving the row at `grid-cols-[2.6fr_9.1fr]` re-divides the SAME paper between two columns: the
+ * portrait goes 186x233 -> 239x299 and the founders 647 -> 744px TALL (a wider facts column wraps to
+ * more lines, and a grid row is as tall as its tallest column — CLAUDE.md). That silently resizes
+ * both things he said not to touch, blows the one-frame budget qa/founder-frame.mjs guards (726px),
+ * and REPORTS DEAD CENTRE THE WHOLE TIME — centring alone does not catch it. `fr` is a share of what
+ * is there, not a width, so the way to keep a track's pixels is to keep its denominator.
+ *
+ * So the tracks keep 2.6 and 9.1 of the original 14.7 and the BLOCK gets narrower instead: exactly
+ * the two surviving tracks plus their one surviving gap wide, with `mx-auto` laying the vacated
+ * (3fr + one gap) down as equal margins.
+ *   free space = 100% - 3rem                  (the three tracks had two 1.5rem gaps)
+ *   block      = free * 11.7/14.7 + 1.5rem    (2.6 + 9.1 of 14.7, plus the one gap that survives)
+ * Measured at the 1100px page measure: portrait 186x233 before AND after, block 289..1151, margins
+ * 119/119, centre 720 = the content box's own centre.
+ *
+ * IT WRAPS THE KICKER TOO, NOT JUST THE ROWS. "The founders." was flush with the portrait's left
+ * edge; centring only the rows left it 119px adrift of the composition it labels, which is a change
+ * to the frame rather than the absence of one. Same block, one gesture, alignment preserved.
+ */
+const FOUNDERS_BLOCK_W = 'md:mx-auto md:w-[calc((100%_-_3rem)*11.7/14.7_+_1.5rem)]';
+
+/**
+ * One founder, as a two-band sheet: PORTRAIT · FACTS, read across, centred on the paper.
  *
  * This IS the retired ascent draft's `Founders()` (`git show
  * about-v2-nonflowers:src/pages/ascent/AscentPage.tsx`), ported wholesale on Daniel's ruling —
  * "I much preferred Clay's founder page... the entirety of it is a lot better than my current
- * ones." Kept exactly: the 5/7/5 measure, the bordered 4:5 portrait with its caption UNDER it
- * (name over role, both mono), the facts as a real `<dl>` on a 52ch measure at 17px, and the
- * specimen hung large at the outer edge. What the old node did — a 112px circular crop, the role
- * in olive, the facts squeezed into a 13.5px list on leader lines — is all gone.
+ * ones." Kept exactly: the bordered 4:5 portrait with its caption UNDER it (name over role, both
+ * mono) and the facts as a real `<dl>`. What the old node did — a 112px circular crop, the role in
+ * olive, the facts squeezed into a 13.5px list on leader lines — is all gone.
  *
- * TWO DELIBERATE DEPARTURES from the source, both required by where it now lives:
- *  1. Clay's draft was INK_BLUE and forced `voice: 'ink'` on the specimen, because his page
- *     rationed pigment to two events. This page's law is the opposite (CLAUDE.md): structure is
- *     INK_SEPIA and the botanical specimens are the one place FULL PIGMENT is allowed. Daniel on
- *     round 1: "the colors are amazing". So the commission hangs unmodified, in pigment.
- *  2. The specimen is keyed on `person.id`, NOT `member.name.startsWith('Clay')` as the draft did
- *     — that grows the wrong plant the day someone rewords a name. See FOUNDER_SPECIMENS.
- *
+ * THE THIRD BAND WAS A SPECIMEN, and round 10 deleted it (item 4a); the row is a centred pair now.
  * The draft's `flex-col-reverse` wrappers are also dropped: they existed only to invert DOM order
  * for the ascent's column-reverse scroller. This page reads downward, so reading order already IS
  * visual order, and the source's intended sequence (kicker, then Clay, then Daniel) survives.
@@ -1672,9 +1689,12 @@ function FounderNode({ person }: { person: TeamMember }) {
     // `data-founder-row` is what the parenthesis measures itself against — the row's REAL laid-out
     // rect, read at runtime. It is the ornament's only handle on the layout, and the arrow points
     // one way: nothing here reads the parenthesis back.
+    // THE SPECIMEN COLUMN IS GONE (round 10, item 4a). Two tracks now, and they keep their share of
+    // the ORIGINAL fourteen-point-seven rather than re-dividing the paper between them — the width
+    // that makes that true is on the centred block in AboutPage; see FOUNDERS_BLOCK_W.
     <div
       data-founder-row
-      className="grid gap-6 md:grid-cols-[minmax(0,2.6fr)_minmax(0,9.1fr)_minmax(0,3fr)] md:items-start"
+      className="grid gap-6 md:grid-cols-[minmax(0,2.6fr)_minmax(0,9.1fr)] md:items-start"
     >
       <figure>
         {person.image ? (
@@ -1717,11 +1737,16 @@ function FounderNode({ person }: { person: TeamMember }) {
         ))}
       </dl>
 
-      {/* The specimen, signed with the seed it grew from — the provenance is the point: type the
-          printed seed into #/lab/gongbi and this exact plant grows back. 340 -> 250 (round 3) -> 210:
-          "the big picture on the side" is the one he named, and it must not become the tallest
-          column in its turn. */}
-      <FanPainting commission={FOUNDER_SPECIMENS[person.id]} size={210} className="md:justify-self-end" />
+      {/* THE SPECIMEN HUNG HERE AND IS DELETED (round 10, item 4a). It was a 210px FanPainting of
+          FOUNDER_SPECIMENS[person.id], signed with a mono `herbal · seed "bower/…"` caption —
+          Daniel named both by their captions and cut them: "Delete both right-side specimen
+          paintings... Both gone, seed labels with them." The caption WAS the seed label, so it went
+          with the slot; nothing else printed a seed. The commission ledger they were the last
+          readers of is deleted too — see paintings.ts, which set that precedent itself when the
+          discipline frontispieces went ("a commission nothing hangs is a painting the worker still
+          queues and no one ever sees"). Pigment survives everywhere else on the page: the
+          parenthesis' organs, the spine garland, the coda. This deletes two paintings, not the law
+          that allows them. */}
     </div>
   );
 }
@@ -1795,7 +1820,7 @@ export function AboutPage() {
               z-50). Ported here the bug cannot recur: this page's <main> carries
               pt-[calc(var(--header-h)+2rem)] globally, and the founders sit mid-page besides. */}
           <section aria-label="The founders" className="relative mx-auto w-full max-w-page px-gutter">
-            <div className="relative z-10">
+            <div className={`relative z-10 ${FOUNDERS_BLOCK_W}`}>
               <p className={`${MONO_SMALL} text-inkBlack/60`}>The founders.</p>
 
               <div className="mt-4 flex flex-col gap-6">

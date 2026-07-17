@@ -55,8 +55,10 @@
  *   - `bower/pool-d`                   pale blue-grey daisies. See the blueFrac note above.
  *   - `bower/pool-e`                   spiky holly leaves, washed blooms.
  *   - `bower/pool-g`                   VIOLET blooms and dark scalloped leaves. The closest call:
- *     violet is arguably in palette (it is the hero's wisteria, and Daniel's own pinned specimen
- *     `bower/daniel-guerra-5` is violet), and the blooms are genuinely handsome. Cut on two counts.
+ *     violet is arguably in palette (it is the hero's wisteria; it was also the colour of Daniel's
+ *     pinned specimen `bower/daniel-guerra-5`, which round 10 deleted along with the whole founder
+ *     ledger — the palette argument stands on the wisteria alone now), and the blooms are genuinely
+ *     handsome. Cut on two counts.
  *     Its leaves are the weakest of the four finalists — dark and half of them curled — and leaves
  *     are most of the ornament's mass. And it measured blueFrac 0.271, by far the highest of the
  *     twelve. Membership here is a COIN TOSS, not a choice: shipping the blue-most take means a
