@@ -51,7 +51,7 @@ const PROUD_MAX = 30;
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--window-size=1440,900'] });
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-await page.goto('http://localhost:5333/#/about', { waitUntil: 'domcontentloaded' });
+await page.goto('http://localhost:5333/?species=spine-2#/about', { waitUntil: 'domcontentloaded' });
 
 // CANCEL THE AUTOPLAY FIRST, or it wins: it owns window.scrollTo for a 24s descent, so a scroll set
 // underneath it is simply overwritten on the next frame (measured — the datum read wherever the
@@ -63,10 +63,22 @@ await page.goto('http://localhost:5333/#/about', { waitUntil: 'domcontentloaded'
 // another 650ms — still fighting us. And `End` cancels correctly but jumps to the document bottom
 // first, leaving the seek to claw back 11k pixels while lazy surfaces change the page height under
 // it (measured: the whole sticky row ended up 2009px above the viewport). Shift scrolls nothing.
-await sleep(800); // < AUTOPLAY_LEAD_IN_MS (2500)
+// WAIT FOR THE COMPONENT TO MOUNT, THEN CANCEL — not a wall-clock guess. The autoplay's cancel
+// listener does not exist until the timeline mounts, and in the dev build the module graph takes
+// ~1.8s to get there, so a Shift at 800ms hits nothing: the autoplay then runs and fights the seek
+// (measured — camY idled at ~2739-2944 instead of the pin's 3806, and varied run to run). The
+// window is [mount, mount + AUTOPLAY_LEAD_IN_MS]; waiting for the element puts us at its start.
+await page.waitForSelector('[data-timeline-track]', { timeout: 15000 });
+await sleep(250);
 await page.keyboard.down('Shift');
 await page.keyboard.up('Shift');
-await sleep(400);
+
+// THEN LET THE ORNAMENT FINISH PAINTING BEFORE SEEKING. The camera is a rAF lerp, and during the
+// cold paint the main thread is busy enough to STARVE it: it still converges, just slowly and by a
+// different amount each run, which is why this landed at camY 2486 / 2619 / 2739 / 2944 of 3806 on
+// four consecutive runs and looked like a layout bug. Cancel the autoplay first (the listener is
+// live the moment the track exists), then wait, then seek into a quiet page.
+await sleep(22000);
 
 // CONVERGE on the pin rather than assume one jump lands it. The page's scrollHeight CHANGES as
 // lazy surfaces mount and unmount under the scroll, which moves the track out from under a
@@ -82,25 +94,19 @@ const seek = () =>
     return +(-after.top / (after.height - window.innerHeight)).toFixed(4);
   }, PIN_HOLD_FRAC);
 
+// SEEK REPEATEDLY, AND DO NOT BREAK EARLY. Two different things have to arrive: the scroll
+// position (immediate) and the camera, which lerps toward it at 0.1/frame and takes ~2.4s from
+// cold. Breaking as soon as `p` is right leaves the camera mid-flight, and it then stalled at
+// camY ~2486-2944 of 3806, differently every run.
+//
+// Re-seeking is free when nothing has moved (scrollTo to the same offset fires no event), and it
+// re-kicks the camera if the document's height HAS moved under us — which it does: measured, the
+// page grows ~300px while the ornament finishes painting. Six passes at 900ms covers the measured
+// convergence with room, and the pin guard below decides whether we actually arrived.
 let atP = 0;
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 6; i++) {
   atP = await seek();
   await sleep(900);
-  if (Math.abs(atP - PIN_HOLD_FRAC) < 0.002) break;
-}
-
-// SETTLING IS A SEPARATE WAIT FROM SEEKING, and it needs polling rather than a guessed sleep. The
-// scroll position and the camera are two different values: `p` is the real scrollY, while the
-// component's camera lerps toward it at 0.1/frame and only then idles. A fixed 2s sleep looked
-// sufficient on paper and was not in practice (p had arrived at 0.75 while the camera was still at
-// 0.63 — headless throttles rAF). Poll the viewBox until it stops moving.
-const camNow = () => page.evaluate(() => +document.querySelector('[data-timeline-track] svg').getAttribute('viewBox').split(' ')[1]);
-let prev = await camNow();
-for (let i = 0; i < 25; i++) {
-  await sleep(400);
-  const now = await camNow();
-  if (Math.abs(now - prev) < 0.01) break;
-  prev = now;
 }
 
 const r = await page.evaluate(() => {
