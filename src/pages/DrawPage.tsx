@@ -32,16 +32,26 @@
  * The site step is parked (engine/site.ts + draw/SiteMap.tsx still exist, and
  * still have their tests) — scaffold to come back to.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import { SplashHeader } from './splash/SplashHeader';
 import { DrawStage, type Tool } from './draw/DrawStage';
+import { CinematicCamera } from './draw/CinematicCamera';
+import { surfaceSamples, type Framing } from './draw/framing';
 import { Folly } from '../scene/Folly';
 import { webglSupported } from '../ui/webgl';
 import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
 import { readDrawing, type Spine } from '../engine/fromDrawing';
-import { surfaceAreaM2, surfacePeakM, type Edit, type SurfaceInput } from '../engine/surface';
+import {
+  isHole,
+  surfaceAreaM2,
+  surfaceBounds,
+  surfaceHeight,
+  surfacePeakM,
+  type Edit,
+  type SurfaceInput,
+} from '../engine/surface';
 import { shapeFromDrawing } from '../engine/shapeFromDrawing';
 import { buildProjectExport, buildDrawingExport, exportFilename } from '../engine/exportProject';
 import { useDesign } from '../state/store';
@@ -57,10 +67,27 @@ function download(name: string, data: unknown) {
 }
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
-  { id: 'draw', label: 'draw', hint: 'drag a line across the lawn' },
+  // The draw hint is what you are told once the canopy is already standing, so
+  // it cannot be the opening instruction. It used to be, and the caption
+  // reverted to "drag a line across the lawn" with two lines drawn and a
+  // canopy up: the one state where that sentence is plainly false. The two
+  // sentences the opening needs are special-cased below, by line count.
+  { id: 'draw', label: 'draw', hint: 'another line grows it' },
   { id: 'lift', label: 'lift', hint: 'press on it and pull up' },
   { id: 'hole', label: 'excavate', hint: 'press on it and drag out a hole' },
 ];
+
+/** The opening shot. Authored, not derived: it frames the empty lawn. */
+const HOME: Framing = { kind: 'pose', position: [5.6, 3.6, 6.6], target: [0, 1.0, 0] };
+/**
+ * Air left round the object, on whichever axis binds. Measured, not guessed:
+ * 1.08 filled 93% of frame height and put the crown and the near foot within a
+ * few pixels of the edges, which reads as a crop rather than a composition.
+ * 1.22 lands the baked lattice at about three quarters of the frame with an
+ * even band top and bottom, and leaves room for the lattice to breathe as the
+ * turntable brings its wider axis round.
+ */
+const FRAME_MARGIN = 1.22;
 
 export function DrawPage() {
   const [arcs, setArcs] = useState<Spine[]>([]);
@@ -101,6 +128,57 @@ export function DrawPage() {
   const soft = arcs.length > 0 && !baked;
   const canBake = arcs.length >= 2 && !baked;
   const activeHint = TOOLS.find((t) => t.id === tool)!.hint;
+
+  // --- Camera. The object should fill the frame, and it should move once baked.
+  const [framing, setFraming] = useState<Framing>(HOME);
+  const [turntable, setTurntable] = useState(false);
+
+  // The framing effects fire on a COUNT changing, not on the surface changing,
+  // so a lift or an excavate never yanks the camera out from under the hand
+  // doing it. They still need today's surface to measure, so keep it in a ref
+  // and sync it first: effects run top to bottom within a component.
+  const latest = useRef({ surface, peakM });
+  useEffect(() => {
+    latest.current = { surface, peakM };
+  });
+
+  // The canopy has appeared, or grown another line. Frame the soft thing.
+  useEffect(() => {
+    if (baked || arcs.length < 2) return;
+    const input = latest.current.surface;
+    const points = surfaceSamples(
+      surfaceBounds(input),
+      (p) => surfaceHeight(input, p),
+      (p) => isHole(input, p),
+    );
+    if (points.length === 0) return; // nothing standing yet; leave the camera be
+    setFraming({ kind: 'fit', points, margin: FRAME_MARGIN });
+  }, [arcs.length, baked]);
+
+  // Baked. Frame the REAL kit, which is not the size of the skin it replaced.
+  // Keyed on the geometry rather than on `baked`, because at the render where
+  // baked flips true the store still holds the previous geometry: the effect
+  // that feeds it the drawing has not run yet. Framing on `baked` alone would
+  // fit the frame to whatever the studio was last showing.
+  useEffect(() => {
+    if (!baked) return;
+    // The nodes ARE the object: fitting their box instead would reserve a third
+    // of the frame for the empty corners a dome never reaches.
+    setFraming({
+      kind: 'fit',
+      points: outputs.geometry.nodes.map((n) => n.position),
+      margin: FRAME_MARGIN,
+    });
+  }, [baked, outputs.geometry]);
+
+  // Start over: back to the opening shot, so the next take opens where the
+  // last one did. The lawn has no object to fit, so this pose is authored.
+  useEffect(() => {
+    if (arcs.length === 0 && !baked) {
+      setFraming(HOME);
+      setTurntable(false);
+    }
+  }, [arcs.length, baked]);
 
   return (
     <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
@@ -157,7 +235,18 @@ export function DrawPage() {
                   maxDistance={18}
                   maxPolarAngle={Math.PI / 2.05}
                   enablePan={false}
+                  // Without damping the view stops dead on pointer-up, which
+                  // makes a hand-turned object feel like a stepper motor.
+                  enableDamping
+                  dampingFactor={0.07}
+                  // The turntable yields to the person, instantly and for good.
+                  // OrbitControls fires this on the pointer going down, before
+                  // any movement, so the object never fights the first drag.
+                  onStart={() => setTurntable(false)}
                 />
+                {/* After OrbitControls on purpose: it must exist before this
+                    can read it. */}
+                <CinematicCamera framing={framing} turntable={turntable} />
               </Canvas>
             ) : (
               <div className="grid h-full place-items-center p-6">
@@ -260,7 +349,13 @@ export function DrawPage() {
                 </Chip>
               )}
               {canBake && (
-                <Chip onClick={() => setBaked(true)} strong>
+                <Chip
+                  onClick={() => {
+                    setBaked(true);
+                    setTurntable(true);
+                  }}
+                  strong
+                >
                   bake it
                 </Chip>
               )}
@@ -286,7 +381,14 @@ export function DrawPage() {
                   >
                     export everything
                   </Chip>
-                  <Chip onClick={() => setBaked(false)}>keep sculpting</Chip>
+                  <Chip
+                    onClick={() => {
+                      setBaked(false);
+                      setTurntable(false); // you cannot sculpt a moving target
+                    }}
+                  >
+                    keep sculpting
+                  </Chip>
                 </>
               )}
               {(arcs.length > 0 || edits.length > 0) && (

@@ -232,7 +232,7 @@ export function readDrawing(d: Drawing): ReadDrawing {
     if (engineFeet !== footBearingsDeg.length) {
       nudges.push({
         kind: 'offered',
-        text: `At ${footprintM2.toFixed(1)} m² this family usually stands on ${engineFeet} legs. Fewer, wider-spaced feet make a calmer canopy — yours if you want it.`,
+        text: `At ${footprintM2.toFixed(1)} m² this family usually stands on ${engineFeet} legs. Fewer, wider-spaced feet make a calmer canopy. Yours if you want it.`,
       });
     }
   }
@@ -242,7 +242,7 @@ export function readDrawing(d: Drawing): ReadDrawing {
   if (footBearingsDeg.length >= 2) {
     nudges.push({
       kind: 'read',
-      text: `Widest gap between contacts faces ${apertureDeg}° — the canopy opens there. You didn't set this; it fell out of where you put the legs.`,
+      text: `Widest gap between contacts faces ${apertureDeg}°, so the canopy opens there. You didn't set this; it fell out of where you put the legs.`,
     });
   }
 
@@ -251,7 +251,7 @@ export function readDrawing(d: Drawing): ReadDrawing {
   if (footBearingsDeg.length >= 2 && offSun > 45) {
     nudges.push({
       kind: 'offered',
-      text: `That opening faces ${offSun.toFixed(0)}° away from the southern sun. Rotating it toward ${SUNWARD_DEG}° would put more light on the climber. Your call — it's your garden.`,
+      text: `That opening faces ${offSun.toFixed(0)}° away from the southern sun. Rotating it toward ${SUNWARD_DEG}° would put more light on the climber. Your call: it's your garden.`,
     });
   }
 
@@ -268,7 +268,7 @@ export function readDrawing(d: Drawing): ReadDrawing {
       kind: 'held',
       text:
         riseM >= ENVELOPE.riseM.max
-          ? `Held at ${ENVELOPE.riseM.max} m — above that you'd need a planning application, not a delivery.`
+          ? `Held at ${ENVELOPE.riseM.max} m. Above that you'd need a planning application, not a delivery.`
           : `Your lines imply ${askedRiseM.toFixed(1)} m of rise. Below ${ENVELOPE.riseM.min} m people stop being able to walk under it, so it crowns at ${ENVELOPE.riseM.min} m.`,
     });
   } else if (d.spines.length >= 2) {

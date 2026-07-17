@@ -253,3 +253,50 @@ describe('centroid', () => {
     expect(centroid([])).toEqual({ x: 0, y: 0 });
   });
 });
+
+describe('nudge prose obeys the house punctuation rule', () => {
+  /**
+   * Every nudge this engine can produce, across drawings chosen to light up
+   * each branch: in-family, clamped big, clamped small, feet-count offer,
+   * aperture, the sun offer, and the rise cap.
+   */
+  const everyNudge = () => {
+    const line = (x1: number, y1: number, x2: number, y2: number) => ({
+      a: { x: x1, y: y1 },
+      b: { x: x2, y: y2 },
+    });
+    const drawings: Drawing[] = [
+      { spines: [line(-2, -2, 2, 2), line(2, -2, -2, 2)] },
+      { spines: [line(-1, 0, 1, 0)] },
+      // Clamped large, and clamped small: the two 'held' footprint branches.
+      { spines: [line(-9, -9, 9, 9), line(9, -9, -9, 9)] },
+      { spines: [line(-0.4, 0, 0.4, 0), line(0, -0.4, 0, 0.4)] },
+      // Six contacts: trips the feet-count 'offered' branch.
+      {
+        spines: [line(-2.5, 0, 2.5, 0), line(-1.2, -2.2, 1.2, 2.2), line(1.2, -2.2, -1.2, 2.2)],
+      },
+      // A long span asks for more rise than the cap allows: 'held' on rise.
+      { spines: [line(-8, 0, 8, 0), line(0, -3, 0, 3)] },
+      { spines: [line(-2, -2, 2, 2), line(2, -2, -2, 2)], crownPullM: 4 },
+      { spines: [line(-2, -2, 2, 2), line(2, -2, -2, 2)], crownPullM: -4 },
+      { spines: [line(-3, -1, 3, 1), line(-1, -3, 1, 3)], outline: blob(6) },
+    ];
+    return drawings.flatMap((d) => readDrawing(d).nudges);
+  };
+
+  it('never uses an em or en dash as punctuation', () => {
+    const nudges = everyNudge();
+    // Probe guard: an empty list would pass the assertion below while proving
+    // nothing at all. These drawings must actually produce prose.
+    expect(nudges.length).toBeGreaterThan(12);
+    const offenders = nudges.filter((n) => /[—–]/.test(n.text)).map((n) => n.text);
+    expect(offenders).toEqual([]);
+  });
+
+  it('covers every kind of nudge, so the rule is tested where it can break', () => {
+    // If a refactor stopped a branch from firing, the dash test above would go
+    // quietly green over prose it never read.
+    const kinds = new Set(everyNudge().map((n) => n.kind));
+    expect([...kinds].sort()).toEqual(['held', 'offered', 'read']);
+  });
+});
