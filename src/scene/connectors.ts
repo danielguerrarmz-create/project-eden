@@ -26,10 +26,19 @@ const MM = 1 / 1000;
 const UP = new THREE.Vector3(0, 1, 0);
 const scratch = new THREE.Object3D();
 
+/**
+ * Structural steel photographs bright and galvanized; fasteners read darker and
+ * shadow-recessed against it. The split is by ROLE, not by pool: every box is
+ * structural, but the cylinder pool mixes structural core drums with the bolts,
+ * dome-nut caps and ground-screw stubs that are fasteners. `cylRoles` carries
+ * that per-instance so `Folly` can tone them apart with one instanceColor buffer.
+ */
+export type SteelRole = 'structural' | 'fastener';
+
 export interface SteelParts {
   /** Unit-box instances: fins, clamp plates, base plates, fish plates. */
   boxes: THREE.Matrix4[];
-  /** Unit-cylinder (Ø1 × h1, axis Y) instances: core drums, bolts. */
+  /** Unit-cylinder (Ø1 × h1, axis Y) instances: core drums, bolts, nut caps, screw stubs. */
   cylinders: THREE.Matrix4[];
   /**
    * EXPLODE, per instance, parallel to `boxes` / `cylinders`.
@@ -42,6 +51,14 @@ export interface SteelParts {
    */
   boxOwners: SteelOwner[];
   cylOwners: SteelOwner[];
+  /**
+   * Role per CYLINDER instance, exactly parallel to `cylinders`. Boxes are all
+   * structural, so there is deliberately no `boxRoles`. Pushed alongside each
+   * cylinder (not backfilled at the node boundary the way owners are) because a
+   * single node emits BOTH a structural core drum and its fastener bolts, so a
+   * per-node fill would tag them the same and lose the split.
+   */
+  cylRoles: SteelRole[];
 }
 
 /** Which node an instance came from, and the two facts the explode needs. */
@@ -93,13 +110,37 @@ const BLANK_THICK_M = STOCK.blank.thicknessMm * MM;
 const LAMELLA_THICK_M = STOCK.lamella.thicknessMm * MM;
 const STRUT_WIDTH_M = STOCK.strut.widthMm * MM;
 
+// --- Hardware the joint spec already NAMES but Folly did not draw. These are
+// render sizes for parts that exist in JOINTS/FOUNDATION; none moves a BOM line.
+//
+// Dome nut (JOINTS.hub.boltSpec = 'M12×70 8.8 HDG + dome nut'): the nut was
+// named and invisible. A flat cylinder cap, not a faceted hex — reads fine at
+// demo distance (Sai's non-goal). Ø and length are proportioned off the 12 mm
+// bolt, not a spec dimension; eyeball against a render.
+const DOME_NUT_DIA_M = 0.022;
+const DOME_NUT_LEN_M = 0.012;
+// Ground screw (FOUNDATION.groundScrewSpec = 'Ø76 × 865 mm HDG ground screw'):
+// the Ø76 is real; only ~a collar's worth shows above the base plate because
+// most of the 865 mm drives below grade. Visible height is a proportion, tuned
+// down from Sai's ~100 mm so the collar does not fight the foot timber landing
+// on the same node. Eyeball-tunable.
+const GROUND_SCREW_DIA_M = 0.076;
+const GROUND_SCREW_VISIBLE_M = 0.06;
+
 export function buildSteel(g: CanopyGeometry): SteelParts {
   const lamella = g.params.jointSystem === 'lamella';
   const boxes: THREE.Matrix4[] = [];
   const cylinders: THREE.Matrix4[] = [];
   const boxOwners: SteelOwner[] = [];
   const cylOwners: SteelOwner[] = [];
+  const cylRoles: SteelRole[] = [];
   const memberById = new Map(g.members.map((m) => [m.id, m]));
+
+  // Push a cylinder and its role together, so the two arrays cannot drift.
+  const pushCyl = (mat: THREE.Matrix4, role: SteelRole) => {
+    cylinders.push(mat);
+    cylRoles.push(role);
+  };
 
   /** Incident ends: member + the unit dir from this node into it + its trim. */
   const endsAt = (nodeId: string, ids: string[]) =>
@@ -153,12 +194,23 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
       // ================= HUB SYSTEM =================
       // Connector body by node kind (FABRICATION.md §2 variants).
       if (node.kind === 'interior') {
-        cylinders.push(
+        pushCyl(
           cylMat(P, node.normal, JOINTS.hub.coreDiaMm * MM, JOINTS.hub.coreDiscMm * MM),
+          'structural',
         );
       } else if (node.kind === 'ground') {
         // Ground shoe: 200×200×8 base plate over the driven screw.
         boxes.push(boxMat([P[0], 0.004, P[2]], [1, 0, 0], 0.2, [0, 1, 0], 0.008, 0.2));
+        // The screw itself: a Ø76 collar rising from grade through the plate.
+        pushCyl(
+          cylMat(
+            [P[0], GROUND_SCREW_VISIBLE_M / 2, P[2]],
+            [0, 1, 0],
+            GROUND_SCREW_DIA_M,
+            GROUND_SCREW_VISIBLE_M,
+          ),
+          'fastener',
+        );
       } else if (ringT && ringW) {
         // Crown/eave hub: paired flanges gripping the blank band.
         for (const s of [-1, 1]) {
@@ -190,16 +242,22 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
             JOINTS.hub.finThicknessMm * MM,
           ),
         );
-        // The 2 through-bolts per strut end, at the §2 hole insets.
+        // The 2 through-bolts per strut end, at the §2 hole insets — and one
+        // dome nut per bolt, threaded on the OUTER face where the bolt exits.
         for (const insetMm of JOINTS.hub.boltInsetsMm) {
-          cylinders.push(
-            cylMat(
-              v3.add(P, v3.scale(e.u, e.trim + insetMm * MM)),
-              e.f.width,
-              JOINTS.hub.boltDiaMm * MM,
-              STRUT_WIDTH_M + 0.024,
-            ),
+          const boltCenter = v3.add(P, v3.scale(e.u, e.trim + insetMm * MM));
+          pushCyl(
+            cylMat(boltCenter, e.f.width, JOINTS.hub.boltDiaMm * MM, STRUT_WIDTH_M + 0.024),
+            'fastener',
           );
+          // The nut sits in the 12 mm the bolt protrudes past the +width face,
+          // flush against it. One consistent side; the two ends are symmetric
+          // about the fin so either reads as "a nut threaded on".
+          const nutCenter = v3.add(
+            boltCenter,
+            v3.scale(e.f.width, STRUT_WIDTH_M / 2 + DOME_NUT_LEN_M / 2),
+          );
+          pushCyl(cylMat(nutCenter, e.f.width, DOME_NUT_DIA_M, DOME_NUT_LEN_M), 'fastener');
         }
       }
     } else {
@@ -207,19 +265,25 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
       if (node.kind === 'ground') {
         // Bent-plate shoe: base plate over the screw.
         boxes.push(boxMat([P[0], 0.003, P[2]], [1, 0, 0], 0.15, [0, 1, 0], 0.006, 0.15));
+        // The screw itself: same Ø76 collar as the hub shoe.
+        pushCyl(
+          cylMat(
+            [P[0], GROUND_SCREW_VISIBLE_M / 2, P[2]],
+            [0, 1, 0],
+            GROUND_SCREW_DIA_M,
+            GROUND_SCREW_VISIBLE_M,
+          ),
+          'fastener',
+        );
       }
       if (node.kind === 'interior') {
         const butt = strutEnds.find((e) => e.cut.kind === 'butt');
         if (butt) {
           // The Zollinger joint: ONE through-bolt along the butt plane normal
           // (continuous piece mid-hole + both butting ends' slotted holes).
-          cylinders.push(
-            cylMat(
-              P,
-              butt.cut.normal,
-              JOINTS.lamella.boltDiaMm * MM,
-              LAMELLA_THICK_M * 3 + 0.03,
-            ),
+          pushCyl(
+            cylMat(P, butt.cut.normal, JOINTS.lamella.boltDiaMm * MM, LAMELLA_THICK_M * 3 + 0.03),
+            'fastener',
           );
         } else {
           // Split-weave node: fish-plate pair sandwiching the spliced family.
@@ -253,5 +317,9 @@ export function buildSteel(g: CanopyGeometry): SteelParts {
     while (cylOwners.length < cylinders.length) cylOwners.push(owner);
   }
 
-  return { boxes, cylinders, boxOwners, cylOwners };
+  // Net for any cylinder pushed without `pushCyl`: default to the bright
+  // galvanized tone (a missed fastener reads as structural, never as black).
+  while (cylRoles.length < cylinders.length) cylRoles.push('structural');
+
+  return { boxes, cylinders, boxOwners, cylOwners, cylRoles };
 }

@@ -43,6 +43,19 @@ describe.each(['hub', 'lamella'] as const)('buildSteel (%s system)', (jointSyste
     expect(steel.cylOwners).toHaveLength(steel.cylinders.length);
   });
 
+  it('tags a role for EVERY cylinder, exactly parallel', () => {
+    // The instanceColor split rests on this the way the explode rests on owners.
+    // A drift here is a bolt rendered galvanized (or a drum rendered dark).
+    expect(steel.cylRoles).toHaveLength(steel.cylinders.length);
+    for (const r of steel.cylRoles) expect(['structural', 'fastener']).toContain(r);
+  });
+
+  it('has both structural and fastener cylinders (bolts exist, drums or stubs exist)', () => {
+    // Every design has bolts (hub) or through-bolts (lamella) plus ground-screw
+    // stubs, so at least one fastener; and ground stubs put steel at the feet.
+    expect(steel.cylRoles).toContain('fastener');
+  });
+
   it('owns every instance from a real node', () => {
     for (const o of [...steel.boxOwners, ...steel.cylOwners]) {
       expect(nodeIds.has(o.nodeId)).toBe(true);

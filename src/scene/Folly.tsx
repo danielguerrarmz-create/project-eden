@@ -22,18 +22,27 @@ import { buildSteel, type SteelOwner } from './connectors';
 import { applyExplode, explodeDistanceM, type ExplodeUniforms } from './explodeShader';
 import { applyReveal, makeRevealDepthMaterial, type RevealUniforms } from './revealShader';
 
-// Prism corners come ordered [start 0..3, end 0..3] around the section.
-const FACES: [number, number, number, number][] = [
-  [0, 1, 2, 3], // start cut face
-  [4, 5, 6, 7], // end cut face
-  [0, 1, 5, 4],
-  [1, 2, 6, 5],
-  [2, 3, 7, 6],
-  [3, 0, 4, 7],
-];
+// Two-tone steel by ROLE (connectors.ts tags each cylinder). Structural keeps
+// the bright galvanized tone already tuned by the 2026-07-17 visual pass;
+// fasteners go dark so a bolt reads as recessed against the plate it holds, the
+// single cheapest move that turns "a cluster of grey boxes" into "a plate with
+// bolts in it". Driven through instanceColor on ONE mesh — see the cylinder
+// material's `vertexColors` + white `color` buffer, which this three version
+// REQUIRES for instanceColor to reach the fragment (USE_COLOR gates it).
+const STEEL_STRUCTURAL = new THREE.Color('#aab0b4');
+const STEEL_FASTENER = new THREE.Color('#3a382f');
 
 /**
- * Merge clipped member prisms into one flat-shaded BufferGeometry.
+ * Merge clipped member prisms into one flat-shaded BufferGeometry, with an
+ * EASED ARRIS: the 4 long running edges are chamfered so the box section reads
+ * as an octagon, the way a timber shop breaks the sharp corners on planed stock.
+ * The two end-cap (cut) faces are NOT chamfered — those are the honest joint the
+ * saw makes, and softening them would blur the "what you see IS the cut" claim.
+ *
+ * `chamferM` is a render bevel, not a stock dimension: it moves no BOM line. It
+ * is applied purely tangentially inside each cut plane, so each cap stays planar
+ * and flush on its plane — the octagon is the rectangle with its 4 corners
+ * clipped, not a new bevelled surface between cap and side.
  *
  * `explode` carries, per prism, the world-space vector that prism travels at
  * full explode and when it starts (0 = eave/ground, 1 = crown). Written as
@@ -45,6 +54,7 @@ const FACES: [number, number, number, number][] = [
  */
 function prismsToGeometry(
   prisms: Vec3[][],
+  chamferM: number,
   explode?: { offsets: Vec3[]; delays: number[]; pieceIndex: number[] },
 ): THREE.BufferGeometry {
   const positions: number[] = [];
@@ -53,53 +63,84 @@ function prismsToGeometry(
   const delays: number[] = [];
   const pieceIdx: number[] = [];
   const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const scale = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s];
   const cross = (a: Vec3, b: Vec3): Vec3 => [
     a[1] * b[2] - a[2] * b[1],
     a[2] * b[0] - a[0] * b[2],
     a[0] * b[1] - a[1] * b[0],
   ];
   const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
+  const norm = (a: Vec3): Vec3 => {
+    const l = len(a) || 1e-9;
+    return [a[0] / l, a[1] / l, a[2] / l];
+  };
+
+  // Faces over the 16 chamfered vertices (start octagon 0..7, end octagon 8..15).
+  // The 8 side quads alternate a shortened original face and a new chamfer facet.
+  const SIDES: number[][] = [];
+  for (let j = 0; j < 8; j++) SIDES.push([j, (j + 1) % 8, ((j + 1) % 8) + 8, j + 8]);
+  const CAP_START = [0, 1, 2, 3, 4, 5, 6, 7];
+  const CAP_END = [8, 9, 10, 11, 12, 13, 14, 15];
 
   for (const [pi, v] of prisms.entries()) {
     const off = explode?.offsets[pi] ?? ([0, 0, 0] as Vec3);
     const delay = explode?.delays[pi] ?? 0;
     const piece = explode?.pieceIndex[pi] ?? -1;
-    const centroid: [number, number, number] = [0, 0, 0];
-    for (const p of v) {
-      centroid[0] += p[0] / 8;
-      centroid[1] += p[1] / 8;
-      centroid[2] += p[2] / 8;
+
+    // Build the chamfered corners. For each of the 4 rectangle corners on a
+    // cap, split it into two points offset along the two incident section edges
+    // by the chamfer, clamped under half the shorter edge so it can never fold.
+    const cv: Vec3[] = [];
+    for (const base of [0, 4]) {
+      for (let k = 0; k < 4; k++) {
+        const ck = v[base + k];
+        const next = v[base + ((k + 1) % 4)];
+        const prev = v[base + ((k + 3) % 4)];
+        const cNext = Math.min(chamferM, 0.45 * len(sub(next, ck)));
+        const cPrev = Math.min(chamferM, 0.45 * len(sub(prev, ck)));
+        cv.push(add(ck, scale(norm(sub(prev, ck)), cPrev))); // toward prev
+        cv.push(add(ck, scale(norm(sub(next, ck)), cNext))); // toward next
+      }
     }
-    for (const face of FACES) {
+
+    const centroid: [number, number, number] = [0, 0, 0];
+    for (const p of cv) {
+      centroid[0] += p[0] / cv.length;
+      centroid[1] += p[1] / cv.length;
+      centroid[2] += p[2] / cv.length;
+    }
+
+    // Fan-triangulate a planar convex face with a single outward normal.
+    const emit = (idx: number[]) => {
       const fc: [number, number, number] = [0, 0, 0];
-      for (const i of face) {
-        fc[0] += v[i][0] / 4;
-        fc[1] += v[i][1] / 4;
-        fc[2] += v[i][2] / 4;
+      for (const i of idx) {
+        fc[0] += cv[i][0] / idx.length;
+        fc[1] += cv[i][1] / idx.length;
+        fc[2] += cv[i][2] / idx.length;
       }
-      // Planar-quad normal from the diagonals, oriented outward (away from
-      // the prism centroid), winding fixed to match.
-      let [a, b, c, d] = face;
-      let n = cross(sub(v[c], v[a]), sub(v[d], v[b]));
+      let n = cross(sub(cv[idx[1]], cv[idx[0]]), sub(cv[idx[2]], cv[idx[0]]));
+      let order = idx;
       if (dot(n, sub(fc, centroid)) < 0) {
-        [b, d] = [d, b];
         n = [-n[0], -n[1], -n[2]];
+        order = [...idx].reverse();
       }
-      const l = Math.hypot(n[0], n[1], n[2]) || 1e-9;
-      const un: Vec3 = [n[0] / l, n[1] / l, n[2] / l];
-      for (const tri of [
-        [a, b, c],
-        [a, c, d],
-      ]) {
-        for (const i of tri) {
-          positions.push(v[i][0], v[i][1], v[i][2]);
+      const un = norm(n);
+      for (let t = 1; t < order.length - 1; t++) {
+        for (const i of [order[0], order[t], order[t + 1]]) {
+          positions.push(cv[i][0], cv[i][1], cv[i][2]);
           normals.push(un[0], un[1], un[2]);
           offsets.push(off[0], off[1], off[2]);
           delays.push(delay);
           pieceIdx.push(piece);
         }
       }
-    }
+    };
+
+    emit(CAP_START);
+    emit(CAP_END);
+    for (const s of SIDES) emit(s);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -206,6 +247,11 @@ export function Folly({
   const cylsRef = useRef<THREE.InstancedMesh>(null);
   const reveal = useReveal(revealUniforms, explodeUniforms);
 
+  // Eased-arris depth by stock, a render bevel (not a config.ts stock spec):
+  // the sawn C24 struts/feet break a heavier arris than the CNC-profiled LVL.
+  const CHAMFER_STRUT_M = 0.004; // C24 struts/feet, 45×70
+  const CHAMFER_LVL_M = 0.003; // LVL blanks (180×45) and lamella (45×120)
+
   // Timber split by STOCK, matching the BOM: planed C24 off the docking saw
   // vs LVL off the CNC sheets. Each member is its plane-clipped solid.
   const { c24Geo, lvlGeo, c24Count, lvlCount } = useMemo(() => {
@@ -229,8 +275,8 @@ export function Folly({
       ex.pieceIndex.push(pieceIndexById.get(m.pieceId) ?? -1);
     }
     return {
-      c24Geo: prismsToGeometry(c24, c24Ex),
-      lvlGeo: prismsToGeometry(lvl, lvlEx),
+      c24Geo: prismsToGeometry(c24, CHAMFER_STRUT_M, c24Ex),
+      lvlGeo: prismsToGeometry(lvl, CHAMFER_LVL_M, lvlEx),
       c24Count: c24.length,
       lvlCount: lvl.length,
     };
@@ -266,6 +312,29 @@ export function Folly({
   const steelDistM = explodeDistanceM(geometry.planB);
   useInstanceMatrices(boxesRef, steel.boxes, steel.boxOwners, steelDistM);
   useInstanceMatrices(cylsRef, steel.cylinders, steel.cylOwners, steelDistM);
+
+  // The cylinder pool's base geometry carries an all-white `color` buffer so the
+  // material's `vertexColors` is valid (no `color` attribute would render the
+  // steel black under USE_COLOR); the per-instance tone then comes from
+  // instanceColor below, white × instanceColor = instanceColor.
+  const cylGeo = useMemo(() => {
+    const g = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+    const n = g.attributes.position.count;
+    g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+    return g;
+  }, []);
+  useEffect(() => () => cylGeo.dispose(), [cylGeo]);
+
+  // Tone each cylinder by its role. Keyed on the count with the matrices, since
+  // the mesh remounts when the instance count changes.
+  useLayoutEffect(() => {
+    const mesh = cylsRef.current;
+    if (!mesh) return;
+    steel.cylRoles.forEach((role, i) => {
+      mesh.setColorAt(i, role === 'fastener' ? STEEL_FASTENER : STEEL_STRUCTURAL);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [steel.cylRoles, steel.cylinders.length]);
 
   // The steel already owns its refs for the instance matrices, so it takes the
   // reveal here rather than through a ref callback. Keyed on the counts because
@@ -325,17 +394,18 @@ export function Folly({
         <instancedMesh
           key={`steel-cyls-${steel.cylinders.length}`}
           ref={cylsRef}
+          geometry={cylGeo}
           args={[undefined, undefined, steel.cylinders.length]}
           castShadow
         >
-          {/* Core drums + bolts (unit Ø1 × h1, scaled per instance). */}
-          <cylinderGeometry args={[0.5, 0.5, 1, 16]} />
-          {/* Crisper than the old 0.62/0.45: with something in the environment
-              to reflect, a lower roughness and higher metalness turn the hubs
-              from flat grey discs into galvanized zinc that catches the light
-              as the turntable brings it round. Without an env map this trade
-              is a downgrade, so the two changes ship together. */}
-          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.58} />
+          {/* Core drums (structural) + bolts, nut caps, screw stubs (fasteners);
+              unit Ø1 × h1, scaled per instance, toned per instance by role.
+              `vertexColors` + the white base `color` buffer let instanceColor
+              reach the fragment; the base color stays white so the instance tone
+              is the whole answer (white × instanceColor = instanceColor).
+              Roughness/metalness stay the 0.5/0.58 the visual pass tuned, shared
+              across both tones — the colour contrast carries the read. */}
+          <meshStandardMaterial color="#ffffff" vertexColors roughness={0.5} metalness={0.58} />
         </instancedMesh>
       )}
     </>
