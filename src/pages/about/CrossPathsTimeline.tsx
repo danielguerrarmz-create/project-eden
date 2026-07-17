@@ -155,6 +155,44 @@ const CX = 600;
 const MAX_YEAR = 2026;
 /** The spine's stroke, in WORLD units — not CSS px. What it renders at depends on the frame's
  *  scale, which is why the parenthesis measures rather than copies the number. */
+/**
+ * THE SPINE'S WEIGHT — and it is not only a weight, which is round 10's item 1a and why that item is
+ * NOT built. TODO(Daniel): read this before anyone thins the spine.
+ *
+ * He asked for three things. 1b (the bottom should grow out of the screen) and 1c (the top should
+ * fade, not cut, and stay clear of the header) are real, diagnosed and measured — see revealProps.
+ * 1a asked that the spine be "drawn by the same procedural algorithm as the nonflowers stroke used
+ * for the ornamental vines, at a similar (thin) weight", so it reads "as the same organism as the
+ * branches around it, not as a rule with plants glued to it". The intent is right: it IS a uniform
+ * 7.5 rule today. But the instruction as written collides with two load-bearing things, so it was
+ * raised rather than complied with.
+ *
+ * ONE: THIS CONSTANT SETS THE MARK'S SIZE. `MARK_K = SPINE_W / MARK_STROKE` and `MARK_R = 30 *
+ * MARK_K`, and the comment there is explicit that "the mark's scale is not a free choice... 2.8 *
+ * MARK_K = SPINE_W, so the line becomes mark linework with no change in weight. That pins the mark
+ * at 90 * MARK_K = 241px wide." Thin the spine to the sub-branches' 2.2 and the Oculus drops to
+ * ~71px — under a third of the size Daniel approved, and "the largest single object at the bottom of
+ * the piece" stops being large. Hold the mark's size instead and the line steps in width where it
+ * winds into it, which CLAUDE.md already lists as a shipped bug ("a trunk with a hardcoded stroke
+ * that matched the spine's position exactly and still stepped 46% in width at the join").
+ *
+ * TWO: THE GARLAND'S TUBE IS A PAINTED BITMAP AND THE SPINE IS ANIMATED GEOMETRY. The nonflowers
+ * stroke is `drawTube` inside the composer, which paints once into a canvas at fixed geometry (see
+ * GarlandOpts.tube — the About page switches it OFF precisely because "the spine is Daniel's drawn
+ * SVG line and must stay the drawn line"). The spine dash-reveals as the card line passes, leans off
+ * its axis, and winds the last 2*pi*r units into the mark with arc length conserved at every w. A
+ * bitmap cannot do any of that. Painting the spine with the composer's tube would cost the finale,
+ * which is the page's climax and the reason the drafts that lost, lost.
+ *
+ * WHAT WOULD HONOUR THE INTENT WITHOUT EITHER COST (proposed, not built, because it is a design call
+ * and the composition around it is one Daniel has already signed off): keep SPINE_W as the weight
+ * the mark is cut from, and give the spine an ORGANIC WIDTH PROFILE in SVG — a filled taper outline
+ * with a slight waver rather than a constant-width stroke. `taperRuns` in about/parenthesis.ts
+ * already does exactly this for the founders' arms, for the same complaint ("they are not a
+ * constant-width rail: they are the line thinning as it grows away from the trunk"). Keep the mean
+ * width at SPINE_W and the join stays seamless and the mark stays 241px, while the line stops
+ * reading as a rule.
+ */
 export const SPINE_W = 7.5;
 
 /** Piecewise time axis: 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1. */
@@ -2153,7 +2191,18 @@ export function CrossPathsTimeline({
   const viewBox = reduced ? `0 0 ${W} ${H}` : `0 ${camY} ${W} ${viewH}`;
 
   /** The middle-segment reveal for the spine: draw only from the top clip to the draw-ahead front,
-   *  so both terminals sit off-frame and the line runs edge to edge. */
+   *  so both terminals sit off-frame and the line runs edge to edge.
+   *
+   *  "EDGE TO EDGE" IS TRUE OF THE viewBox AND FALSE OF THE SCREEN, which is round 10's item 1b/1c
+   *  and is TODO(Daniel) — see the note on SPINE_W. MEASURED live at 1440x900: the SVG element's own
+   *  rect is top 100, bottom 764, inside a 900px viewport. Both terminals do sit outside the viewBox,
+   *  exactly as this comment says, and the line still visibly stops 136px above the bottom of the
+   *  screen and cuts 16px below the header, because the FRAME is not the SCREEN. Daniel: "it stops
+   *  abruptly a little above the bottom. That abrupt stop is the bug."
+   *
+   *  This is the session's own measurement trap pointed outward: a container's rect tells you about
+   *  the container. Here the comment was right about the container and the reader is looking at the
+   *  page. Nothing in the reveal is wrong; the frame is inset. Do not "fix" this in revealProps. */
   const revealProps = (s: Strand) => {
     if (reduced) return { strokeDasharray: undefined, strokeDashoffset: undefined, hidden: false };
     const fTop = atY(s, topY).frac;
