@@ -78,10 +78,30 @@ if (!track) {
   process.exit(1);
 }
 
+/**
+ * A RELOAD UNDER THE HARNESS IS A HARNESS FAULT, NOT A CRASH AND NEVER A VERDICT.
+ *
+ * Four agents share this dev server, so Vite HMR reloads the page the moment anyone saves — mid-seek,
+ * mid-measure. Puppeteer's "Execution context was destroyed" then throws out of whatever `evaluate`
+ * was in flight. Unhandled, that is merely noisy; the danger is the tempting fix of swallowing it and
+ * carrying on, which would measure a page that has just reset to scroll 0 with a cold camera and call
+ * the result data. Every eval goes through here, and a destroyed context poisons the reading rather
+ * than silently returning a plausible number.
+ */
+const DESTROYED = Symbol('context-destroyed');
+const safeEval = async (fn, arg) => {
+  try {
+    return await page.evaluate(fn, arg);
+  } catch (e) {
+    if (/Execution context was destroyed|Target closed|detached/i.test(String(e))) return DESTROYED;
+    throw e;
+  }
+};
+
 /** camY, read off the one element that exposes it: the frame's viewBox is `0 <camY> W viewH`. */
 const camY = () =>
-  page.evaluate(() => {
-    const svg = document.querySelector('[data-timeline-frame]');
+  safeEval(() => {
+    const svg = document.querySelector('[data-timeline-camera]');
     if (!svg) return null;
     const vb = (svg.getAttribute('viewBox') || '').split(/\s+/);
     const y = Number(vb[1]);
@@ -105,14 +125,17 @@ const STILL_READS = 5;
  */
 const seek = async (scrollY) => {
   const before = await camY();
-  if (before === null) return { harness: 'no [data-timeline-frame] — cannot see the camera at all' };
-  await page.evaluate((y) => window.scrollTo(0, y), scrollY);
+  if (before === DESTROYED) return { harness: 'the page reloaded (HMR?) before the seek — reading poisoned' };
+  if (before === null) return { harness: 'no [data-timeline-camera] — cannot see the camera at all' };
+  if ((await safeEval((y) => window.scrollTo(0, y), scrollY)) === DESTROYED)
+    return { harness: 'the page reloaded (HMR?) during the seek — reading poisoned' };
 
   // 1. MOVEMENT. Without this, the two reads below are both the OLD value and "still" is a lie.
   const moveDeadline = Date.now() + MOVE_TIMEOUT;
   let moved = false;
   while (Date.now() < moveDeadline) {
     const c = await camY();
+    if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to start' };
     if (c !== null && Math.abs(c - before) > EPS) {
       moved = true;
       break;
@@ -128,6 +151,7 @@ const seek = async (scrollY) => {
   let still = 0;
   while (Date.now() < settleDeadline) {
     const c = await camY();
+    if (c === DESTROYED) return { harness: 'the page reloaded (HMR?) while waiting for the camera to settle' };
     if (c === null) return { harness: 'camera disappeared mid-seek' };
     if (last !== null && Math.abs(c - last) <= EPS) still++;
     else still = 0;
@@ -161,7 +185,7 @@ const sampleAt = async (scrollY) => {
         if (!worst || rootF < worst.f) worst = { f: rootF, order: s.getAttribute('data-sub-branch') };
       }
     }
-    const svg = document.querySelector('[data-timeline-frame]');
+    const svg = document.querySelector('[data-timeline-camera]');
     const cam = svg ? Number((svg.getAttribute('viewBox') || '').split(/\s+/)[1]) : NaN;
     return { total: stems.length, growing, growingAboveHalfway, worst, scrollY: window.scrollY, cam };
   });
