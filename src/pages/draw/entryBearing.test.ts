@@ -45,9 +45,13 @@ describe('entryBearingDeg — beyond the structure, never in front of the lens',
   ];
 
   it('stands at the target angle off the camera, always', () => {
-    // Photographed before it was chosen. This one invariant prevents all
-    // three failure modes at once: looming (off~0), edge-on (off~90), and
-    // hidden behind the dome (off~180).
+    // Photographed before it was chosen. The angle is TAKEN, not searched:
+    // four feet at 90° spacing can only offer gap midpoints 90° apart, so a
+    // "widest gap" rule cannot hit a readable angle from every camera.
+    //
+    // It prevents the two failure modes that survive billboarding: looming
+    // (off~0) and hidden behind the dome (off~180). It no longer has to dodge
+    // edge-on (off~90) — see the next test.
     for (const feet of RINGS) {
       for (let az = 0; az < 360; az += 3) {
         const b = entryBearingDeg(feet, az);
@@ -57,11 +61,27 @@ describe('entryBearingDeg — beyond the structure, never in front of the lens',
     }
   });
 
-  it('never lands edge-on, which is the degenerate case', () => {
-    // A 9 cm flat extrusion seen at ~90 degrees off is a black fencepost.
+  it('stands INSIDE the old edge-on band, deliberately, because the figure billboards', () => {
+    // This assertion is the exact inverse of the one it replaces, and the
+    // inversion is the point. It used to read `> 45`: keep clear of the 90°
+    // band, because a 9 cm flat extrusion seen edge-on is a black fencepost.
+    //
+    // ScaleFigure now turns to face the camera every frame, so it is ALWAYS
+    // broadside and CANNOT go edge-on. The degenerate angle does not exist,
+    // so the band that existed to dodge it does not either, and the placement
+    // is free to be chosen on composition: 110° is a little past perpendicular,
+    // which pushes the figure inboard from the frame edge and slightly further
+    // in depth, where it renders at the structure's own scale.
+    //
+    // It is asserted rather than deleted because the two are COUPLED and the
+    // coupling is invisible from either file alone. If someone removes the
+    // billboarding (ScaleFigure's useFrame), the degenerate angle comes back
+    // and this target becomes a bug: the figure would sit 20° off edge-on and
+    // the turntable would walk it straight through. This test failing is the
+    // question "did you just un-billboard the figure?".
     for (const feet of RINGS) {
       for (let az = 0; az < 360; az += 3) {
-        expect(Math.abs(off(az, entryBearingDeg(feet, az) as number) - 90)).toBeGreaterThan(45);
+        expect(Math.abs(off(az, entryBearingDeg(feet, az) as number) - 90)).toBeLessThan(45);
       }
     }
   });
@@ -85,10 +105,12 @@ describe('entryBearingDeg — beyond the structure, never in front of the lens',
   });
 
   it('takes the side with more clearance from the nearest leg', () => {
-    // Camera at 0: candidates are 150 and 210. A leg planted at 150 pushes
-    // the figure to 210.
-    expect(entryBearingDeg([150], 0)).toBe(210);
-    expect(entryBearingDeg([210], 0)).toBe(150);
+    // Camera at 0: the two candidates are the target either side, 110 and 250.
+    // A leg planted on one of them pushes the figure to the other. This is the
+    // ONLY job the feet still have — they break the tie, they do not choose
+    // the angle.
+    expect(entryBearingDeg([110], 0)).toBe(250);
+    expect(entryBearingDeg([250], 0)).toBe(110);
   });
 
   it('is deterministic when both sides are equally clear', () => {
@@ -121,11 +143,27 @@ describe('entryBearingDeg — beyond the structure, never in front of the lens',
   });
 });
 
-describe('figurePositionM — outside the apron, on the bearing', () => {
-  it('stands clear of the gravel apron, which sits at plan + 0.45', () => {
+describe('figurePositionM — ON the apron, at the threshold, on the bearing', () => {
+  /** GardenContext's gravel apron runs to plan + 0.45. */
+  const APRON_M = 0.45;
+
+  it('stands ON the gravel, at the threshold, NOT out on the lawn beyond it', () => {
+    // Inverted on 2026-07-17, from `plan + 0.9` (a clear 0.45 m OUTSIDE the
+    // apron) to `plan + 0.25` (on it). The old rule broke the figure's only
+    // job. A viewer reads 2.5 m off the pavilion by COMPARING two heights, and
+    // two objects metres apart in depth cannot be compared: at +0.9 the figure
+    // was a lone thing standing on a lawn near a building, which says nothing
+    // about either. At the threshold the eye reads it against the nearest leg
+    // directly.
     const { x, z } = figurePositionM(0, 2.1, 2.1);
-    expect(Math.hypot(x, z)).toBeCloseTo(3.0, 5); // 2.1 + 0.9
-    expect(Math.hypot(x, z)).toBeGreaterThan(2.1 + 0.45);
+    expect(Math.hypot(x, z)).toBeCloseTo(2.35, 5); // 2.1 + 0.25
+
+    // The two bounds that make it a THRESHOLD and not either other thing:
+    // outside the plan the feet stand on (so it can never stand inside the
+    // structure), and inside the apron's outer edge (so the gravel still reads
+    // as ground continuing past it, which is what places it in the scene).
+    expect(Math.hypot(x, z)).toBeGreaterThan(2.1);
+    expect(Math.hypot(x, z)).toBeLessThan(2.1 + APRON_M);
   });
 
   it('puts bearing 0 on +Z and bearing 90 on +X, matching GardenContext', () => {
@@ -133,14 +171,21 @@ describe('figurePositionM — outside the apron, on the bearing', () => {
     // figure must share that convention or it lands 90 degrees off the gap.
     const north = figurePositionM(0, 2, 2);
     expect(north.x).toBeCloseTo(0, 5);
-    expect(north.z).toBeCloseTo(2.9, 5);
+    expect(north.z).toBeCloseTo(2.25, 5);
     const east = figurePositionM(90, 2, 2);
-    expect(east.x).toBeCloseTo(2.9, 5);
+    expect(east.x).toBeCloseTo(2.25, 5);
     expect(east.z).toBeCloseTo(0, 5);
   });
 
   it('uses the larger plan axis, so it clears an elliptical plan too', () => {
+    // Both axes matter: taking the minor axis on an elliptical plan would put
+    // the figure inside the structure on the major one.
     const { x, z } = figurePositionM(90, 3.4, 1.2);
-    expect(Math.hypot(x, z)).toBeCloseTo(4.3, 5);
+    expect(Math.hypot(x, z)).toBeCloseTo(3.65, 5); // 3.4 + 0.25
+    expect(Math.hypot(x, z)).toBeGreaterThan(3.4);
+  });
+
+  it('honours an explicit standoff, so the threshold is tunable without an edit here', () => {
+    expect(Math.hypot(...Object.values(figurePositionM(0, 2, 2, 0.9)))).toBeCloseTo(2.9, 5);
   });
 });

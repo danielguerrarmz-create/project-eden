@@ -28,15 +28,30 @@
  *     the render, too graphic next to real materials. A soft warm graphite
  *     catches the rim light and reads as a body.
  */
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /** Inside the approved 1.75-1.8 m range. */
 const HEIGHT_M = 1.78;
 /** Flat, but not paper: enough to catch the key on one side and turn. */
 const THICKNESS_M = 0.09;
-/** Close kin to inkBlack (#17160F) but soft enough to take light. */
-const GRAPHITE = '#3a382f';
+/**
+ * THE COLOUR IS A FUNCTION OF THE RIG, NOT A PREFERENCE. The spec's `#3a382f`
+ * was authored against the house rig (ambient 0.8). This Canvas runs ambient
+ * 0.32, because that is what lets the lattice's cast shadow read as dark, and
+ * under it `#3a382f` bottoms out: the figure rendered as a pure black void, a
+ * hole in the frame rather than an object, which is exactly what the spec's
+ * "NOT pure black or it reads as a cutout" was written to prevent.
+ *
+ * This is the same mistake the soil beds made under the same rig, and it was
+ * caught there and missed here. A dark object in a dimly-filled scene needs a
+ * LIGHTER base colour to arrive at the same place, not the same one.
+ *
+ * This value renders as dark warm graphite with a visibly lit side and a
+ * shadow side: a body, not a silhouette sticker.
+ */
+const GRAPHITE = '#87826f';
 
 /**
  * Half the outline, as fractions of height, walked from the CROTCH down the
@@ -44,38 +59,48 @@ const GRAPHITE = '#3a382f';
  * close it. Canonical standing proportions (crotch 0.47, shoulder 0.82, chin
  * 0.87, head ~1/7.5 of height).
  *
- * THE LEG GAP IS THE WHOLE THING. The first version of this ran a single
- * outline straight from hip to ground with the legs merged into one slab, and
- * the result was unmistakably an Easter Island head: a monolith with a small
- * blocky skull. A silhouette reads as a PERSON almost entirely on two cues —
- * the gap between the legs and the notch under the jaw — and it reads as a
- * tombstone without them. Everything else is refinement.
+ * THE TWO CUES ARE THE WHOLE THING, AND THEY MUST BE COARSE. A silhouette
+ * reads as a PERSON almost entirely on the gap between the legs and the notch
+ * under the jaw, and reads as a monolith without them. Two attempts failed
+ * here before this one:
+ *
+ *   v1 merged the legs into one slab from hip to ground: an Easter Island
+ *      head, unmistakably.
+ *   v2 had anatomically correct legs with a ~10 cm gap and a subtle neck. At
+ *      the size this actually renders on camera — roughly 200 px tall — a
+ *      10 cm gap is a ONE-PIXEL hairline and a subtle neck is nothing. It
+ *      read as a hooded, legless pillar. A Grim Reaper.
+ *
+ * So the cues here are deliberately exaggerated past anatomy: the legs splay
+ * to open a ~20 cm gap and the neck is pinched to 10 cm against a 21 cm skull.
+ * Correct proportions that vanish at render size are worth less than coarse
+ * ones that read. This is a section-drawing convention, not a portrait.
  */
 const OUTLINE: [number, number][] = [
-  [0.011, 0.47], // crotch
-  [0.026, 0.3], // inner thigh
-  [0.03, 0.1], // inner calf
-  [0.031, 0.015], // inner ankle
-  [0.076, 0.0], // foot, forward
-  [0.05, 0.028], // outer ankle
-  [0.063, 0.14], // calf
-  [0.055, 0.27], // knee
-  [0.083, 0.37], // outer thigh
-  [0.095, 0.47],
-  [0.1, 0.56], // hip
-  [0.081, 0.635], // waist
-  [0.087, 0.7],
-  [0.104, 0.755], // chest
-  [0.119, 0.8], // deltoid
-  [0.111, 0.826], // shoulder top
-  [0.072, 0.843], // trapezius, sloping in
-  [0.035, 0.856], // neck
-  [0.033, 0.879],
-  [0.051, 0.896], // jaw — the second cue that says "person"
-  [0.058, 0.925],
-  [0.055, 0.955], // skull
-  [0.043, 0.978],
-  [0.024, 0.994],
+  [0.020, 0.46], // crotch
+  [0.040, 0.32], // inner thigh
+  [0.052, 0.14], // inner calf — the legs SPLAY, opening the gap
+  [0.058, 0.02], // inner ankle
+  [0.115, 0.0], // foot
+  [0.088, 0.03], // outer ankle
+  [0.095, 0.15], // calf
+  [0.088, 0.28], // knee
+  [0.101, 0.38], // outer thigh
+  [0.107, 0.47],
+  [0.108, 0.56], // hip
+  [0.086, 0.635], // waist
+  [0.092, 0.7],
+  [0.108, 0.755], // chest
+  [0.121, 0.8], // deltoid
+  [0.112, 0.827], // shoulder top
+  [0.068, 0.845], // trapezius, sloping in hard
+  [0.029, 0.858], // neck — 10 cm. The notch has to be unmissable.
+  [0.028, 0.882],
+  [0.050, 0.898], // jaw
+  [0.058, 0.928],
+  [0.054, 0.958], // skull
+  [0.041, 0.980],
+  [0.022, 0.995],
   [0.0, 1.0], // crown
 ];
 
@@ -94,14 +119,35 @@ function silhouette(): THREE.Shape {
   return s;
 }
 
-export function ScaleFigure({
-  position,
-  /** Radians. The figure faces INTO the structure. */
-  rotationY,
-}: {
-  position: [number, number, number];
-  rotationY: number;
-}) {
+export function ScaleFigure({ position }: { position: [number, number, number] }) {
+  const ref = useRef<THREE.Mesh>(null);
+
+  /**
+   * IT TURNS TO FACE THE CAMERA. Not a cheat — this is what an architectural
+   * entourage cutout has always done, and here it removes an entire class of
+   * failure rather than hiding one.
+   *
+   * A flat extrusion has a degenerate viewing angle: seen at 90° off it is a
+   * 9 cm black fencepost. Anything that orbits WILL find that angle, and the
+   * turntable does, which previously forced the figure's placement into a
+   * narrow band chosen to dodge it, and still let it decay after ~4 s. Facing
+   * the camera means it is always broadside, so the band constraint and the
+   * decay both evaporate and the figure can stand where the COMPOSITION wants
+   * it instead of where the geometry tolerates it.
+   *
+   * The "no face turned to the lens" rule survives by construction: the
+   * silhouette is left-right symmetric and has no face, so its front and its
+   * back are the same shape. There is nothing to turn away.
+   *
+   * The rotation is imperceptible at the turntable's 13.8°/s over the two or
+   * three seconds it runs in the shot.
+   */
+  useFrame(({ camera }) => {
+    const m = ref.current;
+    if (!m) return;
+    m.rotation.y = Math.atan2(camera.position.x - position[0], camera.position.z - position[2]);
+  });
+
   const geo = useMemo(() => {
     const g = new THREE.ExtrudeGeometry(silhouette(), {
       depth: THICKNESS_M,
@@ -116,7 +162,7 @@ export function ScaleFigure({
   }, []);
 
   return (
-    <mesh geometry={geo} position={position} rotation={[0, rotationY, 0]} castShadow>
+    <mesh ref={ref} geometry={geo} position={position} castShadow>
       <meshStandardMaterial color={GRAPHITE} roughness={0.95} metalness={0} />
     </mesh>
   );

@@ -29,29 +29,24 @@ export function angleDeltaDeg(a: number, b: number): number {
  * bearing. Photographed across the range before being chosen; every number
  * here is a measurement, not a preference.
  *
- * The figure is a flat silhouette facing inward, so how broad it reads is a
- * function of this angle alone:
+ * The figure billboards to face the camera, so it is never edge-on and this
+ * angle is now purely a question of composition:
  *
- *   off ≈ 0    it faces directly away: broad, but it stands BETWEEN the lens
- *              and the building at half the camera's distance, so perspective
- *              blows it up into a looming monolith taller than the dome, and
- *              the frame (fitted to the lattice) crops it off at the knee.
- *   off ≈ 90   it faces across the view: EDGE-ON. A 9 cm extrusion seen on its
- *              edge is a black fencepost. This is the degenerate case and the
- *              reason the band below excludes it.
- *   off ≈ 150  it faces 30° off the lens: nearly broadside, standing beyond
- *              the structure at roughly the object's own depth, so it renders
- *              at the object's own scale and reads instantly as a person.
- *              THE TARGET.
- *   off ≈ 180  broadside, but directly behind the dome's centre, where a leg
- *              cuts through it and it reads as a smudge.
+ *   off ≈ 0    it stands BETWEEN the lens and the building, nearer the camera
+ *              than the structure, so perspective blows it up into a monolith
+ *              taller than the dome and the frame crops it at the knee.
+ *   off ≈ 110  beside the structure and a little beyond it, at essentially the
+ *              object's own depth — so the two render at one scale and the eye
+ *              can read the figure against the nearest leg. THE TARGET.
+ *   off ≈ 180  directly behind the dome's centre, where a leg cuts through it
+ *              and it reads as a smudge.
  *
- * The far side is where this wants to be, which is the opposite of the
- * obvious guess ("keep it in front or the lattice will hide it"). The lattice
- * is legs and air: it hides nothing at 150°, and standing beyond it is also
- * what says the pavilion is something you walk through.
+ * Slightly PAST perpendicular on purpose: at exactly 90° the figure is at the
+ * camera's own distance and sits near the frame edge, and the frame is fitted
+ * to the lattice, not to it. A little further round pushes it inboard and
+ * slightly smaller, which is where it belongs.
  */
-export const TARGET_OFF_DEG = 150;
+export const TARGET_OFF_DEG = 110;
 
 /**
  * The bearing to stand on.
@@ -89,14 +84,24 @@ export function entryBearingDeg(
 }
 
 /**
- * Where the figure stands, in plan. Just outside the gravel apron, which sits
- * at plan + 0.45 (see GardenContext), so it never stands ON the apron edge.
+ * Where the figure stands, in plan.
+ *
+ * ON THE APRON, AT THE THRESHOLD — not out on the grass beyond it, which is
+ * where this used to put it (`plan + 0.9`, a clear 0.45 m outside the gravel).
+ * That placement broke the only job the figure has. A viewer reads 2.5 m off
+ * the pavilion by COMPARING two heights, and two objects metres apart in depth
+ * cannot be compared: the figure became a lone thing standing on a lawn near a
+ * building, which tells you nothing about either. Standing at the threshold,
+ * a step from the nearest leg, the eye reads it against the leg directly.
+ *
+ * The gravel apron runs to `plan + 0.45` (GardenContext), so `plan + 0.25`
+ * puts the figure on the gravel with the apron edge still visibly beyond it.
  */
 export function figurePositionM(
   bearingDeg: number,
   planA: number,
   planB: number,
-  standoffM = 0.9,
+  standoffM = 0.25,
 ): { x: number; z: number } {
   const t = (bearingDeg * Math.PI) / 180;
   const r = Math.max(planA, planB) + standoffM;

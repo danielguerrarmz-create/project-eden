@@ -35,16 +35,12 @@ export function PlacedScaleFigure() {
     if (bearing === null) return null; // nothing to stand beside: no figure at all
 
     const { x, z } = figurePositionM(bearing, geo.planA, geo.planB);
-    return {
-      position: [x, 0, z] as [number, number, number],
-      // Face INWARD. A bearing points outward from the origin, so the figure
-      // turns to look back down it at the structure.
-      rotationY: (bearing + 180) * DEG,
-    };
+    // Orientation is not decided here: the figure billboards to the camera.
+    return [x, 0, z] as [number, number, number];
     // Solved at mount and held: see the note above about sliding figures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.footBearingsDeg, geo.planA, geo.planB]);
 
   if (!placed) return null;
-  return <ScaleFigure position={placed.position} rotationY={placed.rotationY} />;
+  return <ScaleFigure position={placed} />;
 }

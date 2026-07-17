@@ -96,6 +96,17 @@ resolved → turntable. Final reads **£17,000**. **Zero console errors.**
   bake near the end runs ~2-3 s of turntable, so it holds — verified readable at bake and
   still readable 5.7 s later. **If Daniel holds the turntable past ~4 s the figure degrades.**
   Cut before then, or re-open this.
+
+  > **SUPERSEDED 2026-07-17 — and the ~4.3 s above was WRONG when written.** The figure now
+  > billboards and the target is 110°, so the budget is **~5.1 s**, not ~4.3 s. See
+  > `2026-07-17-scale-figure-billboarding.md`.
+  >
+  > The old number was optimistic in the unsafe direction because it only considered ONE of
+  > the two tie-break sides. `entryBearingDeg` returns `camAz ± TARGET`, and the turntable
+  > only increases azimuth: on the near side the angle decays 150° → 90° (edge-on) in 4.33 s,
+  > **but on the far side it grows 150° → 180° (behind the dome, leg through it) in 2.17 s.**
+  > Which side a take lands on depends on where the feet fall, so the real old worst case was
+  > **~2.2 s**. Anyone filming to a 4 s rule of thumb was rolling a die.
 - **The soft canopy is illegible from above** (~50°+): its eave goes edge-on and the skin is
   an untextured mass. That is a material question, not a camera one, and it is why the polar
   clamp is 30° and not 50° (see `MIN_POLAR` in `DrawPage.tsx`). Texture on the skin would be
@@ -135,3 +146,7 @@ resolved → turntable. Final reads **£17,000**. **Zero console errors.**
 - **A material flipped to `transparent` mid-animation recompiles and blinks.** Set it for the
   whole life of the fade.
 - **A flat silhouette has a degenerate viewing angle.** Anything that orbits will find it.
+  **Solved on 2026-07-17 by billboarding** rather than by dodging: a plane that turns to face
+  the camera cannot present its edge, so the failure mode stops existing instead of being
+  designed around. The placement band that existed only to dodge it went with it. That is the
+  better shape of fix, and it is why the placement rule and its test both changed.
