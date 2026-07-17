@@ -342,3 +342,27 @@ export function taperRuns(pts: Pt[], n = 10): TaperRun[] {
   }
   return runs;
 }
+
+/**
+ * WHERE THE ORGANS SIT along each arm, 0 (root) .. 1 (tip). ONE list, read by the painter that
+ * stamps them and by the reveal that uncovers them — a disc keyed to a station the composer did not
+ * use is a hole in the drawing.
+ *
+ * NONE BEFORE t=0.34, AND THERE ARE NOW TWO INDEPENDENT REASONS FOR THAT FLOOR, which is worth
+ * knowing before anyone lowers it:
+ *
+ *  1. COMPOSITION (the original): before ~0.34 the arm is still sweeping out of the fork and across
+ *     the page, where a blossom would land on the founders' own column.
+ *  2. MOTION (round 10, item 6): the arms pay out over [PAREN_TRUNK_SHARE, STEM_SHARE] while the
+ *     organs read `t` against STEM_SHARE, so at the root end an organ can outrun its own stem. The
+ *     arm has drawn to (0.66t - 0.06) / 0.48 when the organ at `t` opens, which clears `t` only for
+ *     t >= 0.333. Below that, a flower hangs slightly ahead of the twig carrying it.
+ *
+ * They land within 0.007 of each other by coincidence, not by design. reveal.test.ts asserts (2),
+ * because it is invisible in code review and merely subtle on screen.
+ *
+ * They live here rather than in AboutPage so the tests can read the real list instead of a copy —
+ * a duplicated station list would pass its own assertions happily while the page drew something else.
+ */
+export const PAREN_STATIONS = [0.36, 0.46, 0.56, 0.65, 0.74, 0.83, 0.92] as const;
+export const PAREN_ORGANS = ['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf', 'bud'] as const;

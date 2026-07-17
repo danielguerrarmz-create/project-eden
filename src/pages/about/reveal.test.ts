@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { growAt, cardLineAt, GROWN_BY, UNFURL_SPAN, revealSpanPx, readerLead, clamp01, organAt, ORGAN_LAG, ORGAN_FADE } from './reveal';
-import { subBranchPolylines, computePlates, SUB_ORDER_STAGGER, subBranchOrderLag, subBranchStagger } from './CrossPathsTimeline';
+import { growAt, cardLineAt, GROWN_BY, UNFURL_SPAN, revealSpanPx, readerLead, clamp01, organAt, ORGAN_LAG, ORGAN_FADE, STEM_SHARE, stemDrawAt } from './reveal';
+import { subBranchPolylines, computePlates, SUB_ORDER_STAGGER, subBranchOrderLag, subBranchStagger, subOrganMarks } from './CrossPathsTimeline';
+import { PAREN_STATIONS } from './parenthesis';
 
 /**
  * reveal.ts HAD NO TESTS, and it is the expression the entire page's motion is made of. That is why
@@ -181,9 +182,77 @@ describe('reduced motion and the degenerate ends', () => {
   });
 
   it('an organ never opens before the stem it sits on has drawn past it', () => {
-    // The correctness round 7 called out: organs key to their stem's growth, not to their own y.
+    // The correctness round 7 called out: organs key to their branch's growth, not to their own y.
     expect(organAt(0, 0.5)).toBe(0);
-    expect(organAt(0.5 + ORGAN_LAG - 0.001, 0.5)).toBe(0);
-    expect(organAt(0.5 + ORGAN_LAG + ORGAN_FADE, 0.5)).toBeCloseTo(1, 6);
+    // At the moment the organ begins, the STEM must already be inked as far as it — at least.
+    // NOT strictly greater: at t=1 the organ IS the tip, and a fully drawn stem reaches it exactly.
+    // The first draft asserted `>` and failed there, which is the assertion being wrong rather than
+    // the code — there is nowhere further for a stem to draw than its own end.
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const opensAt = t * STEM_SHARE + ORGAN_LAG;
+      expect(organAt(opensAt - 1e-9, t), `organ at t=${t} opened early`).toBe(0);
+      expect(stemDrawAt(opensAt), `the stem had not reached the organ at t=${t} when it opened`).toBeGreaterThanOrEqual(t);
+    }
   });
+});
+
+describe('ITEM 6: every organ finishes, which is what "it reads half-off" meant', () => {
+  /**
+   * Daniel, round 10: the flowers "load in, render, then de-render"; by the end, "you cannot tell
+   * when it is finished. It reads half-off."
+   *
+   * It was not a timing effect and there was nothing to "tone down". The organ ramp was keyed to a
+   * growth that saturates at 1 while asking for `t + LAG + FADE`, so everything past t = 0.66 was
+   * unreachable. MEASURED on the real timeline geometry: 87 of 218 organs (39.9%) could never reach
+   * full opacity, 57 (26.1%) were stuck part-open, and 30 (13.8%) were painted into the bitmap and
+   * masked out permanently. Two fifths of the flowers never finished at any scroll position, ever.
+   * "Reads half-off" was a literal and accurate bug report.
+   *
+   * (There is no de-render: `camY` is monotonic down the track, so growth never reverses. What reads
+   * as de-rendering is an organ blooming partway and stalling while its neighbours go to full.)
+   */
+  const FULLY_OPEN = 0.999;
+
+  it('at full growth, EVERY station on every real timeline branch is fully open', () => {
+    const marks = subOrganMarks(subBranchPolylines());
+    expect(marks.length, 'no organs — the probe is measuring nothing').toBeGreaterThan(100);
+    const unfinished = marks.filter((m) => organAt(1, m.t) < FULLY_OPEN);
+    const invisible = marks.filter((m) => organAt(1, m.t) <= 0.001);
+    expect(
+      unfinished.length,
+      `${unfinished.length} of ${marks.length} organs never finish opening (${invisible.length} never appear at all). ` +
+        `Deepest station t=${Math.max(...marks.map((m) => m.t)).toFixed(3)}; anything past ` +
+        `${(1 - ORGAN_LAG - ORGAN_FADE).toFixed(2)} is unreachable if the organs are keyed to the raw growth.`,
+    ).toBe(0);
+  });
+
+  it('...and every authored station list, at any t a station could ever take', () => {
+    // Not just the ones authored today: the ramp must be able to finish an organ ANYWHERE on a stem,
+    // or the next station someone adds past 0.66 silently never opens. That is how this shipped.
+    for (let t = 0; t <= 1; t += 0.01) {
+      expect(organAt(1, t), `an organ at t=${t.toFixed(2)} never finishes`).toBeGreaterThanOrEqual(FULLY_OPEN);
+    }
+  });
+
+  it('a station below ~0.34 would bloom ahead of the founders\' arm — the one real limit of the fix', () => {
+    /**
+     * Kept honest rather than quiet. The founders' arms pay out over [PAREN_TRUNK_SHARE, STEM_SHARE]
+     * while their organs read `t` against STEM_SHARE, so at the ROOT end the organ can outrun the
+     * stem: the arm has drawn to (0.66t - 0.06) / 0.48 when the organ at `t` opens, which clears `t`
+     * only for t >= 0.333. Every authored station is >= 0.36, so the page is correct today with about
+     * 0.03 of margin. This test exists because the next person to add a station will not know that,
+     * and the failure is invisible — a flower simply hangs a little ahead of its twig.
+     */
+    const PAREN_TRUNK_SHARE = 0.18;
+    const armDrawnWhenOrganOpens = (t: number) =>
+      (t * STEM_SHARE + ORGAN_LAG - PAREN_TRUNK_SHARE) / (STEM_SHARE - PAREN_TRUNK_SHARE);
+    for (const t of PAREN_STATIONS) {
+      expect(
+        armDrawnWhenOrganOpens(t),
+        `founder station t=${t} blooms while its arm is only ${(armDrawnWhenOrganOpens(t) * 100).toFixed(1)}% drawn — ` +
+          `a flower ahead of its own stem. Stations must sit at t >= 0.333.`,
+      ).toBeGreaterThanOrEqual(t);
+    }
+  });
+
 });

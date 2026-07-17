@@ -53,7 +53,7 @@ import {
 import { FanPainting } from './about/FanPainting';
 import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
-import { armPts, polyD, taperRuns, trunkPts, type ParenLayout, type TaperRun } from './about/parenthesis';
+import { armPts, polyD, taperRuns, trunkPts, PAREN_STATIONS, PAREN_ORGANS, type ParenLayout, type TaperRun } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
 import {
   GROWN_BY,
@@ -64,6 +64,8 @@ import {
   organAt,
   polyLen,
   readerLead,
+  STEM_SHARE,
+  stemDrawAt,
   revealSpanPx,
 } from './about/reveal';
 import { usePageCardLine, useTimelineFrameScale } from './about/usePageCardLine';
@@ -1133,7 +1135,10 @@ function CodaBower({ reduced }: { reduced: boolean }) {
             if (grow <= 0.001) return null;
             return (
               <g key={i}>
-                {/* the stem, drawing root → tip */}
+                {/* the stem, drawing root → tip. `stemDrawAt`, not the raw growth: the stem is inked
+                    by STEM_SHARE of the progress so the tip organs have the rest to open in. See
+                    reveal.ts — the coda carries the same organ ramp as the timeline and had the same
+                    permanently-half-open bug. */}
                 <path
                   d={polyD(pts)}
                   fill="none"
@@ -1141,7 +1146,7 @@ function CodaBower({ reduced }: { reduced: boolean }) {
                   strokeWidth={CODA_STEM_MASK_W}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  {...dashProps(polyLen(pts), grow)}
+                  {...dashProps(polyLen(pts), stemDrawAt(grow))}
                 />
                 {/* the organs, each a beat behind the stretch of stem carrying it */}
                 {CODA_STATIONS.map((t, j) => {
@@ -1247,12 +1252,9 @@ const PAREN_TRUNK_SHARE = 0.18;
  *  segments switching on in sequence. */
 const PAREN_RUN_OVERLAP = 0.34;
 
-/** WHERE THE ORGANS SIT along each arm, 0 (root) .. 1 (tip). ONE list, read by the painter that
- *  stamps them and by the reveal that uncovers them — a disc keyed to a station the composer did not
- *  use is a hole in the drawing. None before t=0.34: before that the arm is still sweeping out of
- *  the fork and across the page, where a blossom would land on the founders' own column. */
-const PAREN_STATIONS = [0.36, 0.46, 0.56, 0.65, 0.74, 0.83, 0.92] as const;
-const PAREN_ORGANS = ['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf', 'bud'] as const;
+// PAREN_STATIONS / PAREN_ORGANS moved to about/parenthesis.ts (the arms' own pure module) so the
+// reveal tests can read the real list rather than a copy of it. See there for the t >= 0.34 floor,
+// which now has two independent reasons holding it up.
 
 /**
  * THE FOUNDERS' PARENTHESIS — the one line arrives, and opens around the two of them.
@@ -1474,7 +1476,18 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
      while still preserving the one-event timing. */
   const trunkGrow = clamp01(parenGrow / PAREN_TRUNK_SHARE);
   const runGrow = (run: TaperRun) => {
-    const armsP = clamp01((parenGrow - PAREN_TRUNK_SHARE) / (1 - PAREN_TRUNK_SHARE));
+    // THE ARMS FINISH DRAWING AT STEM_SHARE, NOT AT 1, and the last third of the event is the tip
+    // organs opening. Round 10, item 6: with the arms paying out to parenGrow=1 there was no room
+    // left for an organ to open, so PAREN_STATIONS 0.74 / 0.83 / 0.92 could never reach full opacity
+    // and 0.92 was invisible at every scroll position, forever — three of seven stations, on both
+    // arms, on the most prominent ornament on the page. See reveal.ts STEM_SHARE for the measurement
+    // and for why squeezing the organs instead would put flowers ahead of the stem.
+    //
+    // The invariant still holds here and gets a margin: an organ at `t` opens when the arm has paid
+    // out to (0.66t - 0.06) / 0.48, which is >= t for t >= 0.333. Every station is >= 0.36. It is
+    // tight at the root end, so a station below ~0.34 would bloom ahead of its own stem — there is a
+    // test asserting exactly that, because the next person to add a station will not know this.
+    const armsP = clamp01((parenGrow - PAREN_TRUNK_SHARE) / (STEM_SHARE - PAREN_TRUNK_SHARE));
     // `t0` is where this run starts along its arm, so a run does not begin until the arm has paid
     // out to it — root → tip, out of one progress. The overlap is what stops it reading as ten
     // separate segments switching on: each run is still drawing while the next one starts.

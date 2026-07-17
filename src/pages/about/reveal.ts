@@ -120,23 +120,65 @@ export function growAt(cardLine: number, y: number, span: number, lag = 0): numb
   return clamp01((cardLine - y - LINE_NUDGE - lag) / span);
 }
 
-/**
- * When an ORGAN opens, given how grown its own stem is.
- *
- * `t` is where the organ sits along that stem (0 root, 1 tip), so it cannot open until the stem has
- * drawn past it — then a beat later. Keying an organ to its OWN stem's growth rather than to its y
- * is the whole correctness of this: space colonization grows in every direction, and 195 of 332
- * organs sit ABOVE the root they grow from, so anything keyed to height uncovers blossoms whose twig
- * has not been drawn. (It did. The page showed flowers floating on bare paper.)
- */
-export function organAt(stemGrow: number, t: number, lag = ORGAN_LAG, fade = ORGAN_FADE): number {
-  return clamp01((stemGrow - t - lag) / fade);
-}
-
-/** How far behind its own stem an organ follows, as a fraction of the stem's draw. */
+/** How far behind its own stem an organ follows, as a fraction of the branch's growth. */
 export const ORGAN_LAG = 0.12;
 /** How long an organ takes to open, same units. */
 export const ORGAN_FADE = 0.22;
+
+/**
+ * THE SHARE OF A BRANCH'S GROWTH SPENT DRAWING THE STEM. The rest belongs to the last organs opening.
+ *
+ * This exists because of round 10, item 6 — Daniel: the flowers "load in, render, then de-render",
+ * and "you cannot tell when it is finished. It reads half-off."
+ *
+ * HE WAS DESCRIBING A REAL, PERMANENT BUG, AND IT WAS NOT A TIMING ONE. The organ ramp was keyed to
+ * the stem's growth, which saturates at 1, so an organ at station `t` needed `stemGrow = t + LAG +
+ * FADE` to open fully — impossible for any t past 1 - 0.12 - 0.22 = 0.66. MEASURED on the real
+ * geometry: of 218 organs, 87 (39.9%) could NEVER reach full opacity even with their stem 100%
+ * drawn, 57 (26.1%) were stuck part-open forever, and 30 (13.8%) were painted into the bitmap and
+ * masked out permanently — composed, paid for, and never visible. "Reads half-off" was literal:
+ * two fifths of the flowers never finished, at any scroll position, ever.
+ *
+ * (There is no de-render as such. The camera is monotonic — `camY` only ever increases down the
+ * track — so growth never reverses. What he read as de-rendering is organs blooming partway and
+ * stalling there while their neighbours go on to full: the region never resolves.)
+ *
+ * THE FIX IS TO LEAVE THE ORGANS ROOM, not to loosen the rule they follow. The obvious repair is to
+ * squeeze the organ schedule into the stem's (scale `t` down so the tip organ lands at 1), and it is
+ * wrong: an organ at t > 0.35 would then start opening BEFORE the stem had drawn past it, which is
+ * exactly the "flowers floating on bare paper" bug the disc mask was built to kill. Instead the stem
+ * finishes DRAWING at STEM_SHARE (0.66) of the branch's progress and the remaining 0.34 is the tail
+ * organs opening. Everything completes at 1, and the invariant gets STRONGER rather than weaker: an
+ * organ at `t` now opens when the stem has drawn to `t + LAG/STEM_SHARE` = t + 0.18 of its length,
+ * i.e. 18% BEYOND the organ, where before it was 12%.
+ */
+export const STEM_SHARE = 1 - ORGAN_LAG - ORGAN_FADE;
+
+/**
+ * How far the STEM itself has drawn, given the branch's overall growth — 1 (fully inked) once the
+ * branch reaches STEM_SHARE, because the rest of the branch's progress belongs to its last organs.
+ *
+ * Pair this with `dashProps`; pair `organAt` with the raw growth. Feeding the raw growth to both is
+ * the bug above.
+ */
+export function stemDrawAt(grow: number): number {
+  return clamp01(grow / STEM_SHARE);
+}
+
+/**
+ * When an ORGAN opens, given its BRANCH's overall growth (not the stem's draw — see stemDrawAt).
+ *
+ * `t` is where the organ sits along that stem (0 root, 1 tip), so it cannot open until the stem has
+ * drawn past it — then a beat later. Keying an organ to its OWN branch's growth rather than to its y
+ * is the whole correctness of this: space colonization grows in every direction, and 195 of 332
+ * organs sit ABOVE the root they grow from, so anything keyed to height uncovers blossoms whose twig
+ * has not been drawn. (It did. The page showed flowers floating on bare paper.)
+ *
+ * The station is read against STEM_SHARE because that is the progress at which the stem passes it.
+ */
+export function organAt(grow: number, t: number, lag = ORGAN_LAG, fade = ORGAN_FADE): number {
+  return clamp01((grow - t * STEM_SHARE - lag) / fade);
+}
 
 /**
  * The reveal disc's radius, CSS px / world units — comfortably larger than the biggest organ, because

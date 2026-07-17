@@ -48,6 +48,7 @@ import { PAGE_SPECIES } from './species';
 import {
   cardLineAt,
   GROWN_BY,
+  stemDrawAt,
   dashProps,
   growAt,
   ORGAN_DISC_R,
@@ -1518,7 +1519,7 @@ interface OrganMark {
 
 /** Every station's world position, resolved once. Pure, and it reads the SAME vine list the painter
  *  is given, so a disc cannot drift from the organ it uncovers. */
-function subOrganMarks(runs: readonly Branch[]): OrganMark[] {
+export function subOrganMarks(runs: readonly Branch[]): OrganMark[] {
   const out: OrganMark[] = [];
   subBranchVines(runs).forEach((vine, bi) => {
     const pts = vine.path;
@@ -1670,7 +1671,11 @@ function SubBranches({ reduced, cardLineY, stagger }: { reduced: boolean; cardLi
             strokeLinejoin="round"
             // Root-first pts (see Branch.pts) mean the dash pays out root -> tip: the branch grows
             // OUT of its parent rather than materialising along its whole length.
-            {...dashProps(lens[i], grow)}
+            //
+            // `stemDrawAt`, not `grow`: the stem is fully inked at STEM_SHARE of the branch's
+            // progress, and the last third belongs to the tip organs opening. Handing the raw growth
+            // to both this and organAt is what left two fifths of the flowers permanently half-open.
+            {...dashProps(lens[i], stemDrawAt(grow))}
           />
         );
       })}
