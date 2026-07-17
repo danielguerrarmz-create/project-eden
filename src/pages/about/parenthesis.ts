@@ -85,6 +85,12 @@ export interface ParenLayout {
   rowRight: number;
   /** The founder rows, top to bottom. */
   rows: RowBox[];
+  /** This overlay's own page y. The reveal's card line is a PAGE coordinate; the arms are drawn in
+   *  overlay-local ones. */
+  pageTop: number;
+  /** The timeline's rendered px-per-world-unit — what the reveal span is converted through so the
+   *  founders grow over the same screen distance the timeline does. */
+  frameScale: number;
   /**
    * The spine's stroke width where it arrives, in CSS px — MEASURED off the timeline's rendered
    * scale, not copied from its constant.
@@ -306,14 +312,25 @@ export function polyD(pts: Pt[]): string {
  * the two widths meet. With round caps and one shared point, each run's cap sits inside its
  * neighbour and the line reads continuous.
  */
-export function taperRuns(pts: Pt[], n = 10): Array<{ d: string; t: number }> {
+export interface TaperRun {
+  d: string;
+  /** Midpoint fraction along the whole arm — drives the stroke's taper. */
+  t: number;
+  /** The run's own points, root-first. The reveal needs its ROOT y (where the card line reaches it)
+   *  and its LENGTH (to dash it), and deriving both from the same slice that draws it is what stops
+   *  the dash and the stroke describing different curves. */
+  pts: Pt[];
+}
+
+export function taperRuns(pts: Pt[], n = 10): TaperRun[] {
   if (pts.length < 2) return [];
-  const runs: Array<{ d: string; t: number }> = [];
+  const runs: TaperRun[] = [];
   const per = Math.max(1, Math.floor((pts.length - 1) / n));
   for (let i = 0; i < pts.length - 1; i += per) {
     const end = Math.min(pts.length, i + per + 1); // +1 = the shared point
     if (end - i < 2) break;
-    runs.push({ d: polyD(pts.slice(i, end)), t: (i + (end - i) / 2) / pts.length });
+    const slice = pts.slice(i, end);
+    runs.push({ d: polyD(slice), t: (i + (end - i) / 2) / pts.length, pts: slice });
   }
   return runs;
 }

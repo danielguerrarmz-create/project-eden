@@ -45,6 +45,15 @@ import { clamp01, lerp } from './growth';
 import { useAutoplayVideo } from './useAutoplayVideo';
 import { requestGarland } from '../../engine/gongbi/painter';
 import { PAGE_SPECIES } from './species';
+import {
+  CARD_LINE,
+  dashProps,
+  growAt,
+  ORGAN_DISC_R,
+  organAt,
+  polyLen,
+  UNFURL_SPAN,
+} from './reveal';
 import type { GarlandOrgan, GarlandStation, GarlandVine } from '../../engine/gongbi/garland';
 import { colonize, branches, seededRandom, type Vec2, type Branch } from './spaceColonization';
 
@@ -560,10 +569,11 @@ const YEAR_TICK_INNER = 24; // spine to tick inner end
 const YEAR_TICK_LEN = 22;
 const YEAR_LABEL_CLEAR = 20; // label baseline sits this far above the tick
 
-/** The foliage reveal line sits at 52% of the frame; a plate opens as it rises past it. */
-const CARD_LINE = 0.52;
-/** How much scroll travel a plate takes to unfurl. */
-const UNFURL_SPAN = 175;
+/** The foliage reveal line sits at 52% of the frame; a plate opens as it rises past it.
+ *  Re-exported from about/reveal.ts, which is where the page's ONE motion lives — the founders and
+ *  the coda read the same line against the viewport. Two definitions that agree today are two
+ *  definitions that disagree later. */
+
 /** The structural reveal front sits BELOW the fold, so whatever is inside the frame is fully drawn
  *  and the spine runs through the bottom edge at every scroll position. */
 const DRAW_AHEAD = 0.35;
@@ -1259,26 +1269,11 @@ export function subBranchWidth(order: number): number {
   return Math.max(0.9, SUB_BRANCH_W * Math.pow(0.72, order));
 }
 
-/** Arc length of a polyline. The dash reveal needs it, and `getTotalLength()` would mean reading
- *  layout back out of the DOM for geometry we already have in hand. */
-function polyLen(pts: Array<{ x: number; y: number }>): number {
-  let d = 0;
-  for (let i = 1; i < pts.length; i++) d += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-  return d;
-}
-
 /** How far behind its parent a branch waits before it starts drawing, in world units of card-line
  *  travel, per order. Trunk -> branch -> twig, in that order, rather than a tree that fades in
- *  uniformly (which is just a fade). Tuned by looking. */
+ *  uniformly (which is just a fade). Tuned by looking. This one is the timeline's own: the founders'
+ *  arms have no botanical order to stagger by. */
 const SUB_GROW_ORDER_LAG = 55;
-/** How far behind its own stem an organ follows, as a fraction of the branch's draw. "A beat behind
- *  the segment carrying them" — the twig reaches the station, then the leaf opens on it. */
-const SUB_ORGAN_LAG = 0.12;
-/** How long an organ takes to fade in, in the same units. */
-const SUB_ORGAN_FADE = 0.22;
-/** The reveal disc's radius, world units — comfortably larger than the biggest organ at
- *  SUB_ORGAN_SCALE, because a disc that clips its own organ is just a differently-shaped bug. */
-const SUB_ORGAN_R = 85;
 
 /** One organ's reveal disc: where it sits, and which branch's growth it waits on. */
 interface OrganMark {
@@ -1381,7 +1376,7 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
   // ramp. The order lag is what keeps the traversal botanical: a twig cannot draw before the branch
   // carrying it.
   const growOf = (b: Branch) =>
-    reduced ? 1 : clamp01((cardLineY - b.pts[0].y - 10 - b.order * SUB_GROW_ORDER_LAG) / UNFURL_SPAN);
+    reduced ? 1 : growAt(cardLineY, b.pts[0].y, UNFURL_SPAN, b.order * SUB_GROW_ORDER_LAG);
   const grows = runs.map(growOf);
 
   /*
@@ -1412,10 +1407,10 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
         <mask id="sub-organ-mask" maskUnits="userSpaceOnUse" x={SUB_BOX.x} y={SUB_BOX.y} width={SUB_BOX.w} height={SUB_BOX.h}>
           {marks.map((m, i) => {
             // The twig reaches the station at grow == t; the organ opens a beat after that.
-            const o = clamp01((grows[m.branch] - m.t - SUB_ORGAN_LAG) / SUB_ORGAN_FADE);
+            const o = organAt(grows[m.branch], m.t);
             if (o <= 0.001) return null;
             return (
-              <circle key={i} cx={m.x} cy={m.y} r={SUB_ORGAN_R} fill="url(#sub-organ-disc)" opacity={o} />
+              <circle key={i} cx={m.x} cy={m.y} r={ORGAN_DISC_R} fill="url(#sub-organ-disc)" opacity={o} />
             );
           })}
         </mask>
@@ -1435,8 +1430,7 @@ function SubBranches({ reduced, cardLineY }: { reduced: boolean; cardLineY: numb
             strokeLinejoin="round"
             // Root-first pts (see Branch.pts) mean the dash pays out root -> tip: the branch grows
             // OUT of its parent rather than materialising along its whole length.
-            strokeDasharray={grow < 1 ? lens[i] : undefined}
-            strokeDashoffset={grow < 1 ? lens[i] * (1 - grow) : undefined}
+            {...dashProps(lens[i], grow)}
           />
         );
       })}
@@ -2366,7 +2360,7 @@ function ClusterGroup({ cluster, cardLineY, reduced }: { cluster: LaidCluster; c
       {plates.map((pl, i) => {
         // Composite opacity ONLY: no scale, no rotate, no pivot, no clip. Reduced motion is fully
         // present from the start, as before.
-        const opacity = reduced ? 1 : clamp01((cardLineY - pl.y - 10) / UNFURL_SPAN);
+        const opacity = reduced ? 1 : growAt(cardLineY, pl.y, UNFURL_SPAN);
         if (opacity <= 0.001) return null;
 
         return (

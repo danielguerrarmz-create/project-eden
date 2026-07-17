@@ -55,6 +55,8 @@ import { FOUNDER_SPECIMENS } from './about/paintings';
 import { requestGarland } from '../engine/gongbi/painter';
 import { armPts, polyD, taperRuns, trunkPts, type ParenLayout } from './about/parenthesis';
 import { PAGE_SPECIES } from './about/species';
+import { dashProps, growAt, ORGAN_DISC_R, organAt, polyLen, revealSpanPx } from './about/reveal';
+import { usePageCardLine, useTimelineFrameScale } from './about/usePageCardLine';
 
 /** ONE colour, page-wide. There is no longer a Clay-blue / Daniel-green split: the authorship
  *  is already stated in words by the meta line, so saying it a second time in colour only
@@ -942,8 +944,46 @@ const CODA_VINES: Array<Array<[number, number]>> = [
   codaArc(1030, 540, 244, -44, 11, 0.8),
 ];
 
-function CodaBower() {
+/** Where the organs sit along each coda vine. ONE list, read by the painter that stamps them and by
+ *  the reveal that uncovers them. */
+const CODA_STATIONS = [0.12, 0.28, 0.44, 0.6, 0.76, 0.9] as const;
+const CODA_ORGANS = ['leaf', 'bloom', 'leaf', 'bloom', 'bud', 'leaf'] as const;
+/** The mask stroke that uncovers a painted vine's STEM. Wide enough to clear the composer's tube
+ *  (rootWidth 3, tapering) and its shading, narrow enough that it does not drag the organs in with
+ *  it — those have their own discs, a beat later. */
+const CODA_STEM_MASK_W = 14;
+/** The organ discs' radius, in BAND units. Smaller than the timeline's 85 because this band is only
+ *  300 tall and the organs are painted at scale 1.5; 85 would uncover half the band per station. */
+const CODA_ORGAN_R = 58;
+
+function CodaBower({ reduced }: { reduced: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const pageLine = usePageCardLine(reduced);
+  // The band's own page position and scale, measured: the card line is a PAGE coordinate and the
+  // drawing is in BAND units, which are 1:1 only while the band is not scaled down.
+  const [box, setBox] = useState({ top: 0, scale: 1 });
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0) return;
+      setBox({ top: r.top + window.scrollY, scale: r.width / CODA_BAND.w });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [url]);
+  const bandTop = box.top;
+  const bandScale = box.scale || 1;
+  // The timeline's px-per-world-unit, so this band's reveal spans the same distance ON SCREEN.
+  const frameScale = useTimelineFrameScale();
   useEffect(() => {
     let live = true;
     let objectUrl: string | null = null;
@@ -956,10 +996,7 @@ function CodaBower() {
       height: CODA_BAND.h,
       vines: CODA_VINES.map((path) => ({
         path,
-        stations: [0.12, 0.28, 0.44, 0.6, 0.76, 0.9].map((t, i) => ({
-          t,
-          organ: (['leaf', 'bloom', 'leaf', 'bloom', 'bud', 'leaf'] as const)[i],
-        })),
+        stations: CODA_STATIONS.map((t, i) => ({ t, organ: CODA_ORGANS[i] })),
       })),
       scale: 1.5,
       rootWidth: 3,
@@ -984,14 +1021,93 @@ function CodaBower() {
     };
   }, []);
   if (!url) return null;
+
+  /*
+   * THE SAME MOTION AS THE TIMELINE, on a painted vine.
+   *
+   * Daniel: "Make sure that all flowers on site, the founder ones and the ones below, appear in the
+   * same motion as the timeline ones."
+   *
+   * The timeline draws its stems as SVG paths, so it dashes them directly. These stems are PAINTED
+   * — `tube: true`, the composer's own brush, which is the whole reason the coda looks like this and
+   * is not up for negotiation. So the stem is revealed by dashing a MASK stroke laid along the vine's
+   * own polyline instead of dashing the stem itself. Same expression, same span, same ramp; the only
+   * difference is which layer the dash lives on. The organs then get the timeline's exact disc rule,
+   * a beat behind their own vine's draw.
+   *
+   * THE VINES ARE KEYED TO THEIR ROOT, NOT THEIR Y — and here that is the point rather than a
+   * detail. These are horizontal swags: every point of a vine is at nearly the same height, so a
+   * y-driven reveal would uncover the whole thing in one frame. It would pop, which is exactly what
+   * Daniel is objecting to. Root-keying is what the timeline's own branches do, and it means each
+   * vine draws root → tip along its length as the line passes it — a stem growing sideways. (The
+   * founders' arms are the opposite case: 650px tall and monotone in y, so they read per-run. Same
+   * rule, applied where each shape actually lives.)
+   *
+   * Everything is in BAND units, and the whole drawing scales together because the <image> and the
+   * mask share one viewBox — so this stays correct when the band is scaled down on a narrower page.
+   */
+  const localLine = (pageLine - bandTop) / bandScale;
+  const spanBand = revealSpanPx(frameScale) / bandScale;
+
   return (
-    <img
+    <svg
+      ref={svgRef}
       aria-hidden
-      src={url}
-      alt=""
+      viewBox={`0 0 ${CODA_BAND.w} ${CODA_BAND.h}`}
       className="pointer-events-none mx-auto block w-full max-w-[1000px]"
-      style={{ aspectRatio: CODA_BAND.w / CODA_BAND.h }}
-    />
+    >
+      <defs>
+        <radialGradient id="coda-organ-disc">
+          <stop offset="0.45" stopColor="#fff" />
+          <stop offset="1" stopColor="#000" />
+        </radialGradient>
+        <mask id="coda-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={CODA_BAND.w} height={CODA_BAND.h}>
+          {CODA_VINES.map((path, i) => {
+            const pts = path.map(([x, y]) => ({ x, y }));
+            const grow = reduced ? 1 : growAt(localLine, pts[0].y, spanBand);
+            if (grow <= 0.001) return null;
+            return (
+              <g key={i}>
+                {/* the stem, drawing root → tip */}
+                <path
+                  d={polyD(pts)}
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth={CODA_STEM_MASK_W}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  {...dashProps(polyLen(pts), grow)}
+                />
+                {/* the organs, each a beat behind the stretch of stem carrying it */}
+                {CODA_STATIONS.map((t, j) => {
+                  const o = reduced ? 1 : organAt(grow, t);
+                  if (o <= 0.001) return null;
+                  const k = Math.max(1, Math.min(pts.length - 1, Math.round(t * (pts.length - 1))));
+                  return (
+                    <circle
+                      key={j}
+                      cx={pts[k].x}
+                      cy={pts[k].y}
+                      r={CODA_ORGAN_R}
+                      fill="url(#coda-organ-disc)"
+                      opacity={o}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
+        </mask>
+      </defs>
+      <image
+        href={url}
+        x={0}
+        y={0}
+        width={CODA_BAND.w}
+        height={CODA_BAND.h}
+        mask={reduced ? undefined : 'url(#coda-mask)'}
+      />
+    </svg>
   );
 }
 
@@ -1013,7 +1129,7 @@ function TeamCoda({ reduced }: { reduced: boolean }) {
     // Labelled for what is actually in it now. It was "Crossed paths" after the kicker that is gone.
     <section aria-label="Why bet on us" className="mx-auto w-full max-w-page px-gutter">
       <div className={reduced ? 'h-12' : 'min-h-[12svh]'} aria-hidden />
-      <CodaBower />
+      <CodaBower reduced={reduced} />
       <div className="mx-auto mt-32 max-w-[640px] text-center">
         <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-accentOlive">
           {TEAM_CODA.payoffLabel}
@@ -1058,6 +1174,13 @@ const PAREN_STEM_FRAC = 0.78;
  *  as a fading line rather than a thin one, and the organs still have to hang off something. */
 const PAREN_TIP_FRAC = 0.25;
 
+/** WHERE THE ORGANS SIT along each arm, 0 (root) .. 1 (tip). ONE list, read by the painter that
+ *  stamps them and by the reveal that uncovers them — a disc keyed to a station the composer did not
+ *  use is a hole in the drawing. None before t=0.34: before that the arm is still sweeping out of
+ *  the fork and across the page, where a blossom would land on the founders' own column. */
+const PAREN_STATIONS = [0.36, 0.46, 0.56, 0.65, 0.74, 0.83, 0.92] as const;
+const PAREN_ORGANS = ['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf', 'bud'] as const;
+
 /**
  * THE FOUNDERS' PARENTHESIS — the one line arrives, and opens around the two of them.
  *
@@ -1093,6 +1216,12 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<ParenLayout | null>(null);
   const [url, setUrl] = useState<string | null>(null);
+
+  // THE PAGE'S CARD LINE — the founders' equivalent of the timeline camera's. Same fraction, same
+  // span, same ramp; the only difference is that the frame here is the viewport rather than a
+  // panning camera. See reveal.ts. Reduced motion hands back Infinity, so every `growAt` below
+  // saturates to 1 and the whole thing settles instantly, fully grown.
+  const pageLine = usePageCardLine(reduced);
 
   // MEASURE. Re-measured on resize and on any layout change inside the founders (a ResizeObserver on
   // the rows, not just the window: the rows' height moves with text wrapping at a fixed width too).
@@ -1164,6 +1293,13 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
       setLayout({
         w: hr.width,
         h: hr.height,
+        // The overlay's own page y, so the PAGE's card line (a page coordinate) can be read against
+        // this overlay's local geometry. Measured, like everything else here.
+        pageTop: hr.top + window.scrollY,
+        // The timeline's px-per-world-unit, so the reveal spans the same DISTANCE ON SCREEN here as
+        // it does up there. See revealSpanPx: reusing the raw constant would be a different motion
+        // wearing the same number.
+        frameScale: tr ? tr.width / TIMELINE_W : 0.696,
         trunkX: contentCenter - hr.left,
         trunkY0,
         forkY: bandTop + (boxes[0].y0 - bandTop) * PAREN_FORK_FRAC,
@@ -1194,12 +1330,35 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
     [layout],
   );
 
+  /**
+   * THE ORGANS' STATIONS, resolved in the SAME place the painter's are, from the same array. The
+   * discs that uncover the painted organs have to sit exactly where the composer stamped them, and
+   * the only way to guarantee that is to derive both from one list rather than from two that agree.
+   */
+  const marks = useMemo(() => {
+    if (!arms) return [];
+    const out: Array<{ x: number; y: number; arm: 'left' | 'right'; t: number }> = [];
+    (['left', 'right'] as const).forEach((side) => {
+      const pts = arms[side];
+      for (const t of PAREN_STATIONS) {
+        // The painter's own index arithmetic (see paintGarland's station loop).
+        const i = Math.max(1, Math.min(pts.length - 1, Math.round(t * (pts.length - 1))));
+        out.push({ x: pts[i].x, y: pts[i].y, arm: side, t });
+      }
+    });
+    return out;
+  }, [arms]);
+
   // PAINT. The organs only; the stems are the SVG below. One request for both arms, because
   // `createFlora` derives the species from the seed: two requests would grow two species, and two
   // requests at one seed would restart the same rng and stamp identical organs (see GarlandOpts.vines).
   const w = layout ? Math.round(layout.w) : 0;
   const h = layout ? Math.round(layout.h) : 0;
   const armsKey = arms ? `${w}x${h}` : '';
+  // The card line, in this overlay's own coordinates, and the reveal's span converted through the
+  // timeline's scale so the founders grow over the same distance ON SCREEN that the timeline does.
+  const localLine = layout ? pageLine - layout.pageTop : 0;
+  const span = layout ? revealSpanPx(layout.frameScale) : revealSpanPx(0.696);
   useEffect(() => {
     if (!arms || !w || !h) return;
     let live = true;
@@ -1219,12 +1378,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
       height: h,
       vines: ([arms.left, arms.right] as const).map((pts) => ({
         path: pts.map((p) => [p.x, p.y] as [number, number]),
-        // Stations by eye, and none before t=0.34: before that the arm is still sweeping out of the
-        // fork and across the page, where a blossom would land on the founders' own column.
-        stations: [0.36, 0.46, 0.56, 0.65, 0.74, 0.83, 0.92].map((t, i) => ({
-          t,
-          organ: (['leaf', 'bloom', 'leaf', 'bud', 'bloom', 'leaf', 'bud'] as const)[i],
-        })),
+        stations: PAREN_STATIONS.map((t, i) => ({ t, organ: PAREN_ORGANS[i] })),
       })),
       scale: PAREN_ORGAN_SCALE,
       tube: false,
@@ -1272,7 +1426,14 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
     >
       {/* The painted organs, 1:1 over the same coordinates the stems are drawn in — never scaled.
           An upscaled painting is this page's recurring bug (CLAUDE.md). */}
-      {url && <img src={url} alt="" className="absolute left-0 top-0" style={{ width: w, height: h }} />}
+      {url && (
+        <img
+          src={url}
+          alt=""
+          className="absolute left-0 top-0"
+          style={{ width: w, height: h, mask: reduced ? undefined : 'url(#paren-organ-mask)', WebkitMask: reduced ? undefined : 'url(#paren-organ-mask)' }}
+        />
+      )}
       {/* `overflow-visible` lets the trunk's overshoot and its round cap kiss the timeline's frame
           above rather than stopping at this box's edge. */}
       {arms && layout && (
@@ -1284,12 +1445,37 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
+          {/* THE ORGANS OPEN A BEAT BEHIND THEIR OWN STEM — the timeline's mechanism exactly (see
+              reveal.ts and SubBranches). The composer paints every organ into ONE bitmap, so there is
+              no per-organ element to fade and the reveal has to be a mask of discs. */}
+          <defs>
+            <radialGradient id="paren-organ-disc">
+              <stop offset="0.45" stopColor="#fff" />
+              <stop offset="1" stopColor="#000" />
+            </radialGradient>
+            <mask id="paren-organ-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={layout.w} height={layout.h}>
+              {marks.map((m, i) => {
+                const o = organAt(growAt(localLine, m.y, span), 0);
+                if (o <= 0.001) return null;
+                return <circle key={i} cx={m.x} cy={m.y} r={ORGAN_DISC_R} fill="url(#paren-organ-disc)" opacity={o} />;
+              })}
+            </mask>
+          </defs>
           {/* The trunk is the spine still, so it keeps the spine's weight, constant.
               `data-paren-trunk` is qa/founder-parenthesis.mjs's handle on the join. */}
-          <path data-paren-trunk d={polyD(arms.trunk)} strokeWidth={layout.trunkW} />
+          <path
+            data-paren-trunk
+            d={polyD(arms.trunk)}
+            strokeWidth={layout.trunkW}
+            {...dashProps(polyLen(arms.trunk), growAt(localLine, arms.trunk[0].y, span))}
+          />
           {/* The arms TAPER root → tip. They are not a constant-width rail: they are the line
               thinning as it grows away from the trunk, and without this each one ends in a blunt
-              round cap of full width, hanging in open paper — a cut line. See taperRuns. */}
+              round cap of full width, hanging in open paper — a cut line. See taperRuns.
+              Each run also DRAWS ON as the card line reaches it, which is what makes a 650px arm
+              grow with the reader instead of shooting out whole the moment the line clears the fork.
+              The arms are monotone in y, so reading each run at its own y is safe here — unlike the
+              space-colonization branches, where 195 of 332 organs sit above their own root. */}
           {([arms.left, arms.right] as const).map((pts, i) =>
             taperRuns(pts).map((run, j) => (
               <path
@@ -1298,6 +1484,7 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
                 strokeWidth={
                   layout.trunkW * (PAREN_STEM_FRAC + (PAREN_TIP_FRAC - PAREN_STEM_FRAC) * run.t)
                 }
+                {...dashProps(polyLen(run.pts), growAt(localLine, run.pts[0].y, span))}
               />
             )),
           )}
