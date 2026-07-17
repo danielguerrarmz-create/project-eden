@@ -137,6 +137,10 @@ interface Cluster {
 }
 
 const A = '/assets/projects';
+/** The timeline's own photographs — the five Daniel shot/supplied for the page itself (orientation,
+ *  studio, DAC pin-up, Resia pitch, graduation) rather than for a project. They live apart from
+ *  `/assets/projects` because they are not a project's documentation; they are the page's narrative. */
+const T = '/assets/about/timeline';
 
 /* --------------------------------- geometry ------------------------------- */
 
@@ -197,10 +201,12 @@ export const yearToY = (y: number) =>
  *
  * Two things this has to guarantee, and they are why it is not a one-liner:
  *
- *  - A YEAR WITH NO WORK KEEPS ITS AXIS POSITION. 2026 has no clusters at all (the spine converges
- *    there and winds into the mark), so there is no plate to sit beside and `yearToY` is the only
- *    honest answer left. Falling back is not a special case; it is the same rule reading an empty
- *    set.
+ *  - A YEAR WITH NO WORK KEEPS ITS AXIS POSITION: there is no plate to sit beside, so `yearToY` is
+ *    the only honest answer left. Falling back is not a special case; it is the same rule reading an
+ *    empty set. (This used to say "2026 has no clusters at all" and named it as the example. Round 9
+ *    gave 2026 the graduation photograph, so 2026 now follows its plate like every other year. The
+ *    branch is still live and still correct — no year currently exercises it, and the moment one is
+ *    added between the ticks it will.)
  *  - THE ORDER IS ENFORCED, not hoped for, AND SO IS THE GAP. `spreadSide` lays each side
  *    independently, so the per-year minimum across both sides is neither monotonic nor spaced:
  *    measured, the first plate of 2021 lands at y=450 and the first of 2022 at y=457, and a label's
@@ -574,7 +580,13 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
   floor: { w: 240, h: 150 }, // reference size only — the hard minimum, never instantiated
   standard: { w: 264, h: 176 },
   hero: { w: 320, h: 213 },
-  showcase: { w: 400, h: 267 }, // reserved for the two bookends: ut-austin and the NYC door
+  // The biggest tier. It read "reserved for the two bookends: ut-austin and the NYC door" while the
+  // ut-austin slot was still a dashed IMAGE TO COME — round 9 cashed that reservation in with the
+  // 2021 orientation call, and added the 2026 graduation to close the drawing.
+  // THERE ARE NOW THREE, not two: orientation, the NYC door, graduation. The door kept this tier
+  // from when it WAS the last plate; it no longer is. TODO(Daniel): drop the door to `hero` so the
+  // showcase tier means "the bookends" again, or keep it big on its own merit? Not guessed here.
+  showcase: { w: 400, h: 267 },
 };
 
 /**
@@ -708,21 +720,44 @@ const easeInOutCubic = (t: number) => {
  */
 export const CLUSTERS: Cluster[] = [
   {
-    // Near the fuse: an honest empty plate for a 2021 moment, image to come. Alternates side with the
-    // 2022 placeholder below; both are held by the same calyx as every real plate.
+    /**
+     * THE FIRST PLATE, and half of the page's bracket. Daniel: "put this image as our FIRST, our
+     * school orientation." It is a UT orientation Zoom grid — forty-odd strangers in forty-odd
+     * boxes, hook-'em hands, nobody having met anybody. The page opens on the paths NOT crossed
+     * yet and closes on the two of them graduating (see `graduation` at the foot of this list),
+     * which is the same bracket the copy makes with "Bower is new." / "The obsession is real, and
+     * it is old." The showcase tier was already reserved for exactly this (see TIER) — the bookend
+     * it names as "ut-austin" had been waiting for an asset since the tier was written.
+     *
+     * PRIVACY, and why this asset is 640px: the photograph shows ~40 identifiable students, each
+     * with their NAME printed under their face, and this repo is public. Shipped at 640 the names
+     * are illegible (measured — the source is 828 and they were readable there), so the face+name
+     * pairing that made it personal data does not survive into the published file. The full-
+     * resolution original is deliberately NOT in the repo: it lives outside it at
+     * `restless-egg/_photo-originals/timeline/`. Daniel is ruling on whether a blur/crop or a swap
+     * is wanted on top of that; swapping this one asset is a one-line change here.
+     */
     id: 'origin-2021',
     year: 2021.1,
     side: 'right',
     hint: '',
     nodes: [
       {
-        tier: 'standard',
-        media: { src: '', ratio: 1.5, alt: 'A 2021 beginning, image to come', pending: true },
+        tier: 'showcase',
+        media: {
+          src: `${T}/2021-orientation-zoom.webp`,
+          ratio: 1.5725,
+          alt: 'A UT Austin orientation call in 2021: a grid of some forty new students in their own boxes, hook-’em hands raised, none of them having met yet',
+        },
       },
     ],
   },
   {
-    // Before the 2022 medical device: an honest empty plate for a 2022 moment, image to come.
+    // The studio, before the first project: the two of them at one desk at night, one rendering,
+    // one watching over his shoulder. Daniel called it "one of our beginning placeholder images".
+    // Which founder is which is NOT asserted here — the filename says both names and does not say
+    // who sits where, and this page has already misattributed a founder once (see the TEAM/ledger
+    // note in CLAUDE.md). "The two cofounders" is what the picture actually supports.
     id: 'early-2022',
     year: 2022.0,
     side: 'left',
@@ -730,7 +765,11 @@ export const CLUSTERS: Cluster[] = [
     nodes: [
       {
         tier: 'standard',
-        media: { src: '', ratio: 1.5, alt: 'A 2022 moment, image to come', pending: true },
+        media: {
+          src: `${T}/studio-desks.webp`,
+          ratio: 1.5009,
+          alt: 'The two cofounders at a shared architecture-studio desk late at night, one at the monitor mid-render, the other standing behind it, the desk buried in drawings and drink cups',
+        },
       },
     ],
   },
@@ -895,6 +934,18 @@ export const CLUSTERS: Cluster[] = [
           alt: 'The Resia landing page, a one-stop remodeling solution to generate, estimate, contract, and manage a renovation',
         },
       },
+      {
+        // Daniel: "next to Resia." Clay presenting the pitch — and this one IS named, because three
+        // things agree: the ledger has Resia as `by: 'clay'`, Daniel's own filename said `clay`, and
+        // only one person is in frame. The deck on the screen reads "Resi.AI", not "Resia"; the alt
+        // says what the slide says rather than quietly correcting the ledger's name onto it.
+        tier: 'standard',
+        media: {
+          src: `${T}/resia-pitch.webp`,
+          ratio: 0.75,
+          alt: 'Clay Seifert presenting the Resia startup pitch deck, its title slide reading “Resi.AI — Removing the Waste from Home Renovation”',
+        },
+      },
     ],
   },
   {
@@ -917,6 +968,18 @@ export const CLUSTERS: Cluster[] = [
           src: `${A}/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp`,
           ratio: 1.4997,
           alt: 'The cardboard physical model of the Dougherty Arts Center, its white catenary arches standing in the round',
+        },
+      },
+      {
+        // Daniel: "around our DAC project." The pin-up wall itself — the sheets (A002–A014, all
+        // stamped DAC) and both physical models in one frame, with the two of them standing either
+        // end of it. It earns its place beside the render and the model because it is the only plate
+        // that shows the WORK as it was actually presented: on a wall, defended in a room.
+        tier: 'standard',
+        media: {
+          src: `${T}/dac-pinup.webp`,
+          ratio: 1.3333,
+          alt: 'The Dougherty Arts Center pin-up: a studio wall of DAC drawing sheets and renders with both cardboard models on stands, the two cofounders standing at either end',
         },
       },
     ],
@@ -963,6 +1026,37 @@ export const CLUSTERS: Cluster[] = [
           src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-office-desk-selfie.webp`,
           ratio: 1.7778,
           alt: 'Daniel at his dual-monitor desk in the Rogers Partners office in New York',
+        },
+      },
+    ],
+  },
+  {
+    /**
+     * THE LAST PLATE, and the other half of the bracket. Daniel: "put this image as our LAST, we
+     * just graduated." Orientation (2021, `origin-2021`) opens on strangers who have not met; this
+     * closes on them graduating. Both bookends are `showcase` and both sit RIGHT, so they rhyme
+     * across the length of the drawing — which is also what balances the lanes at 7 clusters a side.
+     *
+     * THIS IS THE FIRST CLUSTER 2026 HAS EVER HAD, and it changes a documented invariant: the
+     * `yearLabelYs` note used to say 2026 has no work to sit beside, so its label fell back to the
+     * axis. Now the 2026 label follows this plate like every other year follows its first plate.
+     * The fallback is still live and still correct — it is just no longer 2026 that exercises it.
+     *
+     * FOUR people are in the frame, not two, and only the two cofounders are Bower's. The alt says
+     * "four graduates" and names nobody: naming them would mean identifying two people who are not
+     * part of this company on the company's own About page.
+     */
+    id: 'graduation',
+    year: 2026.0,
+    side: 'right',
+    hint: '',
+    nodes: [
+      {
+        tier: 'showcase',
+        media: {
+          src: `${T}/2026-graduation.webp`,
+          ratio: 0.75,
+          alt: 'Four graduates in Texas stoles at the 2026 UT Austin commencement, arms around each other in the packed stadium, fireworks over the jumbotron behind them',
         },
       },
     ],
