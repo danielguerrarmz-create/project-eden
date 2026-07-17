@@ -4,6 +4,7 @@ import {
   MAX_CONCURRENT_STRANDS,
   yearLabelSide,
   yearLabelPositions,
+  YEAR_TICKS,
   CLUSTERS,
   spinePts,
   convArmPts,
@@ -88,48 +89,81 @@ describe('spreadSide: one lane, evenly set, no year deciding anything', () => {
     expect(tops.get('c')! + heights(items[2].heights)).toBeLessThanOrEqual(2100);
   });
 
-  it('THE REAL LANES: every gap on a side is equal, and far wider than packSide ever left', () => {
+  it('THE REAL LANES: no crowding anywhere, and every gap INSIDE a year is equal', () => {
     /**
      * The measured minimum under packSide was 40. Against the real content this asserts the crowding
      * is actually gone rather than merely re-described.
      *
-     * THIS TEST PROMISED TWO THINGS IN ITS TITLE AND ONLY EVER CHECKED ONE. "Every gap on a side is
-     * equal" — the actual guarantee `spreadSide` exists to make, and the entire reason it replaced
-     * packSide — was never asserted. What it asserted instead was `> 100`, a number that came from
-     * the content that happened to be on the page the day it was written.
+     * THIS TEST HAS BEEN WRONG TWICE, IN OPPOSITE DIRECTIONS, AND BOTH ARE WORTH KEEPING.
      *
-     * So it broke on round 9's five photographs: an extra plate per lane divided the same slack into
-     * more gaps and the right lane evened out at 99.61. Every gap was still equal; the crowding was
-     * still gone; the lane was still doing exactly what it promises. The test failed anyway, because
-     * 99.61 < 100, and it would have gone on failing for every future photograph — a tripwire on the
-     * page's content wearing the costume of a layout law.
+     * FIRST it promised two things in its title and checked one. "Every gap on a side is equal" —
+     * `spreadSide`'s actual guarantee — was never asserted. It asserted `> 100`, a number from the
+     * content on the page the day it was written, so round 9's five photographs divided the same
+     * slack into more gaps, the right lane evened out at 99.61, and it failed while the lane was
+     * doing exactly what it promises.
      *
-     * Both claims are now asserted, against the reference each one actually names:
-     *  - EQUAL: to each other, which is `spreadSide`'s contract and is content-independent.
-     *  - FAR WIDER THAN PACKSIDE: against packSide's own measured floor of 40 (`GAP`), which is the
-     *    thing the sentence compares to. 2x it is "far wider" and is a threshold with a reason.
-     * Adding a photograph legitimately narrows the gaps. Only crowding or an uneven lane is a bug.
+     * THEN, fixed to assert the equality it had always claimed, it was overtaken by round 10's item
+     * 9 — WHICH RETIRES THAT CONTRACT, and not by accident. Daniel asked for equal spacing between
+     * the TITLED YEARS ("fake our exact timeline to make it seem like constant growth"). The years
+     * carry 1, 2, 3, 5, 2, 1 clusters. Equal gaps everywhere AND equal year bands cannot both hold
+     * unless every year has the same number of clusters: a band with one cluster in it has slack a
+     * band with five does not. Measured after the axis landed: left gaps of 974.05, 123.83, 123.83,
+     * 123.83 — the 974 is 2021's open paper, the 123.83s are 2023's three clusters sharing a band.
+     * That is the fiction working, not a lane failing.
+     *
+     * So the contract narrowed to what is still true and still worth guarding:
+     *  - NO CROWDING, anywhere, measured against packSide's own floor of 40 (`GAP`). This is the
+     *    claim that mattered all along and it is content- and axis-independent.
+     *  - EQUAL WITHIN A YEAR — `spreadSide`'s guarantee, now scoped to the band it actually governs.
+     * The years' own even spacing is asserted where it belongs: "the titled years are evenly spaced".
      */
+    const CLUSTER_YEAR = new Map(CLUSTERS.map((c) => [c.id, Math.floor(c.year)]));
     for (const side of ['left', 'right'] as const) {
       const ps = computePlates()
         .filter((p) => p.side === side)
         .sort((a, b) => a.rect.y - b.rect.y);
-      const gaps: number[] = [];
+      const gaps: Array<{ g: number; sameYear: boolean }> = [];
       for (let i = 1; i < ps.length; i++) {
         const g = ps[i].rect.y - (ps[i - 1].rect.y + ps[i - 1].rect.h);
         // Siblings inside one cluster keep CLUSTER_GAP_Y (40); only BETWEEN clusters is spread.
-        if (g > GAP + 1) gaps.push(g);
+        if (g <= GAP + 1) continue;
+        gaps.push({ g, sameYear: CLUSTER_YEAR.get(ps[i].clusterId) === CLUSTER_YEAR.get(ps[i - 1].clusterId) });
       }
-      const shown = `${side} gaps: ${gaps.map((x) => x.toFixed(2)).join(', ')}`;
+      const shown = `${side} gaps: ${gaps.map((x) => x.g.toFixed(2)).join(', ')}`;
 
       // Guard the probe: with no inter-cluster gaps found, everything below is vacuously true.
       expect(gaps.length, `${side}: no inter-cluster gaps found — the probe is measuring nothing`).toBeGreaterThan(2);
 
-      // 1. EQUAL — the claim spreadSide is for, and the one that was never checked.
-      for (const g of gaps) expect(g, `${shown} — the lane is not evenly set`).toBeCloseTo(gaps[0], 3);
+      // 1. NO CROWDING — against packSide's own measured floor, which is what the sentence names.
+      for (const { g } of gaps) expect(g, `${shown} — crowding is back`).toBeGreaterThan(2 * GAP);
 
-      // 2. FAR WIDER THAN PACKSIDE'S 40 — the claim, measured against the thing it names.
-      for (const g of gaps) expect(g, `${shown} — crowding is back`).toBeGreaterThan(2 * GAP);
+      // 2. EQUAL WITHIN A YEAR — spreadSide's contract, scoped to the band it now governs.
+      const within = gaps.filter((x) => x.sameYear).map((x) => x.g);
+      if (within.length > 1) {
+        for (const g of within) expect(g, `${shown} — a year's own band is not evenly set`).toBeCloseTo(within[0], 3);
+      }
+    }
+  });
+
+  it('ITEM 9: the titled years are evenly spaced, because the axis is a fiction now', () => {
+    /**
+     * Daniel: 2021 through 2023 are bunched, and "I'd rather fake our exact timeline to make it seem
+     * like constant growth." So this asserts the fiction holds.
+     *
+     * MEASURED BEFORE: label gaps of 52, 270, 604, 1182, 560 — a 22.7x ratio, and 2021 to 2022 was
+     * FIFTY-TWO units. The labels sit beside their work (round 8) and the work was spread by COUNT
+     * across one lane, so the gap between two years was really "how many projects happened to fall
+     * between those dates". Retuning the old piecewise slopes could not have fixed it: the labels do
+     * not read the axis. Each year owning an equal band is what fixes it. After: 1150 x 5, exactly.
+     */
+    const pos = yearLabelPositions();
+    const ys = YEAR_TICKS.map((y) => pos.get(y)!);
+    expect(ys.every((v) => typeof v === 'number'), 'a titled year has no position — measuring nothing').toBe(true);
+    const gaps: number[] = [];
+    for (let i = 1; i < ys.length; i++) gaps.push(ys[i] - ys[i - 1]);
+    expect(gaps.length).toBeGreaterThan(3);
+    for (const g of gaps) {
+      expect(g, `year gaps: ${gaps.map((x) => x.toFixed(1)).join(', ')} — the titled years are not evenly spaced`).toBeCloseTo(gaps[0], 3);
     }
   });
 });

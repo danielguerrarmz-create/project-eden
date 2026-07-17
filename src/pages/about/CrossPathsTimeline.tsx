@@ -195,23 +195,60 @@ const MAX_YEAR = 2026;
  */
 export const SPINE_W = 7.5;
 
-/** Piecewise time axis: 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1. */
-const Y_2021 = 150;
-const Y_2023 = 750;
-const SLOPE_EARLY = 300; // units per year, 2021 to 2023
 /**
- * Units per year, 2023 to 2026. Raised 760 -> 975 on 2026-07-16 (round 3) to buy the lane the room
- * Daniel asked for: "add more white space in between project images... it gets really convoluted."
+ * THE TIME AXIS IS UNIFORM, AND IT IS A FICTION ON PURPOSE (round 10, item 9).
  *
- * This is the honest lever. `spreadSide` shares out whatever slack the lane HAS, so the only way to
- * widen every gap at once is to make the lane longer — and the late stretch is where the projects
- * actually are (nine of the thirteen clusters are 2023 or later). At 760 the even gap came out 88
- * (right) and 107 (left); at 975 it is ~180 on both, which is also what gives the sub-branches a gap
- * worth colonizing. The drawing is taller and the scroll is longer; the track is already 1080vh.
+ * Daniel: 2021 through 2023 are bunched, and "I'd rather fake our exact timeline to make it seem like
+ * constant growth." So every titled year gets the SAME vertical interval, whatever the real elapsed
+ * time and whatever sits in it. The axis is now a COMPOSITION DEVICE, not a measurement. He knows it
+ * is a fiction and he wants the fiction. Nothing on this page any longer claims the interval between
+ * two years means anything, and no comment here should start claiming it again.
+ *
+ * THIS REPLACES THE PIECEWISE AXIS RATHER THAN SITTING NEXT TO IT. It read: "Piecewise time axis:
+ * 2021 to 2023 compressed, 2023 to 2026 open. Unchanged from v1", with SLOPE_EARLY = 300 and
+ * SLOPE_LATE = 975. Two slopes ARE the bunching: 2021 to 2023 got a third of the room per year that
+ * 2023 to 2026 got. Uniform spacing is that mechanism with one slope, so the second concept is
+ * deleted rather than left as two constants that happen to be equal.
+ *
+ * WHAT THE MEASUREMENT ACTUALLY SAID, because the obvious fix would have done nothing. Round 8 moved
+ * the year LABELS off the axis and onto the work they name (`yearLabelYs`), so retuning these slopes
+ * could not have fixed Daniel's complaint on its own — the labels do not read them. Measured before:
+ * label gaps of 52, 270, 604, 1182, 560 units. A 22.7x ratio between the tightest and the widest, and
+ * 2021 to 2022 was FIFTY-TWO units. That is what he is seeing. The labels follow the plates, the
+ * plates were spread evenly by COUNT across one lane, and the years carry 1, 2, 3, 5, 2, 1 clusters —
+ * so the year spacing was really "how many projects happened to fall between these two dates".
+ *
+ * The axis earns its keep again by owning the LANE: each year gets the band between its own tick and
+ * the next (see layoutClusters), so a uniform slope is a uniform band is an evenly spaced year.
  */
-const SLOPE_LATE = 975;
+/** The fuse: where the two strands lay up and the spine is born. Not a year — the drawing's own top. */
+const FUSE_Y = 150;
+/**
+ * THE AXIS ORIGIN, AND IT IS DELIBERATELY THE LANE'S TOP, NOT THE FUSE.
+ *
+ * The plates cannot start at the fuse (they need `LANE_TOP`'s clearance below it), so an axis
+ * anchored at the fuse puts 2021's tick 120 units ABOVE the band its work can actually occupy, and
+ * the band gets clamped. Measured with the origin at the fuse: label gaps of 1030, 1150, 1150, 1150,
+ * 1150 — every year even except the first, which came up 120 short. That is the clearance, showing
+ * up as exactly the inequality item 9 exists to remove.
+ *
+ * So the axis starts where the work can start. `LANE_TOP` is defined from this rather than the other
+ * way round, which keeps the two from disagreeing by construction.
+ */
+const Y_2021 = FUSE_Y + 120;
+/**
+ * Units per year, every year. Sized to the DENSEST year, not chosen: 2024 carries five clusters
+ * (three of them on the right), and a band that cannot hold the worst year makes plates overlap
+ * rather than spread. Measured, 2024's right side needs ~884 units of plate plus its inner gaps.
+ *
+ * THE COST IS REAL AND IT IS THE POINT: 2021 and 2026 carry one cluster each and now get the same
+ * band as 2024's five, so they hold open paper. That is what "constant growth" costs, and Daniel
+ * asked for it with his eyes open. The drawing is much taller than the piecewise axis made it, and
+ * the scroll is longer to match (see the track height).
+ */
+const SLOPE = 1150;
 /** The spine runs plumb to here (2026); below it, the line leans off-axis and winds into the mark. */
-export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
+export const CONVERGE_Y = Y_2021 + (MAX_YEAR - 2021) * SLOPE;
 
 /** The years the drawing ticks and labels. Was written out at three separate call sites (the
  *  garland's station bands, the year rail's render, and now the sub-branch obstacles); a fourth
@@ -219,12 +256,16 @@ export const CONVERGE_Y = Y_2023 + (MAX_YEAR - 2023) * SLOPE_LATE; // 3030
 export const YEAR_TICKS: readonly number[] = [2021, 2022, 2023, 2024, 2025, 2026];
 
 /**
- * THE AXIS, as authored. Since 2026-07-16 (round 8) this is NOT where the year labels go — see
- * `yearLabelYs`. It still places the spine's own geometry (the converge point, the garland's
- * station bands) and it is the fallback for a year that has no work on it.
+ * THE AXIS, as authored — now uniform, and now load-bearing again.
+ *
+ * Round 8 moved the year LABELS off this and onto the work they name (`yearLabelYs`), which left the
+ * axis placing only the spine's own geometry and standing as the fallback for a year with no work.
+ * Round 10 gives it the LANE back: each year owns the band between its tick and the next (see
+ * layoutClusters), so this function is once more what decides where a year's work sits. The label
+ * still goes beside the work — that ruling stands — but the work is now inside its own year's band,
+ * so the two agree instead of drifting.
  */
-export const yearToY = (y: number) =>
-  y <= 2023 ? Y_2021 + (y - 2021) * SLOPE_EARLY : Y_2023 + (y - 2023) * SLOPE_LATE;
+export const yearToY = (y: number) => Y_2021 + (y - 2021) * SLOPE;
 
 /**
  * WHERE THE YEAR LABELS ACTUALLY GO: beside the work they name.
@@ -346,7 +387,7 @@ export function yearLabelSide(obstacles: readonly LabelObstacle[], ty: number): 
  * kink), then in the last stretch cross once over-under and lay up into the spine. The junction is
  * at 2021: the spine is born there and nowhere above it.
  */
-export const CONV_JUNCTION_Y = Y_2021; // 150 — the fuse; the spine is born here
+export const CONV_JUNCTION_Y = FUSE_Y; // 150 — the fuse; the spine is born here (NOT the axis origin: see Y_2021)
 const CONV_TOP_Y = -50; // strand tops, above the frame (cut by frame)
 const CONV_TWIST = 110; // height of the over-under lay above the junction
 const CONV_GATE_Y = CONV_JUNCTION_Y - CONV_TWIST; // 40 — where the wishbone hands off to the twist
@@ -414,6 +455,23 @@ const RAY_END_Y = MARK_CENTER_Y + TAIL_LEN; // where the fully-unwound downward 
 const DESC_DROP = 420; // the sweep below the ray that carries the line to page-centre and out the bottom
 const DESC_BOTTOM_Y = RAY_END_Y + DESC_DROP; // the exit point's world Y (the frame's bottom at track end)
 const H = DESC_BOTTOM_Y + 80; // total drawing height (now runs past the mark, down through the descent)
+
+/**
+ * THE SCROLL TRACK, DERIVED FROM THE DRAWING RATHER THAN PINNED AT 1080vh.
+ *
+ * The track is how much scroll the camera spends crossing the drawing, so track and drawing height
+ * are one fact, not two. 1080vh was tuned by eye against a 5300-unit drawing (the piecewise axis:
+ * CONVERGE_Y 3675, plus the 1625 of mark, unwound ray and descent below it). Item 9's uniform axis
+ * makes the drawing 7645 units. Left at 1080vh the camera would pan **1.44x faster per scroll** —
+ * the same page, whipping by, and nothing would fail. The reveal invariant would even survive it:
+ * growth is keyed to the camera's frame, not to the scroll rate, so "complete by halfway" holds at
+ * any speed. It would just feel wrong, which is the kind of regression only an eye catches.
+ *
+ * So the RATE is the constant now, and the track follows the drawing. Change the axis again and the
+ * scroll re-derives itself instead of quietly re-pacing the page.
+ */
+const TRACK_VH_PER_UNIT = 1080 / 5300; // the pacing Daniel approved: 1080vh across a 5300-unit drawing
+const TRACK_VH = Math.round(H * TRACK_VH_PER_UNIT);
 
 /**
  * WHERE THE ONE LINE LEAVES THIS DRAWING, as a fraction of the drawing's height — so the founders'
@@ -620,15 +678,21 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
   floor: { w: 240, h: 150 }, // reference size only — the hard minimum, never instantiated
   standard: { w: 264, h: 176 },
   hero: { w: 320, h: 213 },
-  // The biggest tier. It read "reserved for the two bookends: ut-austin and the NYC door" while the
-  // ut-austin slot was still a dashed IMAGE TO COME. Round 9 went to cash that reservation in with
-  // the 2021 orientation call and added the 2026 graduation to close the drawing.
-  // THREE nodes claim it now: orientation, the NYC door, graduation — but orientation is HELD on
-  // `pending` awaiting a privacy ruling, so only two of the three are currently drawn as pictures.
-  // The door kept this tier from when it WAS the last plate; it no longer is. TODO(Daniel): drop the
-  // door to `hero` so the showcase tier means "the bookends" again, or keep it big on its own merit?
-  // Not guessed here. (Resolve alongside the orientation ruling — they are the same question about
-  // what the tier is FOR.)
+  // The biggest tier, and ROUND 10 ANSWERED WHAT IT IS FOR — by elimination, which is worth writing
+  // down because the answer is the opposite of what the tier was reserved for.
+  //
+  // It read "reserved for the two bookends: ut-austin and the NYC door". Round 9 cashed that in with
+  // the 2021 orientation call and added the 2026 graduation to close the drawing, so three nodes
+  // claimed it. Then Daniel looked at the page and sent both BOOKENDS down: the orientation plate
+  // "smaller" (-> hero, item 10) and the graduation "much smaller" (-> standard, item 11).
+  //
+  // So the showcase tier now belongs to the NYC door ALONE — the one plate that never asked for it,
+  // and the only one still holding it from when it was the last plate in the drawing. The old
+  // TODO(Daniel) asked whether to drop the door to `hero` so the tier would mean "the bookends"
+  // again; that question is dead, because the bookends left. It is now a tier with one member, which
+  // is a tier that has stopped being a tier. TODO(Daniel): either the door earns 400 on its own
+  // merit, or showcase folds into `hero` and this row goes. Not guessed here — it is a look call and
+  // he is about to look at the page anyway.
   showcase: { w: 400, h: 267 },
 };
 
@@ -650,7 +714,11 @@ const CLUSTER_GAP_Y = 40;
 /** The plate lane. It starts below the fuse (so the twist-fuse reads clean before the first project)
  *  and ends above the converge point (so the last plate never crowds the spine's lean into the mark).
  *  `spreadSide` shares whatever is left between the clusters. */
-const LANE_TOP = CONV_JUNCTION_Y + 120;
+// The lane starts where the axis does, so 2021's band is never clamped and every year's band is
+// exactly SLOPE tall. Was `CONV_JUNCTION_Y + 120`, which is the same number by construction — Y_2021
+// IS the fuse plus that clearance — but saying it this way makes the axis and the lane one fact
+// instead of two that have to be kept equal by hand.
+const LANE_TOP = Y_2021;
 const LANE_BOTTOM = CONVERGE_Y - 160;
 /* CROSS_GAP (the minimum clearance between two clusters in one lane) was deleted with `packSide` on
  * 2026-07-16. It was the floor a year-anchored layout collided against; an evenly spread lane has no
@@ -805,7 +873,16 @@ export const CLUSTERS: Cluster[] = [
     hint: '',
     nodes: [
       {
-        tier: 'showcase',
+        // SMALLER (round 10, item 10). `showcase` -> `hero`, one tier down: 400 wide to 320, a 20%
+        // cut. One tier, not two — he said "smaller" of this and "much smaller" of the graduation
+        // plate, and those are different words.
+        //
+        // A SIDE EFFECT WORTH NAMING AND NOT ACTING ON: a smaller plate also renders ~40 identifiable
+        // faces smaller, which is a happy consequence of a composition note. It is NOT a reason to
+        // shrink it further than he asked, and NOT a reason to reopen the ruling — he has ruled
+        // twice, knowingly, on the faces-and-consent framing. See the note at the head of this
+        // cluster. Do not quietly re-mitigate a decision by tuning a number.
+        tier: 'hero',
         media: {
           src: `${T}/2021-orientation-zoom.webp`,
           ratio: 1.5725,
@@ -841,12 +918,28 @@ export const CLUSTERS: Cluster[] = [
     side: 'right',
     hint: '',
     nodes: [
+      /*
+       * THE DRAWING LEADS HERE TOO (round 10, item 12). Daniel: the Origami Device rendering comes
+       * out of the timeline, the main brochure drawing goes in.
+       *
+       * READ THIS WITH THE PROJECT HERO SWAP, NOT AS A SECOND DECISION. He moved the same asset to
+       * the front of BOTH surfaces in the same review: this plate and the project's hero in
+       * projects.ts. The drawing is the face of the project now and the hospital photograph is
+       * supporting evidence, in both places, consistently. It only looks like churn (and like
+       * reversing round 8 twice in one night) if you read the two commits apart.
+       *
+       * `fit: 'contain'` because it is a paper sheet and wants a white ground under it, same as the
+       * assembly sheets on the project. Ratio 1.2936 MEASURED off the file (793x613, ffprobe) rather
+       * than inherited from the photograph it replaces — the outgoing staged shot is 1.2795, close
+       * enough to look right and wrong enough to letterbox.
+       */
       {
         tier: 'hero',
         media: {
-          src: `${A}/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp`,
-          ratio: 1.2795,
-          alt: 'The origami-inspired cardboard wedge prototype, a low-cost wound-prevention device, staged for photography',
+          src: `${A}/11-wound-care-kenya/wound-care-kenya-brochure-cover.png`,
+          ratio: 1.2936,
+          fit: 'contain',
+          alt: 'The brochure cover: the finished wedge, the materials needed, the two-hour turning interval, and the device in use under a patient',
         },
       },
       {
@@ -1114,7 +1207,13 @@ export const CLUSTERS: Cluster[] = [
     hint: '',
     nodes: [
       {
-        tier: 'showcase',
+        // MUCH SMALLER (round 10, item 11). `showcase` -> `standard`, two tiers down: 400 wide to 264,
+        // a 34% cut. Daniel said "much smaller" here and only "smaller" of the orientation plate, so
+        // the two are deliberately different magnitudes rather than one shared constant — the
+        // orientation drops one tier, this drops two. It is a PORTRAIT plate at 0.75, so at showcase
+        // it stood 356 tall against the drawing's other bookend and read as the loudest thing on the
+        // page; the tier change takes it to ~235.
+        tier: 'standard',
         media: {
           src: `${T}/2026-graduation.webp`,
           ratio: 0.75,
@@ -1378,9 +1477,22 @@ export function subBranchAttractors(rand: () => number, obstacles: readonly WRec
     for (let x = 0; x < W; x += SUB_ATTRACTOR_STEP) {
       const p = { x: x + rand() * SUB_ATTRACTOR_STEP, y: y + rand() * SUB_ATTRACTOR_STEP };
       if (p.x < 0 || p.x > W || p.y > bottom) continue;
-      // The density ramp: 2021 keeps roughly a quarter of its candidates, 2026 keeps all of them.
+      /*
+       * The density ramp: 2021 keeps a twentieth of its candidates, 2026 keeps nearly all of them.
+       *
+       * STEEPENED 0.18 -> 0.05 BY ITEM 9, and the reason is a genuine interaction between two of
+       * Daniel's own asks rather than a tuning whim. The uniform axis hands 2021 and 2022 a full band
+       * each for one and two clusters, so the early half of the drawing is now mostly open paper —
+       * and open paper is exactly what this scatter fills. Measured after the axis landed and before
+       * this change: the late/early branch-point ratio fell to 1.20x, under the 1.5x the "grows as
+       * the timeline continues" test asserts. The ornament was quietly colonising the fiction.
+       *
+       * At 0.05 it is 1.67x, so both asks hold at once: the years are evenly spaced AND the drawing
+       * still gets visibly lusher as the practice does. Swept 0.10 (1.41x, still under) and 0.03
+       * (1.77x) — 0.05 is the first value that clears with margin rather than the largest available.
+       */
       const t = clamp01((p.y - top) / (bottom - top));
-      if (rand() > lerp(0.18, 0.92, t)) continue;
+      if (rand() > lerp(0.05, 0.95, t)) continue;
       // Off the spine's own band — the SpineGarland already dresses that, and growth started there
       // would just crowd the drawn line.
       if (Math.abs(p.x - CX) < SUB_SPINE_CLEAR) continue;
@@ -1849,14 +1961,29 @@ export function spreadSide(
   laneTop: number,
   laneBottom: number,
   gapWithinCluster: number,
+  /**
+   * Start the first cluster AT `laneTop` instead of one gap below it, paying the slack out between
+   * the clusters and below the last one only.
+   *
+   * Round 10, item 9: a year's band uses this so its first plate lands exactly on the year's tick,
+   * which is what makes the titled years come out evenly spaced BY CONSTRUCTION. Without it, the top
+   * margin is a share of that year's own leftover, so a sparse year's first plate sits further below
+   * its tick than a dense year's and the labels drift apart again — measured at up to ~300 units,
+   * which is better than the 22.7x it replaced and still not "equal".
+   *
+   * Defaults false, so the even-end-to-end behaviour every other caller relies on is untouched.
+   */
+  flushTop = false,
 ): Map<string, number> {
   const stackHeight = (heights: number[]) =>
     heights.reduce((s, h) => s + h, 0) + Math.max(0, heights.length - 1) * gapWithinCluster;
   const sum = items.reduce((s, it) => s + stackHeight(it.heights), 0);
-  // n + 1 gaps: one above each cluster, and one below the last.
-  const gap = (laneBottom - laneTop - sum) / (items.length + 1);
+  // n + 1 gaps: one above each cluster, and one below the last. Flush-top has no gap above the
+  // first, so the same slack is shared between n instead.
+  const slots = flushTop ? Math.max(1, items.length) : items.length + 1;
+  const gap = (laneBottom - laneTop - sum) / slots;
   const tops = new Map<string, number>();
-  let y = laneTop + gap;
+  let y = flushTop ? laneTop : laneTop + gap;
   for (const it of items) {
     tops.set(it.id, y);
     y += stackHeight(it.heights) + gap;
@@ -1866,17 +1993,47 @@ export function spreadSide(
 
 function layoutClusters(spine: Strand): LaidCluster[] {
   const tops = new Map<string, number>();
+  /*
+   * EACH YEAR OWNS AN EQUAL BAND (round 10, item 9). Daniel: equal spacing between the titled years,
+   * "fake our exact timeline to make it seem like constant growth."
+   *
+   * IT USED TO BE ONE LANE PER SIDE, spread evenly by COUNT — `spreadSide(items, LANE_TOP,
+   * LANE_BOTTOM, ...)` over every cluster on that side at once. That is what bunched the years, and
+   * the mechanism is worth understanding because it is not obvious: the labels sit beside their work
+   * (round 8), the work was spread by count, and the years carry 1, 2, 3, 5, 2, 1 clusters. So the
+   * distance between "2021" and "2022" was really "how many projects happened to fall between those
+   * two dates" — measured, 52 units, against 1182 between 2024 and 2025. A 22.7x ratio.
+   *
+   * Now each year is laid inside its own band, and the bands are equal because the axis is uniform.
+   * The year label lands at the top of its first plate, which is the band's top, so the labels come
+   * out exactly SLOPE apart by construction rather than by tuning.
+   *
+   * FLUSH TO THE BAND'S TOP, and that is the whole trick. Spreading a year's clusters across its band
+   * would put a margin above the first one, and the margin differs per year (it is a share of that
+   * year's leftover), so the labels would drift by up to ~300 units — better than 22.7x and still not
+   * equal. `flushTop` pays the leftover out BETWEEN the clusters and below the last one only, so the
+   * first plate is AT the tick. A sparse year's leftover becomes open paper at the foot of its band,
+   * which is exactly the fiction Daniel asked for.
+   */
+  const YEARS = [...new Set(CLUSTERS.map((c) => Math.floor(c.year)))].sort((a, b) => a - b);
   (['left', 'right'] as Side[]).forEach((side) => {
-    const items = CLUSTERS.filter((c) => c.side === side)
-      // Sorted by YEAR, then spread evenly: the sequence is the year's, the spacing is not. The
-      // heights are the DERIVED ones, not the tier's reference box — that is what a plate actually
-      // occupies now that the box comes from the image (see plateBox).
-      .sort((a, b) => a.year - b.year)
-      .map((c) => ({
-        id: c.id,
-        heights: c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h),
-      }));
-    spreadSide(items, LANE_TOP, LANE_BOTTOM, CLUSTER_GAP_Y).forEach((v, k) => tops.set(k, v));
+    for (const year of YEARS) {
+      const items = CLUSTERS.filter((c) => c.side === side && Math.floor(c.year) === year)
+        // Sorted by YEAR within the band, so the sequence inside a year is still the year's own. The
+        // heights are the DERIVED ones, not the tier's reference box — that is what a plate actually
+        // occupies now that the box comes from the image (see plateBox).
+        .sort((a, b) => a.year - b.year)
+        .map((c) => ({
+          id: c.id,
+          heights: c.nodes.map((n) => plateBox(n.tier, n.media.ratio).h),
+        }));
+      if (!items.length) continue;
+      // The band is this year's tick to the next one, clamped into the lane so the first and last
+      // bands cannot push the plates past the fuse above or the converge below.
+      const bandTop = Math.max(LANE_TOP, yearToY(year));
+      const bandBottom = Math.min(LANE_BOTTOM, yearToY(year + 1));
+      spreadSide(items, bandTop, bandBottom, CLUSTER_GAP_Y, true).forEach((v, k) => tops.set(k, v));
+    }
   });
 
   return CLUSTERS.map((c) => {
@@ -2280,7 +2437,7 @@ export function CrossPathsTimeline({
       ref={trackRef}
       data-timeline-track
       className={reduced ? 'relative' : 'relative -mt-8'}
-      style={{ height: reduced ? 'auto' : '1080vh' }}
+      style={{ height: reduced ? 'auto' : `${TRACK_VH}vh` }}
     >
       {/* `data-timeline-frame` is the founders' parenthesis's handle on this row. It needs the row's
           bottom edge to find where the descent's exit lands on the page — see FounderParenthesis's
