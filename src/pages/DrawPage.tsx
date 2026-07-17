@@ -55,6 +55,8 @@ import {
   COST_BUILDUP_LABEL,
   COST_BUILDUP_NOTE,
   COST_SUMMARY_LABEL,
+  COST_TO_COMMISSION_BRIDGE,
+  DEMO_SCOPE_NOTE,
   PRICE_QUALIFIER,
   STEWARDSHIP_LABEL,
   STEWARDSHIP_NOTE,
@@ -734,6 +736,21 @@ export function DrawPage() {
                       model. See ui/priceCopy.ts's header for what the gap
                       implies and why no rate was moved to close it. */}
                   <div className="mt-2.5 border-t border-inkBlack/12 pt-2.5">
+                    {/* THE BRIDGE. This panel is the one that gets FILMED, and
+                        it had the same defect CommissionSheet did: the computed
+                        cost and the stated floor adjacent, ~10x apart, with
+                        nothing between them to explain the distance. A reader
+                        supplies their own explanation and both available ones
+                        are wrong — "they print money", or "the £14k is fake".
+                        The second costs us the decomposition above it, which is
+                        the only thing in this panel that is true right now.
+
+                        Names the categories, prices none of them. A figure here
+                        could only be back-solved from £150k. See the constant's
+                        note in ui/priceCopy.ts before adding one. */}
+                    <p className="mb-2.5 text-[10px] leading-relaxed text-inkBlack/60">
+                      {COST_TO_COMMISSION_BRIDGE}
+                    </p>
                     <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
                       {COMMISSION_LABEL}
                     </p>
@@ -745,6 +762,12 @@ export function DrawPage() {
                     </p>
                     <p className="mt-1.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-inkBlack/45">
                       {STEWARDSHIP_LABEL} · {STEWARDSHIP_NOTE}
+                    </p>
+                    {/* Which rung. GRAMMAR caps at 18 m² / 2.5 m, so the object
+                        on screen is the entry piece, not the core commission
+                        the floor prices. Scope, not an accusation. */}
+                    <p className="mt-1.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-inkBlack/45">
+                      {DEMO_SCOPE_NOTE}
                     </p>
                   </div>
                 </div>
