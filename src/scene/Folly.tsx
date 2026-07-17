@@ -13,12 +13,13 @@
  * The living layer is drawn separately by the Growth overlay onto a
  * conceptual sacrificial armature; nothing here ever depends on the plants.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { memberPrism, sectionFor } from '../engine/jointGeometry';
 import type { Vec3 } from '../engine/types';
 import { useDesign } from '../state/store';
 import { buildSteel } from './connectors';
+import { applyReveal, makeRevealDepthMaterial, type RevealUniforms } from './revealShader';
 
 // Prism corners come ordered [start 0..3, end 0..3] around the section.
 const FACES: [number, number, number, number][] = [
@@ -97,13 +98,38 @@ function useInstanceMatrices(
   }, [ref, matrices]);
 }
 
-export function Folly() {
+/**
+ * Give every material the bottom-up reveal, and give every caster a matching
+ * depth material so the shadow map is cut at the same height as the thing
+ * casting it. A no-op unless `revealUniforms` is passed, so HeroScene and the
+ * studio compile exactly the shaders they always did.
+ */
+function useReveal(revealUniforms?: RevealUniforms) {
+  const depth = useMemo(
+    () => (revealUniforms ? makeRevealDepthMaterial(revealUniforms) : undefined),
+    [revealUniforms],
+  );
+  useEffect(() => () => depth?.dispose(), [depth]);
+
+  return useCallback(
+    (mesh: THREE.Mesh | THREE.InstancedMesh | null) => {
+      if (!mesh || !revealUniforms) return;
+      const mat = mesh.material as THREE.Material;
+      applyReveal(mat, revealUniforms);
+      mesh.customDepthMaterial = depth;
+    },
+    [revealUniforms, depth],
+  );
+}
+
+export function Folly({ revealUniforms }: { revealUniforms?: RevealUniforms } = {}) {
   const geometry = useDesign((s) => s.outputs.geometry);
   const system = geometry.params.jointSystem;
   const lamellaSystem = system === 'lamella';
 
   const boxesRef = useRef<THREE.InstancedMesh>(null);
   const cylsRef = useRef<THREE.InstancedMesh>(null);
+  const reveal = useReveal(revealUniforms);
 
   // Timber split by STOCK, matching the BOM: planed C24 off the docking saw
   // vs LVL off the CNC sheets. Each member is its plane-clipped solid.
@@ -136,17 +162,25 @@ export function Folly() {
   useInstanceMatrices(boxesRef, steel.boxes);
   useInstanceMatrices(cylsRef, steel.cylinders);
 
+  // The steel already owns its refs for the instance matrices, so it takes the
+  // reveal here rather than through a ref callback. Keyed on the counts because
+  // the instanced meshes remount when those change (see their `key`).
+  useLayoutEffect(() => {
+    reveal(boxesRef.current);
+    reveal(cylsRef.current);
+  }, [reveal, steel.boxes.length, steel.cylinders.length]);
+
   return (
     <>
       {c24Count > 0 && (
-        <mesh geometry={c24Geo} castShadow receiveShadow>
+        <mesh geometry={c24Geo} castShadow receiveShadow ref={reveal}>
           {/* Planed C24 spruce/larch, UC3 treated. */}
           <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
         </mesh>
       )}
 
       {lvlCount > 0 && (
-        <mesh geometry={lvlGeo} castShadow receiveShadow>
+        <mesh geometry={lvlGeo} castShadow receiveShadow ref={reveal}>
           {/* Spruce LVL, CNC-profiled — paler than the sawn stock. */}
           <meshStandardMaterial color="#c2ab84" roughness={0.75} metalness={0} />
         </mesh>

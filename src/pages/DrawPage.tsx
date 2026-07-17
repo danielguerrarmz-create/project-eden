@@ -41,6 +41,8 @@ import { DrawStage, type Tool } from './draw/DrawStage';
 import { useSpaceHeld } from './draw/useSpaceHeld';
 import { StudioEnvironment } from './draw/StudioEnvironment';
 import { PlacedScaleFigure } from './draw/PlacedScaleFigure';
+import { BakeReveal, REVEAL_S } from './draw/BakeReveal';
+import { makeRevealUniforms } from '../scene/revealShader';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { surfaceSamples, type Framing } from './draw/framing';
 import { PRICE_QUALIFIER, priceMetaLine } from './draw/priceCopy';
@@ -208,6 +210,26 @@ export function DrawPage() {
     return () => clearTimeout(t);
   }, [arcs.length, baked, hintShown]);
 
+  // --- The bake dissolve. The skin does NOT unmount when `baked` flips; it
+  // stays for the length of the reveal, fading, while the lattice sweeps up
+  // out of the ground through it. `dissolving` is what keeps it mounted.
+  const revealUniforms = useMemo(() => makeRevealUniforms(), []);
+  const skinFadeRef = useRef(1);
+  const revealProgressRef = useRef(0);
+  const [dissolving, setDissolving] = useState(false);
+  useEffect(() => {
+    if (!baked) {
+      setDissolving(false);
+      return;
+    }
+    setDissolving(true);
+    // Unmount the skin once it is fully invisible. A timer rather than a
+    // per-frame state write: the ref is already driving the pixels, and this
+    // only needs to fire once, at the end.
+    const t = setTimeout(() => setDissolving(false), (REVEAL_S + 0.1) * 1000);
+    return () => clearTimeout(t);
+  }, [baked]);
+
   // --- Camera. The object should fill the frame, and it should move once baked.
   const [framing, setFraming] = useState<Framing>(HOME);
   const [turntable, setTurntable] = useState(false);
@@ -330,10 +352,23 @@ export function DrawPage() {
                   edits={edits}
                   tool={tool}
                   enabled={!baked}
+                  // `resolved` retires the lawn and the arcs at bake, but the
+                  // SKIN has to outlive it by the length of the dissolve — it
+                  // is the thing being dissolved.
                   resolved={baked}
+                  keepSkin={dissolving}
+                  skinFadeRef={skinFadeRef}
                   spaceHeldRef={spaceHeldRef}
                   onArc={(s) => setArcs((xs) => [...xs, s])}
                   onEdit={(e) => setEdits((xs) => [...xs, e])}
+                />
+
+                <BakeReveal
+                  active={baked}
+                  peakM={peakM}
+                  uniforms={revealUniforms}
+                  fadeRef={skinFadeRef}
+                  progressRef={revealProgressRef}
                 />
 
                 {/* The bake: soft surface out, real kit in — and the ground
@@ -342,7 +377,7 @@ export function DrawPage() {
                     ground stops it, which is the same law that makes bake a
                     resolution rather than a jump-cut. DrawStage's own lawn is
                     gated on !resolved so these two never sit coplanar. */}
-                {baked && <Folly />}
+                {baked && <Folly revealUniforms={revealUniforms} />}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
                 {/* A dome renders identically at 3 m and at 30 m. One person
                     and it snaps to human scale. Bake only: see the file. */}

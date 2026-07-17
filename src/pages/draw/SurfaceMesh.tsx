@@ -19,7 +19,8 @@
  * Deliberately NOT the finished object: matte, seamless, jointless. The whole
  * point of the bake is that this becomes something with nodes and a cut list.
  */
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { surfaceHeight, isHole, footprintHull, planCentre, type SurfaceInput } from '../../engine/surface';
 import { fairedRadius } from '../../engine/shapeFromDrawing';
@@ -27,7 +28,27 @@ import { fairedRadius } from '../../engine/shapeFromDrawing';
 const RINGS = 34;
 const SPOKES = 96;
 
-export function SurfaceMesh({ input, ghost = false }: { input: SurfaceInput; ghost?: boolean }) {
+export function SurfaceMesh({
+  input,
+  ghost = false,
+  fadeRef,
+}: {
+  input: SurfaceInput;
+  ghost?: boolean;
+  /**
+   * 1 = solid, 0 = gone. Driven per frame during the bake dissolve, so it is
+   * a ref rather than a prop: a React re-render per frame for 800 ms of
+   * animation would fight the very moment it exists to smooth.
+   */
+  fadeRef?: React.RefObject<number>;
+}) {
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame(() => {
+    const m = matRef.current;
+    if (!m || !fadeRef || fadeRef.current === null) return;
+    m.opacity = ghost ? 0.25 * fadeRef.current : fadeRef.current;
+  });
+
   const geo = useMemo(() => {
     if (input.arcs.length < 2) return null;
 
@@ -92,11 +113,15 @@ export function SurfaceMesh({ input, ghost = false }: { input: SurfaceInput; gho
   return (
     <mesh geometry={geo} castShadow receiveShadow>
       <meshStandardMaterial
+        ref={matRef}
         vertexColors
         side={THREE.DoubleSide}
         roughness={0.92}
         metalness={0}
-        transparent={ghost}
+        // `transparent` must be true for the whole dissolve, not just when
+        // ghosting: a material flipped to transparent mid-fade recompiles and
+        // the skin blinks at exactly the wrong moment.
+        transparent={ghost || !!fadeRef}
         opacity={ghost ? 0.25 : 1}
       />
     </mesh>

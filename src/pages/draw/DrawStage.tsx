@@ -89,6 +89,8 @@ export function DrawStage({
   tool,
   enabled,
   resolved,
+  keepSkin = false,
+  skinFadeRef,
   spaceHeldRef,
   onArc,
   onEdit,
@@ -100,6 +102,14 @@ export function DrawStage({
   enabled: boolean;
   /** Baked: the surface steps aside for the real structure. */
   resolved: boolean;
+  /**
+   * Baked, but the dissolve is still running: hold the skin on, fading, while
+   * the lattice sweeps up through it. Everything else about `resolved` still
+   * applies — the lawn and the arcs are gone.
+   */
+  keepSkin?: boolean;
+  /** Skin opacity during the dissolve, driven per frame. */
+  skinFadeRef?: React.RefObject<number>;
   /** Space down = the camera has the pointer. A ref, so `down` reads NOW. */
   spaceHeldRef: React.RefObject<boolean>;
   onArc: (s: Spine) => void;
@@ -227,12 +237,18 @@ export function DrawStage({
         </mesh>
       )}
 
-      {/* The soft thing. Also a drag target, so you sculpt ON it, not near it. */}
-      {!resolved && arcs.length > 0 && (
-        <group onPointerDown={down} onPointerMove={move}>
-          <SurfaceMesh input={surface} />
-        </group>
-      )}
+      {/* The soft thing. Also a drag target, so you sculpt ON it, not near it.
+          It outlives `resolved` by the length of the bake dissolve: at that
+          point it is no longer a drag target, just the thing being dissolved,
+          so it drops its handlers and the group with them. */}
+      {arcs.length > 0 &&
+        (!resolved ? (
+          <group onPointerDown={down} onPointerMove={move}>
+            <SurfaceMesh input={surface} />
+          </group>
+        ) : (
+          keepSkin && <SurfaceMesh input={surface} fadeRef={skinFadeRef} />
+        ))}
 
       {/* The arcs you drew. Full-weight while they are the only thing standing;
           once the canopy rises from them they GHOST — the arcs are the gesture,
