@@ -71,14 +71,22 @@ export function InkPass({
     return m;
   }, [revealUniforms, explodeUniforms]);
 
-  const { composer, ink } = useMemo(() => {
+  // ONE composer for the life of the canvas. `camera` is deliberately NOT a
+  // dependency: the draw page swaps its camera at bake (CinematicCamera), and
+  // rebuilding the composer mid-flight tears the pass down at the exact moment
+  // the bake needs it (live QA round 4: the wash died at bake completion and
+  // the scene fell back to the raw render). The RenderPass is retargeted to
+  // the live camera each frame instead, same as the uniforms already are.
+  const { composer, renderPass, ink } = useMemo(() => {
     const c = new EffectComposer(gl);
-    c.addPass(new RenderPass(scene, camera));
+    const rp = new RenderPass(scene, camera);
+    c.addPass(rp);
     const inkPass = new ShaderPass(makeInkShader());
     c.addPass(inkPass);
     c.addPass(new OutputPass());
-    return { composer: c, ink: inkPass };
-  }, [gl, scene, camera]);
+    return { composer: c, renderPass: rp, ink: inkPass };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- camera is retargeted per frame
+  }, [gl, scene]);
 
   useEffect(() => {
     return () => {
@@ -103,6 +111,7 @@ export function InkPass({
 
   useFrame((state) => {
     const cam = state.camera as THREE.PerspectiveCamera;
+    renderPass.camera = cam;
     ink.uniforms.uMode.value = modeRef ? modeRef.current : mode;
     ink.uniforms.uTime.value = state.clock.elapsedTime;
     ink.uniforms.cameraNear.value = cam.near;

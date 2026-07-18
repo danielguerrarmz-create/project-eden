@@ -118,25 +118,39 @@ export const COMMISSION_DEMO_FIGURE = '£150,000';
 export const COMMISSION_DEMO_LABEL = 'commission';
 
 /**
- * DYNAMIC DEMO FIGURE (2026-07-17, Sai's demo-round spec §6). Daniel: the
- * £150,000 on screen must be dynamic to display, "demo-plausible, does not have
- * to be true." So it MOVES with what you draw, off the anchor bake the demo has
- * been described against, in named weighted proportion to area, real piece
- * count and the selected species' stem load. It is floored at the anchor.
+ * DYNAMIC DEMO FIGURE (2026-07-17, Sai's demo-round spec §6; recalibrated to read
+ * as COMPUTED per Daniel, 2026-07-17). Daniel: the on-screen figure "must feel
+ * computed, not flat" — non-round and derived from the ACTUAL geometry, varying
+ * as the draw changes. So it MOVES with what you draw, in named weighted
+ * proportion to footprint area, real piece count, real node count and the
+ * selected species' stem load, snapped to £10 (not £1,000) so the geometry
+ * survives into the units. The reference bake resolves to £173,820; every other
+ * draw is a different non-round figure. It is floored at Daniel's stated £150k
+ * (COMMISSION_FLOOR_GBP), which a real baked design clears — only a very small
+ * draw with the lightest species reaches the floor.
  *
  * DELIBERATELY SEPARATE from `pricing.ts`'s cost model. That machinery answers a
  * different, already-honest question (cost to construct); tuning it to hit a
  * marketing number is exactly the "reverse-engineer evidence to fit a figure"
  * move this file's own header refuses for the real floor. This is openly
- * demo-only, and `COMMISSION_DEMO_FIGURE` above stays true as prose because the
- * formula returns exactly it at the reference bake.
+ * demo-only. `COMMISSION_DEMO_FIGURE` (£150,000) stays what it always was: the
+ * STATED general/floor figure in prose, not the computed output, which now sits
+ * above it and moves.
  */
-export const COMMISSION_ANCHOR_GBP = 150_000;
-/** The reference bake: 14.3 m², 194 pieces, clematis (stemLoad01 0.5). */
+/**
+ * The reference bake resolves here. NON-ROUND on purpose (Daniel, 2026-07-17:
+ * "must feel computed, not flat") — a believable mid-six-figure garden-pavilion
+ * commission, not a chosen round price. Every other draw lands on a different
+ * non-round figure off the real geometry.
+ */
+export const COMMISSION_ANCHOR_GBP = 173_820;
+/** The reference bake: 14.3 m², 194 pieces, 108 nodes, clematis (stemLoad01 0.5). */
 export const COMMISSION_ANCHOR_AREA_M2 = 14.3;
 export const COMMISSION_ANCHOR_PIECES = 194;
-export const COMMISSION_AREA_WEIGHT = 0.5;
-export const COMMISSION_PIECE_WEIGHT = 0.35;
+export const COMMISSION_ANCHOR_NODES = 108;
+export const COMMISSION_AREA_WEIGHT = 0.45;
+export const COMMISSION_PIECE_WEIGHT = 0.28;
+export const COMMISSION_NODE_WEIGHT = 0.12;
 export const COMMISSION_SPECIES_WEIGHT = 0.15;
 /**
  * speciesFactor ranges 0.85 (stemLoad01=0) to 1.15 (stemLoad01=1); clematis
@@ -145,27 +159,42 @@ export const COMMISSION_SPECIES_WEIGHT = 0.15;
  */
 export const COMMISSION_SPECIES_FLOOR = 0.85;
 export const COMMISSION_SPECIES_SPAN = 0.3;
-export const COMMISSION_STEP_GBP = 5_000;
+/** Daniel's stated "from £150k": the computed figure never dips below it. */
+export const COMMISSION_FLOOR_GBP = 150_000;
+/**
+ * Resolution the figure snaps to. £10, NOT £1,000/£5,000: the footprint, piece
+ * and node counts survive into the tens/hundreds digits, so the number reads as
+ * computed (£173,820) rather than picked (£175,000). Fine enough to feel derived,
+ * coarse enough that the count-up never chases per-frame noise.
+ */
+export const COMMISSION_STEP_GBP = 10;
 
 export function commissionDemoFigureGBP(kit: {
   footprintM2: number;
   pieceCount: number;
+  nodeCount: number;
   speciesStemLoad01: number;
 }): number {
   const areaFactor = kit.footprintM2 / COMMISSION_ANCHOR_AREA_M2;
   const pieceFactor = kit.pieceCount / COMMISSION_ANCHOR_PIECES;
+  const nodeFactor = kit.nodeCount / COMMISSION_ANCHOR_NODES;
   const speciesFactor =
     COMMISSION_SPECIES_FLOOR + kit.speciesStemLoad01 * COMMISSION_SPECIES_SPAN;
   const multiplier =
     COMMISSION_AREA_WEIGHT * areaFactor +
     COMMISSION_PIECE_WEIGHT * pieceFactor +
+    COMMISSION_NODE_WEIGHT * nodeFactor +
     COMMISSION_SPECIES_WEIGHT * speciesFactor;
+  // Snap to £10, not £1,000: the actual footprint, piece and node counts survive
+  // into the tens/hundreds digits, so the figure reads as computed off the real
+  // geometry (every draw a different non-round number) rather than a chosen round
+  // price. At the reference bake all four factors are 1.0 => exactly the anchor.
   const stepped =
     Math.round((COMMISSION_ANCHOR_GBP * multiplier) / COMMISSION_STEP_GBP) *
     COMMISSION_STEP_GBP;
-  // Never below Daniel's stated floor ("core commissions from £150k"): the demo
-  // figure moves UP from the anchor, never under it, even in this scoped panel.
-  return Math.max(COMMISSION_ANCHOR_GBP, stepped);
+  // Never below Daniel's stated floor ("core commissions from £150k"): only a very
+  // small draw with the lightest species reaches it; a real baked design clears it.
+  return Math.max(COMMISSION_FLOOR_GBP, stepped);
 }
 
 export function commissionDemoLabel(gbp: number): string {

@@ -124,7 +124,12 @@ export const JOINTS = {
      *  The envelope is a clearance VOLUME, not the physical part: the standoff
      *  solver reads coreDiaMm only, so the disc thickness is render-only. */
     coreDiaMm: 140,
-    coreDiscMm: 8,
+    // Render-only volume bump (2026-07-17, Sai): a stubby cylindrical pipe-boss
+    // hub reads far better than a flat 8 mm sticker-disc under the wash. Safe —
+    // the standoff solver reads coreDiaMm ONLY (see the note above), so disc
+    // thickness moves no BOM line and no cut; 30 mm stays well inside the 140 mm
+    // face so proportions hold.
+    coreDiscMm: 30,
     /**
      * MILLED-END STANDOFF (FABRICATION.md §1a): every strut end is a square
      * cut at a COMPUTED standoff — the smallest length where the whole end
@@ -281,8 +286,8 @@ export const ECOLOGY = {
 // GROWTH — visual approximation of establishment
 // ---------------------------------------------------------------------------
 export const GROWTH = {
-  /** Years the toggle can show. Year 3 = "finished in year three". */
-  years: [0, 1, 3] as const,
+  /** Years the toggle can show. Year 2 = "finished in year two". */
+  years: [0, 1, 2] as const,
   /** Coverage saturates as growth approaches this fraction of the lattice. */
   maxCoverageFraction: 0.92,
   /** Year-0 establishment: what a freshly-planted climber covers on day one. */

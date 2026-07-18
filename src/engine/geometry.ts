@@ -555,6 +555,69 @@ export function generateGeometry(rawParams: DesignParams, shape?: ShapeField): C
   ringPieces(0, 'crown', 'crownBlank', 'crown', []);
   ringPieces(ringCount, 'eave', 'eaveBlank', 'eave', uniqueEaveBoundaries);
 
+  // -------------------------------------------------------------------------
+  // CROWN CAP — close the oculus into a solid crown boss so the DEFAULT build
+  // reads as a COMPLETE dome. The r < r0 region was a literal ~1 m hole at the
+  // top; Daniel wants holes to come ONLY from the excavate tool. A polar
+  // diagrid converges toward the crown, so rather than run the net to a
+  // degenerate point across many rings, ONE fan of short radial ribs springs
+  // from the innermost diagrid ring (ring 0) up to a single apex node — a
+  // bespoke machined crown boss, the summit cousin of the eave hubs.
+  //
+  // The ribs are ordinary diagrid members (the same type/stock the rest of the
+  // net uses), so they inherit the hub standoff / blank-face joint resolution,
+  // the prism render and the BOM line with no new machinery. Crucially they are
+  // added BEFORE the excavation prune below, so an excavation over the crown
+  // removes them by midpoint exactly like any member and reopens the crown right
+  // where the user asked — excavate stays the ONLY source of holes.
+  //
+  // FAB FLOOR: these are the shortest members in the kit (~0.4-0.5 m centreline).
+  // That is under the 0.45 m connector-overlap floor, but that floor governs
+  // FIELD diamonds (fin overlap at acute diagrid angles); the crown region is
+  // already floor-exempt (the ring-0 compression chords run ~0.17 m as blanks).
+  // The apex is a single purpose-made boss, not a field diamond, and the
+  // standoff solver still clears every rib end off the boss envelope.
+  const apex: CanopyNode = {
+    id: 'n-crown-apex',
+    // surfaceNormal() is degenerate at r=0 (the θ-tangent collapses to zero, so
+    // the cross product is 0 → NaN); the summit simply points straight up.
+    position: canopyPoint(ctx, 0, 0),
+    normal: [0, 1, 0],
+    v: 1,
+    kind: 'crown',
+    memberIds: [],
+  };
+  nodes.push(apex);
+  const capType: Member['type'] = lamella ? 'lamella' : 'lattice';
+  for (let j = 0; j < spokeCount; j++) {
+    const from = grid[0][j];
+    const { u, v } = uv(0, j);
+    const rib = addMember(
+      {
+        id: `crowncap-${j}`,
+        type: capType,
+        start: from.position,
+        end: apex.position,
+        nodeStartId: from.id,
+        nodeEndId: apex.id,
+        pieceId: '', // patched immediately below
+        u,
+        v,
+      },
+      from,
+      apex,
+    );
+    const pieceId = `crowncap-${lamella ? 'lam' : 'strut'}-${j}`;
+    rib.pieceId = pieceId;
+    addPiece(
+      lamella ? 'lamella' : 'strut',
+      pieceId,
+      [rib],
+      lamella ? 'sheet' : 'linear',
+      lamella ? LAMELLA_DEPTH_M : STRUT_DEPTH_M,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // JOINT RESOLUTION (FABRICATION.md §1a) — assign every member end its ONE
   // planar cut (mitres, skew butts, blank faces, computed hub standoffs),

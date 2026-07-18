@@ -53,15 +53,21 @@ const fragmentShader = /* glsl */ `
   uniform float cameraFar;
   varying vec2 vUv;
 
-  // Edge-line ink: a warm dark, slightly warmer/lighter than pure ink so it
-  // reads as a drawn line, not a graphic cutout (spec A5). Lightened for round 4
-  // (Daniel: outlines too thick/heavy) so the line reads as pencil, not contour.
-  const vec3 INK = vec3( 0.243, 0.224, 0.176 ); // ~#3e3a2d
-  // Sobel magnitude mapped to a line through these two thresholds. Raised for
-  // round 4: a higher onset + narrower band paints only the strongest edges, so
-  // the outline is thinner and the watercolour texture/colour carries the read.
-  const float EDGE_LO = 0.30;
-  const float EDGE_HI = 0.62;
+  // Edge-line ink and Sobel thresholds are MODE-DEPENDENT (round 4). Sketch
+  // (uMode -> 0, pre-bake) keeps the heavier round-3 read so the lawn stays
+  // legible; wash (uMode -> 1) keeps the thin round-4 read Daniel likes. Both
+  // sets are declared here and mix()ed by clamp(uMode) in main() — the same
+  // reason uMode is a uniform not a #define (see the header): a crossfade needs
+  // both reads live in one program.
+  const vec3 INK_WASH   = vec3( 0.243, 0.224, 0.176 ); // ~#3e3a2d, thin round 4
+  const vec3 INK_SKETCH = vec3( 0.184, 0.165, 0.122 ); // ~#2f2a1f, heavy round 3
+  // Sobel magnitude mapped to a line through these two thresholds. Wash raises
+  // the onset + narrows the band (only the strongest edges read); sketch lowers
+  // both so more of the drawing carries a line.
+  const float EDGE_LO_WASH   = 0.30;
+  const float EDGE_HI_WASH   = 0.62;
+  const float EDGE_LO_SKETCH = 0.16;
+  const float EDGE_HI_SKETCH = 0.42;
 
   // --- Inigo Quilez gradient noise (one function, two uses: grain + wobble) ---
   vec2 hash2( vec2 p ) {
@@ -168,10 +174,19 @@ const fragmentShader = /* glsl */ `
     vec3 base = texture2D( tDiffuse, wuv ).rgb;
 
     // Edges: geometry Sobel on normals (creases) + relative depth (silhouettes).
-    // Weights pulled down for round 4 so the line is thinner and the texture
-    // carries the read (Daniel: outlines too thick).
-    float edge = normalSobel( wuv, texel ) * 0.42 + depthSobel( wuv, texel ) * 2.4;
-    float line = smoothstep( EDGE_LO, EDGE_HI, edge );
+    // Mode-dependent (round 4): sketch (uMode -> 0) uses the heavier round-3
+    // weights + lower onset so the pre-bake lawn keeps its line; wash (uMode ->
+    // 1) uses the thinner round-4 weights so the texture carries the read.
+    // clamp(uMode) is per-frame-coherent, so this mix costs no warp divergence.
+    float m = clamp( uMode, 0.0, 1.0 );
+    float nWeight = mix( 0.55, 0.42, m );
+    float dWeight = mix( 3.2, 2.4, m );
+    float edge = normalSobel( wuv, texel ) * nWeight + depthSobel( wuv, texel ) * dWeight;
+    float line = smoothstep(
+      mix( EDGE_LO_SKETCH, EDGE_LO_WASH, m ),
+      mix( EDGE_HI_SKETCH, EDGE_HI_WASH, m ),
+      edge
+    );
 
     // Paper grain, sampled low-frequency, biased into shadow (Enscape "Surface
     // Detail") — one gradient-noise tap at a fixed screen frequency.
@@ -199,6 +214,11 @@ const fragmentShader = /* glsl */ `
     if ( uMode < 0.999 ) {
       float l = luma( base );
       float dark = 1.0 - smoothstep( 0.18, 0.92, l );      // tonal fill strength
+      // The sketch phase draws on paper: background pixels sit at the far plane
+      // (cleared depth), so they never hatch. Without this the round-4 sky's
+      // mid luma reads as "dark" and the whole sky cross-hatches into grey
+      // plaid; with it the blue sky arrives WITH the wash as the bake paints.
+      dark *= 1.0 - step( cameraFar * 0.85, linDepth( wuv ) );
       // Cross-hatch: two gratings at ~45 deg, thresholded, added where dark.
       float g1 = sin( ( wuv.x + wuv.y ) * resolution.y * 0.16 );
       float g2 = sin( ( wuv.x - wuv.y ) * resolution.y * 0.16 );
@@ -209,11 +229,13 @@ const fragmentShader = /* glsl */ `
       sketch = clamp( sketch, 0.0, 1.0 );
     }
 
-    vec3 col = mix( sketch, wash, clamp( uMode, 0.0, 1.0 ) );
+    vec3 col = mix( sketch, wash, m );
 
-    // Drawn ink line on top, both modes. Softened opacity for round 4 so it
-    // reads as a light pencil edge, not a heavy contour.
-    col = mix( col, INK, line * 0.8 );
+    // Drawn ink line on top, both modes. Sketch (round 3) draws it at full
+    // opacity in the darker ink; wash (round 4) softens to 0.8 in the lighter
+    // ink so it reads as a light pencil edge, not a heavy contour.
+    vec3 ink = mix( INK_SKETCH, INK_WASH, m );
+    col = mix( col, ink, line * mix( 1.0, 0.8, m ) );
 
     gl_FragColor = vec4( col, 1.0 );
   }

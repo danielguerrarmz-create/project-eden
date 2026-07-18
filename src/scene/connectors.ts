@@ -117,8 +117,11 @@ const STRUT_WIDTH_M = STOCK.strut.widthMm * MM;
 // named and invisible. A flat cylinder cap, not a faceted hex — reads fine at
 // demo distance (Sai's non-goal). Ø and length are proportioned off the 12 mm
 // bolt, not a spec dimension; eyeball against a render.
-const DOME_NUT_DIA_M = 0.022;
-const DOME_NUT_LEN_M = 0.012;
+// Bumped ~1.3x (2026-07-17, Sai) so the bright dome-nut caps sit visibly proud
+// of the fin face at demo distance, matching the reference's prominent bolt
+// heads. Still a render proportion off the 12 mm bolt, not a spec dimension.
+const DOME_NUT_DIA_M = 0.028;
+const DOME_NUT_LEN_M = 0.018;
 // Ground screw (FOUNDATION.groundScrewSpec = 'Ø76 × 865 mm HDG ground screw'):
 // the Ø76 is real; only ~a collar's worth shows above the base plate because
 // most of the 865 mm drives below grade. Visible height is a proportion, tuned

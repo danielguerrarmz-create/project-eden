@@ -1,25 +1,27 @@
 /**
- * PlantGrowth.tsx — the living layer, in the draw flow, botanically per species.
+ * PlantGrowth.tsx — the living layer, growing ALONG the real lattice.
  *
- * The round-2 growth overlay clothed the lattice in one icosahedron blob per
- * strut-field cell. This keeps everything that was right about it — placement
- * follows the strut density and normal, size eases toward the year's coverage,
- * staggered per-cell thresholds give a natural fill, idle sway reads alive — and
- * changes only WHAT gets placed at each cell, driven by the selected species'
- * habit (`speciesVisual.ts`): a fine flowering net for clematis, a spiralled
- * twiner with hanging racemes for wisteria, arched canes with sparse blooms for
- * the rose, a dense flat mat for ivy (round-3 brief item 2).
+ * The round-3 overlay placed one primitive per (u,v) strut-field CELL on the
+ * conceptual shell, pointing OUT along the cell normal — so each plant poked
+ * away from the skin on a grid that mostly missed the timber, reading as
+ * floating bits. This tiles vine stations along the ACTUAL members instead
+ * (`plantPlacement.placeVines`): each station rides a strut's centreline in a
+ * frame whose +Y climbs the member and +Z faces outward, so a spiral twines UP
+ * the strut, an arched cane rides it, a mat lies flat on it. Stations grow in by
+ * height up the canopy (`climbThreshold`), so the canopy visibly clothes from
+ * eave to crown as the year's coverage rises. Foliage richness reads the
+ * strut-density field at each member — where the engine put the most support,
+ * the plant grows thickest.
  *
  * STAYS INSTANCED, STAYS CHEAP. Two instanced pools — one stem primitive, one
- * flower primitive — replace the round-2 per-leaf meshes, so the draw call count
- * drops even as the read gets richer. The frame loop writes instance matrices,
- * never React state, so the growth animation never re-renders the tree (the same
- * ref-not-state rule BakeReveal/ExplodeReveal hold).
+ * flower primitive. The frame loop writes instance matrices, never React state,
+ * so the growth animation never re-renders the tree (the same ref-not-state rule
+ * BakeReveal/ExplodeReveal hold).
  *
- * The timing math lives in `growthTiming.ts` (pure, tested); this file is that
- * math plus three.js placement. Mounted bake-only and hidden while exploded or
- * dissolving (DrawPage), because foliage anchored to the pre-explode strut field
- * would hang in space over scattered pieces.
+ * The timing math lives in `growthTiming.ts` (pure, tested) and placement in
+ * `plantPlacement.ts` (pure, tested); this file is that math plus three.js.
+ * Mounted bake-only and hidden while exploded or dissolving (DrawPage), because
+ * foliage anchored to the pre-explode members would hang over scattered pieces.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -28,63 +30,60 @@ import { useDesign } from '../../state/store';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { visualFor, type PetalForm, type StemForm } from './speciesVisual';
 import { plantGradient } from '../../scene/npr/toonGradient';
-import {
-  cellFlowers,
-  cellJitter,
-  easeCoverage,
-  leafProgress,
-  leafThreshold,
-} from './growthTiming';
-import { isCellOnStructure } from './plantPlacement';
+import { cellFlowers, cellJitter, climbThreshold, easeCoverage, leafProgress } from './growthTiming';
+import { placeVines, type VineOptions } from './plantPlacement';
 
-const UP = new THREE.Vector3(0, 1, 0);
 // A clearer foliage green than the old near-black #4a5b34, which the wash read as
 // tan; this stays above the shadow-shift band so stems paint green (live QA).
 const STEM_COLOR = new THREE.Color('#6c7e48');
 
-/** A small stem primitive, main axis +Y, rooted at the origin. */
+/**
+ * A small stem/leaf primitive in the vine frame: +Y runs ALONG the member
+ * (the climb axis), +Z faces outward off the timber.
+ */
 function makeStemGeometry(form: StemForm): THREE.BufferGeometry {
   switch (form) {
     case 'spiral': {
-      // A short helical wrap: the twining read (wisteria/jasmine/honeysuckle).
+      // A helix winding around the climb axis: it twines UP the strut
+      // (wisteria / jasmine / honeysuckle).
       const pts: THREE.Vector3[] = [];
       for (let i = 0; i <= 20; i++) {
         const t = i / 20;
         const a = t * Math.PI * 4;
-        pts.push(new THREE.Vector3(Math.cos(a) * 0.03, t * 0.17, Math.sin(a) * 0.03));
+        pts.push(new THREE.Vector3(Math.cos(a) * 0.03, (t - 0.5) * 0.18, Math.sin(a) * 0.03));
       }
-      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.011, 5, false);
+      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, 0.011, 5, false);
     }
     case 'arch': {
-      // An arched cane bowing off the surface: the scrambler read (the rose).
+      // A cane running along the member (+Y) and bowing outward (+Z): the
+      // scrambler read (the rose).
       const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(-0.09, 0, 0),
-        new THREE.Vector3(0, 0.16, 0),
-        new THREE.Vector3(0.09, 0, 0),
+        new THREE.Vector3(0, -0.09, 0),
+        new THREE.Vector3(0, 0, 0.14),
+        new THREE.Vector3(0, 0.09, 0),
       );
-      return new THREE.TubeGeometry(curve, 16, 0.02, 6, false);
+      return new THREE.TubeGeometry(curve, 14, 0.018, 6, false);
     }
     case 'mat': {
-      // A dense flat leaf mat lying tangent to the skin: the clinging read (ivy).
-      const g = new THREE.IcosahedronGeometry(0.13, 0);
-      g.scale(1, 0.4, 1);
-      g.translate(0, 0.02, 0);
+      // A flat leaf patch lying tangent to the timber (thin in +Z = outward):
+      // the clinging read (ivy).
+      const g = new THREE.IcosahedronGeometry(0.12, 0);
+      g.scale(1, 1, 0.35);
       return g;
     }
     case 'net':
     default:
-      // A fine thin stem tick: many of them read as the tendril net (clematis,
-      // sweet pea).
-      return new THREE.BoxGeometry(0.016, 0.15, 0.016).translate(0, 0.075, 0);
+      // A fine stem tick centred on the member; many tile into a mesh
+      // (clematis, sweet pea).
+      return new THREE.BoxGeometry(0.016, 0.16, 0.016);
   }
 }
 
-/** A small flower primitive at the stem tip, or null where the plant barely flowers. */
+/** A small flower primitive at the station, or null where the plant barely flowers. */
 function makeFlowerGeometry(form: PetalForm): THREE.BufferGeometry | null {
   switch (form) {
     case 'star': {
       // A five-point star, thin-extruded, facing outward: clematis/jasmine.
-      // Sized up from round 3.0 so the Kuwahara wash does not erase it (QA).
       const shape = new THREE.Shape();
       const outer = 0.08;
       const inner = 0.032;
@@ -117,9 +116,26 @@ function makeFlowerGeometry(form: PetalForm): THREE.BufferGeometry | null {
   }
 }
 
+/** Placement tuning per habit family: finer mesh -> denser tiling; scramblers
+ *  stand their canes further off the timber; clingers hug it. */
+function placementFor(form: StemForm): VineOptions {
+  switch (form) {
+    case 'spiral': // twining — close stations spiralling the strut
+      return { segSpacingM: 0.18, maxPerMember: 6, standoffM: 0.035 };
+    case 'arch': // scrambler — sparser canes, stood further off
+      return { segSpacingM: 0.28, maxPerMember: 4, standoffM: 0.05 };
+    case 'mat': // clinging — dense flat patches hugging the timber
+      return { segSpacingM: 0.12, maxPerMember: 7, standoffM: 0.02 };
+    case 'net':
+    default: // tendril — the finest mesh of stations
+      return { segSpacingM: 0.14, maxPerMember: 7, standoffM: 0.03 };
+  }
+}
+
 interface Placed {
   pos: THREE.Vector3;
-  /** Stem-tip anchor for a flower, precomputed so the frame loop allocates nothing. */
+  /** Flower anchor, stood a touch further off the timber, precomputed so the
+   *  frame loop allocates nothing. */
   tip: THREE.Vector3;
   quat: THREE.Quaternion;
   maxSize: number;
@@ -128,19 +144,11 @@ interface Placed {
 }
 
 export function PlantGrowth() {
-  const allCells = useDesign((s) => s.outputs.strutField.cells);
+  const cells = useDesign((s) => s.outputs.strutField.cells);
   const members = useDesign((s) => s.outputs.geometry.members);
   const coverage = useDesign((s) => s.outputs.growth.coverageFraction);
   const speciesId = useDesign((s) => s.params.speciesId);
   const reducedMotion = useReducedMotion();
-
-  // Keep only cells that actually hug a member, so foliage never hangs off the
-  // structure (live QA). A parametric strut-field grid strays off the lattice at
-  // holes and the crown; those cells are dropped rather than snapped.
-  const cells = useMemo(
-    () => allCells.filter((c) => isCellOnStructure(c.position, members)),
-    [allCells, members],
-  );
 
   const visual = visualFor(speciesId);
   const petalColor = useMemo(() => new THREE.Color(visual.petalColor), [visual.petalColor]);
@@ -150,32 +158,56 @@ export function PlantGrowth() {
   useEffect(() => () => stemGeo.dispose(), [stemGeo]);
   useEffect(() => () => flowerGeo?.dispose(), [flowerGeo]);
 
-  // Placement + orientation per cell, solved once (like the round-2 overlay).
-  const placed = useMemo<Placed[]>(
-    () =>
-      cells.map((cell, i) => {
-        const jitter = cellJitter(i);
-        const local = 0.4 + 0.6 * cell.density01;
-        const maxSize = local * (0.7 + 0.5 * jitter);
-        const p = new THREE.Vector3(...cell.position);
-        const n = new THREE.Vector3(...cell.normal);
-        p.addScaledVector(n, 0.02); // root on the skin
-        const quat = new THREE.Quaternion().setFromUnitVectors(UP, n);
-        const tip = p.clone().addScaledVector(n, 0.14 * maxSize);
-        return {
-          pos: p,
-          tip,
-          quat,
-          maxSize,
-          threshold: leafThreshold(cell.density01, jitter),
-          phase: i * 1.7,
-        };
-      }),
-    [cells],
-  );
+  const opts = useMemo<VineOptions>(() => placementFor(visual.stemForm), [visual.stemForm]);
 
-  // Which cells carry a flower — the flower pool indexes into these.
-  const flowerCells = useMemo(
+  // Sample the strut-density field at any (u,v) by nearest cell (u wraps 0..1).
+  const densityAt = useMemo(() => {
+    return (u: number, v: number) => {
+      let best = Infinity;
+      let d = 0.5;
+      for (const c of cells) {
+        let du = Math.abs(c.u - u);
+        if (du > 0.5) du = 1 - du;
+        const dv = c.v - v;
+        const dd = du * du + dv * dv;
+        if (dd < best) {
+          best = dd;
+          d = c.density01;
+        }
+      }
+      return d;
+    };
+  }, [cells]);
+
+  // Vines tiled along the real members, solved once. Orientation is a per-station
+  // basis (+Y climb axis, +Z outward), so the primitive runs along the timber.
+  const placed = useMemo<Placed[]>(() => {
+    const side = new THREE.Vector3();
+    const axis = new THREE.Vector3();
+    const out = new THREE.Vector3();
+    const basis = new THREE.Matrix4();
+    return placeVines(members, densityAt, opts).map((seg, i) => {
+      const jitter = cellJitter(i);
+      axis.set(seg.axis[0], seg.axis[1], seg.axis[2]);
+      out.set(seg.out[0], seg.out[1], seg.out[2]);
+      side.crossVectors(axis, out).normalize();
+      const quat = new THREE.Quaternion().setFromRotationMatrix(basis.makeBasis(side, axis, out));
+      const pos = new THREE.Vector3(seg.pos[0], seg.pos[1], seg.pos[2]);
+      const maxSize = (0.6 + 0.5 * seg.density01) * (0.78 + 0.44 * jitter);
+      const tip = pos.clone().addScaledVector(out, 0.05);
+      return {
+        pos,
+        tip,
+        quat,
+        maxSize,
+        threshold: climbThreshold(seg.climb01, jitter),
+        phase: i * 1.7,
+      };
+    });
+  }, [members, densityAt, opts]);
+
+  // Which stations carry a flower — the flower pool indexes into these.
+  const flowerPlaced = useMemo(
     () => placed.filter((_, i) => cellFlowers(i, visual.flowerDensity01)),
     [placed, visual.flowerDensity01],
   );
@@ -187,9 +219,7 @@ export function PlantGrowth() {
   const scratchS = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((state, dt) => {
-    cover.current = reducedMotion
-      ? coverage
-      : easeCoverage(cover.current, coverage, dt);
+    cover.current = reducedMotion ? coverage : easeCoverage(cover.current, coverage, dt);
     const cov = cover.current;
     const t = state.clock.elapsedTime;
 
@@ -197,7 +227,7 @@ export function PlantGrowth() {
     if (stems) {
       for (let i = 0; i < placed.length; i++) {
         const c = placed[i];
-        const prog = leafProgress(cov, c.threshold);
+        const prog = leafProgress(cov, c.threshold, 0.35);
         const sway = reducedMotion ? 1 : 1 + 0.04 * prog * Math.sin(t * 1.3 + c.phase);
         const size = Math.max(0, prog * c.maxSize * sway);
         scratchS.setScalar(size < 0.02 ? 0 : size);
@@ -209,11 +239,11 @@ export function PlantGrowth() {
 
     const flowers = flowerRef.current;
     if (flowers) {
-      for (let i = 0; i < flowerCells.length; i++) {
-        const c = flowerCells[i];
-        // Flowers arrive a touch after their stem and a touch smaller, so the
+      for (let i = 0; i < flowerPlaced.length; i++) {
+        const c = flowerPlaced[i];
+        // Flowers arrive a touch after their stem and a touch larger, so the
         // bloom reads as opening on established growth rather than with it.
-        const prog = leafProgress(cov, c.threshold + 0.06);
+        const prog = leafProgress(cov, c.threshold + 0.06, 0.35);
         const sway = reducedMotion ? 1 : 1 + 0.05 * prog * Math.sin(t * 1.1 + c.phase);
         const size = Math.max(0, prog * c.maxSize * 1.15 * sway);
         scratchS.setScalar(size < 0.02 ? 0 : size);
@@ -236,11 +266,11 @@ export function PlantGrowth() {
           <meshToonMaterial color={STEM_COLOR} gradientMap={plantGradient} />
         </instancedMesh>
       )}
-      {flowerGeo && flowerCells.length > 0 && (
+      {flowerGeo && flowerPlaced.length > 0 && (
         <instancedMesh
-          key={`flowers-${flowerCells.length}-${visual.petalForm}`}
+          key={`flowers-${flowerPlaced.length}-${visual.petalForm}`}
           ref={flowerRef}
-          args={[flowerGeo, undefined, flowerCells.length]}
+          args={[flowerGeo, undefined, flowerPlaced.length]}
           castShadow
         >
           <meshToonMaterial color={petalColor} gradientMap={plantGradient} />

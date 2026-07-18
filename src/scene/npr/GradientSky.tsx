@@ -17,9 +17,9 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /** Zenith -> horizon, tuned to read as a soft Enscape sky once the wash desaturates it. */
-const SKY_ZENITH = '#6f9fd0';
-const SKY_MID = '#a9c9e6';
-const SKY_HORIZON = '#dde9ef';
+const SKY_ZENITH = '#4a7ab5';
+const SKY_MID = '#8fb5d9';
+const SKY_HORIZON = '#d8e6ef';
 
 /** The horizon tone, exported so each canvas can match its fog to it. */
 export const SKY_HORIZON_COLOR = SKY_HORIZON;

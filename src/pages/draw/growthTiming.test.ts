@@ -3,6 +3,7 @@ import {
   cellFlowers,
   cellJitter,
   clamp01,
+  climbThreshold,
   easeCoverage,
   leafProgress,
   leafThreshold,
@@ -51,6 +52,27 @@ describe('growth timing math', () => {
         const t = leafThreshold(d, j);
         expect(t).toBeGreaterThanOrEqual(0.05);
         expect(t).toBeLessThanOrEqual(0.55);
+      }
+    }
+  });
+
+  it('climb thresholds rise from ground to crown and stay under peak coverage', () => {
+    // Ground stations lead, crown stations come last.
+    expect(climbThreshold(0, 0.5)).toBeLessThan(climbThreshold(1, 0.5));
+    // Monotonic in height at a fixed jitter.
+    let prev = -1;
+    for (let c = 0; c <= 1; c += 0.1) {
+      const t = climbThreshold(c, 0.3);
+      expect(t).toBeGreaterThanOrEqual(prev);
+      prev = t;
+    }
+    // Every threshold sits below the final stage's peak coverage (~0.86), so the
+    // crown does grow in by the last year rather than staying bare.
+    for (const c of [0, 0.5, 1]) {
+      for (const j of [0, 0.5, 1]) {
+        const t = climbThreshold(c, j);
+        expect(t).toBeGreaterThanOrEqual(0);
+        expect(t).toBeLessThan(0.86);
       }
     }
   });

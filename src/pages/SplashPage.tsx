@@ -90,13 +90,6 @@ export function SplashPage() {
           Instead of a catalogue of shapes to choose from, a grammar computes the{' '}
           <em className="italic">one</em> that's yours.
         </h2>
-        <p className={BODY}>
-          You shape four things: footprint, rise, lattice spacing, and the way it opens. A fabrication
-          grammar clamps them to what a cutter can actually make, then the same functions run every
-          time: geometry, cut list, nesting, sun path, ecology, so the same choices always mean the
-          same pavilion.
-        </p>
-
         <div className="mx-auto mt-12 max-w-[640px]">
           <PipelineSchematic />
         </div>

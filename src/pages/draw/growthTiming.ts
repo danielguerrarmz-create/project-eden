@@ -36,6 +36,23 @@ export function leafThreshold(density01: number, jitter: number): number {
 }
 
 /**
+ * When a vine STATION starts growing in, by its height up the canopy. Ground
+ * stations (climb01 -> 0) lead; crown stations (climb01 -> 1) come last, so the
+ * living layer visibly rises up the real lattice as coverage climbs. A little
+ * per-station jitter breaks each ring so it fills in naturally rather than as a
+ * hard band. Max threshold = span + spread (~0.6), kept below the final stage's
+ * peak coverage so the crown does reach in by year's end.
+ */
+export function climbThreshold(
+  climb01: number,
+  jitter: number,
+  span = 0.5,
+  spread = 0.1,
+): number {
+  return span * clamp01(climb01) + spread * clamp01(jitter);
+}
+
+/**
  * A cell's visible progress 0..1 given the animated coverage and its threshold.
  * 0 until coverage passes the threshold, then a smoothstep ramp over `ramp`.
  */

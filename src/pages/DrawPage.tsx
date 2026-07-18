@@ -32,8 +32,8 @@
  * The site step is parked (engine/site.ts + draw/SiteMap.tsx still exist, and
  * still have their tests) — scaffold to come back to.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { SplashHeader } from './splash/SplashHeader';
@@ -119,6 +119,14 @@ const FRAME_MARGIN = 1.22;
  * that measured well and deletes the singularity.
  */
 const MIN_POLAR = Math.PI / 6;
+
+/**
+ * The pre-bake fog tone: the page's own `paper` (#F6F4EE, the body background).
+ * Pre-bake the far lawn should dissolve into paper, NOT darken — a darker far
+ * ground over-hatches in the sketch pass into faint grey plaid. At bake the fog
+ * lerps to SKY_HORIZON_COLOR so the ground melts into the sky instead.
+ */
+const FOG_PAPER = '#F6F4EE';
 
 export function DrawPage() {
   const [arcs, setArcs] = useState<Spine[]>([]);
@@ -244,6 +252,7 @@ export function DrawPage() {
   const commissionTarget = commissionDemoFigureGBP({
     footprintM2: outputs.geometry.params.footprintM2,
     pieceCount: outputs.geometry.pieces.length,
+    nodeCount: outputs.geometry.nodes.length,
     speciesStemLoad01: getSpecies(outputs.geometry.params.speciesId).stemLoad01,
   });
   const commissionDisplay = useCountUp(commissionTarget, dissolving ? 1100 : 550);
@@ -356,11 +365,14 @@ export function DrawPage() {
                 {/* Enscape-style watercolour sky (round 4): a blue gradient the
                     ink pass paints, replacing the flat paper background. */}
                 <GradientSky />
-                {/* Fog recoloured to the sky's horizon tone so the ground disc's
-                    outer edge dissolves into the sky rather than into paper.
-                    near=10 starts it past the object's own extent (the lattice
-                    must never fog), far=30 lands inside the r=26 ground disc. */}
-                <fog attach="fog" args={[SKY_HORIZON_COLOR, 10, 30]} />
+                {/* Fog, recoloured across the bake by `revealProgressRef` — the
+                    same clock the wash comes in on. Pre-bake (sketch) it is
+                    paper so the far lawn dissolves into the page instead of
+                    darkening into the sketch's cross-hatch; at bake it lerps to
+                    the sky's horizon tone so the ground disc's outer edge melts
+                    into the sky. A per-frame lerp, not a hard swap on `baked`,
+                    so it crossfades instead of popping mid-dissolve. */}
+                <BakeFog progressRef={revealProgressRef} />
                 {/* THE RIG. Flat fill used to outweigh the key (0.8 ambient +
                     0.7 hemisphere = 1.5 against 1.35), so the shadow the
                     engine already computes never got to read as dark. This is
@@ -446,6 +458,14 @@ export function DrawPage() {
                     a part that has nowhere to report to. */}
                 {baked && (
                   <Folly
+                    // VISIBLE STEEL for the demo (Daniel, 2026-07-17): the
+                    // round-3 concealed timber collars read as pale blobs and a
+                    // true embedded-joinery mock is out of scope for the demo, so
+                    // show the real hub connectors — core drums, fins, bolt pairs,
+                    // dome nuts — the FABRICATION.md kit, matching his reference
+                    // (visible black-steel diagrid hubs). One switch; the concealed
+                    // path stays in Folly, unmounted.
+                    hardwareVisible
                     revealUniforms={revealUniforms}
                     explodeUniforms={explodeUniforms}
                   />
@@ -544,7 +564,14 @@ export function DrawPage() {
                     and explode uniforms go in so the edge G-buffer clips and
                     travels exactly as the timber does. */}
                 <InkPass
-                  modeRef={revealProgressRef}
+                  // WASH MODE THROUGHOUT (2026-07-17, Daniel): the pencil-sketch
+                  // pre-bake read as illegible cross-hatch plaid — "you cannot
+                  // tell what the screen is". The drawing phase now uses the SAME
+                  // watercolour wash as the baked result, so before-bake looks
+                  // like after-bake and stays legible. uMode is left at its
+                  // default (1 = wash); dropping `modeRef` retires the
+                  // sketch->wash crossfade. The reveal/explode uniforms still
+                  // drive the geometry sweep, independent of the ink mode.
                   revealUniforms={revealUniforms}
                   explodeUniforms={explodeUniforms}
                 />
@@ -777,6 +804,36 @@ export function DrawPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * The scene fog, recoloured across the bake (Task A). A component with a
+ * per-frame colour lerp rather than a declarative `<fog>` so it can crossfade
+ * with the wash: pre-bake it sits at `FOG_PAPER` (the far lawn dissolves into
+ * the page, not into the sketch's cross-hatch), and it lerps to
+ * `SKY_HORIZON_COLOR` on `revealProgressRef` — the wash's own clock — so at bake
+ * the ground disc melts into the sky. Runs at the default useFrame priority (0),
+ * which executes BEFORE InkPass's priority-1 composer render, so the colour is
+ * current for the frame the composer draws. near=10 clears the object (the
+ * lattice never fogs), far=30 lands inside the r=26 ground disc.
+ */
+function BakeFog({ progressRef }: { progressRef: MutableRefObject<number> }) {
+  const scene = useThree((s) => s.scene);
+  const fog = useMemo(() => new THREE.Fog(FOG_PAPER, 10, 30), []);
+  const paper = useMemo(() => new THREE.Color(FOG_PAPER), []);
+  const sky = useMemo(() => new THREE.Color(SKY_HORIZON_COLOR), []);
+  useEffect(() => {
+    const prev = scene.fog;
+    scene.fog = fog;
+    return () => {
+      scene.fog = prev;
+    };
+  }, [scene, fog]);
+  useFrame(() => {
+    const t = THREE.MathUtils.clamp(progressRef.current, 0, 1);
+    fog.color.copy(paper).lerp(sky, t);
+  });
+  return null;
 }
 
 function Chip({

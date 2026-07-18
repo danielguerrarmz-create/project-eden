@@ -9,7 +9,7 @@
  * defensive `max-h` + scroll for a short laptop viewport.
  *
  * Under the cards sit the three growth-year pills (spec C3): the studio's own
- * Year 0/1/3 mechanism (`params.year` / `setYear`, computed `outputs.growth`),
+ * Year 0/1/2 mechanism (`params.year` / `setYear`, computed `outputs.growth`),
  * wired into the draw page so a viewer can see potential growth over time. They
  * share this column because they are one control surface: which plant, and how
  * grown-in.

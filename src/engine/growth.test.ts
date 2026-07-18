@@ -10,12 +10,12 @@ describe('growth: a saturating establishment curve, never a warranty', () => {
     expect(computeGrowth(species, 0).coverageFraction).toBe(GROWTH.year0CoverageFraction);
   });
 
-  it('increases year 0 -> 1 -> 3', () => {
+  it('increases year 0 -> 1 -> 2', () => {
     const y0 = computeGrowth(species, 0).coverageFraction;
     const y1 = computeGrowth(species, 1).coverageFraction;
-    const y3 = computeGrowth(species, 3).coverageFraction;
+    const y2 = computeGrowth(species, 2).coverageFraction;
     expect(y1).toBeGreaterThan(y0);
-    expect(y3).toBeGreaterThan(y1);
+    expect(y2).toBeGreaterThan(y1);
   });
 
   it('never claims more than the saturating maximum coverage', () => {
@@ -27,7 +27,7 @@ describe('growth: a saturating establishment curve, never a warranty', () => {
   });
 
   it('mirrors coverage into leafDensity and carries a stage label', () => {
-    const g = computeGrowth(species, 3);
+    const g = computeGrowth(species, 2);
     expect(g.leafDensity01).toBe(g.coverageFraction);
     expect(g.label.length).toBeGreaterThan(0);
   });

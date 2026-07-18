@@ -131,15 +131,20 @@ function buildCollars(g: CanopyGeometry): Collars {
   return { mats, tones, owners };
 }
 
-// Two-tone steel by ROLE (connectors.ts tags each cylinder). Structural keeps
-// the bright galvanized tone already tuned by the 2026-07-17 visual pass;
-// fasteners go dark so a bolt reads as recessed against the plate it holds, the
-// single cheapest move that turns "a cluster of grey boxes" into "a plate with
-// bolts in it". Driven through instanceColor on ONE mesh — see the cylinder
-// material's `vertexColors` + white `color` buffer, which this three version
-// REQUIRES for instanceColor to reach the fragment (USE_COLOR gates it).
-const STEEL_STRUCTURAL = new THREE.Color('#aab0b4');
-const STEEL_FASTENER = new THREE.Color('#3a382f');
+// Two-tone steel by ROLE (connectors.ts tags each cylinder). INVERTED 2026-07-17
+// (Daniel + Sai) to match his reference (a diagrid with visible near-BLACK hub
+// bodies and BRIGHT silver bolt caps): structural goes near-black, fasteners
+// take the old bright tone so the bolts/nuts read as the accent. The near-black
+// is #1c1a16, deliberately darker than the wash's INK (#3e3a2d) and
+// WASH_SHADOW_WARM (#3a3226) so the hub keeps its own ink outline and doesn't
+// dissolve into ambient shadow. Driven through instanceColor on ONE mesh — see
+// the cylinder material's `vertexColors` + white `color` buffer, which this
+// three version REQUIRES for instanceColor to reach the fragment (USE_COLOR
+// gates it). NOTE: the box material's `color` literal below is hardcoded, not a
+// ref to this const — it must track STEEL_STRUCTURAL by hand or fins/plates
+// mismatch the hub disc.
+const STEEL_STRUCTURAL = new THREE.Color('#1c1a16');
+const STEEL_FASTENER = new THREE.Color('#aab0b4');
 
 /**
  * Merge clipped member prisms into one flat-shaded BufferGeometry, with an
@@ -563,7 +568,7 @@ export function Folly({
           {/* Toon-banded like the timber (spec A5): under the watercolour pass
               the whole kit paints in one language, so the steel drops its PBR
               galvanized reflection for the same stepped falloff. */}
-          <meshToonMaterial color="#aab0b4" gradientMap={toonGradient} />
+          <meshToonMaterial color="#1c1a16" gradientMap={toonGradient} />
         </instancedMesh>
       )}
 

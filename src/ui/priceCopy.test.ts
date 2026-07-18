@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   COMMISSION_ANCHOR_AREA_M2,
   COMMISSION_ANCHOR_GBP,
+  COMMISSION_ANCHOR_NODES,
   COMMISSION_ANCHOR_PIECES,
   COMMISSION_DEMO_FIGURE,
   COMMISSION_DEMO_LABEL,
+  COMMISSION_FLOOR_GBP,
   COMMISSION_FROM,
   COMMISSION_LABEL,
   COMMISSION_NOTE,
@@ -156,17 +158,22 @@ describe('the dynamic demo figure moves off a calibrated anchor', () => {
   // the demo has been shown against, floored at Daniel's stated £150k.
   const clematis = 0.5; // stemLoad01 at the reference; species term is a no-op
 
-  it('returns exactly the anchor at the reference bake', () => {
-    // 14.3 m², 194 pieces, clematis => £150,000, so COMMISSION_DEMO_FIGURE stays
-    // true as prose. If this fails the calibration drifted and the constant lies.
+  it('returns exactly the anchor at the reference bake, and it reads computed', () => {
+    // 14.3 m², 194 pieces, 108 nodes, clematis: all four factors are 1.0, so the
+    // figure is exactly the calibration anchor. Recalibrated 2026-07-17 to a
+    // non-round mid-six-figure so it reads as computed off the geometry rather
+    // than a chosen round price. If this fails the calibration drifted.
     const figure = commissionDemoFigureGBP({
       footprintM2: COMMISSION_ANCHOR_AREA_M2,
       pieceCount: COMMISSION_ANCHOR_PIECES,
+      nodeCount: COMMISSION_ANCHOR_NODES,
       speciesStemLoad01: clematis,
     });
     expect(figure).toBe(COMMISSION_ANCHOR_GBP);
-    expect(commissionDemoLabel(figure)).toBe('£150,000');
-    expect(commissionDemoLabel(figure)).toBe(COMMISSION_DEMO_FIGURE);
+    expect(figure).toBe(173_820);
+    expect(commissionDemoLabel(figure)).toBe('£173,820');
+    // The whole point: it does NOT snap to the nearest £1,000.
+    expect(figure % 1000).not.toBe(0);
   });
 
   it('never dips below the stated floor, even for the lightest species on a small draw', () => {
@@ -176,14 +183,15 @@ describe('the dynamic demo figure moves off a calibrated anchor', () => {
     const figure = commissionDemoFigureGBP({
       footprintM2: 8,
       pieceCount: 120,
+      nodeCount: 70,
       speciesStemLoad01: 0.1,
     });
-    expect(figure).toBeGreaterThanOrEqual(COMMISSION_ANCHOR_GBP);
+    expect(figure).toBeGreaterThanOrEqual(COMMISSION_FLOOR_GBP);
   });
 
-  it('rises with area and with piece count', () => {
-    const base = commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, speciesStemLoad01: 0.5 });
-    const bigger = commissionDemoFigureGBP({ footprintM2: 26, pieceCount: 300, speciesStemLoad01: 0.5 });
+  it('rises with area, piece count and node count', () => {
+    const base = commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, nodeCount: 130, speciesStemLoad01: 0.5 });
+    const bigger = commissionDemoFigureGBP({ footprintM2: 26, pieceCount: 300, nodeCount: 160, speciesStemLoad01: 0.5 });
     expect(bigger).toBeGreaterThan(base);
   });
 
@@ -191,16 +199,22 @@ describe('the dynamic demo figure moves off a calibrated anchor', () => {
     // On a design large enough to clear the floor, a heavier species reads as at
     // least as much, never less — the "wisteria needs heavier struts" beat.
     const at = (stem: number) =>
-      commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, speciesStemLoad01: stem });
+      commissionDemoFigureGBP({ footprintM2: 20, pieceCount: 240, nodeCount: 130, speciesStemLoad01: stem });
     expect(at(0.95)).toBeGreaterThanOrEqual(at(0.5));
     expect(at(0.5)).toBeGreaterThanOrEqual(at(0.1));
   });
 
-  it('steps to round £5k figures, so the count-up never lands on noise', () => {
+  it('snaps to £10, never to a round £1,000, so it reads computed not chosen', () => {
+    // £10 resolution keeps meaningful units digits (the geometry survives into
+    // them) while staying coarse enough that the count-up never chases noise.
     for (const stem of [0.1, 0.35, 0.5, 0.7, 0.95]) {
-      const figure = commissionDemoFigureGBP({ footprintM2: 22, pieceCount: 260, speciesStemLoad01: stem });
-      expect(figure % 5000).toBe(0);
+      const figure = commissionDemoFigureGBP({ footprintM2: 22, pieceCount: 260, nodeCount: 140, speciesStemLoad01: stem });
+      expect(figure % 10).toBe(0);
     }
+    // A representative baked draw lands on a non-round figure, not a tidy £1,000.
+    const drawn = commissionDemoFigureGBP({ footprintM2: 16.2, pieceCount: 224, nodeCount: 122, speciesStemLoad01: 0.95 });
+    expect(drawn % 1000).not.toBe(0);
+    expect(drawn % 10).toBe(0);
   });
 
   it('formats with a thousands separator and no dash', () => {

@@ -1,8 +1,8 @@
 /**
- * GrowthPhasesDiagram.tsx — D4. Three canopy elevations (year 0 / 1 / 3) sharing
+ * GrowthPhasesDiagram.tsx — D4. Three canopy elevations (year 0 / 1 / 2) sharing
  * the real surface silhouette (canopyProfile, sampled on the aperture axis),
  * foliage rendered as a deterministic dot scatter whose count follows the live
- * leafDensity01 from computeGrowth(). Year 3 carries a flowering leader (the
+ * leafDensity01 from computeGrowth(). Year 2 carries a flowering leader (the
  * ecological payoff) and the row footer reads the live computeEcology() values
  * at the grown-in state. Every number is computed, never typed.
  */
@@ -15,7 +15,7 @@ import { deDash } from '../../ui/text';
 import { DiagramSvg, LeaderCallout, useInk } from './hairline';
 import { CrownFlower, FoliageLeaves } from './botanicalFoliage';
 
-const YEARS: Year[] = [0, 1, 3];
+const YEARS: Year[] = [0, 1, 2];
 
 /** Deterministic low-discrepancy foliage scatter inside the canopy silhouette. */
 function foliageDots(
@@ -78,8 +78,8 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
           the same deterministic scatter points, count + size from leafDensity01.
           INK_BLUE botany over the diagram's own structural ink. */}
       <FoliageLeaves dots={dots} origin={{ x: cx, y: baseY }} sizeScale={leafScale} />
-      {/* Year 3: flowering payoff leader + a generated bloom at the crown */}
-      {year === 3 && (
+      {/* Year 2: flowering payoff leader + a generated bloom at the crown */}
+      {year === 2 && (
         <>
           <CrownFlower cx={apexX} cy={apexY + 5} sizeScale={leafScale} />
           <LeaderCallout
@@ -94,7 +94,7 @@ function GrowthPanel({ outputs, year }: { outputs: EngineOutputs; year: Year }) 
 }
 
 export function GrowthPhasesDiagram({ outputs }: { outputs: EngineOutputs }) {
-  const grownIn = computeGrowth(outputs.species, 3);
+  const grownIn = computeGrowth(outputs.species, 2);
   const eco = computeEcology(outputs.geometry, outputs.species, grownIn);
   return (
     <div>

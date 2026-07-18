@@ -1,5 +1,5 @@
 /**
- * growth.ts — year 0 / 1 / 3 plant-coverage states.
+ * growth.ts — year 0 / 1 / 2 plant-coverage states.
  *
  * Powers "it's finished in year three" as something you SEE, not just read
  * (mvp-spec §"What it must prove" #4). A visual approximation (labelled as such
@@ -16,7 +16,7 @@ import type { GrowthState, Species, Year } from './types';
 const LABELS: Record<Year, string> = {
   0: 'Year 0 — just planted',
   1: 'Year 1 — establishing',
-  3: 'Year 3 — grown in',
+  2: 'Year 2 — grown in',
 };
 
 export function computeGrowth(species: Species, year: Year): GrowthState {
@@ -26,7 +26,7 @@ export function computeGrowth(species: Species, year: Year): GrowthState {
     coverageFraction = GROWTH.year0CoverageFraction;
   } else {
     // Metres of growth achieved / the characteristic bed-to-crown climb.
-    // Saturating curve so year 3 is nearly full but never a guaranteed 100%.
+    // Saturating curve so year 2 is nearly full but never a guaranteed 100%.
     const reach = (species.growthRateMPerYr * year) / GROWTH.characteristicLengthM;
     coverageFraction = GROWTH.maxCoverageFraction * (1 - Math.exp(-reach));
   }
