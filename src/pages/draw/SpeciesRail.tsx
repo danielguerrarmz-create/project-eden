@@ -39,6 +39,7 @@ export function SpeciesRail() {
             key={sp.id}
             onClick={() => setSpecies(sp.id)}
             aria-pressed={active}
+            aria-label={sp.common}
             className={`w-full rounded-lg border px-2.5 py-1.5 text-left backdrop-blur transition ${
               active
                 ? 'border-accentOlive bg-accentOlive/10'

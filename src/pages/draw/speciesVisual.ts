@@ -41,21 +41,25 @@ export interface SpeciesVisual {
   flowerDensity01: number;
 }
 
+// Bloom colours are deliberately BRIGHT and saturated: live QA found the earlier
+// muted hues washing out to timber-tan under the watercolour pass, so these are
+// lifted well clear of the shadow-shift band while staying inside the house
+// palette (wisteria warm-shifted off its real blue-violet, no blue).
 export const SPECIES_VISUAL: Record<string, SpeciesVisual> = {
   // Vigorous spring blossom on a fine clasping mesh — dense small stars.
-  clematis: { stemForm: 'net', petalColor: '#C98F82', petalForm: 'star', flowerDensity01: 0.7 },
+  clematis: { stemForm: 'net', petalColor: '#E58BA6', petalForm: 'star', flowerDensity01: 0.7 },
   // The heavyweight twiner; hanging racemes, warm-shifted mauve off its blue-violet.
-  wisteria: { stemForm: 'spiral', petalColor: '#8B7398', petalForm: 'raceme', flowerDensity01: 0.6 },
-  // Evergreen tidy twiner; white star flowers read faintly, so it leans green.
-  trachelospermum: { stemForm: 'spiral', petalColor: '#6E7C52', petalForm: 'star', flowerDensity01: 0.22 },
+  wisteria: { stemForm: 'spiral', petalColor: '#B084CE', petalForm: 'raceme', flowerDensity01: 0.6 },
+  // Evergreen tidy twiner; white star flowers, lifted to a warm cream so they read.
+  trachelospermum: { stemForm: 'spiral', petalColor: '#EDE3C2', petalForm: 'star', flowerDensity01: 0.22 },
   // Twining, clustered tubular blooms in warm coral.
-  lonicera: { stemForm: 'spiral', petalColor: '#C97B4A', petalForm: 'bloom', flowerDensity01: 0.5 },
+  lonicera: { stemForm: 'spiral', petalColor: '#E8934C', petalForm: 'bloom', flowerDensity01: 0.5 },
   // Scrambling cane, larger sparser dusty-rose blooms on wide horizontal runs.
-  'rosa-newdawn': { stemForm: 'arch', petalColor: '#C97286', petalForm: 'bloom', flowerDensity01: 0.4 },
-  // Annual tendril; fastest to clothe a fine net, pale orchid-pink pea flowers.
-  lathyrus: { stemForm: 'net', petalColor: '#B98CA6', petalForm: 'bloom', flowerDensity01: 0.6 },
+  'rosa-newdawn': { stemForm: 'arch', petalColor: '#E9899E', petalForm: 'bloom', flowerDensity01: 0.4 },
+  // Annual tendril; fastest to clothe a fine net, orchid-pink pea flowers.
+  lathyrus: { stemForm: 'net', petalColor: '#CE95C8', petalForm: 'bloom', flowerDensity01: 0.6 },
   // Self-clinging dense evergreen mat; its Sep-Nov flowers are invisibly small.
-  hedera: { stemForm: 'mat', petalColor: '#4F5A3A', petalForm: 'none', flowerDensity01: 0.02 },
+  hedera: { stemForm: 'mat', petalColor: '#5E6E42', petalForm: 'none', flowerDensity01: 0.02 },
 };
 
 const NEUTRAL: SpeciesVisual = {

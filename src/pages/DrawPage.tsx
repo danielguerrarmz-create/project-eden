@@ -47,6 +47,7 @@ import { makeRevealUniforms } from '../scene/revealShader';
 import { explodeDistanceM, makeExplodeUniforms } from '../scene/explodeShader';
 import { CinematicCamera } from './draw/CinematicCamera';
 import { InkPass } from '../scene/npr/InkPass';
+import { GradientSky, SKY_HORIZON_COLOR } from '../scene/npr/GradientSky';
 import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
@@ -352,15 +353,14 @@ export function DrawPage() {
                 // summon the browser's menu on top of the shot mid-gesture.
                 onContextMenu={(e) => e.preventDefault()}
               >
-                <color attach="background" args={['#F6F4EE']} />
-                {/* Fog WAS configured and never rendered: near=24 sits beyond
-                    everything ever in frame (camera maxDistance 18, object
-                    ~9-11 m), so it was paid for and invisible. near=10 starts
-                    it past the object's own extent — the lattice must never
-                    fog, that reads as a bug — and far=30 lands inside the
-                    r=26 ground disc, so its outer edge dissolves into the
-                    vellum instead of ending at a hard rim. */}
-                <fog attach="fog" args={['#F6F4EE', 10, 30]} />
+                {/* Enscape-style watercolour sky (round 4): a blue gradient the
+                    ink pass paints, replacing the flat paper background. */}
+                <GradientSky />
+                {/* Fog recoloured to the sky's horizon tone so the ground disc's
+                    outer edge dissolves into the sky rather than into paper.
+                    near=10 starts it past the object's own extent (the lattice
+                    must never fog), far=30 lands inside the r=26 ground disc. */}
+                <fog attach="fog" args={[SKY_HORIZON_COLOR, 10, 30]} />
                 {/* THE RIG. Flat fill used to outweigh the key (0.8 ambient +
                     0.7 hemisphere = 1.5 against 1.35), so the shadow the
                     engine already computes never got to read as dark. This is
@@ -586,7 +586,10 @@ export function DrawPage() {
                 it. */}
             {!baked && (
               <div
-                className={`pointer-events-none absolute left-4 top-1/2 max-w-[24ch] -translate-y-1/2 space-y-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/40 transition-opacity duration-700 ${
+                // A faint vellum backing so the rail keeps contrast where it
+                // crosses the sketched horizon line pre-bake (live QA); text
+                // lifted to /55 for the same reason.
+                className={`pointer-events-none absolute left-4 top-1/2 max-w-[26ch] -translate-y-1/2 space-y-2 rounded-lg bg-paperVellum/55 px-3 py-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/55 backdrop-blur-sm transition-opacity duration-700 ${
                   hintUp ? 'opacity-100' : 'opacity-0'
                 }`}
               >

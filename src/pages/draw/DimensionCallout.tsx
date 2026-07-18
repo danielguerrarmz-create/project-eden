@@ -96,11 +96,14 @@ export function DimensionCallout({ figurePos }: { figurePos: [number, number, nu
         <lineBasicMaterial color="#2f2a1f" transparent opacity={0} />
       </lineSegments>
 
+      {/* One label node. Legibility at filming distance (live QA) comes from a
+          vellum chip in the panel register rather than a hairline of tiny text;
+          `labelRef` fades the whole chip in step with the line. */}
       <Html position={labelPos} center zIndexRange={[20, 0]}>
         <div
           ref={labelRef}
           style={{ opacity: 0, pointerEvents: 'none' }}
-          className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/70"
+          className="whitespace-nowrap rounded border border-inkBlack/15 bg-paperVellum/90 px-1.5 py-0.5 font-mono text-[13px] uppercase tracking-[0.1em] text-inkBlack/80 shadow-sm"
         >
           {HEIGHT_M.toFixed(2)} m
         </div>

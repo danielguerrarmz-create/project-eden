@@ -54,11 +54,14 @@ const fragmentShader = /* glsl */ `
   varying vec2 vUv;
 
   // Edge-line ink: a warm dark, slightly warmer/lighter than pure ink so it
-  // reads as a drawn line, not a graphic cutout (spec A5). #2f2a1f.
-  const vec3 INK = vec3( 0.184, 0.165, 0.122 );
-  // Sobel magnitude mapped to a line through these two thresholds.
-  const float EDGE_LO = 0.16;
-  const float EDGE_HI = 0.42;
+  // reads as a drawn line, not a graphic cutout (spec A5). Lightened for round 4
+  // (Daniel: outlines too thick/heavy) so the line reads as pencil, not contour.
+  const vec3 INK = vec3( 0.243, 0.224, 0.176 ); // ~#3e3a2d
+  // Sobel magnitude mapped to a line through these two thresholds. Raised for
+  // round 4: a higher onset + narrower band paints only the strongest edges, so
+  // the outline is thinner and the watercolour texture/colour carries the read.
+  const float EDGE_LO = 0.30;
+  const float EDGE_HI = 0.62;
 
   // --- Inigo Quilez gradient noise (one function, two uses: grain + wobble) ---
   vec2 hash2( vec2 p ) {
@@ -165,7 +168,9 @@ const fragmentShader = /* glsl */ `
     vec3 base = texture2D( tDiffuse, wuv ).rgb;
 
     // Edges: geometry Sobel on normals (creases) + relative depth (silhouettes).
-    float edge = normalSobel( wuv, texel ) * 0.55 + depthSobel( wuv, texel ) * 3.2;
+    // Weights pulled down for round 4 so the line is thinner and the texture
+    // carries the read (Daniel: outlines too thick).
+    float edge = normalSobel( wuv, texel ) * 0.42 + depthSobel( wuv, texel ) * 2.4;
     float line = smoothstep( EDGE_LO, EDGE_HI, edge );
 
     // Paper grain, sampled low-frequency, biased into shadow (Enscape "Surface
@@ -179,9 +184,13 @@ const fragmentShader = /* glsl */ `
     if ( uMode > 0.001 ) {
       wash = kuwahara( wuv, texel );
       float l = luma( wash );
-      wash = mix( vec3( l ), wash, 0.84 );                 // gentle desaturation
-      float shadow = smoothstep( 0.55, 0.12, l );          // low luma -> shadow
-      wash = mix( wash, uShadowTint, shadow * 0.5 );       // warm shadow shift (A4)
+      wash = mix( vec3( l ), wash, 0.9 );                  // gentle desaturation
+      // Confine the warm shadow shift to genuinely DARK pixels. The old 0.55
+      // onset treated every mid-tone as shadow and dragged saturated plant
+      // colours to umber-tan (live QA); 0.40 leaves coloured materials alone and
+      // still warms the true shadows (spec A4).
+      float shadow = smoothstep( 0.40, 0.08, l );
+      wash = mix( wash, uShadowTint, shadow * 0.42 );      // warm shadow shift (A4)
       wash *= 1.0 - grainAmt * ( grain * 0.5 + 0.5 );      // granulation
     }
 
@@ -202,8 +211,9 @@ const fragmentShader = /* glsl */ `
 
     vec3 col = mix( sketch, wash, clamp( uMode, 0.0, 1.0 ) );
 
-    // Drawn ink line on top, both modes, one weight.
-    col = mix( col, INK, line );
+    // Drawn ink line on top, both modes. Softened opacity for round 4 so it
+    // reads as a light pencil edge, not a heavy contour.
+    col = mix( col, INK, line * 0.8 );
 
     gl_FragColor = vec4( col, 1.0 );
   }

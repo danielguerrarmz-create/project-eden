@@ -48,3 +48,13 @@ export function makeToonGradient(steps: readonly number[] = TOON_STEPS): THREE.D
  * handful of texels that lives for the life of the page, like a font.
  */
 export const toonGradient = /* @__PURE__ */ makeToonGradient();
+
+/**
+ * A higher-floored ramp for the LIVING layer (stems + blooms). Live QA found the
+ * plants' saturated colours crushing to umber-tan: the toon shadow bands dropped
+ * their luma below the wash's shadow-shift threshold, so a pink flower painted as
+ * brown timber. A 0.62 floor keeps foliage and blooms luminous enough to hold
+ * their hue through the wash. Timber and steel keep the deeper `toonGradient`.
+ */
+export const PLANT_STEPS = [0.62, 0.76, 0.9, 1.0] as const;
+export const plantGradient = /* @__PURE__ */ makeToonGradient(PLANT_STEPS);

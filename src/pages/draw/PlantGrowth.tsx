@@ -27,7 +27,7 @@ import * as THREE from 'three';
 import { useDesign } from '../../state/store';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { visualFor, type PetalForm, type StemForm } from './speciesVisual';
-import { toonGradient } from '../../scene/npr/toonGradient';
+import { plantGradient } from '../../scene/npr/toonGradient';
 import {
   cellFlowers,
   cellJitter,
@@ -35,9 +35,12 @@ import {
   leafProgress,
   leafThreshold,
 } from './growthTiming';
+import { isCellOnStructure } from './plantPlacement';
 
 const UP = new THREE.Vector3(0, 1, 0);
-const STEM_COLOR = new THREE.Color('#4a5b34'); // deep foliage stem/leaf green
+// A clearer foliage green than the old near-black #4a5b34, which the wash read as
+// tan; this stays above the shadow-shift band so stems paint green (live QA).
+const STEM_COLOR = new THREE.Color('#6c7e48');
 
 /** A small stem primitive, main axis +Y, rooted at the origin. */
 function makeStemGeometry(form: StemForm): THREE.BufferGeometry {
@@ -81,9 +84,10 @@ function makeFlowerGeometry(form: PetalForm): THREE.BufferGeometry | null {
   switch (form) {
     case 'star': {
       // A five-point star, thin-extruded, facing outward: clematis/jasmine.
+      // Sized up from round 3.0 so the Kuwahara wash does not erase it (QA).
       const shape = new THREE.Shape();
-      const outer = 0.055;
-      const inner = 0.022;
+      const outer = 0.08;
+      const inner = 0.032;
       for (let i = 0; i < 10; i++) {
         const r = i % 2 === 0 ? outer : inner;
         const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
@@ -99,13 +103,13 @@ function makeFlowerGeometry(form: PetalForm): THREE.BufferGeometry | null {
     }
     case 'raceme': {
       // A drooping cluster hanging below the tip: wisteria's signature.
-      const g = new THREE.ConeGeometry(0.045, 0.17, 6);
-      g.translate(0, -0.085, 0); // hang down from its anchor
+      const g = new THREE.ConeGeometry(0.065, 0.22, 6);
+      g.translate(0, -0.11, 0); // hang down from its anchor
       return g;
     }
     case 'bloom': {
       // A rounded bloom: rose / honeysuckle cluster / sweet pea.
-      return new THREE.DodecahedronGeometry(0.052, 0);
+      return new THREE.DodecahedronGeometry(0.075, 0);
     }
     case 'none':
     default:
@@ -124,10 +128,19 @@ interface Placed {
 }
 
 export function PlantGrowth() {
-  const cells = useDesign((s) => s.outputs.strutField.cells);
+  const allCells = useDesign((s) => s.outputs.strutField.cells);
+  const members = useDesign((s) => s.outputs.geometry.members);
   const coverage = useDesign((s) => s.outputs.growth.coverageFraction);
   const speciesId = useDesign((s) => s.params.speciesId);
   const reducedMotion = useReducedMotion();
+
+  // Keep only cells that actually hug a member, so foliage never hangs off the
+  // structure (live QA). A parametric strut-field grid strays off the lattice at
+  // holes and the crown; those cells are dropped rather than snapped.
+  const cells = useMemo(
+    () => allCells.filter((c) => isCellOnStructure(c.position, members)),
+    [allCells, members],
+  );
 
   const visual = visualFor(speciesId);
   const petalColor = useMemo(() => new THREE.Color(visual.petalColor), [visual.petalColor]);
@@ -202,7 +215,7 @@ export function PlantGrowth() {
         // bloom reads as opening on established growth rather than with it.
         const prog = leafProgress(cov, c.threshold + 0.06);
         const sway = reducedMotion ? 1 : 1 + 0.05 * prog * Math.sin(t * 1.1 + c.phase);
-        const size = Math.max(0, prog * c.maxSize * 0.9 * sway);
+        const size = Math.max(0, prog * c.maxSize * 1.15 * sway);
         scratchS.setScalar(size < 0.02 ? 0 : size);
         scratchM.compose(c.tip, c.quat, scratchS);
         flowers.setMatrixAt(i, scratchM);
@@ -220,7 +233,7 @@ export function PlantGrowth() {
           args={[stemGeo, undefined, placed.length]}
           castShadow
         >
-          <meshToonMaterial color={STEM_COLOR} gradientMap={toonGradient} />
+          <meshToonMaterial color={STEM_COLOR} gradientMap={plantGradient} />
         </instancedMesh>
       )}
       {flowerGeo && flowerCells.length > 0 && (
@@ -230,7 +243,7 @@ export function PlantGrowth() {
           args={[flowerGeo, undefined, flowerCells.length]}
           castShadow
         >
-          <meshToonMaterial color={petalColor} gradientMap={toonGradient} />
+          <meshToonMaterial color={petalColor} gradientMap={plantGradient} />
         </instancedMesh>
       )}
     </group>

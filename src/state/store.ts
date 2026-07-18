@@ -156,7 +156,10 @@ export const useDesign = create<DesignState>((set, get) => {
     // The engine may clamp what the URL asked for; trust the engine.
     params: initialOutputs.geometry.params,
     outputs: initialOutputs,
-    overlays: { strutHeatmap: true, growth: true },
+    // Both OFF by default (round-3 item 6): under the watercolour wash the
+    // heatmap spheres and the old growth blobs read as muddy berries on the
+    // lattice and fight the beauty pass. Still reachable via `setOverlay`.
+    overlays: { strutHeatmap: false, growth: false },
     commissionOpen: false,
 
     reserveEmail: '',
@@ -206,7 +209,7 @@ export const useDesign = create<DesignState>((set, get) => {
         return {
           params: outputs.geometry.params,
           outputs,
-          overlays: { strutHeatmap: true, growth: true },
+          overlays: { strutHeatmap: false, growth: false },
           commissionOpen: false,
           reserved: false,
           reserveEmail: '',

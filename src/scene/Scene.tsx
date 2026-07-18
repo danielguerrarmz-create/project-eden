@@ -17,6 +17,7 @@ import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
 import { GrowthOverlay } from './overlays/GrowthOverlay';
 import { InkPass } from './npr/InkPass';
+import { GradientSky, SKY_HORIZON_COLOR } from './npr/GradientSky';
 import { CageHandles } from './CageHandles';
 
 /**
@@ -42,8 +43,9 @@ export function Scene({ manipulate = false }: { manipulate?: boolean }) {
       camera={{ position: [6.4, 3.4, 7.2], fov: 42 }}
       className="!absolute inset-0"
     >
-      <color attach="background" args={['#F6F4EE']} />
-      <fog attach="fog" args={['#F6F4EE', 20, 46]} />
+      {/* Enscape-style watercolour sky (round 4), same as the draw canvas. */}
+      <GradientSky />
+      <fog attach="fog" args={[SKY_HORIZON_COLOR, 20, 46]} />
 
       <ambientLight intensity={0.85} />
       <directionalLight
