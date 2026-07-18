@@ -9,11 +9,15 @@
  * `#/`       -> the combined Bower + Eden landing (the splash home, with the
  *               condensed engine section at `#how-it-works`).
  * `#/engine` -> the full six-section engine walkthrough (EnginePage chrome).
- * `#/studio` -> the single-page studio (the configurator, untouched component).
+ * `#/studio` -> the ENGINE: the draw tool (DrawPage). Replaced the old
+ *               four-slider configurator on 2026-07-17 (Daniel: "our studio page
+ *               is what the engine should be"), so the STUDIO nav link and the
+ *               "shape your Eden" CTA both open the draw-and-bake engine. `/draw`
+ *               stays as an alias for the same page. The old slider studio (App)
+ *               is retired from routing; the component is kept in the tree.
  * anything else -> the splash landing (fallback, so a stray hash never dead-ends
  * and the splash's in-page `#how-it-works` / `#register` anchors keep resolving).
  */
-import App from './App';
 import { EnginePage } from './pages/engine/EnginePage';
 import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
@@ -26,7 +30,7 @@ import { useRoute } from './routing';
 
 export function Root() {
   const route = useRoute();
-  if (route === '/studio') return <App />;
+  if (route === '/studio') return <DrawPage />;
   if (route === '/engine') return <EnginePage />;
   if (route === '/about') return <AboutPage />;
   if (route === '/draw') return <DrawPage />;
