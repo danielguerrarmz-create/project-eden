@@ -57,7 +57,8 @@ import {
 } from '../ui/priceCopy';
 import { useCountUp } from '../ui/useCountUp';
 import { getSpecies } from '../engine/species';
-import { SpeciesRow } from './draw/SpeciesRow';
+import { SpeciesRail } from './draw/SpeciesRail';
+import { PlantGrowth } from './draw/PlantGrowth';
 import { Folly } from '../scene/Folly';
 import { GardenContext } from '../scene/GardenContext';
 import { webglSupported } from '../ui/webgl';
@@ -445,6 +446,10 @@ export function DrawPage() {
                   />
                 )}
                 {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
+                {/* The living layer, per species and per year. Bake-only and
+                    hidden while exploded or dissolving: foliage anchored to the
+                    pre-explode strut field would hang over scattered pieces. */}
+                {baked && !exploded && !dissolving && <PlantGrowth />}
                 {/* A dome renders identically at 3 m and at 30 m. One person
                     and it snaps to human scale. Bake only: see the file. */}
                 {baked && <PlacedScaleFigure />}
@@ -604,9 +609,10 @@ export function DrawPage() {
               </div>
             )}
 
-            {/* The same slot, baked: tools become plant options. Hidden while
-                exploded or dissolving so it never sits over the cascade. */}
-            {baked && !exploded && !dissolving && <SpeciesRow />}
+            {/* Baked: the plant rail on the right edge, out of the drawing
+                workflow. Hidden while exploded or dissolving so it never sits
+                over the cascade. */}
+            {baked && !exploded && !dissolving && <SpeciesRail />}
 
             {/* What it is, while it's still soft. Two numbers, both true. */}
             {soft && (
