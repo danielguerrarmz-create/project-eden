@@ -484,7 +484,7 @@ describe('composition contract', () => {
 });
 
 describe('yearLabelSide: the heavy year labels step aside from the real layout', () => {
-  const YEARS = [2021, 2022, 2023, 2024, 2025, 2026];
+  const YEARS = [2021, 2022, 2023, 2024, 2025];
   /**
    * THE LABELS' REAL Ys. These take a y COORDINATE, not a year — and they always did, but until the
    * labels started following the plates (round 8) the two were close enough to conflate: every call
@@ -512,7 +512,8 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
 
     for (const [year, ty] of LABEL_Y) {
       const mine = plates.filter((p) => CLUSTER_YEAR[p.clusterId] !== undefined && Math.floor(CLUSTER_YEAR[p.clusterId]) === year);
-      if (mine.length === 0) continue; // 2026 has no work; it keeps the axis (see yearLabelYs)
+      // Every titled year now carries work (the graduation photo that gave 2026 its lone plate was
+      // removed round 11), so there is no empty-year branch to skip here.
       // The label sits within its own year's band of plates — top of the first, bottom of the last.
       const top = Math.min(...mine.map((p) => p.rect.y));
       const bottom = Math.max(...mine.map((p) => p.rect.y + p.rect.h));
@@ -608,17 +609,19 @@ describe('yearLabelSide: the heavy year labels step aside from the real layout',
 /**
  * THE LIVE SIDE RULE: a year label sits beside the work it names, in x as well as y.
  *
- * Daniel, 2026-07-17, item 1: "Move the graduation photograph to the LEFT side of the timeline, NEXT
- * TO THE 2026 TEXT." Measured, moving the plate alone did not do it: the label used to take the
- * roomier side, so the plate arriving on the left pushed the numerals to the right and the two stayed
- * exactly as far apart as they started. These tests pin the rule that makes his instruction hold.
+ * The rule was born from Daniel's round-11 item 1 ("Move the graduation photograph to the LEFT, NEXT
+ * TO THE 2026 TEXT"): moving the plate alone did not do it, because the label used to take the roomier
+ * side and fled to the right. That graduation photograph was later REMOVED (2026 is no longer a titled
+ * year), but the rule it forced — a year label sits beside its own work — stands for every year that
+ * remains, and these tests pin it.
  */
 describe('yearLabelSides: a year label sits beside the work it names', () => {
   const CLUSTER_YEAR: Record<string, number> = Object.fromEntries(CLUSTERS.map((c) => [c.id, c.year]));
 
   it('guards the probe: there are labels and plates to compare', () => {
     // Every assertion below iterates these. An empty map satisfies all of them silently.
-    expect(yearLabelSidePositions().size).toBe(6);
+    // Five titled years now (2021–2025); the graduation photo that gave 2026 a label was removed.
+    expect(yearLabelSidePositions().size).toBe(5);
     expect(computePlates().length).toBeGreaterThan(10);
   });
 
@@ -634,18 +637,9 @@ describe('yearLabelSides: a year label sits beside the work it names', () => {
     }
   });
 
-  it("ITEM 1: the 2026 label is on the same side as the graduation photograph", () => {
-    // Daniel's actual sentence, as a test. This is the one that fails if someone "restores" the
-    // roomier-side rule or flips the plate back, and it names why it matters.
-    const plates = computePlates();
-    const grad = plates.find((p) => p.clusterId === 'graduation');
-    expect(grad, 'the graduation plate is gone').toBeDefined();
-    expect(grad!.side, 'the graduation photograph must sit LEFT (Daniel, round 11 item 1)').toBe('left');
-    expect(
-      yearLabelSidePositions().get(2026),
-      'the 2026 numerals must sit beside the photograph, not across the spine from it',
-    ).toBe('left');
-  });
+  // The ITEM 1 test that pinned the 2026 label beside the graduation photograph is gone with the
+  // photograph itself (round 11): Daniel removed the graduation plate, so 2026 is no longer a titled
+  // year. THE RULE above still holds it for every year that remains.
 
   it('THE LAW THAT MAKES IT SAFE: a label can never touch a plate, on EITHER side, at any year', () => {
     // This is why sitting beside the work costs nothing. The gutter law (YEAR_LABEL_OFFSET +
@@ -950,7 +944,7 @@ describe('the sepia colour lane', () => {
  * not ornament on structure, it is a second plant fighting the first.
  */
 describe('the spine garland: Clay organs on Daniel geometry', () => {
-  const YEARS = [2021, 2022, 2023, 2024, 2025, 2026];
+  const YEARS = [2021, 2022, 2023, 2024, 2025];
   const spanY = (t: number) => CONV_JUNCTION_Y + t * (CONVERGE_Y - CONV_JUNCTION_Y);
 
   it('grows something (the graft is not silently empty)', () => {

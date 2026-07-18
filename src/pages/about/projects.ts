@@ -803,12 +803,11 @@ export const PROJECTS: Project[] = [
        * said so itself — alt "A second Resia product screenshot", caption "Inside the product". Copy
        * that admits it is a second one of something is the copy of an image with no job.
        *
-       * NOTE THE COST, it is real and it is not a bug: this asset is 600x800, ratio 0.75 — the only
-       * PORTRAIT image in the rail. `railWidth` derives the rail's width from the stack, so a portrait
-       * cell narrows every Resia support cell. That was measured at ~26% before the round-10 divider
-       * pin landed and must be RE-MEASURED against the current geometry, not trusted from that note.
-       * If it drops the rail under MIN_CELL=60, raise it — do not widen MIN_CELL, and do not crop this
-       * to landscape to make the number behave. Daniel asked for this photograph specifically.
+       * THIS ASSET IS NOW LANDSCAPE (round 11). Daniel replaced the old 600x800 portrait title-slide
+       * shot with a 1600x841 stage photograph, ratio 1.9025. The portrait cost this note used to warn
+       * about — the only portrait in the rail, narrowing every Resia support cell via `railWidth` — is
+       * GONE; a landscape support image sits in the rail like the others. `MIN_CELL`=60 still stands: if
+       * a rail cell ever drops under it, raise the cell, do not widen MIN_CELL.
        *
        * It is the same file as the timeline's `resia-pitch.webp`, copied rather than cross-linked: the
        * timeline and the ledger own their own assets, and a shared path couples two surfaces that are
@@ -816,8 +815,8 @@ export const PROJECTS: Project[] = [
        */
       {
         src: `${A}/12-resia/resia-clay-pitching.webp`,
-        ratio: 0.75,
-        alt: 'Clay Seifert presenting the Resia startup pitch deck, "Removing the Waste from Home Renovation", to a room',
+        ratio: 1.9025,
+        alt: 'Clay Seifert on stage with a microphone presenting Resia, a child’s crayon drawing of a house with two stick figures and green grass on the screen behind him, "FFPC" balloon letters on the stage and an audience in front',
         caption: 'Clay pitching Resia',
       },
       {

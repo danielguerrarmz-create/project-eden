@@ -65,14 +65,21 @@ function LensFilter() {
 export function SplashHeader({
   actions,
   measure = 'canvas',
+  transparent = false,
 }: {
   actions?: React.ReactNode;
   /** The header must adopt the measure of the PAGE it sits on, or its left edge misses the
    *  content column it is supposed to frame. The engine walkthrough is a narrower reading
    *  spread ('page'); the splash, studio and about are all 'canvas'. */
   measure?: Measure;
+  /** Drop the frosted `.nav-pill` capsules (and the `LensFilter` that only exists for them) so the
+   *  logo and nav float directly on the page — About wants a fully transparent header on its vellum.
+   *  The ink stays `text-inkBlack`, which reads on that ground without the capsule backing. */
+  transparent?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
+  // Present only when the pills are; the filter's whole job is the pills' backdrop lens.
+  const pill = transparent ? '' : 'nav-pill ';
 
   /**
    * The header publishes its own height as `--header-h`.
@@ -96,7 +103,7 @@ export function SplashHeader({
 
   return (
     <header ref={ref} className="fixed inset-x-0 top-0 z-50 pb-4 pt-5">
-      <LensFilter />
+      {!transparent && <LensFilter />}
       {/* The header sits in the SAME frame as the page content, so the wordmark's left edge
           IS the content's left edge at every width. Before this it gutter'd off the raw
           viewport, so on a wide monitor it floated hundreds of px outside the column
@@ -112,7 +119,7 @@ export function SplashHeader({
           href="#/"
           aria-label="Bower, home"
           data-cursor-solid
-          className="nav-pill flex items-center gap-2.5 px-4 py-2 text-inkBlack"
+          className={`${pill}flex items-center gap-2.5 px-4 py-2 text-inkBlack`}
         >
           <BowerMark
             markSize={30}
@@ -120,7 +127,7 @@ export function SplashHeader({
           />
         </a>
         <div className="flex items-center gap-3">
-          <nav data-cursor-solid className="nav-pill flex items-center gap-1 px-2 py-1">
+          <nav data-cursor-solid className={`${pill}flex items-center gap-1 px-2 py-1`}>
             <NavLink href={routes.engine}>how it works</NavLink>
             <NavLink href={routes.studio}>studio</NavLink>
             <NavLink href={routes.about}>about</NavLink>

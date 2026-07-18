@@ -2643,7 +2643,7 @@ export function CrossPathsTimeline({
                thing it found is not a check. Grep before you claim a data attribute. */
             data-timeline-camera
             role="img"
-            aria-label="A timeline from 2021 to 2026 that travels downward as you scroll. At the top, two strands, Clay and Daniel, come in from off the frame and twist together into one line: the spine is born where they fuse in 2021. Each later event branches off the spine to a picture held in a small calyx: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. At the end the line leans off its axis and winds itself up into the Bower mark, with the wordmark, Bower, beneath it."
+            aria-label="A timeline from 2021 to 2025 that travels downward as you scroll. At the top, two strands, Clay and Daniel, come in from off the frame and twist together into one line: the spine is born where they fuse in 2021. Each later event branches off the spine to a picture held in a small calyx: a medical device, startups, buildings grown in place, computational design research, fabrication, robotics, a lamp, and a year in New York. At the end the line leans off its axis and winds itself up into the Bower mark, with the wordmark, Bower, beneath it."
           >
             {/* THE TWIST-FUSE. Two equal strands cross once over-under and become the spine at 2021.
                 The right strand is painted last through the crossing (a vellum halo opens the gap
@@ -2675,7 +2675,7 @@ export function CrossPathsTimeline({
             </g>
 
             {/* THE SPINE. The only long line: heavy, full opacity, born at the fuse and running edge
-                to edge to 2026. */}
+                to edge to the last titled year. */}
             {(() => {
               const r = revealProps(spine);
               return (

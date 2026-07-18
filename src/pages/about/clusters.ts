@@ -63,9 +63,10 @@ export interface Cluster {
 }
 
 const A = '/assets/projects';
-/** The timeline's own photographs — the five Daniel shot/supplied for the page itself (orientation,
- *  studio, DAC pin-up, Resia pitch, graduation) rather than for a project. They live apart from
- *  `/assets/projects` because they are not a project's documentation; they are the page's narrative. */
+/** The timeline's own photographs — the ones Daniel shot/supplied for the page itself (orientation,
+ *  studio, DAC pin-up, Resia pitch) rather than for a project. They live apart from `/assets/projects`
+ *  because they are not a project's documentation; they are the page's narrative. (A 2026 graduation
+ *  photo was the fifth of these until round 11, when Daniel removed it.) */
 const T = '/assets/about/timeline';
 
 /* ------------------------------ the plate box ----------------------------- */
@@ -102,7 +103,8 @@ const TIER: Record<PlateTier, { w: number; h: number }> = {
   // It read "reserved for the two bookends: ut-austin and the NYC door". Round 9 cashed that in with
   // the 2021 orientation call and added the 2026 graduation to close the drawing, so three nodes
   // claimed it. Then Daniel looked at the page and sent both BOOKENDS down: the orientation plate
-  // "smaller" (-> hero, item 10) and the graduation "much smaller" (-> standard, item 11).
+  // "smaller" (-> hero, item 10) and the graduation "much smaller" (-> standard, item 11). The
+  // graduation plate was then removed entirely (round 11), which only reinforces the point below.
   //
   // So the showcase tier now belongs to the NYC door ALONE — the one plate that never asked for it,
   // and the only one still holding it from when it was the last plate in the drawing. The old
@@ -137,10 +139,11 @@ export const CLUSTERS: Cluster[] = [
      * THE FIRST PLATE, and half of the page's bracket. Daniel: "put this image as our FIRST, our
      * school orientation." It is a UT orientation Zoom grid — forty-odd strangers in forty-odd
      * boxes, hook-'em hands, nobody having met anybody. The page opens on the paths NOT crossed
-     * yet and closes on the two of them graduating (see `graduation` at the foot of this list),
-     * which is the same bracket the copy makes with "Bower is new." / "The obsession is real, and
-     * it is old." The showcase tier was already reserved for exactly this (see TIER) — the bookend
-     * it names as "ut-austin" had been waiting for an asset since the tier was written.
+     * yet — the same bracket the copy makes with "Bower is new." / "The obsession is real, and it is
+     * old." (A graduation photograph used to close the visual bracket at the foot of this list; Daniel
+     * removed it in round 11, so the copy carries the closing half alone now.) The showcase tier was
+     * already reserved for exactly this (see TIER) — the bookend it names as "ut-austin" had been
+     * waiting for an asset since the tier was written.
      *
      * SHIPPED BY DANIEL'S EXPLICIT RULING, 2026-07-16. This is the DECISION, recorded — not a
      * justification for it, and the difference is the point. Round 9 left a note here claiming the
@@ -177,7 +180,7 @@ export const CLUSTERS: Cluster[] = [
       {
         // SMALLER (round 10, item 10). `showcase` -> `hero`, one tier down: 400 wide to 320, a 20%
         // cut. One tier, not two — he said "smaller" of this and "much smaller" of the graduation
-        // plate, and those are different words.
+        // plate (since removed, round 11), and those were different words.
         //
         // A SIDE EFFECT WORTH NAMING AND NOT ACTING ON: a smaller plate also renders ~40 identifiable
         // faces smaller, which is a happy consequence of a composition note. It is NOT a reason to
@@ -392,15 +395,16 @@ export const CLUSTERS: Cluster[] = [
         },
       },
       {
-        // Daniel: "next to Resia." Clay presenting the pitch — and this one IS named, because three
-        // things agree: the ledger has Resia as `by: 'clay'`, Daniel's own filename said `clay`, and
-        // only one person is in frame. The deck on the screen reads "Resi.AI", not "Resia"; the alt
-        // says what the slide says rather than quietly correcting the ledger's name onto it.
+        // Daniel: "next to Resia." Clay presenting Resia — named because the ledger has Resia as
+        // `by: 'clay'` and Daniel confirms it is Clay presenting. REPLACED round 11 with a new
+        // LANDSCAPE photograph (was a portrait shot of a "Resi.AI" title slide, ratio 0.75): now Clay
+        // on a stage with a microphone, a child's crayon drawing of a house on the screen behind him,
+        // and an audience in front — so the alt describes the stage, not a slide's wording.
         tier: 'standard',
         media: {
           src: `${T}/resia-pitch.webp`,
-          ratio: 0.75,
-          alt: 'Clay Seifert presenting the Resia startup pitch deck, its title slide reading “Resi.AI — Removing the Waste from Home Renovation”',
+          ratio: 1.9025,
+          alt: 'Clay Seifert on stage with a microphone presenting Resia, a child’s crayon drawing of a house with two stick figures and green grass on the screen behind him, “FFPC” balloon letters on the stage and an audience in front',
         },
       },
     ],
@@ -483,68 +487,6 @@ export const CLUSTERS: Cluster[] = [
           src: `${A}/16-rogers-partners-nyc/rogers-partners-nyc-office-desk-selfie.webp`,
           ratio: 1.7778,
           alt: 'Daniel at his dual-monitor desk in the Rogers Partners office in New York',
-        },
-      },
-    ],
-  },
-  {
-    /**
-     * THE LAST PLATE, and the other half of the bracket. Daniel: "put this image as our LAST, we
-     * just graduated." Orientation (2021, `origin-2021`) opens on strangers who have not met; this
-     * closes on them graduating.
-     *
-     * IT SITS LEFT (2026-07-17, Daniel, round 11 item 1): "Move the graduation photograph to the LEFT
-     * side of the timeline, next to the 2026 text."
-     *
-     * THIS OVERRULES A DOCUMENTED RHYME, so the rhyme is written down here rather than deleted. This
-     * note used to read: "Both bookends are `showcase` and both sit RIGHT, so they rhyme across the
-     * length of the drawing — which is also what balances the lanes at 7 clusters a side." Two of its
-     * three clauses had already expired before Daniel touched it, which is the only reason it is worth
-     * a paragraph:
-     *
-     *   - **"Both bookends are `showcase`" was already FALSE.** Round 10 (items 10/11) took orientation
-     *     to `hero` and this plate to `standard`, two tiers down, on Daniel's "much smaller". The
-     *     bookends had not matched in size for a round, and the sentence claiming they did was still
-     *     sitting here being read as a reason.
-     *   - **The rhyme was the SIDE, and Daniel has now spent it deliberately.** Bookending by side is a
-     *     composition he can have or not have; he looked at it and asked for this instead.
-     *   - **The lane balance is real and is the one true cost.** Measured after the move: plates run
-     *     11 left / 9 right, from 10 / 10. Nothing enforces the balance and no test asserts it (which
-     *     is why "7 clusters a side" could sit in a comment while the plate count was even), so it is
-     *     a composition fact, not an invariant. Flagged in the round-11 handoff, not silently eaten.
-     *
-     * MOVING IT WAS NOT ENOUGH, and this is the part worth knowing: the 2026 label used to pick
-     * whichever side had MORE ROOM, so putting the photograph on the left made the numerals flee to the
-     * right and the two ended up exactly as far apart as they began. His second clause ("next to the
-     * 2026 text") is what forced the real fix, in `yearLabelSides` — read that note before touching
-     * either. **A plate's side and its year label's side are one composition now, not two.**
-     *
-     * THIS IS THE FIRST CLUSTER 2026 HAS EVER HAD, and it changes a documented invariant: the
-     * `yearLabelYs` note used to say 2026 has no work to sit beside, so its label fell back to the
-     * axis. Now the 2026 label follows this plate like every other year follows its first plate.
-     * The fallback is still live and still correct — it is just no longer 2026 that exercises it.
-     *
-     * FOUR people are in the frame, not two, and only the two cofounders are Bower's. The alt says
-     * "four graduates" and names nobody: naming them would mean identifying two people who are not
-     * part of this company on the company's own About page.
-     */
-    id: 'graduation',
-    year: 2026.0,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        // MUCH SMALLER (round 10, item 11). `showcase` -> `standard`, two tiers down: 400 wide to 264,
-        // a 34% cut. Daniel said "much smaller" here and only "smaller" of the orientation plate, so
-        // the two are deliberately different magnitudes rather than one shared constant — the
-        // orientation drops one tier, this drops two. It is a PORTRAIT plate at 0.75, so at showcase
-        // it stood 356 tall against the drawing's other bookend and read as the loudest thing on the
-        // page; the tier change takes it to ~235.
-        tier: 'standard',
-        media: {
-          src: `${T}/2026-graduation.webp`,
-          ratio: 0.75,
-          alt: 'Four graduates in Texas stoles at the 2026 UT Austin commencement, arms around each other in the packed stadium, fireworks over the jumbotron behind them',
         },
       },
     ],

@@ -44,18 +44,20 @@ await page.goto(`${BASE}/#/about`, { waitUntil: 'domcontentloaded' });
 await sleep(MOTION ? 1200 : 6000);
 
 if (MOTION) {
-  // The join is only ON THE PAGE from the end of the track onward: that is when the sticky frame
-  // bottoms out at the track's bottom and the descent's exit stops moving in page coordinates.
-  // Cancel the autoplay first (Shift: it cancels, and unlike End it scrolls nothing), then park at
-  // the track's end.
+  // PARK WHERE THE READER READS THE FOUNDERS, not merely at the track's end. The seam looks connected
+  // for one transient instant as the sticky bottoms out — but scroll a little further IN and the
+  // descent exit rises a full frame-padding (~132px) relative to the founders, the settled state
+  // Daniel actually looks at. Parking at the track end pinned this join GREEN while it sat 132px
+  // broken one scroll down (round 11): the exact "only connected at the end of the track" trap in
+  // CLAUDE.md. Bring the founders into view and check the join THERE.
+  // Cancel the autoplay first (Shift: it cancels, and unlike End it scrolls nothing).
   await page.keyboard.down('Shift');
   await page.keyboard.up('Shift');
   await sleep(400);
   for (let i = 0; i < 4; i++) {
     await page.evaluate(() => {
-      const t = document.querySelector('[data-timeline-track]');
-      const r = t.getBoundingClientRect();
-      window.scrollTo(0, r.top + window.scrollY + (r.height - window.innerHeight));
+      const row = document.querySelector('[data-founder-row]');
+      window.scrollTo(0, row.getBoundingClientRect().top + window.scrollY - 220);
     });
     await sleep(700);
   }

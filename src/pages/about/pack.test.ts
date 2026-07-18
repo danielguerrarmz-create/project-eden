@@ -191,12 +191,20 @@ describe('packWall — coverage, held to what was measured', () => {
    *
    * DO NOT "FIX" A LOW ONE BY LOOSENING THIS. Patterns, LLO and Robots are low because their assets'
    * shapes cannot tile a 2.11 rectangle, and no arrangement changes that. See the note in pack.ts.
+   *
+   * THE MEAN FLOOR MOVED 0.90 -> 0.89 ON AN ASSET CHANGE, NOT A SEARCH ONE (round 11). Daniel replaced
+   * Resia's `clay-pitching` from a 0.75 portrait to a 1.9025 landscape; that portrait happened to tile
+   * Resia's set ~2pts better (Resia went 96 -> 93.8%), which pulled the 12-project mean from just over
+   * 0.90 to 0.898. Every project still clears its own floor and the pack still beats the 0.873 hero/rail
+   * baseline it exists to replace, so this is re-baselining after a deliberate asset swap, not loosening
+   * to hide a regression — a real search regression drops the mean far below 0.89, which this still
+   * catches. If Resia's asset is reverted, restore 0.90.
    */
   it('coverage beats the layout it replaces, on every project and on the mean', () => {
     const cov = PROJECTS.map((p) => ({ title: p.title, c: packWall(order(p.images), REGION.w, REGION.h)!.coverage }));
     const mean = cov.reduce((s, x) => s + x.c, 0) / cov.length;
     for (const { title, c } of cov) expect(c, `${title} coverage ${(c * 100).toFixed(1)}%`).toBeGreaterThan(0.77);
-    expect(mean).toBeGreaterThan(0.9);
+    expect(mean).toBeGreaterThan(0.89);
   });
 
   it('the short viewport, where the hero floor was actually decided, does not collapse', () => {

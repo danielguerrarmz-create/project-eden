@@ -29,6 +29,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
+import { Footer } from '../ui/Footer';
 import { OculusMark } from '../ui/OculusMark';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { useAutoplayVideo } from './about/useAutoplayVideo';
@@ -129,6 +130,39 @@ function heroSplit(images: ProjectImage[]): { hero: ProjectImage; rest: ProjectI
   return { hero: images[heroIdx], rest: images.filter((_, i) => i !== heroIdx) };
 }
 
+/**
+ * The one frame-class recipe for a project image, shared by ProjectVideoEl and ProjectImg so the two
+ * cannot drift — they each carried a byte-identical copy of this ternary. Every branch and every class
+ * string is preserved verbatim; this is a dedupe, not a redesign. The behaviour, including the
+ * licensed-crop path (`fillHero`) and the `bg-white p-1.5` figure default, is decided by the SAME
+ * booleans both callers already compute, so nothing about which class lands where has changed.
+ */
+function imageFrameClass({
+  brick,
+  fillHero,
+  fit,
+  fill,
+  contain,
+  className,
+}: {
+  brick: boolean;
+  fillHero: boolean;
+  fit: boolean;
+  fill: boolean;
+  contain: boolean;
+  className: string;
+}): string {
+  return brick
+    ? `block h-full w-full object-contain ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'} ${className}`
+    : fillHero
+      ? `block h-full w-full object-cover ${className}`
+      : fit
+        ? `${FIT_FRAME} ${className}`
+        : fill
+          ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
+          : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+}
+
 /** One framed image on the paper ground. Renders crop to a clean tile with object-cover; paper
  *  figures set fit:'contain' so nothing is cut, on a white ground.
  *
@@ -162,15 +196,7 @@ function ProjectVideoEl({
   // KUKA loop) — ProjectImg's copy of this branch never sees it. Same gate: the asset's own flag,
   // nothing else. See ProjectImage.fillHero.
   const fillHero = fit && image.fillHero === true;
-  const frame = brick
-    ? `block h-full w-full object-contain ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'} ${className}`
-    : fillHero
-      ? `block h-full w-full object-cover ${className}`
-      : fit
-        ? `${FIT_FRAME} ${className}`
-        : fill
-          ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-          : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const frame = imageFrameClass({ brick, fillHero, fit, fill, contain, className });
 
   // Reduced motion gets the poster still. Nothing moves.
   if (reduced) return <img src={image.src} alt={image.alt} className={frame} data-licensed-crop={fillHero || undefined} />;
@@ -269,15 +295,7 @@ function ProjectImg({
    * scope is enforced by `projects.test.ts`, which pins it to the one asset by src.
    */
   const fillHero = fit && image.fillHero === true;
-  const frame = brick
-    ? `block h-full w-full object-contain ${contain ? 'bg-paperVellum' : 'bg-paperDeep/40'} ${className}`
-    : fillHero
-      ? `block h-full w-full object-cover ${className}`
-      : fit
-        ? `${FIT_FRAME} ${className}`
-        : fill
-          ? `block h-full w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'} ${className}`
-          : `w-full ${contain ? 'bg-white object-contain p-1.5' : 'bg-paperDeep/40 object-cover'} ${className}`;
+  const frame = imageFrameClass({ brick, fillHero, fit, fill, contain, className });
   const btnClass = `group relative block ${brick || fillHero ? 'h-full w-full' : fit ? 'max-h-full max-w-full' : fill ? 'h-full w-full' : 'w-full'} cursor-zoom-in overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`;
 
   // A video tile stays out of the shared-element morph: framer-motion cannot morph a <video>
@@ -1566,15 +1584,21 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
         // edge at the end of the track.
         //
         // BUT THE FRAME'S BOTTOM IS NOT THE ROW'S BOTTOM. The row carries a bottom padding — the
-        // hero lockup's centring lift — so the drawing stops that far short of the track's end, and
-        // a trunk starting at 0 starts BELOW the line it continues. Measured at 1440x900: a 134px
-        // gap, put there by the lockup fix in this same session. The two changes interact, which is
-        // exactly why this is measured and not reasoned about.
+        // hero lockup's centring lift — so the descent exits on the frame's CONTENT bottom (the
+        // camera's viewH window) while this overlay begins at the frame's BORDER bottom, one padding
+        // lower. The trunk must start that padding ABOVE this overlay's top to meet the line.
         //
-        // `padBelow` is pure CSS and scroll-invariant, so it reads correctly at any scroll position
-        // — which matters, because at mount the track is at p=0 and the exit is nowhere near here.
-        const fr = tlFrame.getBoundingClientRect();
-        trunkY0 = -(fr.bottom - tr.bottom);
+        // THIS IS THE FRAME'S BOTTOM PADDING, MEASURED DIRECTLY — and it used to read
+        // `-(fr.bottom - tr.bottom)`, "how far the frame's bottom sits below the svg's", which WAS the
+        // padding until the item-1b bleed grew to reach it. The svg renders `BLEED_PX` past its layout
+        // box (`height: 100% + BLEED`, `marginBottom: -BLEED`); once that bleed equalled the padding
+        // the two bottoms coincided, the difference went to 0, and the trunk started a full ~132px
+        // BELOW the line it continues — a visible break at every founders-reading scroll (round 11).
+        // The padding is what the gap actually is and, unlike the bottom-to-bottom delta, it does not
+        // move when the bleed does. `padBelow` is pure CSS and scroll-invariant, so it reads correctly
+        // at any scroll position — which matters, because at mount the track is at p=0 and the exit is
+        // nowhere near here.
+        trunkY0 = -(parseFloat(getComputedStyle(tlFrame).paddingBottom) || 0);
       }
 
       // THE LINE'S WEIGHT, measured. See ParenLayout.trunkW: the timeline scales world units into
@@ -2029,7 +2053,28 @@ export function AboutPage() {
 
   return (
     <div className="min-h-screen w-full bg-paperVellum text-inkBlack">
-      <SplashHeader />
+      <SplashHeader transparent />
+
+      {/* NOTHING TOUCHES THE HEADER (round 11). The transparent nav floats directly on the page, so
+          content scrolling up would ride straight over "bower" and the links. This fixed band fades
+          scrolling content into the page ground (paperVellum) before it reaches the nav — the same
+          dissolve the drawing already uses at its own top edge. It is OPAQUE through the header's own
+          height (`--header-h`) and fades out over the ~2.5rem below it, so the line/text is gone by
+          the time it would meet the chrome and eased in just under it.
+          - `z-40`: under the header (`z-50`) so the nav stays crisp on top, over the content.
+          - `max-w-canvas`: the About content measure — the header's own frame, not full-bleed. Its
+            paperVellum top blends invisibly into the page's paperVellum margins, so there is no band
+            edge; only content passing under it fades.
+          - `pointer-events-none`: it must never eat a nav click or a scroll. */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center">
+        <div
+          className="w-full max-w-canvas"
+          style={{
+            height: 'calc(var(--header-h) + 2.5rem)',
+            background: 'linear-gradient(to bottom, #FBF9F3, #FBF9F3 var(--header-h), rgba(251,249,243,0))',
+          }}
+        />
+      </div>
 
       <motion.main
         className="mx-auto w-full max-w-canvas px-gutter pb-24 pt-[calc(var(--header-h)+2rem)]"
@@ -2119,6 +2164,8 @@ export function AboutPage() {
           <ListView reduced={reduced} />
         </section>
       </motion.main>
+
+      <Footer />
 
       {intro && (
         <AboutIntro title={TITLE} titleClassName={TITLE_CLASS} onReveal={onReveal} onDone={onDone} />
