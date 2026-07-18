@@ -17,10 +17,12 @@ const defaults: DesignParams = {
 };
 
 describe('splash precedent copy (hand-authored, house dash rule)', () => {
-  it('the ritual is five steps and carries the live component count', () => {
-    const steps = ritualSteps(217);
+  it('the ritual is five steps, and step three names the live cut list', () => {
+    const steps = ritualSteps();
     expect(steps).toHaveLength(5);
-    expect(steps[2].text).toContain('~217 flat timber components');
+    // The ~count moved out of step 3 to the compact recap (home copy pass); step
+    // three now names the SOURCE (the live cut list) rather than the number.
+    expect(steps[2].text).toContain('flat timber components from the live cut list');
     for (const step of steps) expect(step.text).not.toMatch(DASHES);
   });
 
@@ -46,7 +48,8 @@ describe('ritual figures come from the engine, not hardcoded', () => {
     expect(components.totalCount).toBeGreaterThan(0);
     expect(Number.isInteger(components.totalCount)).toBe(true);
     expect(buildPlan.leadTimeWeeks).toBeGreaterThan(0);
-    // The rendered ritual step must reflect whatever the engine actually computed.
-    expect(ritualSteps(components.totalCount)[2].text).toContain(`~${components.totalCount} flat timber components`);
+    // The rendered ritual must reflect whatever the engine actually computed —
+    // the live count now rides the compact recap, not step 3.
+    expect(ritualCompact(components.totalCount)).toContain(`~${components.totalCount} components`);
   });
 });
