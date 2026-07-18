@@ -16,6 +16,7 @@ import { useThree } from '@react-three/fiber';
 import { useDesign } from '../../state/store';
 import { entryBearingDeg, figurePositionM } from './entryBearing';
 import { ScaleFigure } from './ScaleFigure';
+import { DimensionCallout } from './DimensionCallout';
 
 const DEG = Math.PI / 180;
 
@@ -42,5 +43,12 @@ export function PlacedScaleFigure() {
   }, [geo.footBearingsDeg, geo.planA, geo.planB]);
 
   if (!placed) return null;
-  return <ScaleFigure position={placed} />;
+  return (
+    <>
+      <ScaleFigure position={placed} />
+      {/* The dimension that turns the figure into a measuring stick (Part E).
+          Shares the figure's solved position so the two never drift. */}
+      <DimensionCallout figurePos={placed} />
+    </>
+  );
 }

@@ -192,20 +192,23 @@ export function DrawPage() {
       ? 'cursor-default'
       : 'cursor-crosshair';
 
-  // One hint, once, when the first canopy stands: the moment there is finally
-  // an object worth walking round, and the first moment the user is not busy
-  // being told how to draw. NOT persisted to localStorage on purpose — a take
-  // has to be reproducible with a reload, the same reason "start over"
-  // returns to the opening pose.
-  const [hintShown, setHintShown] = useState(false);
+  // THE GUIDANCE RAIL, ARMED AT MOUNT (spec F2). It is now the very first thing
+  // on screen, before a single line is drawn — first contact has to teach
+  // navigation, and the old "wait for the first canopy" trigger taught nothing
+  // in exactly the seconds someone is deciding how to approach the lawn. It arms
+  // on mount and on every "start over" (via `armNonce`), auto-hides after 6.5s,
+  // and dismisses the instant the viewer orbits or drags (OrbitControls
+  // onStart). NOT persisted to localStorage on purpose — a take has to be
+  // reproducible with a reload, the same reason "start over" returns to the
+  // opening pose.
   const [hintUp, setHintUp] = useState(false);
+  const [armNonce, setArmNonce] = useState(0);
   useEffect(() => {
-    if (hintShown || arcs.length < 2 || baked) return;
-    setHintShown(true);
+    if (baked) return;
     setHintUp(true);
     const t = setTimeout(() => setHintUp(false), 6500);
     return () => clearTimeout(t);
-  }, [arcs.length, baked, hintShown]);
+  }, [baked, armNonce]);
 
   // --- The bake dissolve. The skin does NOT unmount when `baked` flips; it
   // stays for the length of the reveal, fading, while the lattice sweeps up
@@ -305,18 +308,20 @@ export function DrawPage() {
   // Start over: back to the opening shot, so the next take opens where the
   // last one did. The lawn has no object to fit, so this pose is authored.
   //
-  // THE RAIL RE-ARMS HERE, AND THAT IS A FILM-DAY BUG FIX, not tidiness.
-  // `hintShown` latches true forever and nothing ever cleared it, so the guidance
-  // appeared on the FIRST take of a session and never again — a second take shot
-  // without a page reload silently lost it. Daniel takes more than one take. This
-  // is the same reason the hint is not persisted to localStorage: a take has to
-  // be reproducible, and "reproducible" has to include the second one.
+  // THE RAIL RE-ARMS HERE, AND THAT IS A FILM-DAY BUG FIX, not tidiness. A
+  // second take shot without a page reload used to lose the guidance; bumping
+  // `armNonce` on the return to the empty lawn re-runs the show effect so every
+  // take reproduces it. This is the same reason the hint is not persisted to
+  // localStorage: a take has to be reproducible, and "reproducible" has to
+  // include the second one. (Verified the reset still fires under the new
+  // mount-trigger, spec F4.)
   useEffect(() => {
     if (arcs.length === 0 && !baked) {
       setFraming(HOME);
       setTurntable(false);
-      setHintShown(false);
-      setHintUp(false);
+      // Re-arm the rail for the next take: bumping the nonce re-runs the show
+      // effect (F4). The effect owns hintUp now, so this does not touch it.
+      setArmNonce((n) => n + 1);
     }
   }, [arcs.length, baked]);
 
@@ -563,22 +568,23 @@ export function DrawPage() {
               </p>
             )}
 
-            {/* THE GUIDANCE RAIL. How to LOOK at the thing you just made, said
-                once, quietly, on the left edge, then never again.
+            {/* THE GUIDANCE RAIL. How to LOOK at and work the thing, said
+                quietly on the left edge from the very first frame (spec F2),
+                then gone once obeyed.
 
-                It is the same hint that used to sit bottom-center, relocated and
-                given a second line — not a new mechanism. It deliberately is NOT
-                the nudge panel: that is the engine's read of YOUR DRAWING, and it
-                only speaks after bake. Operating instructions are neither, and
-                folding them in would make one panel speak in two registers and
-                arrive too late to help anyone sculpt.
+                It deliberately is NOT the nudge panel: that is the engine's read
+                of YOUR DRAWING, and it only speaks after bake. Operating
+                instructions are neither, and folding them in would make one
+                panel speak in two registers and arrive too late to help anyone
+                sculpt.
 
-                Both turn paths are named because they are not the same user:
-                right-drag is the mouse's, space is the trackpad's, where
-                two-finger drag is a wheel event and already means zoom. "Scroll
-                to zoom" is direction-agnostic on purpose — it covers in, out, and
-                the trackpad pinch that arrives as the same wheel event. */}
-            {hintShown && !baked && (
+                The first line now also names what left-drag does, and both turn
+                paths, because they are not the same user: right-drag is the
+                mouse's, space is the trackpad's, where two-finger drag is a
+                wheel event and already means zoom. It never promises pan, which
+                this canvas does not have. Mounted whenever soft; `hintUp` fades
+                it. */}
+            {!baked && (
               <div
                 className={`pointer-events-none absolute left-4 top-1/2 max-w-[24ch] -translate-y-1/2 space-y-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/40 transition-opacity duration-700 ${
                   hintUp ? 'opacity-100' : 'opacity-0'

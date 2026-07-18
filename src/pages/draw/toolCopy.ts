@@ -42,8 +42,20 @@ export const TOOLS: ToolCopy[] = [
   { id: 'hole', label: 'excavate', hint: 'press on it and drag out a hole' },
 ];
 
-/** The two lines of the guidance rail, in order. */
-export const RAIL_LINES = ['right-drag, or hold space, to turn it', 'scroll to zoom'] as const;
+/**
+ * The two lines of the guidance rail, in order.
+ *
+ * The first line now names what LEFT-drag does too (spec F2): first-run guidance
+ * has to teach both clicks, not just the orbit gesture. It stays generic ("uses
+ * the tool") so it reads true across draw, sculpt and excavate. It deliberately
+ * does NOT promise pan — `OrbitControls` has `enablePan={false}`, so teaching a
+ * pan gesture would be an overclaim; the copy stops implying it instead of the
+ * control being changed. The middot is a separator, not a dash.
+ */
+export const RAIL_LINES = [
+  'left-drag uses the tool · right-drag, or hold space, turns it',
+  'scroll to zoom',
+] as const;
 
 /**
  * The explode's sequence, named in the panel the eye is already on.

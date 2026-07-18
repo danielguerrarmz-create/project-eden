@@ -75,4 +75,15 @@ describe('the guidance rail', () => {
     expect(RAIL_LINES[1]).toBe('scroll to zoom');
     expect(RAIL_LINES[1]).not.toContain('closer');
   });
+
+  it('teaches what left-drag does, not only the orbit (spec F2)', () => {
+    // First-run guidance has to cover both clicks, not just turning.
+    expect(RAIL_LINES[0]).toContain('left-drag');
+  });
+
+  it('never promises pan, because enablePan is false', () => {
+    // Teaching a gesture the canvas does not have is the exact overclaim the
+    // repo's honesty discipline exists to catch.
+    for (const line of RAIL_LINES) expect(line.toLowerCase()).not.toContain('pan');
+  });
 });

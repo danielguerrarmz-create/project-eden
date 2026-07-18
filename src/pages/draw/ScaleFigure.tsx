@@ -32,8 +32,9 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-/** Inside the approved 1.75-1.8 m range. */
-const HEIGHT_M = 1.78;
+/** Inside the approved 1.75-1.8 m range. Exported so the dimension callout
+ *  (Part E) labels the same height the figure is actually built to. */
+export const HEIGHT_M = 1.78;
 /** Flat, but not paper: enough to catch the key on one side and turn. */
 const THICKNESS_M = 0.09;
 /**
