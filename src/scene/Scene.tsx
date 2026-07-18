@@ -8,6 +8,7 @@
  */
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { webglSupported } from '../ui/webgl';
@@ -15,6 +16,7 @@ import { Folly } from './Folly';
 import { GardenContext } from './GardenContext';
 import { StrutHeatmap } from './overlays/StrutHeatmap';
 import { GrowthOverlay } from './overlays/GrowthOverlay';
+import { InkPass } from './npr/InkPass';
 import { CageHandles } from './CageHandles';
 
 /**
@@ -31,6 +33,11 @@ export function Scene({ manipulate = false }: { manipulate?: boolean }) {
   return (
     <Canvas
       shadows
+      onCreated={({ gl }) => {
+        // Same painterly VSM shadow the draw page uses, so both surfaces meet
+        // the beauty bar (spec F/round-3 item 6). A renderer flag, no bundle cost.
+        gl.shadowMap.type = THREE.VSMShadowMap;
+      }}
       dpr={[1, 2]}
       camera={{ position: [6.4, 3.4, 7.2], fov: 42 }}
       className="!absolute inset-0"
@@ -45,6 +52,8 @@ export function Scene({ manipulate = false }: { manipulate?: boolean }) {
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0002}
+        shadow-radius={8}
+        shadow-blurSamples={16}
       />
       <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
 
@@ -67,6 +76,12 @@ export function Scene({ manipulate = false }: { manipulate?: boolean }) {
         autoRotate={!reducedMotion && !manipulate}
         autoRotateSpeed={0.35}
       />
+
+      {/* The studio is always resolved, so the pass is always the watercolour
+          wash (constant mode 1, no soft/sketch phase to crossfade from). Mounts
+          last: it takes over rendering at priority 1 and must draw everything
+          above it. */}
+      <InkPass mode={1} />
     </Canvas>
   );
 }

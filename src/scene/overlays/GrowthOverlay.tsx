@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { useDesign } from '../../state/store';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { leafColor } from '../util';
+import { toonGradient } from '../npr/toonGradient';
 
 interface Leaf {
   pos: [number, number, number];
@@ -122,7 +123,9 @@ export function GrowthOverlay({
           castShadow
         >
           <icosahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color={leaf.color} roughness={0.85} flatShading />
+          {/* Toon-banded so the living layer paints the same way the timber
+              does (spec A5); the per-leaf colour carries the green. */}
+          <meshToonMaterial color={leaf.color} gradientMap={toonGradient} />
         </mesh>
       ))}
     </group>

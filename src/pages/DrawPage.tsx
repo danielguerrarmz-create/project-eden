@@ -46,6 +46,7 @@ import { ExplodeReveal } from './draw/ExplodeReveal';
 import { makeRevealUniforms } from '../scene/revealShader';
 import { explodeDistanceM, makeExplodeUniforms } from '../scene/explodeShader';
 import { CinematicCamera } from './draw/CinematicCamera';
+import { InkPass } from '../scene/npr/InkPass';
 import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
 import { surfaceSamples, type Framing } from './draw/framing';
 import {
@@ -330,8 +331,13 @@ export function DrawPage() {
                 // "soft" explicitly, not the bare boolean: the shadow's edge is
                 // a PCF filter kernel, and which kernel you get is the whole
                 // difference between an edge and a smear. Do not assume the
-                // boolean resolves to PCFSoft.
+                // boolean resolves to PCFSoft. The watercolour pass wants a
+                // softer, painterly shadow still, so `onCreated` swaps the map
+                // type to VSM (spec A5) — a renderer flag, zero bundle cost.
                 shadows="soft"
+                onCreated={({ gl }) => {
+                  gl.shadowMap.type = THREE.VSMShadowMap;
+                }}
                 dpr={[1, 2]}
                 camera={{ position: [5.6, 3.6, 6.6], fov: 42 }}
                 className={`!absolute inset-0 ${cursor}`}
@@ -377,6 +383,11 @@ export function DrawPage() {
                   shadow-camera-far={26}
                   shadow-bias={-0.0004}
                   shadow-normalBias={0.02}
+                  // VSM reads its softness from the blur radius + sample count
+                  // (PCF ignored these). A wide radius gives the painterly,
+                  // feathered shadow the watercolour look wants. Eyeball-tunable.
+                  shadow-radius={8}
+                  shadow-blurSamples={16}
                 />
                 {/* Rim: separates timber from vellum and catches member edges.
                     No shadow map, so it costs one light and nothing else. */}
@@ -514,6 +525,19 @@ export function DrawPage() {
                 {/* After OrbitControls on purpose: it must exist before this
                     can read it. */}
                 <CinematicCamera framing={framing} turntable={turntable} />
+
+                {/* The watercolour/sketch pass. Takes over rendering (priority
+                    1 useFrame) so it must mount last, after everything it draws
+                    exists. uMode rides `revealProgressRef`: pure sketch (0)
+                    while soft, crossfading to pure wash (1) across the bake
+                    reveal — the same clock the lattice sweeps up on. The reveal
+                    and explode uniforms go in so the edge G-buffer clips and
+                    travels exactly as the timber does. */}
+                <InkPass
+                  modeRef={revealProgressRef}
+                  revealUniforms={revealUniforms}
+                  explodeUniforms={explodeUniforms}
+                />
               </Canvas>
             ) : (
               <div className="grid h-full place-items-center p-6">

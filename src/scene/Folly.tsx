@@ -21,6 +21,7 @@ import { useDesign } from '../state/store';
 import { buildSteel, type SteelOwner } from './connectors';
 import { applyExplode, explodeDistanceM, type ExplodeUniforms } from './explodeShader';
 import { applyReveal, makeRevealDepthMaterial, type RevealUniforms } from './revealShader';
+import { toonGradient } from './npr/toonGradient';
 
 // Two-tone steel by ROLE (connectors.ts tags each cylinder). Structural keeps
 // the bright galvanized tone already tuned by the 2026-07-17 visual pass;
@@ -354,8 +355,10 @@ export function Folly({
           ref={reveal}
           {...(onSelectPiece ? { onClick: pick } : {})}
         >
-          {/* Planed C24 spruce/larch, UC3 treated. */}
-          <meshStandardMaterial color="#9c8466" roughness={0.8} metalness={0} />
+          {/* Planed C24 spruce/larch, UC3 treated. Toon-banded (spec A5): the
+              light-to-shadow falloff paints in steps, so timber reads as
+              painted rather than rendered under the watercolour pass. */}
+          <meshToonMaterial color="#9c8466" gradientMap={toonGradient} />
         </mesh>
       )}
 
@@ -368,7 +371,7 @@ export function Folly({
           {...(onSelectPiece ? { onClick: pick } : {})}
         >
           {/* Spruce LVL, CNC-profiled — paler than the sawn stock. */}
-          <meshStandardMaterial color="#c2ab84" roughness={0.75} metalness={0} />
+          <meshToonMaterial color="#c2ab84" gradientMap={toonGradient} />
         </mesh>
       )}
 
@@ -381,12 +384,10 @@ export function Folly({
         >
           {/* Fins, clamp plates, base plates, fish plates — S355 HDG. */}
           <boxGeometry args={[1, 1, 1]} />
-          {/* Crisper than the old 0.62/0.45: with something in the environment
-              to reflect, a lower roughness and higher metalness turn the hubs
-              from flat grey discs into galvanized zinc that catches the light
-              as the turntable brings it round. Without an env map this trade
-              is a downgrade, so the two changes ship together. */}
-          <meshStandardMaterial color="#aab0b4" roughness={0.5} metalness={0.58} />
+          {/* Toon-banded like the timber (spec A5): under the watercolour pass
+              the whole kit paints in one language, so the steel drops its PBR
+              galvanized reflection for the same stepped falloff. */}
+          <meshToonMaterial color="#aab0b4" gradientMap={toonGradient} />
         </instancedMesh>
       )}
 
@@ -402,10 +403,10 @@ export function Folly({
               unit Ø1 × h1, scaled per instance, toned per instance by role.
               `vertexColors` + the white base `color` buffer let instanceColor
               reach the fragment; the base color stays white so the instance tone
-              is the whole answer (white × instanceColor = instanceColor).
-              Roughness/metalness stay the 0.5/0.58 the visual pass tuned, shared
-              across both tones — the colour contrast carries the read. */}
-          <meshStandardMaterial color="#ffffff" vertexColors roughness={0.5} metalness={0.58} />
+              is the whole answer (white × instanceColor = instanceColor). Toon-
+              banded like the rest of the kit; the two-tone role colour carries
+              the fastener-vs-structural read. */}
+          <meshToonMaterial color="#ffffff" vertexColors gradientMap={toonGradient} />
         </instancedMesh>
       )}
     </>
