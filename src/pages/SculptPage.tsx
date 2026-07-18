@@ -46,7 +46,12 @@ export function SculptPage() {
   const [radius, setRadius] = useState(1.1);
   const [resetNonce, setResetNonce] = useState(0);
   const [stats, setStats] = useState<ShellStats | null>(null);
-  const [fps, setFps] = useState(60);
+  // null until the solver's first stats tick. A HUD that invents a healthy
+  // "60 fps / 0 out of spec" before the loop has stepped is worse than one that
+  // admits it doesn't know yet: an unfocused tab throttles rAF to ~1fps, and
+  // the panel then reads a confident 60/0 next to four honest em-dashes —
+  // which reads as "the solver is dead" to anyone looking at it.
+  const [fps, setFps] = useState<number | null>(null);
 
   const onStats = useCallback((s: ShellStats, f: number) => {
     setStats(s);
@@ -54,7 +59,6 @@ export function SculptPage() {
   }, []);
 
   const d = DENSITY[level];
-  const outOfSpec = stats?.outOfSpec ?? 0;
 
   return (
     <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
@@ -115,14 +119,23 @@ export function SculptPage() {
           <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5">
             <Stat label="nodes" value={stats ? String(stats.nodes) : '—'} />
             <Stat label="struts" value={stats ? String(stats.struts) : '—'} />
-            <Stat label="fps" value={String(Math.round(fps))} warn={fps < 30} />
-            <Stat label="out of spec" value={String(outOfSpec)} warn={outOfSpec > 0} />
+            <Stat label="fps" value={fps === null ? '—' : String(Math.round(fps))} warn={fps !== null && fps < 30} />
+            <Stat
+              label="out of spec"
+              value={stats ? String(stats.outOfSpec) : '—'}
+              warn={!!stats && stats.outOfSpec > 0}
+            />
             <Stat label="min strut" value={stats ? `${stats.minLen.toFixed(2)} m` : '—'} />
             <Stat label="max strut" value={stats ? `${stats.maxLen.toFixed(2)} m` : '—'} />
           </dl>
           <p className="mt-2.5 border-t border-inkBlack/12 pt-2 font-mono text-[9px] leading-snug tracking-[0.02em] text-inkBlack/55">
             fab limits {FAB_MIN_M.toFixed(2)}–{FAB_MAX_M.toFixed(2)} m · every strut clamped inside,
-            live. out of spec {outOfSpec === 0 ? 'holds at 0' : 'BREACHED'}.
+            live.{' '}
+            {!stats
+              ? 'waiting for the first solve.'
+              : stats.outOfSpec === 0
+                ? 'out of spec holds at 0.'
+                : 'out of spec BREACHED.'}
           </p>
         </div>
 

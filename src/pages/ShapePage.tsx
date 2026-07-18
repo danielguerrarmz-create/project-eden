@@ -17,6 +17,12 @@
 import { GRAMMAR } from '../data/config';
 import { Scene } from '../scene/Scene';
 import { useDesign, type SliderKey } from '../state/store';
+import {
+  COMMISSION_LABEL,
+  COMMISSION_QUALIFIER,
+  COMMISSION_FROM,
+  PRICE_QUALIFIER,
+} from '../ui/priceCopy';
 import { deDash } from '../ui/text';
 import { SplashHeader } from './splash/SplashHeader';
 
@@ -24,7 +30,7 @@ export function ShapePage() {
   const params = useDesign((s) => s.params);
   const geo = useDesign((s) => s.outputs.geometry);
   const notes = useDesign((s) => s.outputs.bounds.notes);
-  const price = useDesign((s) => s.outputs.price.fixedTotalGBP);
+  const price = useDesign((s) => s.outputs.price.costBuildUpGBP);
   const setParam = useDesign((s) => s.setParam);
 
   const stepSpacing = (delta: number) => {
@@ -88,11 +94,23 @@ export function ShapePage() {
 
         {/* Grammar notes + price, bottom-right: the engine narrating its clamps. */}
         <div className="absolute bottom-6 right-6 max-w-[320px] rounded-2xl border border-inkBlack/15 bg-paperVellum/85 px-4 py-3 backdrop-blur">
+          {/* This panel narrates live engine output, so the computed build-up
+              belongs here. What it may not do is call itself a price: the rates
+              behind it are placeholders. The stated range sits below its own
+              rule, where nothing the sliders do can move it. */}
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/55">
-            fixed price · grammar
+            kit and install · grammar
           </p>
-          <p className="font-serifDisplay text-[22px] font-semibold leading-none text-inkBlack">
-            £{price.toLocaleString('en-GB')}
+          <div className="flex items-baseline gap-2">
+            <p className="font-serifDisplay text-[22px] font-semibold leading-none text-inkBlack">
+              £{price.toLocaleString('en-GB')}
+            </p>
+            <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/50">
+              {PRICE_QUALIFIER}
+            </p>
+          </div>
+          <p className="mt-2 border-t border-inkBlack/12 pt-2 font-mono text-[10px] leading-snug tracking-[0.02em] text-inkBlack/55">
+            {COMMISSION_LABEL} {COMMISSION_FROM}, {COMMISSION_QUALIFIER}
           </p>
           <div className="mt-2.5 space-y-1 border-t border-inkBlack/12 pt-2">
             {notes.map((n) => (

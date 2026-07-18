@@ -2,9 +2,13 @@
  * CommissionSheet.tsx — the spec sheet view (demo-spec §2.5).
  *
  * What the Commission button opens: component count, BOM summary, assembly
- * step count, lead time, the fixed price, and the nesting preview — the
+ * step count, lead time, the commission range, and the nesting preview — the
  * evidence that the form on the stage compiles to files a fab shop can cut.
  * Client-side view only; reserving captures an email locally (no backend).
+ *
+ * 2026-07-17 honesty pass: the hero was a computed figure labelled "fixed" over
+ * the sentence "the number is a commitment, not an estimate". No fab quote has
+ * landed, so it was a commitment made out of placeholder rates. See ui/priceCopy.ts.
  *
  * 2026-07-10 chrome unify: documentation-layer styling (paperVellum overlay,
  * mono eyebrows, editorial serif figures + titles, hairline panels, olive/amber
@@ -15,6 +19,18 @@ import { WORDMARK } from '../data/config';
 import { Frame } from './Frame';
 import { useDesign } from '../state/store';
 import { NestingPreview } from './NestingPreview';
+import {
+  COMMISSION_FROM,
+  COMMISSION_NOTE,
+  COMMISSION_QUALIFIER,
+  COST_BUILDUP_NOTE,
+  COST_SUMMARY_LABEL,
+  COST_TO_COMMISSION_BRIDGE,
+  DEMO_SCOPE_NOTE,
+  PRICE_QUALIFIER,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
+} from './priceCopy';
 import { ReserveCTA } from './ReserveCTA';
 import { deDash } from './text';
 
@@ -70,23 +86,71 @@ export function CommissionSheet() {
           </button>
         </div>
 
-        {/* Fixed price hero */}
+        {/* Commission hero. Until 2026-07-17 this read "{figure} FIXED" over the
+            sentence "the number is a commitment, not an estimate" — the strongest
+            claim anywhere in the demo, resting on rates nobody has quoted. The
+            hero is now the STATED floor; the computed build-up keeps its place in
+            the sheet below, as a COST rather than as the price. */}
         <div className="mb-6 rounded-lg border border-inkBlack/12 bg-white/45 p-6">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="font-serifDisplay text-[clamp(2.75rem,6vw,3.75rem)] font-semibold tabular-nums leading-none text-inkBlack">
-              {gbp(price.fixedTotalGBP)}
+            <span className="font-serifDisplay text-[clamp(2.25rem,5vw,3rem)] font-semibold tabular-nums leading-none text-inkBlack">
+              {COMMISSION_FROM}
             </span>
-            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">fixed</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-accentOlive">
+              {COMMISSION_QUALIFIER}
+            </span>
           </div>
           <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-inkBlack/70">
-            One figure, guaranteed: fabrication, delivery, install, groundwork and the planting
-            allowance. Every reachable form compiles to components, an assembly sequence and this
-            price, so the number is a commitment, not an estimate.
+            {COMMISSION_NOTE} It covers fabrication, delivery, install, groundwork and the planting
+            allowance. Every reachable form compiles to components, an assembly sequence and a cut
+            list, which is what makes a firm figure possible quickly once the quote is in.
           </p>
-          <p className="mt-2 text-[11px] leading-relaxed text-inkBlack/50">
-            Indicative until your site survey and fabrication quote. Every figure is built from this
-            design's real cut list, so it moves correctly as you shape the form.
+          {/* Stewardship: the recurring line, and the one that only exists
+              because the structure is alive. Sits with the commission because it
+              is the same KIND of number — stated, a rate, not computed. */}
+          <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-inkBlack/60">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accentOlive">
+              {STEWARDSHIP_LABEL}
+            </span>{' '}
+            {STEWARDSHIP_NOTE}
           </p>
+          {/* THE BRIDGE. The floor and the build-up used to sit four lines
+              apart with nothing between them: two figures an order of magnitude
+              apart, and a reader left to explain the distance themselves. The
+              only two available explanations were "they print money" and "the
+              £14k is fake", and the second one costs us the itemization, which
+              is the one thing on this sheet that is true right now.
+
+              It names the categories and prices NONE of them, deliberately. A
+              numeric bridge could only be back-solved from £150k — the same
+              circular move priceCopy.ts already refuses on rates. See the
+              constant's own note before adding a figure here. */}
+          <div className="mt-4 border-t border-inkBlack/12 pt-3">
+            <p className="max-w-xl text-[12px] leading-relaxed text-inkBlack/65">
+              {COST_TO_COMMISSION_BRIDGE}
+            </p>
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/55">
+                this design, {COST_SUMMARY_LABEL}
+              </span>
+              <span className="font-mono text-[15px] font-medium tabular-nums text-inkBlack">
+                {gbp(price.costBuildUpGBP)}
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+                {PRICE_QUALIFIER}
+              </span>
+            </div>
+            <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-inkBlack/50">
+              {COST_BUILDUP_NOTE}
+            </p>
+            {/* Which rung this is. The grammar caps at 18 m² / 2.5 m, so the
+                object on screen is the entry piece, not the core commission the
+                floor prices. Saying so turns the distance between the figures
+                into scope rather than an accusation. */}
+            <p className="mt-2 max-w-xl font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-inkBlack/45">
+              {DEMO_SCOPE_NOTE}
+            </p>
+          </div>
         </div>
 
         {/* Key figures */}

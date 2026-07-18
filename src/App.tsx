@@ -3,7 +3,7 @@
  *
  * One screen, built to be filmed in one take: the pavilion on its ground
  * plane, four sliders that stop at grammar bounds with visible reasons, a
- * species selector the lattice armature answers to, the year 0/1/3 growth
+ * species selector the lattice armature answers to, the year 0/1/2 growth
  * toggle, a live fixed price beside the viewport, and a Commission button
  * that opens the spec sheet + nesting preview. No steps, no accounts, no
  * backend; the design persists as a URL.

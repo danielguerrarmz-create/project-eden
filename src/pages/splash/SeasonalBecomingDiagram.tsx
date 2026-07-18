@@ -23,7 +23,7 @@ import { CrownFlower, FoliageLeaves } from '../engine/botanicalFoliage';
 const PHASES: { year: Year; caption: string }[] = [
   { year: 0, caption: 'just placed' },
   { year: 1, caption: 'taking hold' },
-  { year: 3, caption: 'in full leaf' },
+  { year: 2, caption: 'in full leaf' },
 ];
 
 /** Deterministic low-discrepancy foliage scatter inside the canopy silhouette. */
@@ -121,7 +121,7 @@ function GrowthPanel({
   const lattice = latticeHint(front, cx, baseY, scale);
   // One accent at a flowering position in the fullest panel only: the topmost leaf,
   // read as a bloom at the crown. No leader, no callout (this strip stays numberless).
-  const bloom = year === 3 && dots.length > 0 ? dots.reduce((a, b) => (b.y < a.y ? b : a), dots[0]) : null;
+  const bloom = year === 2 && dots.length > 0 ? dots.reduce((a, b) => (b.y < a.y ? b : a), dots[0]) : null;
 
   return (
     // Durationless label: the caption, never growth.label (which names a year).

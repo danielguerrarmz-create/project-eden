@@ -19,6 +19,7 @@ import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
 import { ShapePage } from './pages/ShapePage';
 import { SculptPage } from './pages/SculptPage';
+import { DrawPage } from './pages/DrawPage';
 import { BotanicalLab } from './pages/lab/BotanicalLab';
 import { GongbiLab } from './pages/lab/GongbiLab';
 import { useRoute } from './routing';
@@ -28,6 +29,7 @@ export function Root() {
   if (route === '/studio') return <App />;
   if (route === '/engine') return <EnginePage />;
   if (route === '/about') return <AboutPage />;
+  if (route === '/draw') return <DrawPage />;
   if (route === '/shape') return <ShapePage />;
   if (route === '/sculpt') return <SculptPage />;
   if (route === '/lab/botanical') return <BotanicalLab />;

@@ -1,16 +1,34 @@
 /**
- * PricePanel.tsx — the live price ticker beside the viewport (demo-spec §2.3).
+ * PricePanel.tsx — the commission panel beside the viewport (demo-spec §2.3).
  *
- * One guaranteed figure ("£38,700, fixed"), ticking on every parameter change,
- * with the decomposition one disclosure away: components / fabrication /
- * install / planting / margin. Decomposition = credibility, and the margin is
- * shown plainly. The placeholder-rate note stays on screen until Clay's fab
- * quote is wired into config.ts — the price MOVES correctly, it is not yet TRUE.
+ * 2026-07-17 honesty pass. This panel used to headline one computed figure as
+ * "YOUR PRICE, FIXED". Both halves of that were wrong: no fab quote has landed,
+ * so every rate behind the figure is a placeholder (see pricing.ts's header),
+ * and the figure is a cost of construction sitting ~10x under what an Eden is
+ * actually commissioned for. "Fixed" is a word for after the quotes come back.
+ *
+ * So the headline is the STATED commission floor (from £150k, Daniel's own
+ * ladder), stewardship rides with it as the other stated rate, and the computed
+ * build-up sits in the disclosure where a reader has room to read what kind of
+ * number it is: a COST, off a real cut list, at invented rates. See
+ * ui/priceCopy.ts for the distinction, what the ~10x gap implies, and why no
+ * rate was moved to close it.
  *
  * 2026-07-10 chrome unify: documentation-layer styling (mono eyebrow, editorial
- * serif figure, inkBlack CTA, amber honesty note kept). Values + logic unchanged.
+ * serif figure, inkBlack CTA, amber honesty note kept).
  */
 import { useDesign } from '../state/store';
+import {
+  COMMISSION_FROM,
+  COMMISSION_LABEL,
+  COMMISSION_NOTE,
+  COMMISSION_QUALIFIER,
+  COST_BUILDUP_NOTE,
+  COST_SUMMARY_LABEL,
+  PRICE_QUALIFIER,
+  STEWARDSHIP_LABEL,
+  STEWARDSHIP_NOTE,
+} from './priceCopy';
 import { deDash } from './text';
 
 const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
@@ -22,19 +40,33 @@ export function PricePanel() {
 
   return (
     <div className="rounded-lg border border-inkBlack/12 bg-white/45 p-4">
-      <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/50">your price, fixed</div>
+      <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-inkBlack/50">
+        {COMMISSION_LABEL}
+      </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-serifDisplay text-[40px] font-semibold leading-none tabular-nums text-inkBlack">
-          {gbp(price.fixedTotalGBP)}
+        <span className="font-serifDisplay text-[34px] font-semibold leading-none tabular-nums text-inkBlack">
+          {COMMISSION_FROM}
         </span>
       </div>
-      <p className="mt-1.5 text-[12px] leading-snug text-inkBlack/60">
-        one figure, held: fabrication, install, groundwork and planting
+      <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+        {COMMISSION_QUALIFIER}
+      </p>
+      <p className="mt-1.5 text-[12px] leading-snug text-inkBlack/60">{COMMISSION_NOTE}</p>
+
+      {/* Stewardship: recurring, and the most on-thesis number in the model —
+          income that exists BECAUSE the thing is alive. It rides with the
+          commission because it is the same kind of number (stated, a rate, not
+          computed), and it was invisible in the demo until 2026-07-17. */}
+      <p className="mt-2 border-t border-inkBlack/12 pt-2 text-[11px] leading-snug text-inkBlack/55">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+          {STEWARDSHIP_LABEL}
+        </span>{' '}
+        {STEWARDSHIP_NOTE}
       </p>
 
       <details className="group mt-2.5 border-t border-inkBlack/12 pt-2.5">
         <summary className="flex cursor-pointer list-none items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-inkBlack/55 hover:text-inkBlack">
-          <span>how this price is built</span>
+          <span>{COST_SUMMARY_LABEL}</span>
           <span className="text-inkBlack/40 transition group-open:rotate-90">›</span>
         </summary>
         <div className="mt-3 space-y-1 text-[12px]">
@@ -48,14 +80,19 @@ export function PricePanel() {
             </div>
           ))}
           <div className="flex justify-between gap-3 border-t border-inkBlack/12 pt-1.5">
-            <span className="font-medium text-inkBlack">fixed total</span>
-            <span className="font-mono font-medium tabular-nums text-inkBlack">{gbp(price.fixedTotalGBP)}</span>
+            <span className="font-medium text-inkBlack">
+              {COST_SUMMARY_LABEL}
+              <span className="ml-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
+                {PRICE_QUALIFIER}
+              </span>
+            </span>
+            <span className="font-mono font-medium tabular-nums text-inkBlack">{gbp(price.costBuildUpGBP)}</span>
           </div>
-          {/* Honesty, kept, but where it belongs: inside the build-up, not on the headline. */}
-          <p className="pt-2 text-[10px] leading-relaxed text-inkBlack/45">
-            Indicative until your site survey and fabrication quote. The figure is built from this
-            design's real cut list, so it moves correctly as you shape it.
-          </p>
+          {/* The admission travels WITH the figure, always. Without it the total
+              sits under the floor looking like a cheaper version of the same
+              number, which is exactly the misreading to prevent: this is a COST
+              at invented rates, the floor is what an Eden sells FOR. */}
+          <p className="pt-2 text-[10px] leading-relaxed text-inkBlack/45">{COST_BUILDUP_NOTE}</p>
         </div>
       </details>
 

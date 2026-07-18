@@ -51,8 +51,13 @@ const DEG = Math.PI / 180;
 const TWO_PI = Math.PI * 2;
 const round = (x: number, step: number) => Math.round(x / step) * step;
 
-/** Catenary-ish cap profile: 1 at the crown (r=0), 0 at the edge (r=1). */
-function capProfile(r: number): number {
+/**
+ * Catenary-ish cap profile: 1 at the crown (r=0), 0 at the edge (r=1).
+ * Exported (with eaveHeightAtM / footPullAt) because the soft drawn surface
+ * (surface.ts) raises the SAME canopy over the drawn plan — one rule, two
+ * resolutions, so bake is a resolution rather than a jump-cut.
+ */
+export function capProfile(r: number): number {
   const k = 1.1;
   return (Math.cosh(k) - Math.cosh(k * r)) / (Math.cosh(k) - 1);
 }
@@ -65,61 +70,136 @@ function angDiff(a: number, b: number): number {
   return d;
 }
 
+/**
+ * A DRAWN shape the generator should obey instead of inventing one.
+ *
+ * Without this the generator answers every question from the grammar: feet get
+ * spread evenly around an ellipse, and the canopy is an analytic cap. That is
+ * right for a parametric studio and WRONG the moment somebody draws, because
+ * their lines then change nothing but a footprint number — the tool quietly
+ * throws the drawing away and builds its own generic dome on top of it.
+ *
+ * Every field is optional and every default reproduces the old behaviour
+ * exactly, so the parametric path (and its tests) is untouched.
+ */
+export interface ShapeField {
+  /** Where the canopy roots, as compass bearings. Replaces even spacing. */
+  footBearingsDeg?: number[];
+  /** Plan radius at a bearing (m). Replaces the grammar's ellipse. */
+  planRadiusAtM?: (bearingRad: number) => number;
+  /** Canopy height at a world plan point (m). Replaces the analytic cap. */
+  heightAtM?: (x: number, z: number) => number;
+  /** True where the canopy has been excavated away. */
+  isHoleAt?: (x: number, z: number) => boolean;
+}
+
 interface SurfaceCtx {
   a: number;
   b: number;
   H: number;
-  eaveBaseM: number;
   apertureRad: number;
   footAnglesRad: number[];
+  shape?: ShapeField;
 }
 
-function surfaceCtx(p: DesignParams, snapToSpokes?: number): SurfaceCtx {
+function surfaceCtx(p: DesignParams, snapToSpokes?: number, shape?: ShapeField): SurfaceCtx {
   const { a, b } = planDims(p.footprintM2);
   const H = p.riseM;
-  const feet = feetCountFor(p.footprintM2);
   const apertureRad = p.apertureDeg * DEG;
-  // Feet sit evenly spaced, offset half a bay from the aperture so the opening
-  // is always clear of a leg. When generating members, each foot snaps to the
-  // nearest diagrid spoke so a leg (or the foot sweep) lands EXACTLY on a
-  // node column (a foot hovering a few cm off the lawn would undo the whole
-  // "is it real" answer).
-  const footAnglesRad = Array.from({ length: feet }, (_, i) => {
-    const raw = apertureRad + (TWO_PI / feet) * (i + 0.5);
+
+  // Feet: the DRAWN bearings when there are any, else the grammar's even
+  // spread offset half a bay from the aperture so the opening is always clear
+  // of a leg. Either way each foot snaps to the nearest diagrid spoke so a leg
+  // lands EXACTLY on a node column — a foot hovering a few cm off the lawn
+  // would undo the whole "is it real" answer.
+  const snap = (raw: number) => {
     if (!snapToSpokes) return raw;
     const spokeStep = TWO_PI / snapToSpokes;
     return Math.round(raw / spokeStep) * spokeStep;
-  });
-  return { a, b, H, eaveBaseM: 0.62 * H, apertureRad, footAnglesRad };
+  };
+
+  let footAnglesRad: number[];
+  const drawn = shape?.footBearingsDeg;
+  if (drawn && drawn.length > 0) {
+    // Snap first, THEN dedupe: two drawn feet inside one bay are one node, and
+    // emitting both would put two shoes on the same screw.
+    const seen = new Set<number>();
+    footAnglesRad = [];
+    for (const deg of drawn) {
+      const s = ((snap(deg * DEG) % TWO_PI) + TWO_PI) % TWO_PI;
+      const key = Math.round(s * 1e6);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      footAnglesRad.push(s);
+    }
+    footAnglesRad.sort((x, y) => x - y);
+  } else {
+    const feet = feetCountFor(p.footprintM2);
+    footAnglesRad = Array.from({ length: feet }, (_, i) =>
+      snap(apertureRad + (TWO_PI / feet) * (i + 0.5)),
+    );
+  }
+
+  return { a, b, H, apertureRad, footAnglesRad, shape };
 }
 
-/** Free-edge (eave) height at bearing θ: lifts toward the aperture. */
-function eaveHeightM(ctx: SurfaceCtx, thetaRad: number): number {
-  const toward = Math.max(0, Math.cos(angDiff(thetaRad, ctx.apertureRad)));
-  const lifted = ctx.eaveBaseM * (1 + 0.5 * Math.pow(toward, 1.5));
-  return Math.min(lifted, ctx.H - 0.25);
+/**
+ * Free-edge (eave) height at bearing θ: stays UP between the legs and lifts
+ * toward the aperture. This — with footPullAt — is what makes an Eden read as
+ * a canopy with an eave and open sides rather than a tent.
+ */
+export function eaveHeightAtM(H: number, apertureRad: number, thetaRad: number): number {
+  const toward = Math.max(0, Math.cos(angDiff(thetaRad, apertureRad)));
+  const lifted = 0.62 * H * (1 + 0.5 * Math.pow(toward, 1.5));
+  return Math.min(lifted, H - 0.25);
 }
 
 /** How strongly bearing θ is pulled to ground by the nearest foot (0..1). */
-function footPull(ctx: SurfaceCtx, thetaRad: number): number {
+export function footPullAt(footAnglesRad: number[], thetaRad: number): number {
   const sigma = 0.32; // angular half-width of a foot sweep (rad)
   let w = 0;
-  for (const f of ctx.footAnglesRad) {
+  for (const f of footAnglesRad) {
     const d = angDiff(thetaRad, f);
     w += Math.exp(-(d * d) / (sigma * sigma));
   }
   return Math.min(1, w);
 }
 
-/** World point of the canopy surface at polar-parametric (r 0..1, θ bearing rad). */
+function eaveHeightM(ctx: SurfaceCtx, thetaRad: number): number {
+  return eaveHeightAtM(ctx.H, ctx.apertureRad, thetaRad);
+}
+
+function footPull(ctx: SurfaceCtx, thetaRad: number): number {
+  return footPullAt(ctx.footAnglesRad, thetaRad);
+}
+
+/**
+ * World point of the canopy surface at polar-parametric (r 0..1, θ bearing rad).
+ *
+ * With a drawn ShapeField the plan radius and the height BOTH come from the
+ * drawing: the net fills the footprint the lines enclosed and lies on the
+ * surface that was sculpted. Without one, the analytic cap below — unchanged.
+ */
 function canopyPoint(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
+  // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
+  const sin = Math.sin(thetaRad);
+  const cos = Math.cos(thetaRad);
+
+  if (ctx.shape?.planRadiusAtM && ctx.shape?.heightAtM) {
+    const R = ctx.shape.planRadiusAtM(thetaRad);
+    const x = r * R * sin;
+    const z = r * R * cos;
+    // The drawn surface already dives to the lawn at the feet and stays up
+    // between them — the eave is a property of the drawing, not of a rule.
+    return [x, Math.max(0, ctx.shape.heightAtM(x, z)), z];
+  }
+
   const E = eaveHeightM(ctx, thetaRad);
   let y = E + (ctx.H - E) * capProfile(r);
   // The ONE typology: near the edge, the surface sweeps down and roots at
   // the feet (FABRICATION.md §5).
   y *= 1 - footPull(ctx, thetaRad) * Math.pow(r, 5);
-  // Bearing convention: 0 = north = +Z, 90° = east = +X (matches sunpath.ts).
-  return [ctx.a * r * Math.sin(thetaRad), y, ctx.b * r * Math.cos(thetaRad)];
+  return [ctx.a * r * sin, y, ctx.b * r * cos];
 }
 
 /** Outward (upward) unit surface normal at (r, θ), by central differences. */
@@ -137,21 +217,28 @@ function surfaceNormal(ctx: SurfaceCtx, r: number, thetaRad: number): Vec3 {
 
 /**
  * Sample the canopy at parametric (u,v): u = around the plan (0..1 from north,
- * clockwise), v = up the canopy (0 = edge, 1 = crown). Returns the world point
- * plus the compass bearing (deg) that facet faces. Used by the strut optimiser
- * + overlays so the living layer keys off coordinates, never off members.
+ * clockwise), v = up the canopy (0 = edge, 1 = crown). Returns the world point,
+ * the outward unit surface normal there, and the compass bearing (deg) that
+ * facet faces. Used by the strut optimiser + overlays so the living layer keys
+ * off coordinates, never off members.
+ *
+ * The normal matters: overlays sit ON the skin by stepping along it. Offsetting
+ * radially about Y instead (the old `p * 1.04` trick) only holds for a vertical
+ * cylinder — on a dome it collapses to zero at the crown and shoves cells off
+ * the face near the eave, where the normal points outward AND down.
  */
 export function surfacePoint(
   params: DesignParams,
   u: number,
   v: number,
-): { point: Vec3; bearingDeg: number } {
+): { point: Vec3; normal: Vec3; bearingDeg: number } {
   const p = clampParams(params);
   const ctx = surfaceCtx(p);
   const theta = u * TWO_PI;
   const r = 1 - v;
   return {
     point: canopyPoint(ctx, r, theta),
+    normal: surfaceNormal(ctx, r, theta),
     bearingDeg: ((theta / DEG) % 360 + 360) % 360,
   };
 }
@@ -185,7 +272,7 @@ const STRUT_DEPTH_M = STOCK.strut.depthMm / 1000;
 const LAMELLA_DEPTH_M = STOCK.lamella.depthMm / 1000;
 const BLANK_DEPTH_M = STOCK.blank.depthMm / 1000;
 
-export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
+export function generateGeometry(rawParams: DesignParams, shape?: ShapeField): CanopyGeometry {
   const params = clampParams(rawParams);
   const lamella = params.jointSystem === 'lamella';
   const { a: planAM, b: planBM } = planDims(params.footprintM2);
@@ -196,7 +283,7 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   const bayM = params.strutSpacingM * 1.35;
   const spokeCount = Math.max(12, 2 * Math.round(perimeterM / bayM / 2));
 
-  const ctx = surfaceCtx(params, spokeCount);
+  const ctx = surfaceCtx(params, spokeCount, shape);
   const { a, b, H } = ctx;
   const feetCount = ctx.footAnglesRad.length;
   const meanR = (a + b) / 2;
@@ -224,6 +311,8 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
         id: `n-${i}-${j}`,
         position: grounded ? [pos[0], 0, pos[2]] : pos,
         normal: surfaceNormal(ctx, rAt(i), thetaAt(j)),
+        // Same sense as Member.v (see uv() below): 0 = eave/ground, 1 = crown.
+        v: 1 - i / ringCount,
         kind: grounded ? 'ground' : i === 0 ? 'crown' : i === ringCount ? 'eave' : 'interior',
         memberIds: [],
       });
@@ -390,6 +479,8 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
             from.normal[1] + to.normal[1],
             from.normal[2] + to.normal[2],
           ]),
+          // A splice sits mid-bay on its own ring, so it shares that ring's v.
+          v,
           kind: 'splice',
           memberIds: [],
         };
@@ -464,12 +555,106 @@ export function generateGeometry(rawParams: DesignParams): CanopyGeometry {
   ringPieces(0, 'crown', 'crownBlank', 'crown', []);
   ringPieces(ringCount, 'eave', 'eaveBlank', 'eave', uniqueEaveBoundaries);
 
+  // -------------------------------------------------------------------------
+  // CROWN CAP — close the oculus into a solid crown boss so the DEFAULT build
+  // reads as a COMPLETE dome. The r < r0 region was a literal ~1 m hole at the
+  // top; Daniel wants holes to come ONLY from the excavate tool. A polar
+  // diagrid converges toward the crown, so rather than run the net to a
+  // degenerate point across many rings, ONE fan of short radial ribs springs
+  // from the innermost diagrid ring (ring 0) up to a single apex node — a
+  // bespoke machined crown boss, the summit cousin of the eave hubs.
+  //
+  // The ribs are ordinary diagrid members (the same type/stock the rest of the
+  // net uses), so they inherit the hub standoff / blank-face joint resolution,
+  // the prism render and the BOM line with no new machinery. Crucially they are
+  // added BEFORE the excavation prune below, so an excavation over the crown
+  // removes them by midpoint exactly like any member and reopens the crown right
+  // where the user asked — excavate stays the ONLY source of holes.
+  //
+  // FAB FLOOR: these are the shortest members in the kit (~0.4-0.5 m centreline).
+  // That is under the 0.45 m connector-overlap floor, but that floor governs
+  // FIELD diamonds (fin overlap at acute diagrid angles); the crown region is
+  // already floor-exempt (the ring-0 compression chords run ~0.17 m as blanks).
+  // The apex is a single purpose-made boss, not a field diamond, and the
+  // standoff solver still clears every rib end off the boss envelope.
+  const apex: CanopyNode = {
+    id: 'n-crown-apex',
+    // surfaceNormal() is degenerate at r=0 (the θ-tangent collapses to zero, so
+    // the cross product is 0 → NaN); the summit simply points straight up.
+    position: canopyPoint(ctx, 0, 0),
+    normal: [0, 1, 0],
+    v: 1,
+    kind: 'crown',
+    memberIds: [],
+  };
+  nodes.push(apex);
+  const capType: Member['type'] = lamella ? 'lamella' : 'lattice';
+  for (let j = 0; j < spokeCount; j++) {
+    const from = grid[0][j];
+    const { u, v } = uv(0, j);
+    const rib = addMember(
+      {
+        id: `crowncap-${j}`,
+        type: capType,
+        start: from.position,
+        end: apex.position,
+        nodeStartId: from.id,
+        nodeEndId: apex.id,
+        pieceId: '', // patched immediately below
+        u,
+        v,
+      },
+      from,
+      apex,
+    );
+    const pieceId = `crowncap-${lamella ? 'lam' : 'strut'}-${j}`;
+    rib.pieceId = pieceId;
+    addPiece(
+      lamella ? 'lamella' : 'strut',
+      pieceId,
+      [rib],
+      lamella ? 'sheet' : 'linear',
+      lamella ? LAMELLA_DEPTH_M : STRUT_DEPTH_M,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // JOINT RESOLUTION (FABRICATION.md §1a) — assign every member end its ONE
   // planar cut (mitres, skew butts, blank faces, computed hub standoffs),
   // derive the trims from the planes, then fill the PHYSICAL cut lengths the
   // BOM prices. The scene draws the same clipped solids.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // EXCAVATION. A hole has to remove real members, or "excavate" is a lie the
+  // soft surface tells and the cut list contradicts: the opening shows on
+  // screen, then the kit arrives solid and priced as solid.
+  //
+  // Pruned BEFORE joint resolution on purpose. The members that survive are the
+  // ones whose ends must be cut and whose lengths get priced — resolving joints
+  // first would compute planes against neighbours that are about to vanish, and
+  // the BOM would quietly bill for them.
+  // ---------------------------------------------------------------------------
+  if (shape?.isHoleAt) {
+    const holed = (m: Member) =>
+      shape.isHoleAt!((m.start[0] + m.end[0]) / 2, (m.start[2] + m.end[2]) / 2);
+    const gone = new Set(members.filter(holed).map((m) => m.id));
+    if (gone.size > 0) {
+      for (let k = members.length - 1; k >= 0; k--) {
+        if (gone.has(members[k].id)) members.splice(k, 1);
+      }
+      for (const n of nodes) n.memberIds = n.memberIds.filter((id) => !gone.has(id));
+      for (const pc of pieces) pc.memberIds = pc.memberIds.filter((id) => !gone.has(id));
+      // A piece with nothing left is not a piece; it must not reach the BOM.
+      for (let k = pieces.length - 1; k >= 0; k--) {
+        if (pieces[k].memberIds.length === 0) pieces.splice(k, 1);
+      }
+      // A node nothing arrives at is not a joint; it must not get a connector.
+      for (let k = nodes.length - 1; k >= 0; k--) {
+        if (nodes[k].memberIds.length === 0) nodes.splice(k, 1);
+      }
+    }
+  }
+
   resolveJointCuts(nodes, members, params.jointSystem);
   const memberById = new Map(members.map((m) => [m.id, m]));
   for (const piece of pieces) {

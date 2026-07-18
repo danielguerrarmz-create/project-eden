@@ -36,6 +36,9 @@ export const routes = {
   engine: '#/engine',
   studio: '#/studio',
   about: '#/about',
+  /** The drawing flow: pick a site, scribble the plan, drag the spines. The
+   *  sliders become a readout of what you drew rather than the design act. */
+  draw: '#/draw',
   /** Direct-manipulation shaping prototype (draggable cage, no sliders). */
   shape: '#/shape',
   /** Form-finding spike: sculpt a control lattice, relax onto a buildable gridshell. */

@@ -15,6 +15,7 @@ import { ENVELOPE, GROWTH } from '../data/config';
 import { runEngine } from '../engine';
 import { DEFAULT_SPECIES_ID, SPECIES_BY_ID } from '../engine/species';
 import type { DesignParams, EngineOutputs, JointSystem } from '../engine/types';
+import type { ShapeField } from '../engine/geometry';
 import type { Year } from '../data/config';
 
 export type OverlayKey = 'strutHeatmap' | 'growth';
@@ -56,17 +57,34 @@ export function paramsFromURL(): DesignParams {
   };
 }
 
+export function queryFor(params: DesignParams): string {
+  return String(
+    new URLSearchParams({
+      a: params.footprintM2.toFixed(1),
+      r: params.riseM.toFixed(2),
+      s: params.strutSpacingM.toFixed(2),
+      ap: String(Math.round(params.apertureDeg)),
+      j: params.jointSystem,
+      sp: params.speciesId,
+      y: String(params.year),
+    }),
+  );
+}
+
+/**
+ * Compose the design URL. Pure, so the hash rule below is actually testable.
+ *
+ * The HASH MUST SURVIVE: routing is hash-based (`#/studio`, `#/draw`), so
+ * dropping it silently navigates the user to the splash the instant they touch
+ * a param. That shipped once — clicking a year on the studio threw you back to
+ * `/?a=15.0&…` with no route at all, and any link you copied went with it.
+ */
+export function composeDesignUrl(pathname: string, params: DesignParams, hash: string): string {
+  return `${pathname}?${queryFor(params)}${hash}`;
+}
+
 function urlFor(params: DesignParams): string {
-  const q = new URLSearchParams({
-    a: params.footprintM2.toFixed(1),
-    r: params.riseM.toFixed(2),
-    s: params.strutSpacingM.toFixed(2),
-    ap: String(Math.round(params.apertureDeg)),
-    j: params.jointSystem,
-    sp: params.speciesId,
-    y: String(params.year),
-  });
-  return `${window.location.pathname}?${q}`;
+  return composeDesignUrl(window.location.pathname, params, window.location.hash);
 }
 
 let urlTimer: ReturnType<typeof setTimeout> | undefined;
@@ -95,6 +113,18 @@ interface DesignState {
   reserved: boolean;
 
   setParam: (key: SliderKey, value: number) => void;
+  /**
+   * Set several params at once. The drawing flow (`#/draw`) derives a whole
+   * DesignParams from linework in one go, so patching key-by-key would run the
+   * engine four times and briefly render states the user never drew.
+   */
+  setParams: (patch: Partial<DesignParams>) => void;
+  /**
+   * Hand the engine a DRAWN shape (engine/shapeFromDrawing). With one, the
+   * generator roots at the bearings that were drawn and lays the lattice on the
+   * sculpted surface; without one it stays parametric. The studio never sets it.
+   */
+  setShape: (shape: ShapeField | undefined) => void;
   setJointSystem: (system: JointSystem) => void;
   setSpecies: (id: string) => void;
   setYear: (year: Year) => void;
@@ -109,9 +139,14 @@ const initialParams = paramsFromURL();
 const initialOutputs = runEngine(initialParams);
 
 export const useDesign = create<DesignState>((set, get) => {
+  // The drawn shape, if any. Held outside the store's reactive state because
+  // it's a bundle of closures, not data to diff — the store only needs it to
+  // be in hand whenever the engine re-runs.
+  let shape: ShapeField | undefined;
+
   /** Run the engine on a param patch; keep the clamped params it returns. */
   const recompute = (patch: Partial<DesignParams>) => {
-    const outputs = runEngine({ ...get().params, ...patch });
+    const outputs = runEngine({ ...get().params, ...patch }, shape);
     const params = { ...outputs.geometry.params };
     writeURL(params);
     return { params, outputs };
@@ -121,13 +156,23 @@ export const useDesign = create<DesignState>((set, get) => {
     // The engine may clamp what the URL asked for; trust the engine.
     params: initialOutputs.geometry.params,
     outputs: initialOutputs,
-    overlays: { strutHeatmap: true, growth: true },
+    // Both OFF by default (round-3 item 6): under the watercolour wash the
+    // heatmap spheres and the old growth blobs read as muddy berries on the
+    // lattice and fight the beauty pass. Still reachable via `setOverlay`.
+    overlays: { strutHeatmap: false, growth: false },
     commissionOpen: false,
 
     reserveEmail: '',
     reserved: false,
 
     setParam: (key, value) => set(recompute({ [key]: value })),
+
+    setParams: (patch) => set(recompute(patch)),
+
+    setShape: (s2) => {
+      shape = s2;
+      set(recompute({}));
+    },
 
     setJointSystem: (jointSystem) => set(recompute({ jointSystem })),
 
@@ -148,7 +193,7 @@ export const useDesign = create<DesignState>((set, get) => {
       console.log('[RESERVE] commission intent captured', {
         email: reserveEmail,
         species: outputs.species.common,
-        fixedPriceGBP: outputs.price.fixedTotalGBP,
+        costBuildUpGBP: outputs.price.costBuildUpGBP,
         dimensions: `${outputs.geometry.spanM} m span × ${outputs.geometry.riseM} m rise`,
         componentCount: outputs.components.totalCount,
         sheets: outputs.nesting.sheets.length,
@@ -164,7 +209,7 @@ export const useDesign = create<DesignState>((set, get) => {
         return {
           params: outputs.geometry.params,
           outputs,
-          overlays: { strutHeatmap: true, growth: true },
+          overlays: { strutHeatmap: false, growth: false },
           commissionOpen: false,
           reserved: false,
           reserveEmail: '',

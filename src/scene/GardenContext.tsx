@@ -15,7 +15,24 @@ import { useDesign } from '../state/store';
 
 const DEG = Math.PI / 180;
 
-export function GardenContext({ showNorthMarker = true }: { showNorthMarker?: boolean } = {}) {
+export function GardenContext({
+  showNorthMarker = true,
+  bedColor = '#5b4632',
+}: {
+  showNorthMarker?: boolean;
+  /**
+   * Tilled earth at each foot. A prop, and defaulted to the original, because
+   * how dark this reads is a function of the RIG it is lit by, and there are
+   * now two. Under the house rig (HeroScene, ambient 0.74) `#5b4632` is soil.
+   * Under `/draw`'s retuned rig (ambient 0.32, so the lattice's cast shadow
+   * can read as dark) the same colour bottoms out near black and the beds
+   * stop looking like planting and start looking like craters punched in the
+   * lawn — the darkest thing in frame, pulling the eye to the ground and off
+   * the object. `/draw` passes a lighter one. Do not "fix" this by changing
+   * the default: that would drag HeroScene along with it.
+   */
+  bedColor?: string;
+} = {}) {
   const geo = useDesign((s) => s.outputs.geometry);
 
   // A planting bed just outside the eave at each foot bearing.
@@ -59,7 +76,7 @@ export function GardenContext({ showNorthMarker = true }: { showNorthMarker?: bo
       {beds.map((p, i) => (
         <mesh key={i} position={[p[0], p[1], p[2]]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.34, 16]} />
-          <meshStandardMaterial color="#5b4632" roughness={1} />
+          <meshStandardMaterial color={bedColor} roughness={1} />
         </mesh>
       ))}
 

@@ -12,6 +12,18 @@ dist-ssr
 # INTERNAL DOCS -- this repo is PUBLIC. Candid internal material (audits, stress
 # tests, accelerator application drafts, reviews of Clay's work) lives in the
 # PRIVATE `bower-docs` repo, mirrored from ~/restless-egg/docs. Never commit it here.
+#
+# THE RULES BELOW PROTECT BY FILENAME PREFIX, AND THAT IS NOT ENOUGH. A doc is
+# candid because of what it SAYS, not what it is called, so a new candid doc
+# under any other name is unprotected by default. This is not hypothetical:
+# 2026-07-17-redlining-direction.md quoted brief-for-evaluators.md and stated
+# the placeholder-rate / ~6x pricing gap outright, matched none of these
+# patterns, and sat untracked-but-committable on a branch about to be pushed.
+# It now lives in bower-docs/handoffs/.
+#
+# So: put candid material in docs/private/ (ignored wholesale, below), and mirror
+# it to bower-docs. Do not rely on inventing a matching filename.
+docs/private/
 docs/audit-*
 docs/stress-test-*
 docs/re-application-*
@@ -19,3 +31,4 @@ docs/pr-*-review-*
 docs/handoff-clay-*
 docs/brief-for-evaluators.md
 qa-*.mjs
+docs/**/*-redlining-direction.md

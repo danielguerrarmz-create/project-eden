@@ -1,0 +1,860 @@
+/**
+ * DrawPage.tsx — `#/draw`. You open on a lawn and start making.
+ *
+ * WHY. The studio opens on four sliders. Four sliders is a Grasshopper
+ * definition with better type: the design act collapses into number entry, the
+ * tool contributes arithmetic, and an artist has nothing to do.
+ *
+ * So: no setup, no wizard, no numbers. Drag a line across the lawn and an arc
+ * stands up. Drag a second and a SURFACE appears between them — blended, not
+ * unioned, so it swells where they cross and reads as one vault rather than
+ * two ribs. Then keep going: more lines grow it, lift raises it under your
+ * hand, excavate opens it. The thing stays SOFT the whole time.
+ *
+ * Baking is the last move, not the second. The old flow went from two arcs
+ * straight to a manufacturable kit, which meant the interesting part — making
+ * — lasted about four seconds. Now the kit is something you ask for when
+ * you're done: hit bake and the soft surface becomes the real gridshell, with
+ * nodes, joints, a cut list and a price.
+ *
+ * Everything the grammar decides is said out loud, because an engine that
+ * silently snaps your line to its bounds is a slider wearing a costume.
+ *
+ * THE MODEL (settled 2026-07-16): the arcs are the GESTURE, not the ribs. Your
+ * lines answer where it lands, how much ground it claims and how high it goes;
+ * the engine raises its own canopy over that plan with the rules the built
+ * thing obeys — eave up between the legs, diving only at the feet. Bake runs
+ * the drawing through the REAL engine (generateGeometry -> nesting -> pricing)
+ * with a ShapeField, so the lattice roots at your bearings, fills your plan,
+ * lies on the sculpted surface and loses members to your holes. NOT faked:
+ * the surface, the sculpt, and every number the bake reports.
+ *
+ * The site step is parked (engine/site.ts + draw/SiteMap.tsx still exist, and
+ * still have their tests) — scaffold to come back to.
+ */
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
+import { SplashHeader } from './splash/SplashHeader';
+import { DrawStage, type Tool } from './draw/DrawStage';
+import { useSpaceHeld } from './draw/useSpaceHeld';
+import { StudioEnvironment } from './draw/StudioEnvironment';
+import { PlacedScaleFigure } from './draw/PlacedScaleFigure';
+import { BakeReveal, REVEAL_S } from './draw/BakeReveal';
+import { ExplodeReveal } from './draw/ExplodeReveal';
+import { makeRevealUniforms } from '../scene/revealShader';
+import { explodeDistanceM, makeExplodeUniforms } from '../scene/explodeShader';
+import { CinematicCamera } from './draw/CinematicCamera';
+import { InkPass } from '../scene/npr/InkPass';
+import { GradientSky, SKY_HORIZON_COLOR } from '../scene/npr/GradientSky';
+import { RAIL_LINES, TOOLS, explodeReadout } from './draw/toolCopy';
+import { surfaceSamples, type Framing } from './draw/framing';
+import {
+  COMMISSION_DEMO_LABEL,
+  commissionDemoFigureGBP,
+  commissionDemoLabel,
+  priceMetaLine,
+} from '../ui/priceCopy';
+import { useCountUp } from '../ui/useCountUp';
+import { getSpecies } from '../engine/species';
+import { SpeciesRail } from './draw/SpeciesRail';
+import { PlantGrowth } from './draw/PlantGrowth';
+import { Folly } from '../scene/Folly';
+import { GardenContext } from '../scene/GardenContext';
+import { webglSupported } from '../ui/webgl';
+import { useCanvasSizeGuard } from '../ui/useCanvasSizeGuard';
+import { readDrawing, type Spine } from '../engine/fromDrawing';
+import type { Vec3 } from '../engine/types';
+import {
+  isHole,
+  surfaceAreaM2,
+  surfaceBounds,
+  surfaceHeight,
+  surfacePeakM,
+  type Edit,
+  type SurfaceInput,
+} from '../engine/surface';
+import { shapeFromDrawing } from '../engine/shapeFromDrawing';
+import { useDesign } from '../state/store';
+
+// The toolbar's words and the rail's live in `draw/toolCopy.ts`, where the
+// DOM-free suite can pin them. The sculpt hint in particular is the
+// highest-leverage sentence in the product and was wrong for months; that
+// module's header carries the reasoning.
+
+/** The opening shot. Authored, not derived: it frames the empty lawn. */
+const HOME: Framing = { kind: 'pose', position: [5.6, 3.6, 6.6], target: [0, 1.0, 0] };
+/**
+ * Air left round the object, on whichever axis binds. Measured, not guessed:
+ * 1.08 filled 93% of frame height and put the crown and the near foot within a
+ * few pixels of the edges, which reads as a crop rather than a composition.
+ * 1.22 lands the baked lattice at about three quarters of the frame with an
+ * even band top and bottom, and leaves room for the lattice to breathe as the
+ * turntable brings its wider axis round.
+ */
+const FRAME_MARGIN = 1.22;
+/**
+ * How high the camera may climb. `maxPolarAngle` already stopped it going
+ * underground; nothing stopped it going straight up, and it went all the way:
+ * measured at exactly 0 rad, a dead plan view.
+ *
+ * WHY CLAMP AT ALL. Straight down is degenerate, not merely unflattering. At
+ * polar 0 the view direction is parallel to the rig's up vector, so azimuth
+ * stops being defined and the object can spin under a gesture that only meant
+ * to tilt. It is also a trap with no handle: there is no horizon left to grab
+ * and no obvious way back out.
+ *
+ * WHY 30° AND NOT MORE, WHICH IS THE TEMPTING MISTAKE. Shot across the range,
+ * the SOFT canopy does not read from anywhere above ~50°: its eave, the whole
+ * point of the form, is edge-on and the skin is an untextured beige mass, so
+ * 40° and 15° are equally a blob. That argues for clamping at 50°. It would be
+ * the wrong fix. The skin is illegible from above because it has no detail,
+ * which is a material question, and the BAKED lattice — the thing actually on
+ * camera — reads beautifully steep: at 25° the oculus, the diagrid and every
+ * node are crisp. Clamping to 50° would spend the kit's best views paying for
+ * the skin's missing texture.
+ *
+ * So the clamp only removes what is genuinely broken. 30° keeps every view
+ * that measured well and deletes the singularity.
+ */
+const MIN_POLAR = Math.PI / 6;
+
+/**
+ * The pre-bake fog tone: the page's own `paper` (#F6F4EE, the body background).
+ * Pre-bake the far lawn should dissolve into paper, NOT darken — a darker far
+ * ground over-hatches in the sketch pass into faint grey plaid. At bake the fog
+ * lerps to SKY_HORIZON_COLOR so the ground melts into the sky instead.
+ */
+const FOG_PAPER = '#F6F4EE';
+
+export function DrawPage() {
+  const [arcs, setArcs] = useState<Spine[]>([]);
+  const [edits, setEdits] = useState<Edit[]>([]);
+  const [tool, setTool] = useState<Tool>('draw');
+  const [baked, setBaked] = useState(false);
+
+  // Without this, loading into a non-rendering tab leaves the canvas dead at
+  // 300x150 for the life of the page. See the hook — it's not paranoia, it's
+  // reproducible.
+  useCanvasSizeGuard();
+
+  const surface: SurfaceInput = useMemo(() => ({ arcs, edits }), [arcs, edits]);
+
+  // The soft thing's own measurements — live, and true of what's on screen.
+  const areaM2 = useMemo(() => surfaceAreaM2(surface), [surface]);
+  const peakM = useMemo(() => surfacePeakM(surface), [surface]);
+
+  // What the engine WOULD build. Computed live so bake is instant and the
+  // nudges can talk before you commit, but only rendered once you ask.
+  const read = useMemo(
+    () => readDrawing({ spines: arcs, outline: undefined }),
+    [arcs],
+  );
+
+  const setParams = useDesign((s) => s.setParams);
+  const setShape = useDesign((s) => s.setShape);
+  const outputs = useDesign((s) => s.outputs);
+  useEffect(() => {
+    if (!baked) return;
+    // The drawing IS the input. Hand the generator the shape, not just a
+    // footprint number — otherwise it spreads feet evenly round an ellipse and
+    // raises its own dome, and everything you sculpted was decoration.
+    setShape(shapeFromDrawing(surface));
+    setParams(read.params);
+  }, [baked, read.params, surface, setParams, setShape]);
+
+  const soft = arcs.length > 0 && !baked;
+  const canBake = arcs.length >= 2 && !baked;
+  const activeHint = TOOLS.find((t) => t.id === tool)!.hint;
+
+  // --- The pointer. Left drag makes; right drag and space-drag look.
+  const { held: spaceHeld, heldRef: spaceHeldRef } = useSpaceHeld();
+  // Only so the hand can close while it turns. Window-level, because the
+  // release that matters most is the one that happens off the canvas.
+  const [pressing, setPressing] = useState(false);
+  useEffect(() => {
+    const down = () => setPressing(true);
+    const up = () => setPressing(false);
+    window.addEventListener('pointerdown', down);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    window.addEventListener('blur', up);
+    return () => {
+      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      window.removeEventListener('blur', up);
+    };
+  }, []);
+
+  /**
+   * System cursors only. The hand says "you are about to move the view, not
+   * the thing"; the crosshair says "this gesture lands somewhere precise".
+   * Once baked there is no tool, so the pointer stops promising one.
+   */
+  const cursor = spaceHeld
+    ? pressing
+      ? 'cursor-grabbing'
+      : 'cursor-grab'
+    : baked
+      ? 'cursor-default'
+      : 'cursor-crosshair';
+
+  // THE GUIDANCE RAIL, ARMED AT MOUNT (spec F2). It is now the very first thing
+  // on screen, before a single line is drawn — first contact has to teach
+  // navigation, and the old "wait for the first canopy" trigger taught nothing
+  // in exactly the seconds someone is deciding how to approach the lawn. It arms
+  // on mount and on every "start over" (via `armNonce`), auto-hides after 6.5s,
+  // and dismisses the instant the viewer orbits or drags (OrbitControls
+  // onStart). NOT persisted to localStorage on purpose — a take has to be
+  // reproducible with a reload, the same reason "start over" returns to the
+  // opening pose.
+  const [hintUp, setHintUp] = useState(false);
+  const [armNonce, setArmNonce] = useState(0);
+  useEffect(() => {
+    if (baked) return;
+    setHintUp(true);
+    const t = setTimeout(() => setHintUp(false), 6500);
+    return () => clearTimeout(t);
+  }, [baked, armNonce]);
+
+  // --- The bake dissolve. The skin does NOT unmount when `baked` flips; it
+  // stays for the length of the reveal, fading, while the lattice sweeps up
+  // out of the ground through it. `dissolving` is what keeps it mounted.
+  const revealUniforms = useMemo(() => makeRevealUniforms(), []);
+  // The explode's own clock, deliberately not the bake's: the bake is a one-shot
+  // narrative beat, this is a repeatable toggle you reach for afterwards.
+  const explodeUniforms = useMemo(() => makeExplodeUniforms(), []);
+  const [exploded, setExploded] = useState(false);
+  const explodeProgressRef = useRef(0);
+  const skinFadeRef = useRef(1);
+  const revealProgressRef = useRef(0);
+  const [dissolving, setDissolving] = useState(false);
+  useEffect(() => {
+    if (!baked) {
+      setDissolving(false);
+      return;
+    }
+    setDissolving(true);
+    // Unmount the skin once it is fully invisible. A timer rather than a
+    // per-frame state write: the ref is already driving the pixels, and this
+    // only needs to fire once, at the end.
+    const t = setTimeout(() => setDissolving(false), (REVEAL_S + 0.1) * 1000);
+    return () => clearTimeout(t);
+  }, [baked]);
+
+  // --- The commission figure, made dynamic (demo-only, priceCopy.ts §6). Reads
+  // live off the baked kit and the selected species, so a species swap or a
+  // different draw moves it. Longer tween right after bake (settles as the
+  // lattice finishes sweeping up, 1100 ms sits just under REVEAL_S), quicker
+  // 550 ms for a later species change. Reuses the existing `dissolving` flag.
+  const commissionTarget = commissionDemoFigureGBP({
+    footprintM2: outputs.geometry.params.footprintM2,
+    pieceCount: outputs.geometry.pieces.length,
+    nodeCount: outputs.geometry.nodes.length,
+    speciesStemLoad01: getSpecies(outputs.geometry.params.speciesId).stemLoad01,
+  });
+  const commissionDisplay = useCountUp(commissionTarget, dissolving ? 1100 : 550);
+
+  // --- Camera. The object should fill the frame, and it should move once baked.
+  const [framing, setFraming] = useState<Framing>(HOME);
+  const [turntable, setTurntable] = useState(false);
+
+  // The framing effects fire on a COUNT changing, not on the surface changing,
+  // so a lift or an excavate never yanks the camera out from under the hand
+  // doing it. They still need today's surface to measure, so keep it in a ref
+  // and sync it first: effects run top to bottom within a component.
+  const latest = useRef({ surface, peakM });
+  useEffect(() => {
+    latest.current = { surface, peakM };
+  });
+
+  // The canopy has appeared, or grown another line. Frame the soft thing.
+  useEffect(() => {
+    if (baked || arcs.length < 2) return;
+    const input = latest.current.surface;
+    const points = surfaceSamples(
+      surfaceBounds(input),
+      (p) => surfaceHeight(input, p),
+      (p) => isHole(input, p),
+    );
+    if (points.length === 0) return; // nothing standing yet; leave the camera be
+    setFraming({ kind: 'fit', points, margin: FRAME_MARGIN });
+  }, [arcs.length, baked]);
+
+  // Baked. Frame the REAL kit, which is not the size of the skin it replaced.
+  // Keyed on the geometry rather than on `baked`, because at the render where
+  // baked flips true the store still holds the previous geometry: the effect
+  // that feeds it the drawing has not run yet. Framing on `baked` alone would
+  // fit the frame to whatever the studio was last showing.
+  useEffect(() => {
+    if (!baked) return;
+    // The nodes ARE the object: fitting their box instead would reserve a third
+    // of the frame for the empty corners a dome never reaches.
+    //
+    // Exploded, the object is bigger, so the frame has to open with it or the
+    // outermost pieces leave the shot at the moment they become the point. The
+    // exploded point set is computed ANALYTICALLY — every node plus its own
+    // normal times the travel — rather than measured off the GPU mid-tween:
+    // the destination is known before the first frame moves, so the camera and
+    // the pieces glide on their own clocks to a frame that already fits.
+    const distM = exploded ? explodeDistanceM(outputs.geometry.planB) : 0;
+    setFraming({
+      kind: 'fit',
+      points: outputs.geometry.nodes.map((n) =>
+        exploded
+          ? ([
+              n.position[0] + n.normal[0] * distM,
+              n.position[1] + n.normal[1] * distM,
+              n.position[2] + n.normal[2] * distM,
+            ] as Vec3)
+          : n.position,
+      ),
+      margin: FRAME_MARGIN,
+    });
+  }, [baked, exploded, outputs.geometry]);
+
+  // Start over: back to the opening shot, so the next take opens where the
+  // last one did. The lawn has no object to fit, so this pose is authored.
+  //
+  // THE RAIL RE-ARMS HERE, AND THAT IS A FILM-DAY BUG FIX, not tidiness. A
+  // second take shot without a page reload used to lose the guidance; bumping
+  // `armNonce` on the return to the empty lawn re-runs the show effect so every
+  // take reproduces it. This is the same reason the hint is not persisted to
+  // localStorage: a take has to be reproducible, and "reproducible" has to
+  // include the second one. (Verified the reset still fires under the new
+  // mount-trigger, spec F4.)
+  useEffect(() => {
+    if (arcs.length === 0 && !baked) {
+      setFraming(HOME);
+      setTurntable(false);
+      // Re-arm the rail for the next take: bumping the nonce re-runs the show
+      // effect (F4). The effect owns hintUp now, so this does not touch it.
+      setArmNonce((n) => n + 1);
+    }
+  }, [arcs.length, baked]);
+
+  return (
+    <div className="relative min-h-screen w-full bg-paperVellum text-inkBlack">
+      <SplashHeader />
+
+      <div className="relative h-[100svh] w-full overflow-hidden pt-[var(--header-h)]">
+        <div className="relative h-full w-full p-3">
+          <div className="relative h-full w-full overflow-hidden rounded-2xl border border-inkBlack/12">
+            {webglSupported() ? (
+              <Canvas
+                // "soft" explicitly, not the bare boolean: the shadow's edge is
+                // a PCF filter kernel, and which kernel you get is the whole
+                // difference between an edge and a smear. Do not assume the
+                // boolean resolves to PCFSoft. The watercolour pass wants a
+                // softer, painterly shadow still, so `onCreated` swaps the map
+                // type to VSM (spec A5) — a renderer flag, zero bundle cost.
+                shadows="soft"
+                onCreated={({ gl }) => {
+                  gl.shadowMap.type = THREE.VSMShadowMap;
+                }}
+                dpr={[1, 2]}
+                camera={{ position: [5.6, 3.6, 6.6], fov: 42 }}
+                className={`!absolute inset-0 ${cursor}`}
+                resize={{ debounce: 0, scroll: false }}
+                // Right-drag is the orbit, so the right button must not also
+                // summon the browser's menu on top of the shot mid-gesture.
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                {/* Enscape-style watercolour sky (round 4): a blue gradient the
+                    ink pass paints, replacing the flat paper background. */}
+                <GradientSky />
+                {/* Fog, recoloured across the bake by `revealProgressRef` — the
+                    same clock the wash comes in on. Pre-bake (sketch) it is
+                    paper so the far lawn dissolves into the page instead of
+                    darkening into the sketch's cross-hatch; at bake it lerps to
+                    the sky's horizon tone so the ground disc's outer edge melts
+                    into the sky. A per-frame lerp, not a hard swap on `baked`,
+                    so it crossfades instead of popping mid-dissolve. */}
+                <BakeFog progressRef={revealProgressRef} />
+                {/* THE RIG. Flat fill used to outweigh the key (0.8 ambient +
+                    0.7 hemisphere = 1.5 against 1.35), so the shadow the
+                    engine already computes never got to read as dark. This is
+                    scoped to this Canvas on purpose: HeroScene keeps the house
+                    rig. */}
+                <ambientLight intensity={0.32} />
+                <directionalLight
+                  // Raking, ~36° altitude: late-afternoon, and honest — the
+                  // repo's own sunpath peaks near 62° at noon, so this is the
+                  // shoulder of the day, not an invented angle. Near-overhead
+                  // (the old [6,10,5]) kills the shadow's length, which is the
+                  // most beautiful thing the lattice has to give.
+                  position={[9, 6.5, -3]}
+                  intensity={1.9}
+                  castShadow
+                  shadow-mapSize={[2048, 2048]}
+                  // Sized to the object, not to Three's default ±5/far-500.
+                  // Same 2048 texels, spent on 11 m instead of scattered over
+                  // half a kilometre of empty space: this is most of why the
+                  // shadow was a blob.
+                  shadow-camera-left={-11}
+                  shadow-camera-right={11}
+                  shadow-camera-top={11}
+                  shadow-camera-bottom={-11}
+                  shadow-camera-near={1}
+                  shadow-camera-far={26}
+                  shadow-bias={-0.0004}
+                  shadow-normalBias={0.02}
+                  // VSM reads its softness from the blur radius + sample count
+                  // (PCF ignored these). A wide radius gives the painterly,
+                  // feathered shadow the watercolour look wants. Eyeball-tunable.
+                  shadow-radius={8}
+                  shadow-blurSamples={16}
+                />
+                {/* Rim: separates timber from vellum and catches member edges.
+                    No shadow map, so it costs one light and nothing else. */}
+                <directionalLight position={[-7, 4, 6]} intensity={0.35} />
+                <hemisphereLight args={['#fbfaf5', '#d8cfae', 0.7]} />
+                <StudioEnvironment />
+
+                <DrawStage
+                  arcs={arcs}
+                  edits={edits}
+                  tool={tool}
+                  enabled={!baked}
+                  // `resolved` retires the lawn and the arcs at bake, but the
+                  // SKIN has to outlive it by the length of the dissolve — it
+                  // is the thing being dissolved.
+                  resolved={baked}
+                  keepSkin={dissolving}
+                  skinFadeRef={skinFadeRef}
+                  spaceHeldRef={spaceHeldRef}
+                  onArc={(s) => setArcs((xs) => [...xs, s])}
+                  onEdit={(e) => setEdits((xs) => [...xs, e])}
+                />
+
+                <BakeReveal
+                  active={baked}
+                  peakM={peakM}
+                  uniforms={revealUniforms}
+                  fadeRef={skinFadeRef}
+                  progressRef={revealProgressRef}
+                />
+
+                <ExplodeReveal
+                  active={exploded}
+                  uniforms={explodeUniforms}
+                  progressRef={explodeProgressRef}
+                />
+
+                {/* The bake: soft surface out, real kit in — and the ground
+                    resolves with it. The soft phase keeps its plain green
+                    disc deliberately: loose ground invites editing, polished
+                    ground stops it, which is the same law that makes bake a
+                    resolution rather than a jump-cut. DrawStage's own lawn is
+                    gated on !resolved so these two never sit coplanar. */}
+                {/* Both passes, on the same materials. `Folly` applies the
+                    reveal first and CHAINS the explode onto it — see
+                    explodeShader.ts; assigning would have deleted the reveal. */}
+                {/* No `onSelectPiece` for the demo: the per-piece money hop was
+                    dropped from the panel, and without a handler R3F does not
+                    raycast the members, so a stray click on the kit can't select
+                    a part that has nowhere to report to. */}
+                {baked && (
+                  <Folly
+                    // VISIBLE STEEL for the demo (Daniel, 2026-07-17): the
+                    // round-3 concealed timber collars read as pale blobs and a
+                    // true embedded-joinery mock is out of scope for the demo, so
+                    // show the real hub connectors — core drums, fins, bolt pairs,
+                    // dome nuts — the FABRICATION.md kit, matching his reference
+                    // (visible black-steel diagrid hubs). One switch; the concealed
+                    // path stays in Folly, unmounted.
+                    hardwareVisible
+                    revealUniforms={revealUniforms}
+                    explodeUniforms={explodeUniforms}
+                  />
+                )}
+                {baked && <GardenContext showNorthMarker={false} bedColor="#7d6b52" />}
+                {/* The living layer, per species and per year. Bake-only and
+                    hidden while exploded or dissolving: foliage anchored to the
+                    pre-explode strut field would hang over scattered pieces. */}
+                {baked && !exploded && !dissolving && <PlantGrowth />}
+                {/* A dome renders identically at 3 m and at 30 m. One person
+                    and it snaps to human scale. Bake only: see the file. */}
+                {baked && <PlacedScaleFigure />}
+
+                {/* TWO passes, doing two different jobs. The wide soft one
+                    grounds the whole object in its setting; it is bad at
+                    contact, because a blur that wide has no idea where the
+                    foot actually meets the earth. The tight one is the
+                    ambient-occlusion stand-in: short `far`, small blur, so it
+                    only darkens where something is genuinely NEAR the ground.
+                    Two render-to-texture passes, no new dependency, no
+                    postprocessing pass to go black on the capture machine.
+
+                    Honest limit: this darkens the GROUND under the lattice,
+                    never member against member. Real AO would do both. At
+                    1440x900 for ten seconds the eye checks ground contact
+                    first and never gets to the second read. */}
+                <ContactShadows
+                  position={[0, 0.015, 0]}
+                  opacity={0.24}
+                  scale={22}
+                  blur={2.6}
+                  far={8}
+                  color="#5a5443"
+                />
+                <ContactShadows
+                  position={[0, 0.016, 0]}
+                  opacity={0.55}
+                  scale={5}
+                  blur={0.6}
+                  far={1.3}
+                  color="#4a4436"
+                />
+                <OrbitControls
+                  makeDefault
+                  target={[0, 1.0, 0]}
+                  minDistance={4}
+                  maxDistance={18}
+                  minPolarAngle={MIN_POLAR}
+                  maxPolarAngle={Math.PI / 2.05}
+                  enablePan={false}
+                  // THE ORBIT. OrbitControls binds RIGHT to PAN by default, and
+                  // pan is off here (deliberately: there is one object and it is
+                  // at the origin), so the right button drove a disabled action
+                  // and did nothing at all. That, plus DrawStage claiming every
+                  // button, is why there was no way to turn the object.
+                  // LEFT is ROTATE too; DrawStage takes it back for the tool
+                  // unless space is held, so this is the space-hold orbit.
+                  mouseButtons={{
+                    LEFT: THREE.MOUSE.ROTATE,
+                    MIDDLE: THREE.MOUSE.DOLLY,
+                    RIGHT: THREE.MOUSE.ROTATE,
+                  }}
+                  // Without damping the view stops dead on pointer-up, which
+                  // makes a hand-turned object feel like a stepper motor.
+                  enableDamping
+                  dampingFactor={0.07}
+                  // The turntable yields to the person, instantly and for good.
+                  // OrbitControls fires this on the pointer going down, before
+                  // any movement, so the object never fights the first drag.
+                  //
+                  // The rail goes with it: guidance that has been OBEYED should
+                  // stop talking. That is `fromDrawing.ts:205-207`'s rule for the
+                  // engine's nudges ("an engine that only talks when it overrules
+                  // you reads as a validator") applied to chrome — it answers to
+                  // being followed, not only to a clock, so a confident take
+                  // clears the frame the instant the viewer acts.
+                  //
+                  // `onStart` and NOT `onChange`: onStart fires only on real
+                  // pointer/wheel input, never on the programmatic camera moves
+                  // the framing effects make. onChange fires on those too, and
+                  // would dismiss the rail before anyone had read it.
+                  onStart={() => {
+                    setTurntable(false);
+                    setHintUp(false);
+                  }}
+                />
+                {/* After OrbitControls on purpose: it must exist before this
+                    can read it. */}
+                <CinematicCamera framing={framing} turntable={turntable} />
+
+                {/* The watercolour/sketch pass. Takes over rendering (priority
+                    1 useFrame) so it must mount last, after everything it draws
+                    exists. uMode rides `revealProgressRef`: pure sketch (0)
+                    while soft, crossfading to pure wash (1) across the bake
+                    reveal — the same clock the lattice sweeps up on. The reveal
+                    and explode uniforms go in so the edge G-buffer clips and
+                    travels exactly as the timber does. */}
+                <InkPass
+                  // WASH MODE THROUGHOUT (2026-07-17, Daniel): the pencil-sketch
+                  // pre-bake read as illegible cross-hatch plaid — "you cannot
+                  // tell what the screen is". The drawing phase now uses the SAME
+                  // watercolour wash as the baked result, so before-bake looks
+                  // like after-bake and stays legible. uMode is left at its
+                  // default (1 = wash); dropping `modeRef` retires the
+                  // sketch->wash crossfade. The reveal/explode uniforms still
+                  // drive the geometry sweep, independent of the ink mode.
+                  revealUniforms={revealUniforms}
+                  explodeUniforms={explodeUniforms}
+                />
+              </Canvas>
+            ) : (
+              <div className="grid h-full place-items-center p-6">
+                <p className="max-w-sm text-center text-sm text-inkBlack/70">
+                  The 3D view needs WebGL. Try a current Chrome, Edge, Firefox or Safari.
+                </p>
+              </div>
+            )}
+
+            {/* One line of instruction, and it goes away once it's obeyed. */}
+            {!baked && (
+              <p className="pointer-events-none absolute inset-x-0 top-5 mx-auto max-w-[44ch] text-center font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/55">
+                {arcs.length === 0
+                  ? 'drag a line across the lawn'
+                  : arcs.length === 1
+                    ? 'one more, crossing it'
+                    : activeHint}
+              </p>
+            )}
+
+            {/* THE GUIDANCE RAIL. How to LOOK at and work the thing, said
+                quietly on the left edge from the very first frame (spec F2),
+                then gone once obeyed.
+
+                It deliberately is NOT the nudge panel: that is the engine's read
+                of YOUR DRAWING, and it only speaks after bake. Operating
+                instructions are neither, and folding them in would make one
+                panel speak in two registers and arrive too late to help anyone
+                sculpt.
+
+                The first line now also names what left-drag does, and both turn
+                paths, because they are not the same user: right-drag is the
+                mouse's, space is the trackpad's, where two-finger drag is a
+                wheel event and already means zoom. It never promises pan, which
+                this canvas does not have. Mounted whenever soft; `hintUp` fades
+                it. */}
+            {!baked && (
+              <div
+                // A faint vellum backing so the rail keeps contrast where it
+                // crosses the sketched horizon line pre-bake (live QA); text
+                // lifted to /55 for the same reason.
+                className={`pointer-events-none absolute left-4 top-1/2 max-w-[26ch] -translate-y-1/2 space-y-2 rounded-lg bg-paperVellum/55 px-3 py-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-inkBlack/55 backdrop-blur-sm transition-opacity duration-700 ${
+                  hintUp ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                {RAIL_LINES.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Tools. Only once there's something to work on. */}
+            {soft && (
+              <div className="absolute left-1/2 top-14 flex -translate-x-1/2 gap-1.5">
+                {TOOLS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTool(t.id)}
+                    className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] backdrop-blur transition ${
+                      tool === t.id
+                        ? 'border-inkBlack/60 bg-inkBlack text-paperVellum'
+                        : 'border-inkBlack/20 bg-paperVellum/80 hover:border-inkBlack/50'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Baked: the plant rail on the right edge, out of the drawing
+                workflow. Hidden while exploded or dissolving so it never sits
+                over the cascade. */}
+            {baked && !exploded && !dissolving && <SpeciesRail />}
+
+            {/* What it is, while it's still soft. Two numbers, both true. */}
+            {soft && (
+              <div className="absolute bottom-4 left-4 rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-inkBlack/45">
+                  {areaM2.toFixed(1)} m² · {peakM.toFixed(2)} m tall
+                </p>
+                <p className="mt-0.5 font-mono text-[9px] tracking-[0.02em] text-inkBlack/35">
+                  {arcs.length} {arcs.length === 1 ? 'line' : 'lines'}
+                  {edits.length > 0 && ` · ${edits.length} ${edits.length === 1 ? 'edit' : 'edits'}`}
+                  {' · not built yet'}
+                </p>
+              </div>
+            )}
+
+            {/* Baked: what the engine actually made of it. */}
+            {baked && (
+              <>
+                <div className="absolute left-4 top-4 max-w-[290px] rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-3.5 py-2.5 backdrop-blur">
+                  <ul className="space-y-1.5">
+                    {read.nudges.slice(0, 3).map((n, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span
+                          className={`mt-[5px] h-1 w-1 shrink-0 rounded-full ${
+                            n.kind === 'held'
+                              ? 'bg-[#b8402f]'
+                              : n.kind === 'offered'
+                                ? 'bg-[#7d8e5b]'
+                                : 'bg-inkBlack/30'
+                          }`}
+                        />
+                        <span className="text-[11px] leading-snug text-inkBlack/70">{n.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="absolute bottom-4 left-4 max-w-[300px] rounded-xl border border-inkBlack/12 bg-paperVellum/85 px-4 py-3 backdrop-blur">
+                  {/* DEMO PANEL (2026-07-17). Deliberately minimal: one general
+                      commission figure and one quiet line of true geometry.
+                      Daniel, for a very short demo video: "assume a general
+                      £150,000 figure and do not get into specifics of pricing.
+                      This is for a very short demo, does not have to be true."
+
+                      The computed cost-to-construct summary, the itemized
+                      disclosure, the per-piece money hop, the cost-to-commission
+                      bridge, the stewardship line and the demo-scope note were
+                      all here until this commit. They live in git history and
+                      this CONSCIOUSLY SUPERSEDES the price-honesty pass FOR THE
+                      DEMO — it is not a silent reversal. See
+                      docs/handoffs/2026-07-17-demo-simplification.md and the
+                      COMMISSION_DEMO_FIGURE note in ui/priceCopy.ts. The build-up
+                      machinery (priceCopy.ts, costAttribution.ts) is kept and
+                      still tested; rollup drops the now-unused exports. */}
+                  <div className="flex items-baseline gap-2.5">
+                    {/* tabular-nums so the figure holds its width while the
+                        count-up ticks; without it the digits jitter. */}
+                    <p className="font-serif text-[26px] leading-none tabular-nums">
+                      {commissionDemoLabel(Math.round(commissionDisplay))}
+                    </p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/55">
+                      {COMMISSION_DEMO_LABEL}
+                    </p>
+                  </div>
+                  {/* The one quiet supporting line, and it is TRUE: every count
+                      is read off the baked kit, no pricing claim in it. It films
+                      well and grounds the figure without getting into specifics. */}
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-inkBlack/45">
+                    {priceMetaLine({
+                      footprintM2: outputs.geometry.params.footprintM2,
+                      feetCount: outputs.geometry.feetCount,
+                      pieceCount: outputs.geometry.pieces.length,
+                      nodeCount: outputs.geometry.nodes.length,
+                    })}
+                  </p>
+                  {/* The assembly sequence, part of the explode star, told in
+                      the panel the eye is already on rather than as floating 3D
+                      callouts. Only present while exploded. */}
+                  {exploded && (
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accentOlive">
+                      {explodeReadout(outputs.geometry.ringCount)}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Actions. */}
+            <div className="absolute bottom-4 right-4 flex gap-1.5">
+              {!baked && (arcs.length > 0 || edits.length > 0) && (
+                <Chip
+                  onClick={() =>
+                    edits.length > 0
+                      ? setEdits((xs) => xs.slice(0, -1))
+                      : setArcs((xs) => xs.slice(0, -1))
+                  }
+                >
+                  undo
+                </Chip>
+              )}
+              {canBake && (
+                <Chip
+                  onClick={() => {
+                    setBaked(true);
+                    setTurntable(true);
+                  }}
+                  strong
+                >
+                  bake it
+                </Chip>
+              )}
+              {baked && (
+                <>
+                  {/* The two export chips lived here until 2026-07-17. Removed on
+                      Daniel's call: "we will have that later." The engine side
+                      (`engine/exportProject.ts`) is deliberately KEPT — see its
+                      header. Nothing imports it now, so it costs zero bundle. */}
+                  {/* Gated on the dissolve being FINISHED, not just on `baked`:
+                      exploding a structure that is still sweeping up out of the
+                      ground would run two clocks over the same vertices and read
+                      as a glitch rather than as either move. */}
+                  {!dissolving && (
+                    <Chip onClick={() => setExploded((x) => !x)}>
+                      {exploded ? 'reassemble' : 'explode'}
+                    </Chip>
+                  )}
+                  <Chip
+                    onClick={() => {
+                      setBaked(false);
+                      setExploded(false); // a soft surface has nothing to explode
+                      setTurntable(false); // you cannot sculpt a moving target
+                    }}
+                  >
+                    keep sculpting
+                  </Chip>
+                </>
+              )}
+              {(arcs.length > 0 || edits.length > 0) && (
+                <Chip
+                  onClick={() => {
+                    setArcs([]);
+                    setEdits([]);
+                    setBaked(false);
+                    setTool('draw');
+                  }}
+                >
+                  start over
+                </Chip>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The scene fog, recoloured across the bake (Task A). A component with a
+ * per-frame colour lerp rather than a declarative `<fog>` so it can crossfade
+ * with the wash: pre-bake it sits at `FOG_PAPER` (the far lawn dissolves into
+ * the page, not into the sketch's cross-hatch), and it lerps to
+ * `SKY_HORIZON_COLOR` on `revealProgressRef` — the wash's own clock — so at bake
+ * the ground disc melts into the sky. Runs at the default useFrame priority (0),
+ * which executes BEFORE InkPass's priority-1 composer render, so the colour is
+ * current for the frame the composer draws. near=10 clears the object (the
+ * lattice never fogs), far=30 lands inside the r=26 ground disc.
+ */
+function BakeFog({ progressRef }: { progressRef: MutableRefObject<number> }) {
+  const scene = useThree((s) => s.scene);
+  const fog = useMemo(() => new THREE.Fog(FOG_PAPER, 10, 30), []);
+  const paper = useMemo(() => new THREE.Color(FOG_PAPER), []);
+  const sky = useMemo(() => new THREE.Color(SKY_HORIZON_COLOR), []);
+  useEffect(() => {
+    const prev = scene.fog;
+    scene.fog = fog;
+    return () => {
+      scene.fog = prev;
+    };
+  }, [scene, fog]);
+  useFrame(() => {
+    const t = THREE.MathUtils.clamp(progressRef.current, 0, 1);
+    fog.color.copy(paper).lerp(sky, t);
+  });
+  return null;
+}
+
+function Chip({
+  children,
+  onClick,
+  strong = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  strong?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] backdrop-blur transition ${
+        strong
+          ? 'border-inkBlack/70 bg-inkBlack text-paperVellum hover:opacity-90'
+          : 'border-inkBlack/20 bg-paperVellum/80 hover:border-inkBlack/50'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}

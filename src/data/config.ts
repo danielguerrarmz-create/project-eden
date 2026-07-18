@@ -117,11 +117,19 @@ export const JOINTS = {
     /** Bolt hole centres from the strut end face (mm) — FABRICATION.md §2. */
     boltInsetsMm: [40, 85],
     boltDiaMm: 12,
-    /** Hub core drum diameter / height (mm). The core claims a cylindrical
-     *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior core,
-     *  ring flange assembly, ground shoe alike) — timber stays out of it. */
+    /** Hub core disc: a laser-cut disc the fins weld to (FABRICATION.md §2) —
+     *  drawn as the thin plate it is, not a drum. Its Ø claims a cylindrical
+     *  CONNECTOR ENVELOPE about the node normal at EVERY node (interior disc,
+     *  ring flange assembly, ground shoe alike) — timber stays out of it.
+     *  The envelope is a clearance VOLUME, not the physical part: the standoff
+     *  solver reads coreDiaMm only, so the disc thickness is render-only. */
     coreDiaMm: 140,
-    coreHeightMm: 80,
+    // Render-only volume bump (2026-07-17, Sai): a stubby cylindrical pipe-boss
+    // hub reads far better than a flat 8 mm sticker-disc under the wash. Safe —
+    // the standoff solver reads coreDiaMm ONLY (see the note above), so disc
+    // thickness moves no BOM line and no cut; 30 mm stays well inside the 140 mm
+    // face so proportions hold.
+    coreDiscMm: 30,
     /**
      * MILLED-END STANDOFF (FABRICATION.md §1a): every strut end is a square
      * cut at a COMPUTED standoff — the smallest length where the whole end
@@ -187,8 +195,11 @@ export const SITE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// PRICING — price = Σ components × rate + install + groundwork + planting
-//           + margin, shown as ONE fixed figure (demo-spec §2.3).
+// PRICING — cost build-up = Σ components × rate + install + groundwork
+//           + planting + margin (demo-spec §2.3). Shown as a cost build-up for
+//           the kit and its install, NEVER as the commission price: the ladder's
+//           stated range lives in ui/priceCopy.ts and is ~6x this. Read that
+//           module's header before touching a rate here.
 // ---------------------------------------------------------------------------
 export const PRICING = {
   /**
@@ -235,14 +246,18 @@ export const PRICING = {
   plantingPerPlantGBP: 55,
 
   /**
-   * Margin + fixed-price guarantee. Covers the designer channel fee, VAT
-   * treatment and contingency in one stated line so the on-screen figure can
-   * honestly read "fixed", not "estimate". Shown in the decomposition — hiding
-   * it would be the overclaim the application warns against.
+   * Margin + contingency. Covers the designer channel fee, VAT treatment and
+   * contingency in one stated line. Shown in the decomposition — hiding it
+   * would be the overclaim the application warns against.
+   *
+   * This comment used to say the margin line is what lets the on-screen figure
+   * "honestly read 'fixed', not 'estimate'". It does not. A margin on top of
+   * placeholder rates is a placeholder with a margin on it, and no on-screen
+   * copy has said "fixed" since 2026-07-17. See ui/priceCopy.ts.
    */
   marginRate: 0.28,
 
-  /** The fixed figure is rounded to this so it reads as a commitment. */
+  /** The total is rounded to this. Rounding is legibility, not confidence. */
   roundTotalToGBP: 100,
 } as const;
 
@@ -271,8 +286,8 @@ export const ECOLOGY = {
 // GROWTH — visual approximation of establishment
 // ---------------------------------------------------------------------------
 export const GROWTH = {
-  /** Years the toggle can show. Year 3 = "finished in year three". */
-  years: [0, 1, 3] as const,
+  /** Years the toggle can show. Year 2 = "finished in year two". */
+  years: [0, 1, 2] as const,
   /** Coverage saturates as growth approaches this fraction of the lattice. */
   maxCoverageFraction: 0.92,
   /** Year-0 establishment: what a freshly-planted climber covers on day one. */

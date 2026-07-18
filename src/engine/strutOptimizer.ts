@@ -106,7 +106,7 @@ export function computeStrutField(
     const u = nU === 1 ? 0.5 : iu / (nU - 1);
     for (let iv = 0; iv < nV; iv++) {
       const v = nV === 1 ? 0.5 : iv / (nV - 1);
-      const { point, bearingDeg } = surfacePoint(params, u, v);
+      const { point, normal, bearingDeg } = surfacePoint(params, u, v);
 
       // Sun bias: this facet's compass sector -> its daylight exposure (0..1).
       const sectorExposure = exposure[sectorForDeg(bearingDeg)] ?? 0;
@@ -126,7 +126,7 @@ export function computeStrutField(
       );
       densitySum += density01;
 
-      cells.push({ u, v, density01, orientation, position: point });
+      cells.push({ u, v, density01, orientation, position: point, normal });
     }
   }
 

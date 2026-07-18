@@ -13,12 +13,12 @@ const base: DesignParams = {
   year: 0,
 };
 
-describe('pricing: a fixed figure built from the real BOM', () => {
+describe('pricing: a cost build-up from the real BOM', () => {
   const { price } = runEngine(base);
 
-  it('rounds the total UP to the commitment step', () => {
-    expect(price.fixedTotalGBP % PRICING.roundTotalToGBP).toBe(0);
-    expect(price.fixedTotalGBP).toBeGreaterThanOrEqual(price.subtotalGBP + price.marginGBP);
+  it('rounds the total UP, never below its own cost', () => {
+    expect(price.costBuildUpGBP % PRICING.roundTotalToGBP).toBe(0);
+    expect(price.costBuildUpGBP).toBeGreaterThanOrEqual(price.subtotalGBP + price.marginGBP);
   });
 
   it('decomposes into materials, fabrication, install, planting and margin', () => {
@@ -47,15 +47,15 @@ describe('pricing: a fixed figure built from the real BOM', () => {
   });
 
   it('moves with the design: a bigger pavilion costs more', () => {
-    const small = runEngine({ ...base, footprintM2: 12 }).price.fixedTotalGBP;
-    const big = runEngine({ ...base, footprintM2: 18 }).price.fixedTotalGBP;
+    const small = runEngine({ ...base, footprintM2: 12 }).price.costBuildUpGBP;
+    const big = runEngine({ ...base, footprintM2: 18 }).price.costBuildUpGBP;
     expect(big).toBeGreaterThan(small);
   });
 
-  it('prices both joint systems to a positive fixed figure', () => {
+  it('prices both joint systems to a positive figure', () => {
     for (const jointSystem of ['hub', 'lamella'] as const) {
       const { price: p } = runEngine({ ...base, jointSystem });
-      expect(p.fixedTotalGBP).toBeGreaterThan(0);
+      expect(p.costBuildUpGBP).toBeGreaterThan(0);
     }
   });
 });

@@ -58,6 +58,19 @@ export interface CanopyNode {
   /** Outward (upward) unit surface normal — the connector's axis: the hub
    *  core and every member's section depth align to this. */
   normal: Vec3;
+  /**
+   * Up the canopy: 0 = eave/ground edge, 1 = crown. The same coordinate and
+   * the same sense as `Member.v`, so a node and the members arriving at it
+   * agree about where they are.
+   *
+   * Added 2026-07-17 for the explode's assembly sequence, which cascades in
+   * install order (ground first, crown last). The ring index was already
+   * encoded in `id` (`n-{ring}-{spoke}`) and could be parsed back out, but a
+   * parsed id is a format that cannot be changed without silently breaking a
+   * caller that never declared the dependency. This is generated where `i` is
+   * already in scope and changes no existing behaviour.
+   */
+  v: number;
   /** 'ground' nodes sit EXACTLY at y=0 on a ground screw. 'splice' nodes are
    *  valence-2 mid-bay beam splices (fish plate, no hub) — inserted where a
    *  single eave facet would outgrow the sheet (steep sweep drops). */
@@ -278,8 +291,13 @@ export interface PriceBreakdown {
   plantingGBP: number;
   subtotalGBP: number;
   marginGBP: number;
-  /** The fixed figure on screen, rounded to a commitment-shaped number. */
-  fixedTotalGBP: number;
+  /**
+   * What this kit and its install cost out at, rounded up. NOT the commission
+   * price, and not a quote: every rate behind it is a placeholder (pricing.ts).
+   * Named `fixedTotalGBP` until 2026-07-17, which is how "fixed" kept finding
+   * its way back into the copy. See ui/priceCopy.ts.
+   */
+  costBuildUpGBP: number;
   /** Human-readable decomposition lines for the price panel + spec sheet. */
   lines: { label: string; valueGBP: number; note?: string }[];
 }
@@ -339,6 +357,9 @@ export interface StrutCell {
   density01: number; // 0..1 -> heatmap colour + real strut spacing
   orientation: 'vertical' | 'horizontal' | 'diagonal' | 'mesh';
   position: Vec3;
+  /** Outward unit surface normal at the cell — overlays step along this to sit
+   *  ON the skin. Radial-about-Y offsets do not work on a doubly curved shell. */
+  normal: Vec3;
 }
 
 export interface StrutField {
