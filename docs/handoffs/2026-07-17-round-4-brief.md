@@ -35,10 +35,11 @@ research is `docs/research/2026-07-17-npr-watercolor.md`. All three are committe
 - **Gates at 9f150ac:** `npx tsc --noEmit` 0 · `npx vitest run` 612/612 · `npm run build`
   clean · three chunk **1066.35 kB** against the 1100 kB hard ceiling (33.65 kB headroom;
   the whole composer/InkPass chain cost only ~8 kB).
-- **In flight at pause:** Edward was mid **fix 1** (petal color legibility) with edits to
-  `PlantGrowth.tsx`, `speciesVisual.ts`, `inkShader.ts`, `toonGradient.ts`. He was told to
-  land it only if green and otherwise discard. **Check `git log`/`git status` first thing**
-  to see which happened.
+- **In flight at pause:** Edward's fix-round work (fixes 1 through 5, partial, across ten
+  files including a new `plantPlacement.ts` + test) was PAUSED mid-flight and preserved as
+  **`stash@{0}`** ("round-4 fix round in flight"), leaving the tip green. It is unverified
+  and possibly red: `git stash pop`, run the gates, and either finish it or
+  `git checkout -- . && git clean -fd src/pages/draw` it away; do not assume it works.
 - **Safety branch `backup-all-six-parts`** (`f3b9d48`) duplicates the six-part build from
   before a history rewrite mixup; tree-identical to `9f150ac`. Delete once Daniel signs off
   on round 4. A leftover review worktree from Lain may exist under
