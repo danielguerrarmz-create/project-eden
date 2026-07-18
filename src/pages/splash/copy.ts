@@ -15,14 +15,13 @@ export interface RitualStep {
 }
 
 /**
- * The commission ritual, numbered 1 to 5, one line each. Step 3 carries the live
- * component count off `outputs.components.totalCount`.
+ * The commission ritual, numbered 1 to 5, one line each.
  */
-export function ritualSteps(componentCount: number): RitualStep[] {
+export function ritualSteps(): RitualStep[] {
   return [
     { n: '1', text: 'Shape it in the studio' },
     { n: '2', text: 'The price fixes itself as you do' },
-    { n: '3', text: `We CNC-cut ~${componentCount} flat timber components from the live cut list` },
+    { n: '3', text: `We CNC-cut flat timber components from the live cut list` },
     { n: '4', text: 'Days to raise, ground screws, no slab, no wet trades' },
     { n: '5', text: 'Plant, and let it start becoming.' },
   ];
