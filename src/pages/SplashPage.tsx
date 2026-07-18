@@ -79,9 +79,7 @@ export function SplashPage() {
             <p className={BODY}>
               Bower is a generative design studio. An engine computes a one of a kind timber
               structure for your garden, priced and buildable as you shape it, that a climber grows
-              into season after season. You shape four things: footprint, rise, lattice spacing, and
-              the way it opens. The same functions run every time, so the same choices always mean
-              the same pavilion.
+              into season after season.
             </p>
             <a
               href={routes.engine}
@@ -107,7 +105,7 @@ export function SplashPage() {
             </p>
 
             <ol className="mt-8 max-w-[560px]">
-              {ritualSteps(components.totalCount).map((step) => (
+              {ritualSteps().map((step) => (
                 <li
                   key={step.n}
                   className="flex gap-5 border-t border-inkNavy/15 py-4 first:border-t-0 sm:py-5"
