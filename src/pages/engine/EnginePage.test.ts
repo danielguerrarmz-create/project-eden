@@ -9,15 +9,21 @@ const clean = (html: string) => html.replace(/<!-- -->/g, '');
 describe('EnginePage (the restored /engine walkthrough)', () => {
   const html = clean(renderToString(createElement(EnginePage)));
 
-  it('renders the full six-section HowItWorks verbatim', () => {
-    // sec 1 + 2 (the condensed home only keeps a folded version of these)
-    expect(html).toContain('The generative engine');
-    expect(html).toContain('not chosen from a catalogue');
-    // sec 3 + 5: the detail demoted off the home page lives here
-    expect(html).toContain('Solar geometry');
+  it('renders the layperson four-beat walkthrough (rewritten 2026-07-17)', () => {
+    // The arc: shape it -> real & buildable -> a plant grows into it -> keep it alive.
+    expect(html).toContain('How it works');
+    expect(html).toContain('a garden structure'); // hero H2 (the word "grow" is italicized, so it splits)
+    expect(html).toContain('buy one off a shelf');
+    expect(html).toContain('You shape a few simple things');
+    expect(html).toContain('A plant grows into it');
+    // the growth honesty note (the one caveat kept), and the close CTA into the studio
     expect(html).toContain('projection');
-    // sec 6 close CTA back into the studio
     expect(html).toContain('Shape your own Eden');
+    // the old engineer-facing walkthrough and its jargon are GONE
+    expect(html).not.toContain('The generative engine');
+    expect(html).not.toContain('Solar geometry');
+    expect(html).not.toContain('fabrication grammar');
+    expect(html).not.toContain('density field');
   });
 
   it('wears the shared splash chrome (one floating SplashHeader, one nav)', () => {

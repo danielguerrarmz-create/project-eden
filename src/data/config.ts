@@ -323,10 +323,9 @@ export const CTA_PRIMARY_EVALUATOR = 'See how the engine works';
 export const CTA_PRIMARY_BUYER = 'Shape your Eden';
 
 /**
- * CONTACT — the one address every "door" on the site writes to (mailto). These are
- * real, working doors (no backend needed), so the studio, the close, and the advisor
- * path all reach a human today. TODO: swap to a Bower inbox when it exists; this is
- * the single place to change it.
+ * CONTACT — deliberately empty (2026-07-17, Daniel): there is no inbox to route to
+ * yet, so the site exposes no contact address rather than a stale or dead one. The
+ * email-based "doors" (advisor / investor mailto links) were removed with it. Restore
+ * a real address here and re-add those doors when a Bower inbox exists.
  */
-export const CONTACT_EMAIL = 'danielguerrarmz@utexas.edu';
 

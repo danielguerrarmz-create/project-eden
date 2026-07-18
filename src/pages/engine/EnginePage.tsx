@@ -20,6 +20,7 @@ import { routes } from '../../routing';
 import { Frame } from '../../ui/Frame';
 import { SplashHeader } from '../splash/SplashHeader';
 import { HowItWorks } from '../splash/HowItWorks';
+import { Footer } from '../../ui/Footer';
 
 export function EnginePage() {
   const reduced = useReducedMotion();
@@ -47,6 +48,8 @@ export function EnginePage() {
           </a>
         </Frame>
       </div>
+
+      <Footer measure="page" />
     </div>
   );
 }
