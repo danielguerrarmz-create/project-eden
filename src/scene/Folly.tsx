@@ -15,13 +15,121 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { memberPrism, sectionFor } from '../engine/jointGeometry';
-import type { Vec3 } from '../engine/types';
+import { memberFrame, memberPrism, sectionFor } from '../engine/jointGeometry';
+import { JOINTS } from '../data/config';
+import type { CanopyGeometry, Member, Vec3 } from '../engine/types';
 import { useDesign } from '../state/store';
 import { buildSteel, type SteelOwner } from './connectors';
 import { applyExplode, explodeDistanceM, type ExplodeUniforms } from './explodeShader';
 import { applyReveal, makeRevealDepthMaterial, type RevealUniforms } from './revealShader';
 import { toonGradient } from './npr/toonGradient';
+import { ellipseArcPoint } from './ringCurve';
+
+// Timber tones, matched to the two stocks the members are cut from, so a
+// concealment collar reads as the timber arriving at its node.
+const TIMBER_C24 = new THREE.Color('#9c8466');
+const TIMBER_LVL = new THREE.Color('#c2ab84');
+
+/**
+ * The eave/crown ring is a physically curved beam the renderer drew as a
+ * straight chord (spec D4). Subdivide each ring member into this many
+ * longitudinal segments and bow the intermediate cross-sections out toward the
+ * true plan ellipse. Ring members are a small subset (~12-16 vs 150+ struts),
+ * so the per-member triangle bump is modest in absolute terms.
+ */
+const RING_SEGMENTS = 4;
+
+const isRingMember = (m: Member) => m.type === 'eave' || m.type === 'crown';
+
+/**
+ * A ring member as `RING_SEGMENTS` sub-prisms bowed to the plan ellipse. The two
+ * END sections are the real clipped mitre faces (`memberPrism` already resolves
+ * them); only the interior sections move, so the joints stay honest while the
+ * span curves. Corner order matches `memberPrism`: [w-,d-][w+,d-][w+,d+][w-,d+].
+ */
+function curvedRingPrisms(
+  m: Member,
+  widthM: number,
+  depthM: number,
+  planA: number,
+  planB: number,
+): Vec3[][] {
+  const straight = memberPrism(m, widthM, depthM);
+  const startFace = straight.slice(0, 4);
+  const endFace = straight.slice(4, 8);
+  const avg = (pts: Vec3[]): Vec3 => [
+    (pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) / 4,
+    (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) / 4,
+    (pts[0][2] + pts[1][2] + pts[2][2] + pts[3][2]) / 4,
+  ];
+  const startC = avg(startFace);
+  const endC = avg(endFace);
+
+  const { width, depth } = memberFrame(m);
+  const combos: [number, number][] = [
+    [-0.5, -0.5],
+    [0.5, -0.5],
+    [0.5, 0.5],
+    [-0.5, 0.5],
+  ];
+  const sectionAt = (t: number): Vec3[] => {
+    const c = ellipseArcPoint(startC, endC, t, planA, planB);
+    return combos.map(([sw, sd]): Vec3 => [
+      c[0] + width[0] * sw * widthM + depth[0] * sd * depthM,
+      c[1] + width[1] * sw * widthM + depth[1] * sd * depthM,
+      c[2] + width[2] * sw * widthM + depth[2] * sd * depthM,
+    ]);
+  };
+
+  const sections: Vec3[][] = [startFace];
+  for (let i = 1; i < RING_SEGMENTS; i++) sections.push(sectionAt(i / RING_SEGMENTS));
+  sections.push(endFace);
+
+  const prisms: Vec3[][] = [];
+  for (let i = 0; i < RING_SEGMENTS; i++) prisms.push([...sections[i], ...sections[i + 1]]);
+  return prisms;
+}
+
+// --- Concealment (spec D3): a timber sleeve over the connector envelope. The
+// Ø140 mm core plus 2x the 10 mm clearance is a real, already-computed
+// dimension; this only changes what covers it (a timber collar, not steel).
+const COLLAR_DIA_M = (JOINTS.hub.coreDiaMm + 2 * JOINTS.hub.envelopeClearanceMm) / 1000;
+const COLLAR_LEN_M = 0.11;
+
+interface Collars {
+  mats: THREE.Matrix4[];
+  tones: THREE.Color[];
+  owners: SteelOwner[];
+}
+
+/**
+ * One timber collar per structural node, oriented on the node normal, toned to
+ * the stock arriving there (LVL at ring nodes, C24 elsewhere). This is the
+ * honest cousin of a scarf joint: a wrapped timber sleeve concealing a hidden
+ * connector, not an invented through-tenon with peg proportions nothing spec's.
+ */
+function buildCollars(g: CanopyGeometry): Collars {
+  const UP = new THREE.Vector3(0, 1, 0);
+  const scratch = new THREE.Object3D();
+  const memberById = new Map(g.members.map((m) => [m.id, m]));
+  const mats: THREE.Matrix4[] = [];
+  const tones: THREE.Color[] = [];
+  const owners: SteelOwner[] = [];
+  for (const node of g.nodes) {
+    const touchesRing = node.memberIds.some((id) => {
+      const m = memberById.get(id);
+      return m ? isRingMember(m) : false;
+    });
+    scratch.position.set(node.position[0], node.position[1], node.position[2]);
+    scratch.quaternion.setFromUnitVectors(UP, new THREE.Vector3(...node.normal).normalize());
+    scratch.scale.set(COLLAR_DIA_M, COLLAR_LEN_M, COLLAR_DIA_M);
+    scratch.updateMatrix();
+    mats.push(scratch.matrix.clone());
+    tones.push(touchesRing ? TIMBER_LVL : TIMBER_C24);
+    owners.push({ nodeId: node.id, normal: node.normal, v: node.v });
+  }
+  return { mats, tones, owners };
+}
 
 // Two-tone steel by ROLE (connectors.ts tags each cylinder). Structural keeps
 // the bright galvanized tone already tuned by the 2026-07-17 visual pass;
@@ -229,6 +337,7 @@ export function Folly({
   revealUniforms,
   explodeUniforms,
   onSelectPiece,
+  hardwareVisible = false,
 }: {
   revealUniforms?: RevealUniforms;
   explodeUniforms?: ExplodeUniforms;
@@ -239,6 +348,14 @@ export function Folly({
    * without this prop these meshes are not interactive at all.
    */
   onSelectPiece?: (pieceIndex: number | null) => void;
+  /**
+   * Show the visible steel (round-2 behaviour). DEFAULT `false`: the round-3
+   * Japanese-joinery direction (brief item 4) conceals the connectors behind a
+   * timber collar and draws no fasteners. `true` reproduces round 2 exactly —
+   * the hardware code path is kept switchable, not deleted. Nothing in
+   * `connectors.ts` changes either way; this only chooses what is mounted.
+   */
+  hardwareVisible?: boolean;
 } = {}) {
   const geometry = useDesign((s) => s.outputs.geometry);
   const system = geometry.params.jointSystem;
@@ -246,6 +363,7 @@ export function Folly({
 
   const boxesRef = useRef<THREE.InstancedMesh>(null);
   const cylsRef = useRef<THREE.InstancedMesh>(null);
+  const collarsRef = useRef<THREE.InstancedMesh>(null);
   const reveal = useReveal(revealUniforms, explodeUniforms);
 
   // Eased-arris depth by stock, a render bevel (not a config.ts stock spec):
@@ -269,11 +387,26 @@ export function Folly({
     for (const m of geometry.members) {
       const { widthM, depthM } = sectionFor(m.type, system);
       const isLinear = !lamellaSystem && (m.type === 'lattice' || m.type === 'foot');
-      (isLinear ? c24 : lvl).push(memberPrism(m, widthM, depthM));
       const ex = isLinear ? c24Ex : lvlEx;
-      ex.offsets.push([m.normal[0] * distM, m.normal[1] * distM, m.normal[2] * distM]);
+      const off: Vec3 = [m.normal[0] * distM, m.normal[1] * distM, m.normal[2] * distM];
+      const pieceIdx = pieceIndexById.get(m.pieceId) ?? -1;
+      if (isRingMember(m)) {
+        // Curved: one member becomes several bowed sub-prisms, each carrying the
+        // member's own explode offset/delay/piece so the ring still flies as one
+        // piece (spec D4). Ring members are always LVL blanks.
+        const subs = curvedRingPrisms(m, widthM, depthM, geometry.planA, geometry.planB);
+        for (const sub of subs) {
+          lvl.push(sub);
+          lvlEx.offsets.push(off);
+          lvlEx.delays.push(m.v);
+          lvlEx.pieceIndex.push(pieceIdx);
+        }
+        continue;
+      }
+      (isLinear ? c24 : lvl).push(memberPrism(m, widthM, depthM));
+      ex.offsets.push(off);
       ex.delays.push(m.v);
-      ex.pieceIndex.push(pieceIndexById.get(m.pieceId) ?? -1);
+      ex.pieceIndex.push(pieceIdx);
     }
     return {
       c24Geo: prismsToGeometry(c24, CHAMFER_STRUT_M, c24Ex),
@@ -281,7 +414,7 @@ export function Folly({
       c24Count: c24.length,
       lvlCount: lvl.length,
     };
-  }, [geometry.members, geometry.pieces, geometry.planB, system, lamellaSystem]);
+  }, [geometry.members, geometry.pieces, geometry.planA, geometry.planB, system, lamellaSystem]);
 
   /**
    * Which piece a click hit. The geometry is NON-INDEXED (the merge writes three
@@ -337,13 +470,37 @@ export function Folly({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [steel.cylRoles, steel.cylinders.length]);
 
+  // The concealment collars (spec D3) — one timber sleeve per node over the
+  // connector envelope, mounted instead of the steel when hardware is hidden.
+  // Still computed either way (cheap); only mounted when concealed.
+  const collars = useMemo(() => buildCollars(geometry), [geometry]);
+  useInstanceMatrices(collarsRef, collars.mats, collars.owners, steelDistM);
+
+  // Collar geometry: the same unit cylinder + white colour buffer trick the
+  // steel cylinders use, so the per-instance timber tone reaches the fragment.
+  const collarGeo = useMemo(() => {
+    const g = new THREE.CylinderGeometry(0.5, 0.5, 1, 20);
+    const n = g.attributes.position.count;
+    g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+    return g;
+  }, []);
+  useEffect(() => () => collarGeo.dispose(), [collarGeo]);
+
+  useLayoutEffect(() => {
+    const mesh = collarsRef.current;
+    if (!mesh) return;
+    collars.tones.forEach((tone, i) => mesh.setColorAt(i, tone));
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [collars.tones, collars.mats.length]);
+
   // The steel already owns its refs for the instance matrices, so it takes the
   // reveal here rather than through a ref callback. Keyed on the counts because
   // the instanced meshes remount when those change (see their `key`).
   useLayoutEffect(() => {
     reveal(boxesRef.current);
     reveal(cylsRef.current);
-  }, [reveal, steel.boxes.length, steel.cylinders.length]);
+    reveal(collarsRef.current);
+  }, [reveal, steel.boxes.length, steel.cylinders.length, collars.mats.length, hardwareVisible]);
 
   return (
     <>
@@ -375,7 +532,26 @@ export function Folly({
         </mesh>
       )}
 
-      {steel.boxes.length > 0 && (
+      {/* CONCEALED (default): no steel, a timber collar over each connector
+          envelope instead (spec D2/D3). The Japanese-joinery read — near-
+          invisible fasteners — is a wrapped timber sleeve, not an exposed peg. */}
+      {!hardwareVisible && collars.mats.length > 0 && (
+        <instancedMesh
+          key={`collars-${collars.mats.length}`}
+          ref={collarsRef}
+          geometry={collarGeo}
+          args={[undefined, undefined, collars.mats.length]}
+          castShadow
+          receiveShadow
+        >
+          {/* Timber-toned per instance (C24 at strut nodes, LVL at ring nodes),
+              same white-base + vertexColors instanceColor recipe the steel used. */}
+          <meshToonMaterial color="#ffffff" vertexColors gradientMap={toonGradient} />
+        </instancedMesh>
+      )}
+
+      {/* VISIBLE HARDWARE (round-2 behaviour, kept switchable): the steel. */}
+      {hardwareVisible && steel.boxes.length > 0 && (
         <instancedMesh
           key={`steel-boxes-${steel.boxes.length}`}
           ref={boxesRef}
@@ -391,7 +567,7 @@ export function Folly({
         </instancedMesh>
       )}
 
-      {steel.cylinders.length > 0 && (
+      {hardwareVisible && steel.cylinders.length > 0 && (
         <instancedMesh
           key={`steel-cyls-${steel.cylinders.length}`}
           ref={cylsRef}
