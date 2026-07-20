@@ -4,12 +4,15 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Where the work is — read this first
 
-**Current: mobile Phase 1 shipped LIVE on `main` (2026-07-20). Handoff:
-`docs/handoffs/2026-07-20-mobile-phase1.md`.** Below `lg` the About timeline is now a DOM tree
-(`src/pages/about/MobileTimeline.tsx`); responsive `srcset` is live across About/Splash/Engine.
-Open D3 (rail vs center spine) and Phase 2 (WP4–6) are in that handoff. **Base new work on
-`origin/main`** — the old `about-round-10` branch is 52 commits behind and carries an unrelated
-`/lab/seeds` dev-rig WIP.
+**Current: mobile About REDESIGN shipped LIVE on `main` (2026-07-20). Handoff:
+`docs/handoffs/2026-07-20-mobile-about-redesign.md`** (design-of-record:
+`docs/design/2026-07-20-mobile-about-redesign.md`). Below `lg` the About timeline is a center-spine
+DOM tree (`src/pages/about/MobileTimeline.tsx`): centred intro title, questions-first then a
+grow/scroll-reveal choreography, small spine-hugging specimens (tap → shared Lightbox), reframed
+projects gallery. Also live: hamburger nav below `md`, responsive `srcset` across About/Splash/Engine
+(handoff `2026-07-20-mobile-phase1.md`). Phase 2 (font cleanup, `/shape`+`/sculpt` gate cards, mobile
+QA probes) still open. **Base new work on `origin/main`** — the old `about-round-10` branch is 52
+commits behind and carries an unrelated `/lab/seeds` dev-rig WIP.
 
 Prior desktop-About work: round 11, `docs/handoffs/2026-07-17-round-11.md` (the timeline/founders
 laws below still hold).
