@@ -26,7 +26,7 @@
  *
  * Images are REAL, imported from Daniel's portfolio (see about/projects.ts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
 import { Footer } from '../ui/Footer';
@@ -403,11 +403,16 @@ function SupportingRow({
   if (images.length === 0) return null;
   const sumRatio = images.reduce((s, im) => s + im.ratio, 0);
   return (
-    <div className="flex w-full shrink-0 gap-2" style={{ aspectRatio: sumRatio > 0 ? sumRatio : undefined }}>
-      {images.map((img) => (
-        <div key={img.src} className="relative min-h-0" style={{ flexGrow: img.ratio, flexBasis: 0 }}>
-          <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
-        </div>
+    <div className="flex w-full shrink-0 items-stretch gap-2" style={{ aspectRatio: sumRatio > 0 ? sumRatio : undefined }}>
+      {images.map((img, i) => (
+        <Fragment key={img.src}>
+          {/* A hairline sepia divider between supporting chips (Sai §5) — the timeline's chip language,
+              echoed here so the gallery reads as mounted plates rather than a second, larger photo grid. */}
+          {i > 0 && <span aria-hidden className="w-px flex-none self-stretch" style={{ background: `${INK_SEPIA}2a` }} />}
+          <div className="relative min-h-0" style={{ flexGrow: img.ratio, flexBasis: 0 }}>
+            <ProjectImg image={img} onOpen={onOpen} reduced={reduced} fill />
+          </div>
+        </Fragment>
       ))}
     </div>
   );
@@ -561,15 +566,26 @@ function Gallery({
   reduced?: boolean;
 }) {
   const { hero, rest } = heroSplit(project.images);
+  // MOUNTED-PLATE FRAME (Sai §5): a hairline sepia rule + a small paperVellum mat, so the mobile
+  // gallery reads in the same "mounted specimen" register as the timeline plates and the founder
+  // paintings — not a full-bleed photo dump escalating off the lighter timeline above it. These are
+  // the work itself (tap-to-lightbox), so they are NOT miniaturized; the change is framing, not scale.
+  // Inline rule colour because `INK_SEPIA` is a hex the SVG/border layers already share; `33`/`2a` are
+  // low-opacity sepia so the frame reads as a quiet mount, never a hard box.
+  const plate = 'bg-paperVellum p-1.5';
+  const rule = { border: `1px solid ${INK_SEPIA}33` };
   return (
     <figure className="space-y-3">
-      {/* `data-mobile-hero` is the handle qa/mobile-hero.mjs measures. Desktop's hero is findable by
-          `[data-project-hero]`; this tree had no handle at all, which is a large part of why it went
-          unmeasured through three reports. A guard cannot check what it cannot select. */}
-      <div data-mobile-hero>
+      {/* `data-mobile-hero` is the handle qa/mobile-hero.mjs measures — it stays on the hero's frame so
+          the guard still selects it. */}
+      <div data-mobile-hero className={plate} style={rule}>
         <ProjectImg image={hero} onOpen={onOpen} reduced={reduced} />
       </div>
-      <SupportingRow images={rest} onOpen={onOpen} reduced={reduced} />
+      {rest.length > 0 && (
+        <div className={plate} style={rule}>
+          <SupportingRow images={rest} onOpen={onOpen} reduced={reduced} />
+        </div>
+      )}
     </figure>
   );
 }
@@ -2127,11 +2143,16 @@ export function AboutPage() {
         <section aria-label="How we crossed paths">
           <CrossPathsTimeline
             title={
-              <h1 data-about-title className={`${TITLE_CLASS} max-w-[16ch]`}>
+              // Centred + full-width below lg (the mobile landed state Sai's spec calls for); the
+              // desktop left-slot is restored at lg. AboutIntro reads this element's own textAlign and
+              // flies onto it, so the narration lands convincingly centred on mobile without a
+              // mid-flight alignment snap.
+              <h1 data-about-title className={`${TITLE_CLASS} mx-auto max-w-[16ch] text-center lg:mx-0 lg:text-left`}>
                 {TITLE}
               </h1>
             }
             questions={QUESTIONS}
+            revealed={revealed}
           />
         </section>
 

@@ -2119,12 +2119,18 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
  * The two trees therefore never coexist in the committed DOM. `useMediaQuery` decides synchronously on
  * first paint (same SSR guard as `useReducedMotion`), so there is no flash.
  */
-export function CrossPathsTimeline(props: {
+export function CrossPathsTimeline({
+  revealed = true,
+  ...props
+}: {
   title: ReactNode;
   questions: Array<{ label: string; text: string }>;
+  /** The page's reveal beat (AboutPage's `revealed`), so the mobile tree can time its held-then-grow
+   *  choreography off the intro landing rather than off its own mount. Desktop ignores it. */
+  revealed?: boolean;
 }) {
   const isDesktop = useMediaQuery(LG_QUERY);
-  return isDesktop ? <DesktopTimeline {...props} /> : <MobileTimeline {...props} />;
+  return isDesktop ? <DesktopTimeline {...props} /> : <MobileTimeline {...props} revealed={revealed} />;
 }
 
 function DesktopTimeline({

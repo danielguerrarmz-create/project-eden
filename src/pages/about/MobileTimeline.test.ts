@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CLUSTERS, YEAR_TICKS } from './clusters';
-import { LAID, yearHeaderOrder, caption, parseSpineVariant } from './MobileTimeline';
+import { LAID, yearHeaderOrder, caption } from './MobileTimeline';
 
 describe('MobileTimeline order', () => {
   it('LAID is the clusters in ascending chronological order', () => {
@@ -49,19 +49,5 @@ describe('MobileTimeline captions are authored, never invented', () => {
 
   it('at least one authored caption exists (so the empty-only path is not the whole story)', () => {
     expect(CLUSTERS.some((c) => caption(c).length > 0)).toBe(true);
-  });
-});
-
-describe('parseSpineVariant', () => {
-  it('defaults to rail for empty, garbage, or explicit rail', () => {
-    expect(parseSpineVariant('')).toBe('rail');
-    expect(parseSpineVariant('spine=rail')).toBe('rail');
-    expect(parseSpineVariant('spine=bogus')).toBe('rail');
-    expect(parseSpineVariant('foo=1&bar=2')).toBe('rail');
-  });
-
-  it('returns center only on the explicit opt-in, anywhere in the query', () => {
-    expect(parseSpineVariant('spine=center')).toBe('center');
-    expect(parseSpineVariant('foo=1&spine=center')).toBe('center');
   });
 });

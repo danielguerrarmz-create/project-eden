@@ -88,6 +88,11 @@ interface Rect {
   top: number;
   width: number;
   height: number;
+  /** The target title's OWN text-align, read off the real element. Threaded onto the flying copy so
+   *  it lands coincident: left in the desktop header slot, centre in the mobile centred box. Using the
+   *  target's alignment for the WHOLE flight (never toggling it mid-flight) is what keeps the wrapped
+   *  lines from reflowing — the glitch the old hardcoded 'left' existed to avoid, solved the right way. */
+  align: string;
 }
 
 export function AboutIntro({
@@ -115,7 +120,7 @@ export function AboutIntro({
       const el = document.querySelector('[data-about-title]') as HTMLElement | null;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      setRect({ left: r.left, top: r.top, width: r.width, height: r.height });
+      setRect({ left: r.left, top: r.top, width: r.width, height: r.height, align: getComputedStyle(el).textAlign });
     };
     measure();
     document.fonts?.ready.then(measure).catch(() => {});
@@ -142,9 +147,10 @@ export function AboutIntro({
   // The title shares the header's exact box (position + width + size at scale 1). During the
   // narration the whole box is translated to the COMPLETE CENTRE of the page via the
   // `centerX`/`centerY` translates, then on the settle it travels back to (x:0, y:0) to nest exactly
-  // onto the real header title. Text stays LEFT-aligned the entire flight (matching the header, which
-  // is left-aligned): centring is done by moving the box, never by toggling textAlign — a mid-flight
-  // center→left snap would reflow the wrapped lines and read as a glitch.
+  // onto the real header title. Text keeps the TARGET's own alignment (`rect.align`) the entire
+  // flight — left in the desktop header slot, centre in the mobile centred box — so it lands
+  // coincident; the alignment is never toggled mid-flight (which would reflow the wrapped lines and
+  // read as a glitch). Centring across the page is done by moving the box, as before.
   const centerY = rect ? (vh - rect.height) / 2 - rect.top : 0;
   const centerX = rect ? (vw - rect.width) / 2 - rect.left : 0;
   const showTitle = phase === 'title' || phase === 'settle';
@@ -172,7 +178,7 @@ export function AboutIntro({
               <motion.p
                 key="setup"
                 className={`absolute ${titleClassName}`}
-                style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: 'left' }}
+                style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: rect.align as React.CSSProperties['textAlign'] }}
                 initial={{ opacity: 0, x: centerX, y: centerY + 22 }}
                 animate={{ opacity: 1, x: centerX, y: centerY }}
                 exit={{ opacity: 0, y: centerY - 16, transition: { duration: SETUP_OUT_S, ease: 'easeIn' } }}
@@ -185,13 +191,13 @@ export function AboutIntro({
 
           {/* Title — appears in the header's exact box at scale 1, translated to the complete centre
               of the page (x: centerX, y: centerY), then travels back to (0,0) to nest exactly onto the
-              real header title. Text stays LEFT-aligned throughout (matching the header) so the
+              real header title. Text keeps the target's own alignment throughout (`rect.align`) so the
               wrapped lines never reflow mid-flight. No scale. */}
           {showTitle && (
             <motion.p
               key="title"
               className={`absolute ${titleClassName}`}
-              style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: 'left' }}
+              style={{ left: rect.left, top: rect.top, width: rect.width, textAlign: rect.align as React.CSSProperties['textAlign'] }}
               initial={{ opacity: 0, x: centerX, y: centerY }}
               animate={{ opacity: 1, x: settling ? 0 : centerX, y: settling ? 0 : centerY }}
               transition={{

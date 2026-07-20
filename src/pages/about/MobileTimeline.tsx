@@ -6,52 +6,41 @@
  * scroll-scrubbed by a panning camera (`viewBox = 0 camY 1200 viewH`, `preserveAspectRatio="meet"`).
  * A fixed viewBox with `meet` never breaks — it uniformly scales the whole composition down, and on a
  * 390px phone that is ~0.30x: 30-unit year labels render ~9px, the 2.2-unit spine becomes a 0.66px
- * hairline. It does not look broken; it looks intentionally tiny, which is worse. Media queries cannot
- * reach inside a fixed viewBox. So below `lg` we mount THIS instead — page scroll, not a camera, and
- * every measurement in CSS px so nothing shrinks to illegibility. The trees never coexist in the
- * committed DOM (the wrapper picks one via `useMediaQuery`), which is also what keeps the founders'
- * `[data-timeline-camera]` lookup pointed at the desktop svg and never at anything in here.
+ * hairline. Media queries cannot reach inside a fixed viewBox. So below `lg` we mount THIS instead —
+ * page scroll, not a camera, and every measurement in CSS px so nothing shrinks to illegibility. The
+ * trees never coexist in the committed DOM (the wrapper picks one via `useMediaQuery`), which is also
+ * what keeps the founders' `[data-timeline-camera]` lookup pointed at the desktop svg, never here.
  *
- * COLOUR LAW (viewport-independent, CLAUDE.md): STRUCTURE IS ALWAYS SEPIA — the spine, the ticks, the
- * year labels, the twist glyph, the finale mark. The ONLY pigment on this page is a painted botanical,
- * and this lean tree grows none (it deliberately imports no gongbi/colonize/painter ornament — plan
- * §5.3, "the mobile timeline tree should not import desktop-only ornament modules"), so there is no
- * colour here but sepia plus the photographs' own. Nothing is colour-coded by person.
+ * THE FORM IS A CENTRE SPINE (Sai's 2026-07-20 redesign, Daniel signed off). One sepia line dead
+ * centre, cards alternating left/right off it by their authored `packSide`. Each plate is a SMALL,
+ * fixed-size specimen mark hugging the spine edge — a silhouette and a colour mass, not a document —
+ * with generous paper around it; the point is "absorb about 10% of the photo," a mark along the line,
+ * not a photo reel. A cluster's extra images collapse to a tight chip row rather than a stacked column.
  *
- * THE TWO AUTHORED EVENTS keep their MEANING as static compositions, not their choreography: the
- * twist-fuse opening is a small fixed glyph at the top (two strands crossing into one spine), and the
- * unravel-into-mark finale is the Oculus mark + wordmark lockup at the bottom. The desktop "words rest
- * 18px proud of centre" pin choreography is desktop-only and has no place here.
+ * MOTION (Sai §3): no scroll-scrubbed camera — that is the whole reason this tree exists. "Growth" is
+ * IntersectionObserver reveal-once, one clock per unit (framer `whileInView` + `viewport.once`), which
+ * is deliberately the simpler path: this page's recorded bugs all lived in extra hand-rolled clocks
+ * (the two-garland clock, the autoplay-drives-the-camera clock), and per-item IO sidesteps that class.
+ * The twist glyph + spine grow on a single time beat ~450ms after the page reveals (a held-then-grow,
+ * so title → questions → then the line arrives); every card/year/finale then reveals as it scrolls in.
+ * Reduced motion renders the whole thing at rest, no observers, no delay.
+ *
+ * COLOUR LAW (viewport-independent, CLAUDE.md): STRUCTURE IS ALWAYS SEPIA — spine, ticks, year labels,
+ * twist glyph, finale mark. The only colour besides sepia is the photographs' own; this lean tree
+ * grows no gongbi ornament, so there is no pigment to police. Nothing is colour-coded by person.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type CSSProperties } from 'react';
+import { motion } from 'framer-motion';
+import { useReducedMotion } from '../../ui/useReducedMotion';
 import { OculusMark } from '../../ui/OculusMark';
 import { srcSetFor } from '../../ui/responsiveImg';
 import { WORDMARK } from '../../data/config';
 import { CLUSTERS, type Cluster, type Node } from './clusters';
 import { INK_SEPIA, INK_SEPIA_TEXT } from './CrossPathsTimeline';
 
-/** Which mobile form to render. `rail` (default) is the most legible on 375-430px phones: one sepia
- *  spine on the left, cards full-width beside it. `center` puts the spine down the middle and lets the
- *  cards alternate by their authored `side` — truer to the drawn timeline's two-sided composition, but
- *  it halves every card's width, so it is here for Daniel to compare against `rail`, not as the ship
- *  default (D3: pick the spine form from two real renders). Swap forms live with `#/about?spine=center`;
- *  the capture harness grabs both without a code edit. */
-export type SpineVariant = 'rail' | 'center';
-
-/** Pure: `center` only when the query says so, `rail` otherwise (including garbage/empty). Split out
- *  from the window read so it is testable in the bare-node suite. */
-export function parseSpineVariant(qs: string): SpineVariant {
-  return new URLSearchParams(qs).get('spine') === 'center' ? 'center' : 'rail';
-}
-
-/** Read the spine variant from the URL so both forms can be captured for review without editing code.
- *  Hash routing puts the query after the `#` (`#/about?spine=center`); fall back to a real `?search`. */
-export function readSpineVariant(): SpineVariant {
-  if (typeof window === 'undefined') return 'rail';
-  const hash = window.location.hash;
-  const qs = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : window.location.search.slice(1);
-  return parseSpineVariant(qs);
-}
+/** The page's own reveal ease (`AboutIntro`'s EASE_LINE, and the curve `AboutPage` fades `revealed`
+ *  with). The mobile tree reuses it for its reveals rather than introducing a new vocabulary. */
+const EASE_LINE = [0.16, 1, 0.3, 1] as const;
 
 /**
  * The clusters, read once in true chronological order. The desktop timeline deliberately does NOT sort
@@ -63,8 +52,7 @@ export const LAID: readonly Cluster[] = [...CLUSTERS].sort((a, b) => a.year - b.
 
 /** The distinct year headers in the order the body emits them: the floor of each cluster's year, first
  *  occurrence only, walking `LAID`. Exported so the test can pin it to `YEAR_TICKS` — a header that
- *  drifts from the axis ticks is a year printed twice or a year missing, and neither is visible without
- *  a render. Pure. */
+ *  drifts from the axis ticks is a year printed twice or a year missing, invisible without a render. */
 export function yearHeaderOrder(): number[] {
   const out: number[] = [];
   let last = NaN;
@@ -86,27 +74,32 @@ export function caption(c: Cluster): string {
   return c.hint.trim();
 }
 
+/** Small, fixed specimen size (Sai §4): ~21-22% of the viewport — 80px at 375, ~84 at 390, capped 96
+ *  by 430. Height follows the image's own ratio (FIT_FRAME), so a landscape lands ~53-64px tall: enough
+ *  to read "that's a robot / a growing building / a research plot," not enough to invite study. */
+const PLATE_MAX_W = 'clamp(80px, 22vw, 96px)';
+/** A cluster's non-primary images, as a huddle of chips ~half the plate's width. */
+const CHIP_MAX_W = 'clamp(38px, 11vw, 46px)';
+/** The plate/chip render at their own CSS width; the smallest generated variant (400w) already covers
+ *  them at DPR 3, so a fixed `sizes` keeps the browser from pulling anything larger. */
+const PLATE_SIZES = '96px';
+const CHIP_SIZES = '48px';
+
 /**
- * One plate image. The box is given the picture's OWN measured ratio (`aspectRatio: media.ratio`), so
- * `object-fit` has nothing left to resolve — no crop, no letterbox — which is the FIT_FRAME argument
- * from the other side and the page's single most-repeated law ("stop forcing geometry onto something
- * that already knows its own shape"). Video clusters render their POSTER still: the mobile tree is a
- * static composition and a phone should not autoplay a wall of loops (battery/thermal), and `media.src`
- * on a video node already IS the poster.
- *
- * `srcSet`/`sizes` are threaded through for WP2's width variants; until those assets exist the base
- * `src` stands alone. Always lazy + async-decoded, matching Splash.
+ * One plate image, sized by its container. The box is given the picture's OWN measured ratio
+ * (`aspectRatio: media.ratio`), so `object-fit` has nothing left to resolve — no crop, no letterbox —
+ * the page's single most-repeated law. Video clusters render their POSTER still (`media.src` on a video
+ * node already IS the poster): a static composition, and no phone should autoplay a wall of loops.
  */
-function TimelinePlate({ node, sizes }: { node: Node; sizes?: string }) {
+function PlateImg({ node, sizes }: { node: Node; sizes: string }) {
   const { media } = node;
-  const srcSet = srcSetFor(media.src);
   if (media.pending) {
     return (
       <div
         aria-hidden
         className="grid aspect-[3/2] w-full place-items-center border border-dashed border-inkBlack/25 bg-paperDeep/25"
       >
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-inkBlack/40">Image to come</span>
+        <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-inkBlack/40">soon</span>
       </div>
     );
   }
@@ -114,7 +107,7 @@ function TimelinePlate({ node, sizes }: { node: Node; sizes?: string }) {
   return (
     <img
       src={media.src}
-      srcSet={srcSet}
+      srcSet={srcSetFor(media.src)}
       sizes={sizes}
       alt={media.alt}
       width={Math.round(1000 * media.ratio)}
@@ -127,37 +120,68 @@ function TimelinePlate({ node, sizes }: { node: Node; sizes?: string }) {
   );
 }
 
-/** The `sizes` a full-width card image renders at below `lg`. The card is the content column minus the
- *  page gutters and (in `rail`) the spine indent; in `center` it is roughly half that. A generous
- *  ceiling — the mobile tree only mounts under 1024px. */
-const RAIL_SIZES = '(max-width: 480px) calc(100vw - 5.5rem), (max-width: 1023px) calc(100vw - 7rem), 640px';
-const CENTER_SIZES = '(max-width: 480px) calc(50vw - 2rem), (max-width: 1023px) calc(50vw - 2.5rem), 320px';
+/**
+ * A reveal wrapper: reduced motion renders children at rest; otherwise the unit is hidden until it is
+ * both ARMED (the spine has grown in) and scrolled into view, then reveals once and never re-hides
+ * (`viewport.once`). Before arming it is held at its hidden state so an above-the-fold card cannot
+ * reveal during the intro veil — the choreography is title → questions → spine → cards, not all at once.
+ */
+function Reveal({
+  reduced,
+  armed,
+  y = 16,
+  scale,
+  duration,
+  className,
+  style,
+  children,
+}: {
+  reduced: boolean;
+  armed: boolean;
+  y?: number;
+  scale?: number;
+  duration: number;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  if (reduced) {
+    return (
+      <div className={className} style={style}>
+        {children}
+      </div>
+    );
+  }
+  const hidden = { opacity: 0, y, ...(scale != null ? { scale } : {}) };
+  const shown = { opacity: 1, y: 0, ...(scale != null ? { scale: 1 } : {}) };
+  return (
+    <motion.div
+      className={className}
+      style={style}
+      initial={hidden}
+      {...(armed
+        ? { whileInView: shown, viewport: { once: true, margin: '0px 0px -12% 0px' } }
+        : { animate: hidden })}
+      transition={{ duration, ease: EASE_LINE }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 /** The twist-fuse, as a small static glyph: two equal strands come in from the top corners, cross once
- *  over-under, and lay up into the single spine that the whole timeline hangs from. Sepia structure. */
+ *  over-under, and lay up into the single spine the whole timeline hangs from. Sepia structure. */
 function TwistGlyph() {
   return (
-    <svg
-      width={56}
-      height={72}
-      viewBox="0 0 56 72"
-      fill="none"
-      aria-hidden="true"
-      className="mx-auto"
-      style={{ color: INK_SEPIA }}
-    >
-      {/* left strand crosses to the right of centre, right strand to the left — one over-under — then
-          both close onto x=28 and become the born spine running to the bottom edge. */}
+    <svg width={56} height={72} viewBox="0 0 56 72" fill="none" aria-hidden="true" className="mx-auto" style={{ color: INK_SEPIA }}>
       <path d="M6 2 C 10 24, 34 30, 28 44 L 28 72" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
       <path d="M50 2 C 46 24, 22 30, 28 44" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
     </svg>
   );
 }
 
-/** The finale: the drawn line winds into the Bower mark, then the wordmark. Here it is that lockup as a
- *  static composition — the Oculus mark (sepia, via currentColor) over the wordmark in the display
- *  serif — with a short spine stub arriving into it so the timeline reads as one line ending in the
- *  mark, exactly as the desktop finale resolves. */
+/** The finale lockup: the Oculus mark over the wordmark, a short spine stub arriving into it so the
+ *  line reads as ending in the mark — the same resolution the desktop finale winds into. */
 function FinaleLockup() {
   return (
     <div className="flex flex-col items-center" style={{ color: INK_SEPIA }}>
@@ -170,131 +194,149 @@ function FinaleLockup() {
   );
 }
 
-/** A year header on the spine: a filled node on the rail and the four digits beside it. Sepia. */
-function YearNode({ year, variant }: { year: number; variant: SpineVariant }) {
-  const label = (
-    <span className="font-mono text-[15px] font-semibold tracking-[0.06em]" style={{ color: INK_SEPIA_TEXT }}>
-      {year}
-    </span>
-  );
-  const dot = <span className="block h-2.5 w-2.5 flex-none rounded-full" style={{ background: INK_SEPIA }} />;
-  if (variant === 'center') {
-    return (
-      <div className="relative z-10 my-6 flex items-center justify-center gap-2">
-        {dot}
-        {label}
-      </div>
-    );
-  }
-  // rail: dot sits ON the rail (its centre at the rail x), label to its right.
+/** A year header on the spine: a centred dot + the mono year, between clusters. Unchanged treatment
+ *  (Sai §4: "already reads correctly"), now revealing on scroll. */
+function YearNode({ year, reduced, armed }: { year: number; reduced: boolean; armed: boolean }) {
   return (
-    <div className="relative z-10 mb-4 mt-8 flex items-center gap-3">
-      <span className="grid w-10 flex-none place-items-center">{dot}</span>
-      {label}
-    </div>
+    <Reveal reduced={reduced} armed={armed} y={8} duration={0.4} className="relative z-10 my-8 flex items-center justify-center gap-2">
+      <span className="block h-2.5 w-2.5 flex-none rounded-full" style={{ background: INK_SEPIA }} />
+      <span className="font-mono text-[15px] font-semibold tracking-[0.06em]" style={{ color: INK_SEPIA_TEXT }}>
+        {year}
+      </span>
+    </Reveal>
   );
-}
-
-/** One card's block: the plate(s) of a cluster, plus a caption where the data authored one. In `rail`
- *  the card is full-width past the spine indent; in `center` it takes a side by the cluster's `side`. */
-function ClusterCard({ cluster, variant }: { cluster: Cluster; variant: SpineVariant }) {
-  const cap = caption(cluster);
-  const sizes = variant === 'center' ? CENTER_SIZES : RAIL_SIZES;
-  const plates = (
-    <div className="flex flex-col gap-3">
-      {cluster.nodes.map((node, i) => (
-        <figure key={node.media.src} className="m-0">
-          <TimelinePlate node={node} sizes={sizes} />
-          {i === 0 && cap && (
-            <figcaption
-              className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em]"
-              style={{ color: INK_SEPIA_TEXT }}
-            >
-              {cap}
-            </figcaption>
-          )}
-        </figure>
-      ))}
-    </div>
-  );
-
-  if (variant === 'center') {
-    const isRight = cluster.side === 'right';
-    return (
-      <div className={`relative z-10 mb-8 flex ${isRight ? 'justify-end' : 'justify-start'}`}>
-        <div className="w-[calc(50%-1rem)]">{plates}</div>
-      </div>
-    );
-  }
-  // rail: indent past the spine so the card clears it, full remaining width.
-  return <div className="relative z-10 mb-2 pl-[3.25rem]">{plates}</div>;
 }
 
 /**
- * The vertical timeline body: the spine line, the twist-fuse at its head, the years and their cards in
- * chronological order, and the mark lockup at its foot. A single relative column with an absolutely
- * positioned sepia spine behind the content; the content flows in normal document order over it.
+ * One cluster, off the spine. The card takes the half named by `cluster.side` and its plate hugs the
+ * SPINE-side edge of that half (right edge for a left card, left edge for a right card) — reading as
+ * sprouting off the line, not floating in a box. The rest of the half is paper. A cluster's first node
+ * is the primary plate; any extras become a tight chip row beneath it. Caption, where authored, sits
+ * at the same edge.
  */
-function TimelineBody({ variant }: { variant: SpineVariant }) {
-  // Where the spine line sits. rail: 20px from the left (the year dot's w-10 grid centres on it).
-  // center: dead centre. The line runs the full height behind everything; the twist glyph and finale
-  // sit at its two ends and cap it.
-  const spineStyle =
-    variant === 'center'
-      ? { left: '50%', transform: 'translateX(-50%)' }
-      : { left: 'calc(1.25rem - 1px)' };
+function ClusterCard({ cluster, reduced, armed }: { cluster: Cluster; reduced: boolean; armed: boolean }) {
+  const cap = caption(cluster);
+  const isLeft = cluster.side === 'left';
+  const primary = cluster.nodes[0];
+  const extra = cluster.nodes.slice(1);
+  // The half-column, pushed to its side of the spine, its contents aligned to the spine edge.
+  const half = `flex w-1/2 flex-col gap-1.5 ${isLeft ? 'items-end pr-3' : 'ml-auto items-start pl-3'}`;
+  return (
+    <Reveal reduced={reduced} armed={armed} y={16} scale={0.96} duration={0.45} className="relative z-10 my-9 flex">
+      <div className={half}>
+        <div className="w-full" style={{ maxWidth: PLATE_MAX_W }}>
+          <PlateImg node={primary} sizes={PLATE_SIZES} />
+        </div>
+        {extra.length > 0 && (
+          <div className="flex gap-1">
+            {extra.map((n) => (
+              <div key={n.media.src} className="w-full" style={{ maxWidth: CHIP_MAX_W }}>
+                <PlateImg node={n} sizes={CHIP_SIZES} />
+              </div>
+            ))}
+          </div>
+        )}
+        {cap && (
+          <figcaption
+            className={`font-mono text-[11px] uppercase tracking-[0.14em] ${isLeft ? 'text-right' : 'text-left'}`}
+            style={{ color: INK_SEPIA_TEXT }}
+          >
+            {cap}
+          </figcaption>
+        )}
+      </div>
+    </Reveal>
+  );
+}
+
+/**
+ * The vertical timeline body: the centre spine, the twist-fuse at its head, the years and their cards,
+ * and the mark lockup at its foot. The spine grows in and the twist glyph settles on ONE time beat
+ * ~450ms after the page reveals (Sai's held-then-grow); everything else reveals on scroll. Reduced
+ * motion renders it all at rest.
+ */
+function TimelineBody({ reduced, revealed }: { reduced: boolean; revealed: boolean }) {
+  // `grown` gates the twist glyph + spine (the time-based beat) AND arms the scroll reveals. Reduced
+  // motion is grown from the first frame (everything static); otherwise it flips ~450ms after the page
+  // reveals — a small deliberate pause in the same register as AboutIntro's own beats, not a scroll wait.
+  const [grown, setGrown] = useState(reduced);
+  useEffect(() => {
+    if (reduced || !revealed) return;
+    const t = window.setTimeout(() => setGrown(true), 450);
+    return () => clearTimeout(t);
+  }, [reduced, revealed]);
 
   return (
     <div className="relative">
-      {/* THE SPINE. Structure, so sepia. Behind the cards (z default) while every year/card is z-10. It
-          starts below the twist glyph and stops above the finale — bracketed by them, one continuous
-          line the eye reads top to bottom. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute w-[2px]"
-        style={{ ...spineStyle, top: 8, bottom: 8, background: INK_SEPIA, opacity: 0.9 }}
-      />
+      {/* THE SPINE. Structure, so sepia; behind the cards (z default) while every unit is z-10. A fixed
+          2px line, centred by a -1px margin so framer's scaleY grow (transform-origin top) never fights
+          a centring translate. It is bracketed by the twist glyph and the finale lockup. */}
+      <div aria-hidden className="pointer-events-none absolute" style={{ left: '50%', marginLeft: -1, top: 8, bottom: 8, width: 2 }}>
+        {reduced ? (
+          <div className="h-full w-full" style={{ background: INK_SEPIA, opacity: 0.9 }} />
+        ) : (
+          <motion.div
+            className="h-full w-full"
+            style={{ background: INK_SEPIA, opacity: 0.9, transformOrigin: 'top' }}
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: grown ? 1 : 0 }}
+            transition={{ duration: 0.9, ease: EASE_LINE }}
+          />
+        )}
+      </div>
 
       <div className="relative">
         <div className="pb-2">
-          <TwistGlyph />
+          {reduced ? (
+            <TwistGlyph />
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: grown ? 1 : 0, scale: grown ? 1 : 0.92 }}
+              transition={{ duration: 0.5, ease: EASE_LINE }}
+            >
+              <TwistGlyph />
+            </motion.div>
+          )}
         </div>
 
         {LAID.reduce<{ nodes: ReactNode[]; lastYear: number }>(
           (acc, cluster) => {
             const year = Math.floor(cluster.year);
             if (year !== acc.lastYear) {
-              acc.nodes.push(<YearNode key={`y-${year}`} year={year} variant={variant} />);
+              acc.nodes.push(<YearNode key={`y-${year}`} year={year} reduced={reduced} armed={grown} />);
               acc.lastYear = year;
             }
-            acc.nodes.push(<ClusterCard key={cluster.id} cluster={cluster} variant={variant} />);
+            acc.nodes.push(<ClusterCard key={cluster.id} cluster={cluster} reduced={reduced} armed={grown} />);
             return acc;
           },
           { nodes: [], lastYear: NaN },
         ).nodes}
 
-        <div className="pt-10">
+        <Reveal reduced={reduced} armed={grown} y={16} scale={0.96} duration={0.45} className="relative z-10 pt-10">
           <FinaleLockup />
-        </div>
+        </Reveal>
       </div>
     </div>
   );
 }
 
 /**
- * The mobile About timeline. Renders the page's framing (the title and the two questions) up top —
- * their desktop home is the camera copy column, which does not exist here — then the vertical timeline.
- * No camera, no autoplay, no reduced/motion split: the composition is identical either way, which is
- * exactly the point of the recompose.
+ * The mobile About timeline. Renders the page's framing (title + the two questions) up top — their
+ * desktop home is the camera copy column, which does not exist here — then the vertical timeline. The
+ * title and questions are present in the page's own `revealed` fade (not staged); `revealed` is
+ * threaded down only so the timeline can start its held-then-grow AFTER that beat.
  */
 export function MobileTimeline({
   title,
   questions,
+  revealed = true,
 }: {
   title: ReactNode;
   questions: Array<{ label: string; text: string }>;
+  revealed?: boolean;
 }) {
-  const variant = readSpineVariant();
+  const reduced = useReducedMotion();
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-8">
@@ -311,7 +353,7 @@ export function MobileTimeline({
         </dl>
       </div>
 
-      <TimelineBody variant={variant} />
+      <TimelineBody reduced={reduced} revealed={revealed} />
     </div>
   );
 }
