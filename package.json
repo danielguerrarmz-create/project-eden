@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json",
     "test": "vitest run",
     "qa:matrix": "node qa/capture-matrix.mjs",
+    "qa:nav": "node qa/header-nav.mjs",
     "gen:images": "node scripts/gen-image-variants.mjs"
   },
   "dependencies": {

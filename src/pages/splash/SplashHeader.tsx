@@ -10,10 +10,20 @@
  *
  * Links get a left-origin underline that grows on hover / focus.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { BowerMark } from '../../ui/BowerMark';
 import { Frame, type Measure } from '../../ui/Frame';
 import { routes } from '../../routing';
+import { useReducedMotion } from '../../ui/useReducedMotion';
+
+/** The three global nav destinations, in one place so the inline pill and the mobile dropdown can
+ *  never drift apart. Hrefs/labels are the originals — copied, not invented. */
+const NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
+  { href: routes.engine, label: 'how it works' },
+  { href: routes.studio, label: 'studio' },
+  { href: routes.about, label: 'about' },
+];
 
 /**
  * One nav link inside the glass capsule: a left-origin underline grow (unchanged) plus
@@ -52,6 +62,112 @@ function LensFilter() {
         <feDisplacementMap in="SourceGraphic" in2="bump" scale="16" xChannelSelector="R" yChannelSelector="G" />
       </filter>
     </svg>
+  );
+}
+
+/**
+ * THE MOBILE NAV — a hamburger that opens a dropdown of the three links, shown only below `md`
+ * (where the inline pill would wrap to a second row; measured, the wrap is gone by ~560px, so `md`
+ * safely never shows the wrapped state and 768+ is identical to before).
+ *
+ * THE DROPDOWN IS AN ABSOLUTE OVERLAY, ON PURPOSE. SplashHeader publishes its `offsetHeight` as
+ * `--header-h`, and every `100svh - var(--header-h)` consumer (the About timeline camera, section
+ * clearances) depends on that number being the BAR's height. An absolutely-positioned panel is out of
+ * normal flow, so opening it does not grow the header's `offsetHeight` and the ResizeObserver keeps
+ * measuring the bar — a `100svh` page never jumps when the menu opens.
+ *
+ * Tap-driven, not hover: a real `<button>` with `aria-expanded`/`aria-controls`, and it closes on
+ * Escape, on an outside pointer, and on selecting a link. Focus moves into the panel on open and back
+ * to the button on Escape. Warm vellum panel, the header's own mono type — it reads as the page, not a
+ * generic white sheet — with a short reduced-motion-aware fade/slide, no bounce.
+ */
+function MobileNav({ pill }: { pill: string }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const firstLinkRef = useRef<HTMLAnchorElement>(null);
+  const reduced = useReducedMotion();
+
+  // Escape and outside-pointer close, only while open. Escape restores focus to the toggle.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [open]);
+
+  // Move focus into the menu when it opens, so keyboard/switch users land on the first destination.
+  useEffect(() => {
+    if (open) firstLinkRef.current?.focus();
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative md:hidden">
+      <button
+        ref={btnRef}
+        type="button"
+        data-cursor-solid
+        aria-label={open ? 'Close menu' : 'Open menu'}
+        aria-expanded={open}
+        aria-controls="mobile-nav-menu"
+        onClick={() => setOpen((v) => !v)}
+        className={`${pill}flex h-11 w-11 items-center justify-center rounded-full text-inkBlack transition-colors hover:bg-white/40 focus-visible:bg-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack`}
+      >
+        {/* Three rules that fold into an X — CSS transforms, calm, and instant under reduced motion. */}
+        <span className="relative block h-3.5 w-5" aria-hidden>
+          <span
+            className={`absolute left-0 h-0.5 w-5 rounded-full bg-current transition-all duration-200 ease-out motion-reduce:transition-none ${open ? 'top-1/2 -translate-y-1/2 rotate-45' : 'top-0'}`}
+          />
+          <span
+            className={`absolute left-0 top-1/2 h-0.5 w-5 -translate-y-1/2 rounded-full bg-current transition-opacity duration-200 ease-out motion-reduce:transition-none ${open ? 'opacity-0' : 'opacity-100'}`}
+          />
+          <span
+            className={`absolute left-0 h-0.5 w-5 rounded-full bg-current transition-all duration-200 ease-out motion-reduce:transition-none ${open ? 'top-1/2 -translate-y-1/2 -rotate-45' : 'bottom-0'}`}
+          />
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.nav
+            id="mobile-nav-menu"
+            aria-label="Primary"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            transition={{ duration: reduced ? 0 : 0.18, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute right-0 top-full z-50 mt-2 min-w-[13rem] overflow-hidden rounded-2xl border border-inkBlack/10 bg-paperVellum/95 shadow-lg backdrop-blur-sm"
+          >
+            <ul className="flex flex-col p-1.5">
+              {NAV_LINKS.map((l, i) => (
+                <li key={l.href}>
+                  <a
+                    ref={i === 0 ? firstLinkRef : undefined}
+                    href={l.href}
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-[44px] items-center rounded-xl px-4 font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-inkBlack transition-colors hover:bg-inkBlack/[0.06] focus-visible:bg-inkBlack/[0.06] focus-visible:outline-none"
+                  >
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </motion.nav>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -127,11 +243,16 @@ export function SplashHeader({
           />
         </a>
         <div className="flex items-center gap-3">
-          <nav data-cursor-solid className={`${pill}flex items-center gap-1 px-2 py-1`}>
-            <NavLink href={routes.engine}>how it works</NavLink>
-            <NavLink href={routes.studio}>studio</NavLink>
-            <NavLink href={routes.about}>about</NavLink>
+          {/* Inline pill at `md` and up — identical to before. Below `md` it is replaced by the
+              hamburger dropdown so the header never wraps to two rows on a phone. */}
+          <nav data-cursor-solid className={`${pill}hidden items-center gap-1 px-2 py-1 md:flex`}>
+            {NAV_LINKS.map((l) => (
+              <NavLink key={l.href} href={l.href}>
+                {l.label}
+              </NavLink>
+            ))}
           </nav>
+          <MobileNav pill={pill} />
           {actions}
         </div>
       </Frame>
