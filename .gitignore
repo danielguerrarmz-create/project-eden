@@ -32,3 +32,6 @@ docs/handoff-clay-*
 docs/brief-for-evaluators.md
 qa-*.mjs
 docs/**/*-redlining-direction.md
+
+# QA screenshot review artifacts (large PNGs; regenerate with npm run qa:matrix)
+qa/shots/
