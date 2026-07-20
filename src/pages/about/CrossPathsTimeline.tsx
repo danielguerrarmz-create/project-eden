@@ -39,6 +39,8 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useReducedMotion } from '../../ui/useReducedMotion';
+import { useMediaQuery, LG_QUERY } from '../../ui/useMediaQuery';
+import { MobileTimeline } from './MobileTimeline';
 import { line as d3line, curveCatmullRom } from 'd3-shape';
 import { CENTERS as MARK_CENTERS } from '../../ui/OculusMark';
 import { clamp01, lerp } from './growth';
@@ -2101,7 +2103,31 @@ function useFrameBox(ref: React.RefObject<HTMLElement>): { aspect: number; h: nu
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
-export function CrossPathsTimeline({
+/**
+ * The About timeline's public face — picks a tree by width and MOUNTS exactly one. At and above `lg`
+ * (1024px) the drawn, scroll-scrubbed `DesktopTimeline` below; under it the DOM/flexbox `MobileTimeline`.
+ *
+ * A conditional mount, NOT a `hidden lg:block` CSS swap of two always-mounted trees, and the reasons
+ * are load-bearing rather than tidiness:
+ *  - `DesktopTimeline` builds a `TRACK_VH`vh (thousands of vh) scroll track and runs rAF camera
+ *    smoothing + an autoplay descent on scroll/resize listeners. None of that should exist on a phone;
+ *    unmounting it is the only way it truly does not.
+ *  - The founders' parenthesis and `usePageCardLine` reach the finale camera with
+ *    `[data-timeline-camera]`. With the desktop tree unmounted below `lg`, that svg is simply ABSENT
+ *    (the lookups fall back cleanly) rather than present-but-hidden and first in DOM order — which is
+ *    the exact shape of the stray-svg bug that once made the whole bower invisible.
+ * The two trees therefore never coexist in the committed DOM. `useMediaQuery` decides synchronously on
+ * first paint (same SSR guard as `useReducedMotion`), so there is no flash.
+ */
+export function CrossPathsTimeline(props: {
+  title: ReactNode;
+  questions: Array<{ label: string; text: string }>;
+}) {
+  const isDesktop = useMediaQuery(LG_QUERY);
+  return isDesktop ? <DesktopTimeline {...props} /> : <MobileTimeline {...props} />;
+}
+
+function DesktopTimeline({
   title,
   questions,
 }: {

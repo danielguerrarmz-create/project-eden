@@ -1570,7 +1570,12 @@ function FounderParenthesis({ reduced }: { reduced: boolean }) {
       // WHERE THE TIMELINE'S LINE ACTUALLY STOPS. The two modes are genuinely different geometry and
       // assuming either one leaves a visible gap in the other. Both are MEASURED off the real
       // elements rather than derived from constants, because both were got wrong by reasoning.
-      const tlSvg = document.querySelector('[data-timeline-track] svg');
+      // The DESKTOP camera svg explicitly (`data-timeline-camera`), not "the first svg under the
+      // track". The mobile timeline mounts its own svgs (twist glyph, finale mark) below `lg`; a bare
+      // `[data-timeline-track] svg` would return one of those and read a nonsense trunk height. This
+      // overlay is display:none below `lg` anyway (the `hr.width <= 0` guard above returns early), so
+      // when the mobile tree is up both of these resolve to null and no trunk is drawn — correct.
+      const tlSvg = document.querySelector('[data-timeline-camera]');
       const tlFrame = document.querySelector('[data-timeline-frame]');
       const tr = tlSvg?.getBoundingClientRect();
       let trunkY0 = 0;

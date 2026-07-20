@@ -18,7 +18,12 @@ export function useTimelineFrameScale(): number {
   const [scale, setScale] = useState(0.696);
   useEffect(() => {
     const measure = () => {
-      const svg = document.querySelector('[data-timeline-track] svg');
+      // The DESKTOP camera svg specifically (`data-timeline-camera`), never "the first svg in the
+      // track". Below `lg` the mobile timeline mounts instead and carries its own decorative svgs
+      // (twist glyph, mark); a bare `[data-timeline-track] svg` would grab one of those and scale the
+      // page's reveal off a 56px glyph. This selector matches only the drawn timeline's camera, so it
+      // resolves to it when present and to nothing (the 0.696 fallback) when the mobile tree is up.
+      const svg = document.querySelector('[data-timeline-camera]');
       const w = svg?.getBoundingClientRect().width ?? 0;
       if (w > 0) setScale(w / TIMELINE_W);
     };
