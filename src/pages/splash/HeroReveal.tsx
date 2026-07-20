@@ -122,15 +122,18 @@ function HeroCopy({
         variants={growLine}
         className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 origin-bottom will-change-transform"
       >
+        {/* The primary (buyer) CTA gets a 48px coarse-pointer floor; the quiet proof link 44px. Gated
+            on `pointer:coarse` so only touch devices grow the hit area — the desktop density is
+            untouched (zero-regression bar). */}
         <a
           href={routes.studio}
-          className="rounded-full bg-paperVellum px-6 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-inkBlack shadow-lg transition-colors hover:bg-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paperVellum"
+          className="inline-flex items-center justify-center rounded-full bg-paperVellum px-6 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-inkBlack shadow-lg transition-colors hover:bg-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paperVellum [@media(pointer:coarse)]:min-h-[48px]"
         >
           {CTA_PRIMARY_BUYER}
         </a>
         <a
           href={routes.engine}
-          className="font-mono text-[12px] uppercase tracking-[0.14em] text-paperVellum/90 underline decoration-paperVellum/40 underline-offset-4 transition hover:decoration-paperVellum"
+          className="inline-flex items-center font-mono text-[12px] uppercase tracking-[0.14em] text-paperVellum/90 underline decoration-paperVellum/40 underline-offset-4 transition hover:decoration-paperVellum [@media(pointer:coarse)]:min-h-[44px]"
         >
           See how it works →
         </a>

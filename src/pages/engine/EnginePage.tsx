@@ -42,7 +42,7 @@ export function EnginePage() {
         <Frame measure="page" className="border-t border-inkBlack/15 pt-8">
           <a
             href={routes.shape}
-            className="inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+            className="inline-flex items-center font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive [@media(pointer:coarse)]:min-h-[44px]"
           >
             Prototype: shape one by direct manipulation →
           </a>

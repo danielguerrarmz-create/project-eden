@@ -47,12 +47,12 @@ export function RegisterInterest() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="w-full min-w-[16rem] border border-inkBlack/50 bg-transparent px-3 py-2 font-mono text-[13px] text-inkBlack outline-none transition focus:border-inkBlack placeholder:opacity-40 sm:w-[22rem]"
+          className="w-full min-w-[16rem] border border-inkBlack/50 bg-transparent px-3 py-2 font-mono text-[13px] text-inkBlack outline-none transition focus:border-inkBlack placeholder:opacity-40 sm:w-[22rem] [@media(pointer:coarse)]:min-h-[44px]"
         />
       </label>
       <button
         type="submit"
-        className="border border-inkBlack/60 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack transition hover:border-inkBlack hover:bg-inkBlack/5 focus-visible:border-inkBlack"
+        className="inline-flex items-center justify-center border border-inkBlack/60 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack transition hover:border-inkBlack hover:bg-inkBlack/5 focus-visible:border-inkBlack [@media(pointer:coarse)]:min-h-[44px]"
       >
         submit
       </button>

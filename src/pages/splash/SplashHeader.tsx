@@ -24,7 +24,7 @@ function NavLink({ href, children }: { href: string; children: string }) {
   return (
     <a
       href={href}
-      className="group relative rounded-full px-3 py-1.5 font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-inkBlack transition-colors duration-150 ease-out hover:bg-white/40 focus-visible:bg-white/40 motion-reduce:transition-none"
+      className="group relative inline-flex items-center rounded-full px-3 py-1.5 font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-inkBlack transition-colors duration-150 ease-out hover:bg-white/40 focus-visible:bg-white/40 motion-reduce:transition-none [@media(pointer:coarse)]:min-h-[44px]"
     >
       {children}
       <span

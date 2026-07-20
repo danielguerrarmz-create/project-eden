@@ -26,10 +26,12 @@ export function Footer({ measure = 'canvas' }: { measure?: Measure }) {
         <OculusMark size={18} />
         <span className="font-mono text-[14px] lowercase tracking-[0.1em]">{WORDMARK}</span>
       </span>
+      {/* Coarse-pointer devices get a 44px tap height on each footer link (they render ~17px tall);
+          gated so the desktop footer's density is unchanged. */}
       <nav aria-label="Footer" className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
-        <a href={routes.engine} className="transition-colors duration-150 hover:text-inkBlack">how it works</a>
-        <a href={routes.studio} className="transition-colors duration-150 hover:text-inkBlack">studio</a>
-        <a href={routes.about} className="transition-colors duration-150 hover:text-inkBlack">about</a>
+        <a href={routes.engine} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">how it works</a>
+        <a href={routes.studio} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">studio</a>
+        <a href={routes.about} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">about</a>
       </nav>
       <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">© {year} Bower</span>
     </footer>

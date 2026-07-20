@@ -217,7 +217,7 @@ export function HowItWorks({
           </p>
           <a
             href={routes.studio}
-            className="mt-10 inline-block font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive"
+            className="mt-10 inline-flex items-center font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive [@media(pointer:coarse)]:min-h-[44px]"
           >
             Shape your own {PRODUCT} →
           </a>
