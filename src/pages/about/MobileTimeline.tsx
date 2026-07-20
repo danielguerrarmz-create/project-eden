@@ -25,6 +25,7 @@
  */
 import type { ReactNode } from 'react';
 import { OculusMark } from '../../ui/OculusMark';
+import { srcSetFor } from '../../ui/responsiveImg';
 import { WORDMARK } from '../../data/config';
 import { CLUSTERS, type Cluster, type Node } from './clusters';
 import { INK_SEPIA, INK_SEPIA_TEXT } from './CrossPathsTimeline';
@@ -96,8 +97,9 @@ export function caption(c: Cluster): string {
  * `srcSet`/`sizes` are threaded through for WP2's width variants; until those assets exist the base
  * `src` stands alone. Always lazy + async-decoded, matching Splash.
  */
-function TimelinePlate({ node, srcSet, sizes }: { node: Node; srcSet?: string; sizes?: string }) {
+function TimelinePlate({ node, sizes }: { node: Node; sizes?: string }) {
   const { media } = node;
+  const srcSet = srcSetFor(media.src);
   if (media.pending) {
     return (
       <div

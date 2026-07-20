@@ -31,6 +31,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { SplashHeader } from './splash/SplashHeader';
 import { Footer } from '../ui/Footer';
 import { OculusMark } from '../ui/OculusMark';
+import { srcSetFor, SIZES } from '../ui/responsiveImg';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { useAutoplayVideo } from './about/useAutoplayVideo';
 import { packWall } from './about/pack';
@@ -324,17 +325,35 @@ function ProjectImg({
   // the default project's hero rendered 0x0.) The hero is also the one image guaranteed to be on
   // screen, so `lazy` was never right for it.
   const loading = fit ? 'eager' : 'lazy';
+  // Width variants (generated) let a phone pull ~400-800px instead of the full 0.5-1.1MB plate. The
+  // variants preserve aspect ratio, so the element still sizes from the same intrinsic ratio and the
+  // crop/ratio probes stay valid. `sizes` is the gallery cell's real render width. A source with no
+  // manifest entry (small image, or a PNG left un-varianted) yields undefined and keeps its plain src.
+  const srcSet = srcSetFor(image.src);
+  const sizes = srcSet ? SIZES.galleryPlate : undefined;
   const img = onOpen ? (
     <motion.img
       layoutId={`shot-${image.src}`}
       src={image.src}
+      srcSet={srcSet}
+      sizes={sizes}
       alt={image.alt}
       loading={loading}
+      decoding="async"
       className={frame}
       data-licensed-crop={fillHero || undefined}
     />
   ) : (
-    <img src={image.src} alt={image.alt} loading={loading} className={frame} data-licensed-crop={fillHero || undefined} />
+    <img
+      src={image.src}
+      srcSet={srcSet}
+      sizes={sizes}
+      alt={image.alt}
+      loading={loading}
+      decoding="async"
+      className={frame}
+      data-licensed-crop={fillHero || undefined}
+    />
   );
 
   if (!onOpen) return img;

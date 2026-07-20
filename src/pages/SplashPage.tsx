@@ -24,6 +24,7 @@ import { useDesign } from '../state/store';
 import { useReducedMotion } from '../ui/useReducedMotion';
 import { routes } from '../routing';
 import { AnnotationStrip, EngineSection, Eyebrow } from './engine/EngineSection';
+import { srcSetFor, SIZES } from '../ui/responsiveImg';
 import { HeroReveal } from './splash/HeroReveal';
 import { SplashHeader } from './splash/SplashHeader';
 import { AdaptiveCursor } from './splash/AdaptiveCursor';
@@ -63,6 +64,8 @@ export function SplashPage() {
           <figure className="order-1">
             <img
               src="/assets/product/pavilion-exterior-garden.webp"
+              srcSet={srcSetFor('/assets/product/pavilion-exterior-garden.webp')}
+              sizes={SIZES.photoBand}
               alt="A woven timber gridshell pavilion in a garden, its open oculus at the crown, wisteria and green planting grown through the lattice, a bed of wildflowers in front"
               loading="lazy"
               decoding="async"
@@ -126,6 +129,8 @@ export function SplashPage() {
           <figure className="order-1 md:order-2">
             <img
               src="/assets/product/pavilion-oculus-interior.webp"
+              srcSet={srcSetFor('/assets/product/pavilion-oculus-interior.webp')}
+              sizes={SIZES.photoBand}
               alt="Looking up inside a woven timber gridshell at its open oculus, the lattice converging on the ring with wisteria hanging through it"
               loading="lazy"
               decoding="async"

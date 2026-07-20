@@ -24,6 +24,7 @@ import { Frame } from '../../ui/Frame';
 import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
 import { routes } from '../../routing';
+import { srcSetFor } from '../../ui/responsiveImg';
 import { CTA_PRIMARY_BUYER } from '../../data/config';
 import { SESSION_KEY, INTRO_DONE_EVENT } from './BowerIntro';
 import { HERO_STILL } from './heroStill';
@@ -148,7 +149,11 @@ function HeroStill() {
   return (
     <img
       src={HERO_STILL.src}
+      srcSet={srcSetFor(HERO_STILL.src)}
+      sizes="100vw"
       alt=""
+      decoding="async"
+      fetchPriority="high"
       className="absolute inset-0 h-full w-full object-cover object-bottom"
     />
   );

@@ -1,0 +1,586 @@
+{
+  "/assets/about/daniel-headshot.jpg": {
+    "w": 1467,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/about/timeline/resia-pitch.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/product/pavilion-exterior-garden.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/product/pavilion-garden-sunset.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/product/pavilion-oculus-interior.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-biocore-axon.webp": {
+    "w": 3438,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-building-elevation.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-compression-test.webp": {
+    "w": 976,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-construction-closeup.webp": {
+    "w": 1024,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-courtyard-render.webp": {
+    "w": 1184,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-eidetic-aerial.webp": {
+    "w": 1360,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-growth-loop-poster.webp": {
+    "w": 1920,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/01-synergy/synergy-cosmos-living-walls.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/04-search-by-assembly/search-by-assembly-node-based-workflow-canvas.webp": {
+    "w": 2559,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/04-search-by-assembly/search-by-assembly-system-pipeline.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-catenary-entrance-skyline-money-shot.webp": {
+    "w": 1920,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-final-site-plan.webp": {
+    "w": 2400,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-ground-floor-plan.webp": {
+    "w": 2400,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-north-facade-perspective-austin-skyline.webp": {
+    "w": 1920,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-physical-model-cardboard-catenary.webp": {
+    "w": 2200,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-structural-axonometric-timber-roof.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/05-dougherty/dougherty-arts-center-wall-section-south-facing-east-wing-HERO.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-arm-sanding-aluminum-sheet-platen.webp": {
+    "w": 1350,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-led-light-drawing-long-exposure.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-metal-surface-sanding-end-effector.webp": {
+    "w": 1290,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-ornamentation-pattern-metal-surface.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-plotted-serpentine-drawing-resolved.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-robot-loop-poster.webp": {
+    "w": 1280,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/06-kuka-robotics/kuka-robotics-toolpath-simulation-rosette.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-biophilic-ecodistrict-hero-render.webp": {
+    "w": 2526,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-cherry-blossom-garden-people.webp": {
+    "w": 1450,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-exploded-systems-axonometric.webp": {
+    "w": 1730,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-organic-perforated-facade-boardwalk.webp": {
+    "w": 1427,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-site-section-terrain.webp": {
+    "w": 3877,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-vaulted-pavilion-boardwalk-water.webp": {
+    "w": 1450,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/07-flowerfield/flowerfield-watercolor-site-plan.webp": {
+    "w": 1591,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/08-synthetic-vision/synthetic-vision-56-class-geometry-taxonomy.webp": {
+    "w": 1550,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/08-synthetic-vision/synthetic-vision-patch-probe-saliency-heatmaps.webp": {
+    "w": 1480,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/08-synthetic-vision/synthetic-vision-two-stage-vit-pipeline.webp": {
+    "w": 1590,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/08-synthetic-vision/synthetic-vision-umap-latent-geometry.webp": {
+    "w": 1808,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/09-patterns-across-languages/patterns-medieval-fragments-ten-monuments.webp": {
+    "w": 1713,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/09-patterns-across-languages/patterns-multiscale-saliency-fragment.webp": {
+    "w": 1713,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/09-patterns-across-languages/patterns-style-foldchange-heatmaps.webp": {
+    "w": 1713,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/09-patterns-across-languages/patterns-umap-latent-geometry-clusters.webp": {
+    "w": 980,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/10-robotic-factory/robotic-factory-interior-hall-robot-arms.webp": {
+    "w": 2200,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/10-robotic-factory/robotic-factory-long-section-clipped.webp": {
+    "w": 2200,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/10-robotic-factory/robotic-factory-planted-vaults-interior.webp": {
+    "w": 2200,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/10-robotic-factory/robotic-factory-section-assembly-poster.webp": {
+    "w": 930,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp": {
+    "w": 1284,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/11-wound-care-kenya/wound-care-kenya-staged-cardboard-wedge-prototype.webp": {
+    "w": 1268,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/12-resia/resia-brand-artboard.webp": {
+    "w": 1008,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/12-resia/resia-clay-pitching.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/12-resia/resia-product-screenshot-1.webp": {
+    "w": 1400,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/12-resia/resia-product-screenshot-2.webp": {
+    "w": 1400,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/13-texas-robotics/texas-robotics-robot-device-loop-poster.webp": {
+    "w": 1200,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/13-texas-robotics/texas-robotics-robot-device-still.webp": {
+    "w": 1400,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/14-large-language-object/large-language-object-draft-1.webp": {
+    "w": 1100,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/14-large-language-object/large-language-object-draft-2.webp": {
+    "w": 1100,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/14-large-language-object/large-language-object-lamp.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/15-testfit/testfit-backlit-logo-sign-late-night.webp": {
+    "w": 902,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/15-testfit/testfit-clay-desk-recording-setup.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/16-rogers-partners-nyc/rogers-partners-nyc-door-elevation-drawing.webp": {
+    "w": 1284,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/16-rogers-partners-nyc/rogers-partners-nyc-office-desk-selfie.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/17-hydraulic-commons/hydraulic-commons-circular-program-axonometric-diagram.webp": {
+    "w": 1024,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/17-hydraulic-commons/hydraulic-commons-community-pool-ground-perspective-austin.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/assets/projects/17-hydraulic-commons/hydraulic-commons-generation-aerial-terraced-landscape.webp": {
+    "w": 1024,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/assets/projects/17-hydraulic-commons/hydraulic-commons-landform-rendering-river-infrastructure.webp": {
+    "w": 2000,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v1/pavilion.jpg": {
+    "w": 984,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/hero/v3/pavilion.jpg": {
+    "w": 5056,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v4/eden-bare-frame.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v4/eden-bloom-front.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v4/eden-green-front.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v4/eden-in-garden.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  },
+  "/hero/v4/eden-oculus-up-tall.webp": {
+    "w": 1073,
+    "variants": [
+      400,
+      800
+    ]
+  },
+  "/hero/v4/eden-oculus-up.webp": {
+    "w": 1600,
+    "variants": [
+      400,
+      800,
+      1280
+    ]
+  }
+}
