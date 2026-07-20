@@ -4,8 +4,15 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Where the work is — read this first
 
-**Current: round 11, branch `about-round-10`. Handoff: `docs/handoffs/2026-07-17-round-11.md`.**
-Read it before continuing; it carries what shipped, what is open, and what needs Daniel.
+**Current: mobile Phase 1 shipped LIVE on `main` (2026-07-20). Handoff:
+`docs/handoffs/2026-07-20-mobile-phase1.md`.** Below `lg` the About timeline is now a DOM tree
+(`src/pages/about/MobileTimeline.tsx`); responsive `srcset` is live across About/Splash/Engine.
+Open D3 (rail vs center spine) and Phase 2 (WP4–6) are in that handoff. **Base new work on
+`origin/main`** — the old `about-round-10` branch is 52 commits behind and carries an unrelated
+`/lab/seeds` dev-rig WIP.
+
+Prior desktop-About work: round 11, `docs/handoffs/2026-07-17-round-11.md` (the timeline/founders
+laws below still hold).
 
 Round 11 shipped items 1, 3+4, 6 (content), then 5 (intro stagger: colonization precomputed to
 `subBranches.generated.json`, byte-identical), 8 (the Bower mark enlarged ~1.4x, stroke unchanged),
