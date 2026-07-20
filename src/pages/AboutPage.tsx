@@ -200,7 +200,19 @@ function ProjectVideoEl({
   const frame = imageFrameClass({ brick, fillHero, fit, fill, contain, className });
 
   // Reduced motion gets the poster still. Nothing moves.
-  if (reduced) return <img src={image.src} alt={image.alt} className={frame} data-licensed-crop={fillHero || undefined} />;
+  if (reduced)
+    return (
+      <img
+        src={image.src}
+        srcSet={srcSetFor(image.src)}
+        sizes={srcSetFor(image.src) ? SIZES.galleryPlate : undefined}
+        alt={image.alt}
+        loading="lazy"
+        decoding="async"
+        className={frame}
+        data-licensed-crop={fillHero || undefined}
+      />
+    );
 
   return (
     <video
@@ -2007,8 +2019,11 @@ function FounderNode({ person }: { person: TeamMember }) {
         {person.image ? (
           <img
             src={person.image}
+            srcSet={srcSetFor(person.image)}
+            sizes="(max-width: 768px) 40vw, 200px"
             alt={`Portrait of ${person.name}`}
             loading="lazy"
+            decoding="async"
             className="aspect-[4/5] w-full border border-inkBlack/12 object-cover"
           />
         ) : (
