@@ -644,18 +644,24 @@ function LightboxChevron({ side, onClick }: { side: 'left' | 'right'; onClick: (
  *
  * Close: Escape, the backdrop, or the button. Arrow keys / chevrons walk the project's other shots.
  */
-function Lightbox({
+export function Lightbox({
   images,
   index,
   onClose,
   onStep,
   reduced,
+  morph = true,
 }: {
   images: ProjectImage[];
   index: number | null;
   onClose: () => void;
   onStep: (delta: number) => void;
   reduced: boolean;
+  /** Shared-element morph from the clicked tile. ON for the gallery (its tiles carry the matching
+   *  `shot-${src}` layoutId). OFF for the mobile timeline: its plates carry no layoutId, and some
+   *  timeline srcs also appear as gallery tiles — a shared layoutId across two live elements is the
+   *  documented deadlock (CLAUDE.md). With morph off the viewer just fades in; no collision. */
+  morph?: boolean;
 }) {
   const open = index !== null;
 
@@ -703,7 +709,7 @@ function Lightbox({
             <LightboxVideo image={image} />
           ) : (
             <motion.img
-              layoutId={reduced || image.video ? undefined : `shot-${image.src}`}
+              layoutId={reduced || image.video || !morph ? undefined : `shot-${image.src}`}
               src={image.src}
               alt={image.alt}
               onClick={(e) => e.stopPropagation()}

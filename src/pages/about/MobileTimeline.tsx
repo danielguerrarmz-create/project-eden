@@ -29,14 +29,18 @@
  * twist glyph, finale mark. The only colour besides sepia is the photographs' own; this lean tree
  * grows no gongbi ornament, so there is no pigment to police. Nothing is colour-coded by person.
  */
-import { useEffect, useState, type ReactNode, type CSSProperties } from 'react';
+import { useCallback, useEffect, useState, type ReactNode, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 import { OculusMark } from '../../ui/OculusMark';
 import { srcSetFor } from '../../ui/responsiveImg';
 import { WORDMARK } from '../../data/config';
-import { CLUSTERS, type Cluster, type Node } from './clusters';
+import { CLUSTERS, type Cluster, type Node, type Plate } from './clusters';
 import { INK_SEPIA, INK_SEPIA_TEXT } from './CrossPathsTimeline';
+// The gallery's Lightbox, reused (not reinvented) over the timeline's OWN image set. A hoisted
+// function export, so this render-time import resolves despite the AboutPage↔CrossPathsTimeline↔here
+// module cycle. `morph={false}` because timeline plates carry no shared-element layoutId.
+import { Lightbox } from '../AboutPage';
 
 /** The page's own reveal ease (`AboutIntro`'s EASE_LINE, and the curve `AboutPage` fades `revealed`
  *  with). The mobile tree reuses it for its reveals rather than introducing a new vocabulary. */
@@ -49,6 +53,12 @@ const EASE_LINE = [0.16, 1, 0.3, 1] as const;
  * year header; the fractional part (2023.55) only orders within a year. Content only — never mutated.
  */
 export const LAID: readonly Cluster[] = [...CLUSTERS].sort((a, b) => a.year - b.year);
+
+/** Every tappable timeline image, flattened in reading order — the set the lightbox steps through with
+ *  its chevrons / arrow keys. Pending plates (no asset) are excluded, exactly as the gallery excludes
+ *  them. `Plate` is structurally a `ProjectImage`, so the Lightbox consumes it directly. */
+const TIMELINE_IMAGES: Plate[] = LAID.flatMap((c) => c.nodes.map((n) => n.media)).filter((m) => !m.pending);
+const IMAGE_INDEX = new Map(TIMELINE_IMAGES.map((m, i) => [m.src, i]));
 
 /** The distinct year headers in the order the body emits them: the floor of each cluster's year, first
  *  occurrence only, walking `LAID`. Exported so the test can pin it to `YEAR_TICKS` — a header that
@@ -117,6 +127,47 @@ function PlateImg({ node, sizes }: { node: Node; sizes: string }) {
       style={{ aspectRatio: String(media.ratio) }}
       className={`block w-full ${contain ? 'bg-paperVellum object-contain' : 'bg-paperDeep/40 object-cover'}`}
     />
+  );
+}
+
+/**
+ * A plate wrapped in a real button that opens the shared Lightbox (Daniel's call). The visible plate is
+ * small (~80px) and chips are smaller (~44px), so the HIT AREA is floored at 44px (minHeight, and
+ * minWidth for chips) even though the image is smaller — the tap target is never below the visible mark.
+ * Each carries an `aria-label` naming the year and the work. A pending plate is not tappable.
+ */
+function TappablePlate({
+  node,
+  sizes,
+  maxW,
+  minW,
+  label,
+  onOpen,
+}: {
+  node: Node;
+  sizes: string;
+  maxW: string;
+  minW?: number;
+  label: string;
+  onOpen: (src: string) => void;
+}) {
+  if (node.media.pending) {
+    return (
+      <div className="w-full" style={{ maxWidth: maxW }}>
+        <PlateImg node={node} sizes={sizes} />
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(node.media.src)}
+      aria-label={label}
+      className="relative flex cursor-zoom-in items-center overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-inkBlack"
+      style={{ width: '100%', maxWidth: maxW, minWidth: minW, minHeight: 44 }}
+    >
+      <PlateImg node={node} sizes={sizes} />
+    </button>
   );
 }
 
@@ -214,25 +265,23 @@ function YearNode({ year, reduced, armed }: { year: number; reduced: boolean; ar
  * is the primary plate; any extras become a tight chip row beneath it. Caption, where authored, sits
  * at the same edge.
  */
-function ClusterCard({ cluster, reduced, armed }: { cluster: Cluster; reduced: boolean; armed: boolean }) {
+function ClusterCard({ cluster, reduced, armed, onOpen }: { cluster: Cluster; reduced: boolean; armed: boolean; onOpen: (src: string) => void }) {
   const cap = caption(cluster);
   const isLeft = cluster.side === 'left';
   const primary = cluster.nodes[0];
   const extra = cluster.nodes.slice(1);
+  const year = Math.floor(cluster.year);
+  const label = (m: Plate) => `Open ${year}${cap ? ` — ${cap}` : `: ${m.alt.slice(0, 56)}`}`;
   // The half-column, pushed to its side of the spine, its contents aligned to the spine edge.
   const half = `flex w-1/2 flex-col gap-1.5 ${isLeft ? 'items-end pr-3' : 'ml-auto items-start pl-3'}`;
   return (
     <Reveal reduced={reduced} armed={armed} y={16} scale={0.96} duration={0.45} className="relative z-10 my-9 flex">
       <div className={half}>
-        <div className="w-full" style={{ maxWidth: PLATE_MAX_W }}>
-          <PlateImg node={primary} sizes={PLATE_SIZES} />
-        </div>
+        <TappablePlate node={primary} sizes={PLATE_SIZES} maxW={PLATE_MAX_W} label={label(primary.media)} onOpen={onOpen} />
         {extra.length > 0 && (
           <div className="flex gap-1">
             {extra.map((n) => (
-              <div key={n.media.src} className="w-full" style={{ maxWidth: CHIP_MAX_W }}>
-                <PlateImg node={n} sizes={CHIP_SIZES} />
-              </div>
+              <TappablePlate key={n.media.src} node={n} sizes={CHIP_SIZES} maxW={CHIP_MAX_W} minW={44} label={label(n.media)} onOpen={onOpen} />
             ))}
           </div>
         )}
@@ -255,7 +304,7 @@ function ClusterCard({ cluster, reduced, armed }: { cluster: Cluster; reduced: b
  * ~450ms after the page reveals (Sai's held-then-grow); everything else reveals on scroll. Reduced
  * motion renders it all at rest.
  */
-function TimelineBody({ reduced, revealed }: { reduced: boolean; revealed: boolean }) {
+function TimelineBody({ reduced, revealed, onOpen }: { reduced: boolean; revealed: boolean; onOpen: (src: string) => void }) {
   // `grown` gates the twist glyph + spine (the time-based beat) AND arms the scroll reveals. Reduced
   // motion is grown from the first frame (everything static); otherwise it flips ~450ms after the page
   // reveals — a small deliberate pause in the same register as AboutIntro's own beats, not a scroll wait.
@@ -307,7 +356,7 @@ function TimelineBody({ reduced, revealed }: { reduced: boolean; revealed: boole
               acc.nodes.push(<YearNode key={`y-${year}`} year={year} reduced={reduced} armed={grown} />);
               acc.lastYear = year;
             }
-            acc.nodes.push(<ClusterCard key={cluster.id} cluster={cluster} reduced={reduced} armed={grown} />);
+            acc.nodes.push(<ClusterCard key={cluster.id} cluster={cluster} reduced={reduced} armed={grown} onOpen={onOpen} />);
             return acc;
           },
           { nodes: [], lastYear: NaN },
@@ -337,6 +386,14 @@ export function MobileTimeline({
   revealed?: boolean;
 }) {
   const reduced = useReducedMotion();
+  // The timeline's OWN lightbox over its OWN image set — the same component the gallery uses, morph off.
+  const [shot, setShot] = useState<number | null>(null);
+  const openShot = useCallback((src: string) => setShot(IMAGE_INDEX.get(src) ?? null), []);
+  const closeShot = useCallback(() => setShot(null), []);
+  const stepShot = useCallback(
+    (delta: number) => setShot((i) => (i === null ? i : (i + delta + TIMELINE_IMAGES.length) % TIMELINE_IMAGES.length)),
+    [],
+  );
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-8">
@@ -353,7 +410,11 @@ export function MobileTimeline({
         </dl>
       </div>
 
-      <TimelineBody reduced={reduced} revealed={revealed} />
+      <TimelineBody reduced={reduced} revealed={revealed} onOpen={openShot} />
+
+      {/* The timeline's viewer: the gallery's Lightbox, over the timeline's flattened image set, with
+          the shared-element morph OFF (see the Lightbox `morph` prop). */}
+      <Lightbox images={TIMELINE_IMAGES} index={shot} onClose={closeShot} onStep={stepShot} reduced={reduced} morph={false} />
     </div>
   );
 }
