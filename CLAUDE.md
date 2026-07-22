@@ -4,7 +4,17 @@ Loaded automatically at the start of every session in this repo. Keep it short.
 
 ## Where the work is — read this first
 
-**Current: mobile About REDESIGN shipped LIVE on `main` (2026-07-20). Handoff:
+**THE LIVE SITE IS TWO PAGES: `#/` and `#/about`. The engine is DEV-ONLY (2026-07-21).** Daniel's
+ruling: the studio/engine "is not something to be proud of at this time", so `#/studio`, `#/draw`,
+`#/engine`, `#/shape`, `#/sculpt` and both labs render only under `import.meta.env.DEV` and all links
+into them were stripped from the nav, footer, home and hero. **It is a gate, not a deletion** — every
+route still works under `npm run dev`. See `src/Root.tsx` + `src/DevRoutes.tsx` + `ENGINE_ROUTES` in
+`src/routing.ts`, guarded by `src/routing.test.ts`; handoff
+`docs/handoffs/2026-07-21-engine-hidden.md`. **Add a new engine route to `ENGINE_ROUTES` AND
+`DevRoutes` or it ships.** The hero currently has NO call to action (both pointed into hidden
+routes); the register form is the home's only conversion point until the engine returns.
+
+**Prior: mobile About REDESIGN shipped LIVE on `main` (2026-07-20). Handoff:
 `docs/handoffs/2026-07-20-mobile-about-redesign.md`** (design-of-record:
 `docs/design/2026-07-20-mobile-about-redesign.md`). Below `lg` the About timeline is a center-spine
 DOM tree (`src/pages/about/MobileTimeline.tsx`): centred intro title, questions-first then a

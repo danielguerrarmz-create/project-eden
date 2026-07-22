@@ -15,7 +15,7 @@
   // "these files are node and those files are not".
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["@react-three/fiber", "node"]
+    "types": ["@react-three/fiber", "vite/client", "node"]
   },
   "include": ["src/**/*.test.ts"],
   "exclude": []

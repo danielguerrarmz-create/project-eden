@@ -5,8 +5,13 @@
  * explains the product. It is now HERO -> what Bower is -> what happens after you shape
  * it -> begin -> monument. The "keeps becoming" three-season band and the "habitat built
  * in" ecology band were cut, and the pipeline / envelope / strut-field diagrams with them;
- * the full six-section engine walkthrough still lives at `/engine`, reached by the link in
- * the first band, so nothing is lost, only moved off the front door.
+ * the full six-section engine walkthrough moved to `/engine`, so nothing was lost, only
+ * moved off the front door.
+ *
+ * AMENDED 2026-07-21: `/engine` and `/studio` are dev-only now (see Root.tsx), so every
+ * link into them was removed from this page along with the `#how-it-works` anchor that
+ * served the old nav entry. The home no longer links anywhere except `#/about` and its own
+ * `#register`. This page is the live site's front door and very nearly all of it.
  *
  * The two product photographs (exterior in the garden, and the oculus from within) carry
  * the two middle bands as an alternating split: photo left / text right, then text left /
@@ -55,11 +60,14 @@ export function SplashPage() {
       {/* 1 — HERO: the scroll-scrubbed 2D Oculus -> 3D gridshell -> render reveal */}
       <HeroReveal outputs={outputs} reduced={reduced} />
 
-      {/* 2 — WHAT BOWER IS (vellum, #how-it-works). PHOTO LEFT / TEXT RIGHT.
-          The product said once, plainly, beside the built thing. The photo replaces the
-          pipeline + envelope diagrams that used to carry this band; the depth they held
-          now lives one link away at /engine. */}
-      <EngineSection ground="vellum" reduced={reduced} id="how-it-works" wide>
+      {/* 2 — WHAT BOWER IS (vellum). PHOTO LEFT / TEXT RIGHT.
+          The product said once, plainly, beside the built thing.
+          The `#how-it-works` anchor and the "see the full engine walkthrough" link out to
+          /engine were both removed on 2026-07-21 when the engine came off the live site:
+          the anchor only existed for a nav entry that no longer ships, and an anchor that
+          nothing points at is an orphan. The band itself stays — it is one of the two
+          product photographs, and it says what Bower is without showing the tool. */}
+      <EngineSection ground="vellum" reduced={reduced} wide>
         <div className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
           <figure className="order-1">
             <img
@@ -84,12 +92,6 @@ export function SplashPage() {
               structure for your garden, priced and buildable as you shape it, that a climber grows
               into season after season.
             </p>
-            <a
-              href={routes.engine}
-              className="mt-8 inline-flex items-center font-mono text-[12px] uppercase tracking-[0.14em] underline decoration-inkBlack/30 underline-offset-4 transition hover:decoration-accentOlive focus-visible:decoration-accentOlive [@media(pointer:coarse)]:min-h-[44px]"
-            >
-              See the full engine walkthrough →
-            </a>
           </div>
         </div>
       </EngineSection>
@@ -153,8 +155,10 @@ export function SplashPage() {
 
         <RegisterInterest />
 
+        {/* "Commission one" (into the studio) was removed on 2026-07-21 with the rest of the
+            engine's public surface. Registering interest is the one way in now, which is the
+            honest state of things until there is a tool worth handing someone. */}
         <div className="mt-12 grid gap-x-10 gap-y-6 border-t border-inkBlack/15 pt-8 sm:grid-cols-2">
-          <Door label="Commission one" href={routes.studio} note="Shape it in the studio." />
           <Door label="Who is behind this" href={routes.about} note="The people building Bower." />
         </div>
       </EngineSection>

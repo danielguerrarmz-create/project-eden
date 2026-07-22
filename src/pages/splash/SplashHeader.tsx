@@ -17,11 +17,11 @@ import { Frame, type Measure } from '../../ui/Frame';
 import { routes } from '../../routing';
 import { useReducedMotion } from '../../ui/useReducedMotion';
 
-/** The three global nav destinations, in one place so the inline pill and the mobile dropdown can
- *  never drift apart. Hrefs/labels are the originals — copied, not invented. */
+/** The global nav destinations, in one place so the inline pill and the mobile dropdown can
+ *  never drift apart. "how it works" (`#/engine`) and "studio" were removed on 2026-07-21
+ *  when the engine came off the live site: a nav entry is a promise, and neither page ships
+ *  to production any more. Restore both here when the engine is worth showing again. */
 const NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
-  { href: routes.engine, label: 'how it works' },
-  { href: routes.studio, label: 'studio' },
   { href: routes.about, label: 'about' },
 ];
 

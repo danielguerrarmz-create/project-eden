@@ -1,42 +1,47 @@
 /**
  * Root.tsx — top-level route switch.
  *
- * Bower is one company with one product (Eden), so the company home and the Eden
- * product page are one combined landing. The home carries a condensed engine
- * section (anchored `#how-it-works`); the full generative-engine walkthrough lives
- * at the standalone `#/engine` route for whoever wants the detail.
+ * THE PRODUCTION SITE IS TWO PAGES AND NOTHING ELSE:
  *
- * `#/`       -> the combined Bower + Eden landing (the splash home, with the
- *               condensed engine section at `#how-it-works`).
- * `#/engine` -> the full six-section engine walkthrough (EnginePage chrome).
- * `#/studio` -> the ENGINE: the draw tool (DrawPage). Replaced the old
- *               four-slider configurator on 2026-07-17 (Daniel: "our studio page
- *               is what the engine should be"), so the STUDIO nav link and the
- *               "shape your Eden" CTA both open the draw-and-bake engine. `/draw`
- *               stays as an alias for the same page. The old slider studio (App)
- *               is retired from routing; the component is kept in the tree.
- * anything else -> the splash landing (fallback, so a stray hash never dead-ends
- * and the splash's in-page `#how-it-works` / `#register` anchors keep resolving).
+ * `#/`      -> the home: hero, the two product-photograph bands, the register close,
+ *              and the company monument (SplashPage).
+ * `#/about` -> the founders / timeline page (AboutPage).
+ * anything else -> the home splash (fallback, so a stray hash never dead-ends and the
+ *                  splash's in-page `#register` anchor keeps resolving).
+ *
+ * EVERYTHING ENGINE-FACING IS DEV-ONLY (2026-07-21). Daniel's ruling: the studio/engine
+ * "is not something to be proud of at this time", so it comes off the live site entirely
+ * and stays hidden while it is rebuilt. `#/studio`, `#/draw`, `#/engine`, `#/shape`,
+ * `#/sculpt`, `#/lab/botanical` and `#/lab/gongbi` render only under
+ * `import.meta.env.DEV` and all still work under `npm run dev` — that is the point of a
+ * gate rather than a deletion. In a production build they resolve to the home splash.
+ *
+ * The gate is the ternary below, NOT a runtime check inside the component: Vite folds
+ * `import.meta.env.DEV` to `false` at build time, the dead branch takes its `import()`
+ * with it, and the engine (three.js, the draw tool, the labs) is never emitted into the
+ * production bundle at all. The route decision itself lives in `resolveRoute`
+ * (routing.ts) so it can be unit-tested for both values of `dev`.
  */
-import { EnginePage } from './pages/engine/EnginePage';
+import { Suspense, lazy } from 'react';
 import { SplashPage } from './pages/SplashPage';
 import { AboutPage } from './pages/AboutPage';
-import { ShapePage } from './pages/ShapePage';
-import { SculptPage } from './pages/SculptPage';
-import { DrawPage } from './pages/DrawPage';
-import { BotanicalLab } from './pages/lab/BotanicalLab';
-import { GongbiLab } from './pages/lab/GongbiLab';
-import { useRoute } from './routing';
+import { resolveRoute, useRoute } from './routing';
+
+/** Null in production. See the note above: this ternary IS the gate. */
+const DevRoutes = import.meta.env.DEV
+  ? lazy(() => import('./DevRoutes').then((m) => ({ default: m.DevRoutes })))
+  : null;
 
 export function Root() {
   const route = useRoute();
-  if (route === '/studio') return <DrawPage />;
-  if (route === '/engine') return <EnginePage />;
-  if (route === '/about') return <AboutPage />;
-  if (route === '/draw') return <DrawPage />;
-  if (route === '/shape') return <ShapePage />;
-  if (route === '/sculpt') return <SculptPage />;
-  if (route === '/lab/botanical') return <BotanicalLab />;
-  if (route === '/lab/gongbi') return <GongbiLab />;
+  const target = resolveRoute(route, import.meta.env.DEV);
+  if (target === 'about') return <AboutPage />;
+  if (target === 'engine' && DevRoutes) {
+    return (
+      <Suspense fallback={null}>
+        <DevRoutes route={route} />
+      </Suspense>
+    );
+  }
   return <SplashPage />;
 }

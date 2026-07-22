@@ -13,8 +13,6 @@ describe('SplashPage', () => {
     // New stripped hero: outcome headline + mission line (the cursive "Eden" word).
     expect(html).toContain('Grow a living');
     expect(html).toContain('computed for your garden');
-    // hero's single filled buyer CTA
-    expect(html).toContain('Shape your Eden');
     // the register section's form label is still present lower on the page
     expect(html).toContain('register interest');
     // the hero's old CTAs / stats strip are gone
@@ -41,8 +39,11 @@ describe('SplashPage', () => {
 
   it('honors the durationless constraint in the marketing pitch (no year label leaks)', () => {
     // The durationless rule governs the MARKETING pitch: it must not promise a timeline.
-    // Everything above the #how-it-works band is the pitch (now just the hero).
-    const pitch = html.split('id="how-it-works"')[0];
+    // Everything above the "What Bower is" band is the pitch (now just the hero). It used to
+    // split on `id="how-it-works"`, which was removed with the engine's public surface on
+    // 2026-07-21; the eyebrow marks the same boundary and is real copy, not an anchor.
+    const pitch = html.split('What Bower is')[0];
+    expect(pitch).not.toBe(html); // the split point must actually exist, or this asserts nothing
     expect(pitch).not.toContain('Year 0');
     expect(pitch).not.toContain('just planted');
     expect(pitch.toLowerCase()).not.toMatch(/year (one|two|three|3|1|0)/);
@@ -53,28 +54,45 @@ describe('SplashPage', () => {
     expect(html).toContain('Bower'); // the company wordmark (hero header)
   });
 
-  it('carries the global nav: how it works, studio, about', () => {
-    // The fixed SplashHeader teaches "how it works" (the /engine walkthrough page),
-    // "studio" (the configurator, its label now matching its destination), and "about".
-    expect(html).toContain('how it works');
+  it('carries the global nav, which is now about and nothing else', () => {
+    // 2026-07-21: "how it works" (#/engine) and "studio" left the nav when the engine came
+    // off the live site. The SplashHeader renders NAV_LINKS twice (the inline pill and the
+    // mobile dropdown), so a leaked entry would show up here twice over.
     expect(html).toContain('about');
-    // "studio" nav label now points honestly at the studio route (was mislabeled "engine").
-    expect(html).toContain('>studio<');
-    expect(html).toContain('href="#/studio"');
+    expect(html).toContain('href="#/about"');
+    expect(html).not.toContain('>studio<');
+    expect(html).not.toContain('>how it works<');
     expect(html).not.toContain('(the pavilion)');
   });
 
-  it('states what Bower is and links out to the full engine walkthrough', () => {
-    // The first content band ("What Bower is") explains the product in one pass and defers
-    // the mechanics to /engine. The #how-it-works anchor stays here so the nav resolves.
-    expect(html).toContain('id="how-it-works"');
+  it('links nowhere except #/about and its own #register anchor', () => {
+    // THE HOME MUST NOT DEAD-END INTO A HIDDEN ROUTE. Every engine destination is dev-only
+    // now, so any href into one would 'work' locally and land on the splash in production,
+    // which is a link that silently lies. Sweep the rendered hrefs rather than naming the
+    // ones we happened to remember removing. Anchors only: the nav pill's lens filter
+    // carries an `feImage href="data:image/svg+xml…"`, which is a bump map, not a destination.
+    const hrefs = [...html.matchAll(/<a\b[^>]*?\shref="([^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs.length).toBeGreaterThan(2); // the logo, the nav's about, the close's door
+    for (const href of hrefs) {
+      expect(['#/', '#/about', '#register']).toContain(href);
+    }
+  });
+
+  it('states what Bower is, without pointing at the engine', () => {
+    // The first content band explains the product in one pass. Its `#how-it-works` anchor
+    // and its "see the full engine walkthrough" link were removed on 2026-07-21; the band
+    // and its photograph stay, because they say what Bower is without showing the tool.
     expect(html).toContain('What Bower is');
     expect(html).toContain('grammar computes the');
-    // the deep-link out to the full walkthrough (the /engine route)
-    expect(html).toContain('See the full engine walkthrough');
-    expect(html).toContain('#/engine');
+    expect(html).not.toContain('id="how-it-works"');
+    expect(html).not.toContain('See the full engine walkthrough');
     // the sun-path / growth-phases detail is NOT on the home page
     expect(html).not.toContain('Solar geometry');
+  });
+
+  it('closes on the register, with the studio door gone', () => {
+    expect(html).toContain('Who is behind this');
+    expect(html).not.toContain('Commission one');
   });
 
   it('teaches the commission ritual with live production figures', () => {

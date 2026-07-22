@@ -14,8 +14,16 @@ export default defineConfig({
       output: {
         // Split the heavy 3D stack (three + fiber + drei, and react which they
         // depend on) from app code: app-code edits no longer re-ship ~1 MB.
+        //
+        // RENAMED FROM `three` ON 2026-07-21, because it stopped being three. Every
+        // three.js importer is now behind the dev-only engine gate (Root.tsx), so a
+        // production build reaches none of them and rollup shakes the 3D stack out
+        // entirely — measured 1,067 kB -> 146 kB, and what is left is react-dom, not
+        // three. The chunk kept working and its NAME had become a lie, which is the
+        // kind of artifact this repo gets burned by. The three ids stay listed so the
+        // split is already correct the day the engine comes back.
         manualChunks: {
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
+          vendor: ['three', '@react-three/fiber', '@react-three/drei'],
         },
       },
     },

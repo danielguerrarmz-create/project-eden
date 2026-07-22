@@ -4,11 +4,17 @@
  *   node qa/header-nav.mjs                 assert + capture to qa/shots/<date>/header/
  *   DATE=2026-07-20-nav node qa/header-nav.mjs
  *
- * Asserts, at phone widths: the hamburger is a >=44px button, opening it reveals the three links
- * (each >=44px, original hrefs), and — the load-bearing one — `--header-h` does NOT change when the
- * menu opens (the dropdown is an absolute overlay, so a `100svh - var(--header-h)` consumer never
- * jumps). At `md`+ : the inline pill shows and the hamburger is gone (identical to before). Captures
- * the header region closed and open at each width so the pixels can be reviewed.
+ * Asserts, at phone widths: the hamburger is a >=44px button, opening it reveals the nav's links
+ * (each >=44px, and every href a route that actually ships), and — the load-bearing one —
+ * `--header-h` does NOT change when the menu opens (the dropdown is an absolute overlay, so a
+ * `100svh - var(--header-h)` consumer never jumps). At `md`+ : the inline pill shows and the
+ * hamburger is gone (identical to before). Captures the header region closed and open at each width
+ * so the pixels can be reviewed.
+ *
+ * 2026-07-21: this said "the three links" and hardcoded 3. The nav is ONE link now ("about") —
+ * "how it works" and "studio" left with the rest of the engine's public surface. The count is read
+ * off the same list the app renders rather than re-typed here, and the hrefs are checked against the
+ * public routes, so the next nav change fails this probe honestly instead of failing it as arithmetic.
  */
 import { launch, setViewport, setReducedMotion, waitForReady, capture, sleep, BASE } from './lib.mjs';
 
@@ -72,15 +78,30 @@ for (const vp of WIDTHS) {
       const btn = document.querySelector('button[aria-controls="mobile-nav-menu"]');
       const menu = document.querySelector('#mobile-nav-menu');
       const links = menu ? [...menu.querySelectorAll('a')].map((a) => ({ h: Math.round(a.getBoundingClientRect().height), href: a.getAttribute('href') })) : [];
+      // The inline pill is `hidden md:flex`: still in the DOM at phone widths, just not shown.
+      // It renders from the same NAV_LINKS array, so it is the honest expectation for the
+      // dropdown — no count typed into this file to go stale.
+      const inline = [...document.querySelectorAll('header nav')].find((n) => !n.id);
       return {
         expanded: btn?.getAttribute('aria-expanded'),
         links,
+        inlineHrefs: inline ? [...inline.querySelectorAll('a')].map((a) => a.getAttribute('href')) : [],
         headerVar: getComputedStyle(document.documentElement).getPropertyValue('--header-h').trim(),
         focusInMenu: menu ? menu.contains(document.activeElement) : false,
       };
     });
     if (open.expanded !== 'true') fail(`${vp.w}: aria-expanded not true on open`);
-    if (open.links.length !== 3) fail(`${vp.w}: expected 3 links, got ${open.links.length}`);
+    const dropdownHrefs = open.links.map((l) => l.href);
+    if (dropdownHrefs.length === 0) fail(`${vp.w}: the dropdown rendered no links at all`);
+    if (dropdownHrefs.join('|') !== open.inlineHrefs.join('|')) {
+      fail(`${vp.w}: dropdown and inline nav have drifted: [${dropdownHrefs}] vs [${open.inlineHrefs}]`);
+    } else pass(`${vp.w}: dropdown matches the inline nav (${dropdownHrefs.join(', ')})`);
+    // Only routes a PRODUCTION build renders may be in the nav. Keep in step with `routes` /
+    // `ENGINE_ROUTES` in src/routing.ts: an engine href here would work in dev and land the user
+    // on the splash in production, which is a link that silently lies.
+    const PUBLIC_HREFS = ['#/', '#/about'];
+    const stowaway = dropdownHrefs.find((h) => !PUBLIC_HREFS.includes(h));
+    if (stowaway) fail(`${vp.w}: nav links ${stowaway}, which is not a public route`);
     if (open.links.some((l) => l.h < 44)) fail(`${vp.w}: a dropdown row < 44px`);
     if (!open.focusInMenu) fail(`${vp.w}: focus did not move into the menu`);
     // THE ONE THAT MATTERS: the overlay must not change the measured header height.

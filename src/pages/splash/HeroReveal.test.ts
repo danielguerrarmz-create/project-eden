@@ -39,9 +39,14 @@ describe('HeroReveal SSR (finished still + copy visible)', () => {
     expect(html).toContain('Eden');
     expect(html).toContain('in your garden');
     expect(html).toContain('computed for your garden');
-    // The hero now carries one filled buyer CTA + a quiet proof link.
-    expect(html).toContain('Shape your Eden');
-    expect(html).toContain('See how it works');
+    // THE HERO CARRIES NO CTA (2026-07-21). It had two, "Shape your Eden" into #/studio and
+    // "See how it works" into #/engine, and both destinations are dev-only now. A hero
+    // button pointing at a hidden route is worse than no button, so they were removed
+    // rather than repointed; the register form in the "Begin." section is the one way in.
+    expect(html).not.toContain('Shape your Eden');
+    expect(html).not.toContain('See how it works');
+    expect(html).not.toContain('#/studio');
+    expect(html).not.toContain('#/engine');
     // The 3D reveal is tabled: no three.js canvas is referenced by the hero.
     expect(html).not.toContain('<canvas');
     // The nav lives in the global fixed SplashHeader, not the hero SSR.

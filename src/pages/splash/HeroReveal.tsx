@@ -23,9 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Frame } from '../../ui/Frame';
 import { motion, type Variants } from 'framer-motion';
 import type { EngineOutputs } from '../../engine/types';
-import { routes } from '../../routing';
 import { srcSetFor } from '../../ui/responsiveImg';
-import { CTA_PRIMARY_BUYER } from '../../data/config';
 import { SESSION_KEY, INTRO_DONE_EVENT } from './BowerIntro';
 import { HERO_STILL } from './heroStill';
 
@@ -117,28 +115,12 @@ function HeroCopy({
         grown into it.
       </motion.p>
 
-      {/* One filled action (the buyer path) + a quiet proof link (the engine), so both the
-          person who wants to shape one and the person testing the claim have a next step. */}
-      <motion.div
-        variants={growLine}
-        className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 origin-bottom will-change-transform"
-      >
-        {/* The primary (buyer) CTA gets a 48px coarse-pointer floor; the quiet proof link 44px. Gated
-            on `pointer:coarse` so only touch devices grow the hit area — the desktop density is
-            untouched (zero-regression bar). */}
-        <a
-          href={routes.studio}
-          className="inline-flex items-center justify-center rounded-full bg-paperVellum px-6 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-inkBlack shadow-lg transition-colors hover:bg-accentOlive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paperVellum [@media(pointer:coarse)]:min-h-[48px]"
-        >
-          {CTA_PRIMARY_BUYER}
-        </a>
-        <a
-          href={routes.engine}
-          className="inline-flex items-center font-mono text-[12px] uppercase tracking-[0.14em] text-paperVellum/90 underline decoration-paperVellum/40 underline-offset-4 transition hover:decoration-paperVellum [@media(pointer:coarse)]:min-h-[44px]"
-        >
-          See how it works →
-        </a>
-      </motion.div>
+      {/* THE HERO HAS NO CTA (2026-07-21). It carried two: a filled "Shape your Eden" into
+          `#/studio` and a quiet "See how it works" into `#/engine`. Both destinations are
+          dev-only now (Root.tsx), and a hero button that scrolls nowhere is worse than no
+          button, so both were removed rather than repointed. The register form in the
+          "Begin." section is the page's only conversion point until the engine returns —
+          relanding the pair here is the first thing to do when it does. */}
     </motion.div>
   );
 }

@@ -2,8 +2,8 @@
  * Footer.tsx — the small, quiet footer every standalone page wears.
  *
  * NOT the home page's monument (the viewport-wide lowercase "bower" that closes the splash). This is
- * its documentation-layer cousin: the Oculus mark, the wordmark in mono, a thin rule, the three ways
- * in, and a year. Understated on purpose — it closes a page without competing with its content. The
+ * its documentation-layer cousin: the Oculus mark, the wordmark in mono, a thin rule, the ways in,
+ * and a year. Understated on purpose — it closes a page without competing with its content. The
  * home keeps its monument and suppresses this one (see the pages), so the big gesture stays unique.
  *
  * IT DELIBERATELY DOES NOT USE `BowerMark`: that component carries the single `[data-wordmark]` span
@@ -27,10 +27,10 @@ export function Footer({ measure = 'canvas' }: { measure?: Measure }) {
         <span className="font-mono text-[14px] lowercase tracking-[0.1em]">{WORDMARK}</span>
       </span>
       {/* Coarse-pointer devices get a 44px tap height on each footer link (they render ~17px tall);
-          gated so the desktop footer's density is unchanged. */}
+          gated so the desktop footer's density is unchanged.
+          "how it works" (`#/engine`) and "studio" were removed on 2026-07-21 with the rest of the
+          engine's public surface; only routes that ship to production may be linked here. */}
       <nav aria-label="Footer" className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/55">
-        <a href={routes.engine} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">how it works</a>
-        <a href={routes.studio} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">studio</a>
         <a href={routes.about} className="inline-flex items-center justify-center transition-colors duration-150 hover:text-inkBlack [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]">about</a>
       </nav>
       <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-inkBlack/40">© {year} Bower</span>

@@ -15,11 +15,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["@react-three/fiber"]
+    "types": ["@react-three/fiber", "vite/client"]
   },
   "include": ["src"],
   // THE BROWSER PROGRAM. `types` above is deliberately narrow: it is what stops `process`, `fs` and
   // the rest of node typechecking inside a component that ships to a browser and has no such thing.
+  // `vite/client` was added on 2026-07-21 for `import.meta.env.DEV`, the production gate on the
+  // engine routes (Root.tsx). It types the bundler's own browser-side surface and brings NO node
+  // globals with it, so the sentence above still holds — verified the same way the note below
+  // describes: `const x: string = process.cwd()` in a component still errors.
   // Tests are excluded because they are NOT browser code — they run in vitest's node environment and
   // some of them legitimately read files and shell out to git. They get their own program, with node
   // in it, in tsconfig.tests.json. `npm run typecheck` runs both; keeping them apart is the only

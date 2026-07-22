@@ -27,11 +27,14 @@ describe('EnginePage (the restored /engine walkthrough)', () => {
   });
 
   it('wears the shared splash chrome (one floating SplashHeader, one nav)', () => {
-    // The shared header, not the old bespoke one: wordmark + splash nav.
-    expect(html).toContain('how it works');
+    // The shared header, not the old bespoke one: wordmark + splash nav. The nav lost its
+    // "how it works" and "studio" entries on 2026-07-21 when the engine came off the live
+    // site, so this page (itself dev-only now) wears the same two-destination chrome the
+    // public pages do. Its own in-page link into #/studio is unaffected.
     expect(html).toContain('about');
     expect(html).toContain('#/'); // home link
-    expect(html).toContain('#/studio'); // the "engine" nav target
+    expect(html).toContain('#/studio'); // the close CTA into the draw tool
+    expect(html).not.toContain('>how it works<'); // the removed nav entry
     // The old bespoke header strings are gone.
     expect(html).not.toContain('· the generative engine');
   });
