@@ -115,6 +115,12 @@ still errors. `vite/client` brings no node globals.
   timber structure", and ritual step 1 is "Shape it in the studio". Neither is a link, and both were
   left alone: rewriting the product story is Daniel's/Sai's call, not a side effect of hiding a
   route. Worth a look if the site should stop implying a tool you can use today.
+- **RULED 2026-07-21, both of the two above: LEAVE THEM.** Daniel was shown the choice (leave it /
+  rewrite the copy with Sai / put a register CTA back in the hero) and chose to leave it and revisit
+  when the engine returns. So the hero stays CTA-less, the engine language stays in band 2 and in
+  ritual step 1, and the register form remains the home's only door. **This is a decision, not an
+  oversight — do not "fix" it as a drive-by.** Reopen it only if Daniel does, or if the engine comes
+  back and the copy is then telling the truth again.
 - The "Begin." close now has one door where it had two; the grid is still `sm:grid-cols-2`, so the
   single door sits in the left column. Fine, but it was not redesigned.
 - `qa/capture-matrix.mjs` still captures `#/engine`. That is correct — it runs against dev, where the
