@@ -70,10 +70,12 @@ POINTER; the round log is the record.*
   spine garland's `GARLAND_SEED` was curated by sweeping takes and comparing them, because
   `passesGate` (`engine/gongbi/quality.ts`) is a FLOOR, not a parity check: two seeds can both
   "pass" and still hang as a full plant next to a weed. Curate in `#/lab/gongbi` before pinning.
-- **A year label must fit its gutter.** `YEAR_LABEL_OFFSET + YEAR_LABEL_W <= OFFSET_X` in
-  `CrossPathsTimeline.tsx` (there is a test). When it didn't, every year with a plate on the
-  label's side put the numerals on the photograph and the label's vellum halo cut the branch
-  underneath in half. No choice of side can save a label wider than the space it lives in.
+- **THE TIMELINE SHOWS NO YEARS (2026-07-23).** Clay's client-curation note: the year labels,
+  ticks and mobile year headers are gone, and the intro reads "Bower is new… The obsession is
+  old." (no more "five years"). The `year` fields STAY — they order and band the layout — they
+  are just never printed. The label machinery and its guards (the side rule, the gutter law
+  `YEAR_LABEL_OFFSET + YEAR_LABEL_W <= OFFSET_X`, the collision floor) were deleted with the
+  feature; the tombstone by the axis in `CrossPathsTimeline.tsx` records what went and why.
 - **STOP FORCING GEOMETRY ONTO SOMETHING THAT ALREADY KNOWS ITS OWN SHAPE.** This is the page's
   most repeated bug and the answer has been the same every time: give the thing its own shape back.
   It has now shipped five ways — the hero in a 505x557 portrait box (Daniel: "natively landscape but

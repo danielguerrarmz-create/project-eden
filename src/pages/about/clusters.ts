@@ -63,10 +63,11 @@ export interface Cluster {
 }
 
 const A = '/assets/projects';
-/** The timeline's own photographs — the ones Daniel shot/supplied for the page itself (orientation,
- *  studio, DAC pin-up, Resia pitch) rather than for a project. They live apart from `/assets/projects`
+/** The timeline's own photographs — the ones Daniel shot/supplied for the page itself (studio,
+ *  DAC pin-up, Resia pitch) rather than for a project. They live apart from `/assets/projects`
  *  because they are not a project's documentation; they are the page's narrative. (A 2026 graduation
- *  photo was the fifth of these until round 11, when Daniel removed it.) */
+ *  photo was the fifth of these until round 11, when Daniel removed it; the 2021 orientation Zoom
+ *  grid was the fourth until the 2026-07-23 curation — see the note at the head of CLUSTERS.) */
 const T = '/assets/about/timeline';
 
 /* ------------------------------ the plate box ----------------------------- */
@@ -132,70 +133,26 @@ export function plateBox(tier: PlateTier, ratio: number): { w: number; h: number
  * The content graph, node by node. `nodes[0]` is the lead (hero, or showcase for the two bookends);
  * later nodes stack below as standard siblings. The clusters are agnostic to the winding finale and
  * twist-fuse beginning — this list is content only, and the geometry above holds it whatever it is.
+ *
+ * CURATED FOR CLIENTS, 2026-07-23 — Clay's note to Daniel: "We should be more curatorial,
+ * especially if we are sharing with real clients... focus on the design and cultural work."
+ * Three plates came out (recover any of them, with their full decision history, via
+ * `git log -- src/pages/about/clusters.ts`):
+ *
+ *   - `origin-2021`, the UT orientation Zoom grid. It was the page's opening bracket, and it
+ *     carried a long consent ruling (Daniel chose twice, knowingly, to ship ~40 identifiable
+ *     classmates' faces on this public page). Clay named it for removal; taking it out also
+ *     retires that exposure going forward, though a past public push is effectively permanent.
+ *     If it ever returns, read the ruling history in this file's git log first.
+ *   - `testfit`, the backlit TestFit logo sign at 12:56am. Startup hours, not design work.
+ *   - `medical`'s in-hospital device-test photograph (Clay: "the pressure ulcer photo").
+ *     The brochure DRAWING stays — it is the design; the clinical photograph goes.
+ *
+ * With `origin-2021` gone the page has no visual opening bracket (the closing graduation photo
+ * went in round 11), so the copy carries the bracket alone: "Bower is new…" over the intro,
+ * the obsession coda at the foot.
  */
 export const CLUSTERS: Cluster[] = [
-  {
-    /**
-     * THE FIRST PLATE, and half of the page's bracket. Daniel: "put this image as our FIRST, our
-     * school orientation." It is a UT orientation Zoom grid — forty-odd strangers in forty-odd
-     * boxes, hook-'em hands, nobody having met anybody. The page opens on the paths NOT crossed
-     * yet — the same bracket the copy makes with "Bower is new." / "The obsession is real, and it is
-     * old." (A graduation photograph used to close the visual bracket at the foot of this list; Daniel
-     * removed it in round 11, so the copy carries the closing half alone now.) The showcase tier was
-     * already reserved for exactly this (see TIER) — the bookend it names as "ut-austin" had been
-     * waiting for an asset since the tier was written.
-     *
-     * SHIPPED BY DANIEL'S EXPLICIT RULING, 2026-07-16. This is the DECISION, recorded — not a
-     * justification for it, and the difference is the point. Round 9 left a note here claiming the
-     * names are illegible at 640; round 10 measured it and it is overstated; and a false rationale
-     * left in the code is how the next agent either "re-mitigates" something already decided, or
-     * trusts the claim and reuses it somewhere it is not true. So, what is actually true:
-     *
-     *   - The photograph shows ~40 identifiable UT students with their NAMES printed under their
-     *     faces. THIS REPO IS PUBLIC (`danielguerrarmz-create/project-eden`), so `git add` is
-     *     `publish` — the line is `git push`, not the merge — and a public push is effectively
-     *     permanent, because it can be cached and indexed even if later deleted.
-     *   - MEASURED, by cropping the caption strip out of both files and upscaling 6x nearest (what a
-     *     determined viewer actually does): at 828 the names read outright; at 640 they are badly
-     *     degraded but a few stay partly guessable. "Harder" is not "illegible".
-     *   - AND LEGIBILITY IS LARGELY A RED HERRING. With every name unreadable this is still ~40
-     *     identifiable FACES on a company's public About page. The face is the personal data; the
-     *     name only compounds it.
-     *
-     * Daniel was told all of that, in those terms, and was offered: crop to the two of them, drop it,
-     * ship knowingly, or assert consent. He did not claim consent. He chose to ship the full frame.
-     * It is his photograph, his classmates, his company's page, and his call to make. Do not
-     * re-litigate it here; if it ever needs revisiting that is a conversation with him, not a commit.
-     *
-     * IT SHIPS AT 640, NOT THE 828, and that stays deliberate even though the downscale is no longer
-     * load-bearing for the ruling: it costs nothing visually and it is a real, if partial, reduction
-     * in exposure, so there is no reason to upgrade the resolution now. The 828 original stays out of
-     * the repo, at `restless-egg/_photo-originals/timeline/`.
-     */
-    id: 'origin-2021',
-    year: 2021.1,
-    side: 'right',
-    hint: '',
-    nodes: [
-      {
-        // SMALLER (round 10, item 10). `showcase` -> `hero`, one tier down: 400 wide to 320, a 20%
-        // cut. One tier, not two — he said "smaller" of this and "much smaller" of the graduation
-        // plate (since removed, round 11), and those were different words.
-        //
-        // A SIDE EFFECT WORTH NAMING AND NOT ACTING ON: a smaller plate also renders ~40 identifiable
-        // faces smaller, which is a happy consequence of a composition note. It is NOT a reason to
-        // shrink it further than he asked, and NOT a reason to reopen the ruling — he has ruled
-        // twice, knowingly, on the faces-and-consent framing. See the note at the head of this
-        // cluster. Do not quietly re-mitigate a decision by tuning a number.
-        tier: 'hero',
-        media: {
-          src: `${T}/2021-orientation-zoom.webp`,
-          ratio: 1.5725,
-          alt: 'A UT Austin orientation call in 2021: a grid of some forty new students in their own boxes, hook-’em hands raised, none of them having met yet',
-        },
-      },
-    ],
-  },
   {
     // The studio, before the first project: the two of them at one desk at night, one rendering,
     // one watching over his shoulder. Daniel called it "one of our beginning placeholder images".
@@ -245,30 +202,6 @@ export const CLUSTERS: Cluster[] = [
           ratio: 1.2936,
           fit: 'contain',
           alt: 'The brochure cover: the finished wedge, the materials needed, the two-hour turning interval, and the device in use under a patient',
-        },
-      },
-      {
-        tier: 'standard',
-        media: {
-          src: `${A}/11-wound-care-kenya/wound-care-kenya-in-hospital-device-test.webp`,
-          ratio: 1.2125,
-          alt: 'The device tested in hospital at Moi Teaching Hospital, Kenya',
-        },
-      },
-    ],
-  },
-  {
-    id: 'testfit',
-    year: 2023.0,
-    side: 'left',
-    hint: '',
-    nodes: [
-      {
-        tier: 'hero',
-        media: {
-          src: `${A}/15-testfit/testfit-backlit-logo-sign-late-night.webp`,
-          ratio: 0.5637,
-          alt: 'The backlit TestFit logo sign on an office wall at 12:56 in the morning, the late nights of a startup',
         },
       },
     ],
