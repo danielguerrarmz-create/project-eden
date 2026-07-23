@@ -6,8 +6,8 @@
  * bare node, so everything under test is a pure function.
  */
 import { describe, it, expect } from 'vitest';
-import { CLUSTERS, YEAR_TICKS } from './clusters';
-import { LAID, yearHeaderOrder, caption } from './MobileTimeline';
+import { CLUSTERS } from './clusters';
+import { LAID, caption } from './MobileTimeline';
 
 describe('MobileTimeline order', () => {
   it('LAID is the clusters in ascending chronological order', () => {
@@ -24,19 +24,8 @@ describe('MobileTimeline order', () => {
   });
 });
 
-describe('MobileTimeline year headers', () => {
-  it('emits each ticked year exactly once, in axis order', () => {
-    // A header that drifts from YEAR_TICKS is a year printed twice or a year with no card — invisible
-    // without a render. This ties the two together.
-    expect(yearHeaderOrder()).toEqual([...YEAR_TICKS]);
-  });
-
-  it('every emitted header owns at least one card', () => {
-    for (const y of yearHeaderOrder()) {
-      expect(LAID.some((c) => Math.floor(c.year) === y)).toBe(true);
-    }
-  });
-});
+/* The year-headers describe stood here until 2026-07-23 — the years came off the timeline, and
+ * `yearHeaderOrder()` went with them. */
 
 describe('MobileTimeline captions are authored, never invented', () => {
   it('a caption is exactly the cluster hint, trimmed — empty stays empty', () => {

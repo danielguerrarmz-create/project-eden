@@ -88,8 +88,13 @@ function authorTextColor(_by: Project['by']): string {
 }
 
 /** The page title, shared verbatim between the header and the intro's flying title so they
- *  land coincident — and it IS the narration's payoff line. */
-const TITLE = "We've been chasing it for five years.";
+ *  land coincident — and it IS the narration's payoff line.
+ *
+ *  2026-07-23, Clay's note to Daniel: the years come off the timeline, "And instead just say
+ *  'Bower is new… The obsession is old.' On the intro." So the payoff is no longer the
+ *  five-years count (a number that ages) — the setup's ellipsis hands into this line and the
+ *  two read as one sentence. Was: "We've been chasing it for five years." */
+const TITLE = 'The obsession is old.';
 const TITLE_CLASS =
   'font-serifDisplay text-[clamp(1.6rem,4.4vw,3rem)] font-medium leading-[1.12] tracking-[-0.01em] text-inkBlack';
 

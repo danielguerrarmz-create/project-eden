@@ -2,9 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   spreadSide,
   MAX_CONCURRENT_STRANDS,
-  yearLabelSide,
-  yearLabelPositions,
-  yearLabelSidePositions,
   YEAR_TICKS,
   CLUSTERS,
   spinePts,
@@ -18,11 +15,7 @@ import {
   MARK_R,
   MARK_K,
   SPINE_W,
-  yearLabelClearance,
-  yearLabelBox,
   yearToY,
-  YEAR_LABEL_W,
-  YEAR_LABEL_OFFSET,
   OFFSET_X,
   computePlates,
   SUB_PLATE_PAD,
@@ -483,187 +476,10 @@ describe('composition contract', () => {
   });
 });
 
-describe('yearLabelSide: the heavy year labels step aside from the real layout', () => {
-  const YEARS = [2021, 2022, 2023, 2024, 2025];
-  /**
-   * THE LABELS' REAL Ys. These take a y COORDINATE, not a year — and they always did, but until the
-   * labels started following the plates (round 8) the two were close enough to conflate: every call
-   * site passed the year and `yearLabelClearance` converted it with `yearToY` internally. When that
-   * conversion moved out, these tests kept passing while measuring a label at y=2022px — the top of
-   * the drawing, where there is nothing to collide with, so "clears everything" was true and empty.
-   * Read them from the same function the page does.
-   */
-  const LABEL_Y = yearLabelPositions();
-  /** Authored year per cluster id, so a laid-out plate can be traced back to the year it belongs to. */
-  const CLUSTER_YEAR: Record<string, number> = Object.fromEntries(CLUSTERS.map((c) => [c.id, c.year]));
-
-  it('defaults right when there is nothing to dodge', () => {
-    expect(yearLabelSide([], LABEL_Y.get(2022)!)).toBe('right');
-  });
-
-  it('THE RULING: a year sits beside the work it names, not at its metric position', () => {
-    // Daniel, round 8: the axis stops being metric and becomes a sequence. `spreadSide` moves
-    // plates, so a plate's y stopped meaning its date — a 2023 project could sit beside "2024".
-    // A label beside the wrong project is a factual error a reader catches; nobody measures the
-    // pixel distance between two years.
-    const plates = computePlates();
-    const laidYears = new Set(plates.map((p) => p.clusterId));
-    expect(laidYears.size).toBeGreaterThan(0);
-
-    for (const [year, ty] of LABEL_Y) {
-      const mine = plates.filter((p) => CLUSTER_YEAR[p.clusterId] !== undefined && Math.floor(CLUSTER_YEAR[p.clusterId]) === year);
-      // Every titled year now carries work (the graduation photo that gave 2026 its lone plate was
-      // removed round 11), so there is no empty-year branch to skip here.
-      // The label sits within its own year's band of plates — top of the first, bottom of the last.
-      const top = Math.min(...mine.map((p) => p.rect.y));
-      const bottom = Math.max(...mine.map((p) => p.rect.y + p.rect.h));
-      expect(ty, `${year} is not beside its own work`).toBeGreaterThanOrEqual(top - 1);
-      expect(ty, `${year} is past the end of its own work`).toBeLessThanOrEqual(bottom);
-    }
-  });
-
-  it('...and no two years print on top of each other', () => {
-    // Following the plates cannot mean landing on another label. Measured before the gap floor
-    // existed: 2021's first plate at y=450 and 2022's at y=457, with a 40-unit glyph box.
-    const ys = [...LABEL_Y.values()];
-    for (let i = 1; i < ys.length; i++) {
-      expect(ys[i] - ys[i - 1], `labels ${i - 1} and ${i} collide`).toBeGreaterThanOrEqual(40);
-    }
-  });
-
-  /**
-   * THESE TWO NOW TEST THE FALLBACK, AND SAYING SO IS THE POINT.
-   *
-   * `yearLabelSide` (roomier side) stopped being the page's rule on 2026-07-17 — `yearLabelSides`
-   * puts a label beside the work it names, and the roomier side survives ONLY for a year with no work
-   * to sit beside. **The whole suite stayed green (523/523) through a change that moved five of the
-   * six labels**, because every test in this block called the function the page had stopped asking.
-   * That is this repo's own warning arriving on schedule: *"after a change big enough that you
-   * expected something to fail, an all-green run is a finding about your coverage, not a pass"* — and
-   * a guard that quietly stops guarding still reports green, which reads as "checked".
-   *
-   * So: these keep their value as fallback tests, renamed to say which rule they are about. The tests
-   * for the LIVE rule are in the block below, and they fail when the live rule breaks.
-   */
-  it('THE FALLBACK picks the side with more room, for a year with no work to sit beside', () => {
-    // One plate hard against the label band on the right, nothing on the left → go left.
-    const obstacles = [
-      { side: 'right' as const, rect: { x: 710, y: 1404, w: 320, h: 213 } },
-    ];
-    expect(yearLabelSide(obstacles, 1500)).toBe('left');
-  });
-
-  it('THE FALLBACK always chooses the roomier side — it can never pick the worse one', () => {
-    const obstacles = computePlates();
-    for (const y of YEARS) {
-      const ty = LABEL_Y.get(y)!;
-      const chosen = yearLabelClearance(obstacles, ty, yearLabelSide(obstacles, ty));
-      const other = yearLabelSide(obstacles, ty) === 'right' ? 'left' : 'right';
-      expect(chosen).toBeGreaterThanOrEqual(yearLabelClearance(obstacles, ty, other));
-    }
-  });
-
-  it('clears everything at EVERY year, 2025 included — the exception died with the branches', () => {
-    // Round 1 could not make this true. 2025 measured -2.5 on BOTH sides and no side choice fixed it:
-    // `packSide` pushes llo's plate (right) and dougherty's (left) far below their anchor years, so
-    // both sides carried a long BRANCH descending through 2025's label band. It shipped grandfathered
-    // at > -6 ("must not get WORSE while it waits") and was flagged for Daniel as a composition call.
-    //
-    // The decoupling deleted the branches, and with them the only obstacle 2025 ever had. There is no
-    // exception here any more, and this asserts it rather than leaving the old allowance to rot.
-    const obstacles = computePlates();
-    for (const y of YEARS) {
-      const ty = LABEL_Y.get(y)!;
-      const gap = yearLabelClearance(obstacles, ty, yearLabelSide(obstacles, ty));
-      expect(gap, `year ${y} (label at y=${Math.round(ty)})`).toBeGreaterThan(0);
-    }
-  });
-
-  it('THE ROOT CAUSE: a year label fits inside the gutter it lives in', () => {
-    // The gutter from the spine to a plate's near edge is OFFSET_X (110). A label reaches
-    // YEAR_LABEL_OFFSET + YEAR_LABEL_W from the spine. When that exceeded 110 the label poked
-    // into the plate lane and NO choice of side could save it — both sides were busy at 2023
-    // and 2025. Keep this true and the side rule has nothing left to fight.
-    expect(YEAR_LABEL_OFFSET + YEAR_LABEL_W).toBeLessThanOrEqual(OFFSET_X);
-  });
-
-  it('never puts a label on top of a plate, on either side, at any year', () => {
-    const obstacles = computePlates();
-    for (const y of YEARS) {
-      for (const side of ['left', 'right'] as const) {
-        const box = yearLabelBox(side === 'right' ? 1 : -1, LABEL_Y.get(y)!);
-        for (const o of obstacles) {
-          if (o.side !== side) continue;
-          const overlaps =
-            box.x0 < o.rect.x + o.rect.w &&
-            box.x1 > o.rect.x &&
-            box.y0 < o.rect.y + o.rect.h &&
-            box.y1 > o.rect.y;
-          expect(overlaps).toBe(false);
-        }
-      }
-    }
-  });
-});
-
-/**
- * THE LIVE SIDE RULE: a year label sits beside the work it names, in x as well as y.
- *
- * The rule was born from Daniel's round-11 item 1 ("Move the graduation photograph to the LEFT, NEXT
- * TO THE 2026 TEXT"): moving the plate alone did not do it, because the label used to take the roomier
- * side and fled to the right. That graduation photograph was later REMOVED (2026 is no longer a titled
- * year), but the rule it forced — a year label sits beside its own work — stands for every year that
- * remains, and these tests pin it.
- */
-describe('yearLabelSides: a year label sits beside the work it names', () => {
-  const CLUSTER_YEAR: Record<string, number> = Object.fromEntries(CLUSTERS.map((c) => [c.id, c.year]));
-
-  it('guards the probe: there are labels and plates to compare', () => {
-    // Every assertion below iterates these. An empty map satisfies all of them silently.
-    // Five titled years now (2021–2025); the graduation photo that gave 2026 a label was removed.
-    expect(yearLabelSidePositions().size).toBe(5);
-    expect(computePlates().length).toBeGreaterThan(10);
-  });
-
-  it('THE RULE: every year label is on the side of its own first plate', () => {
-    const plates = computePlates();
-    const sides = yearLabelSidePositions();
-    for (const [year, side] of sides) {
-      // Key on the AUTHORED year — a fact — never on "the nearest plate", which is a magnitude.
-      const mine = plates.filter((p) => Math.floor(CLUSTER_YEAR[p.clusterId] ?? NaN) === year);
-      if (mine.length === 0) continue; // no work: the fallback owns this year, tested above
-      const first = mine.reduce((a, b) => (b.rect.y < a.rect.y ? b : a));
-      expect(side, `${year}'s label is across the spine from the work it names`).toBe(first.side);
-    }
-  });
-
-  // The ITEM 1 test that pinned the 2026 label beside the graduation photograph is gone with the
-  // photograph itself (round 11): Daniel removed the graduation plate, so 2026 is no longer a titled
-  // year. THE RULE above still holds it for every year that remains.
-
-  it('THE LAW THAT MAKES IT SAFE: a label can never touch a plate, on EITHER side, at any year', () => {
-    // This is why sitting beside the work costs nothing. The gutter law (YEAR_LABEL_OFFSET +
-    // YEAR_LABEL_W <= OFFSET_X) means the label lane and the plate lane cannot intersect, so the old
-    // "step aside to stay clear" had nothing to step aside from. Asserted on BOTH sides at every year,
-    // so it holds whichever side the rule picks — that is what makes the rule free to pick.
-    const obstacles = computePlates();
-    for (const [, ty] of yearLabelPositions()) {
-      for (const side of ['left', 'right'] as const) {
-        expect(yearLabelClearance(obstacles, ty, side)).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  it('the render and the ornament read ONE side per year, so the vine cannot dodge a ghost', () => {
-    // The no-go rects and the render both resolve the side. If they ever disagree, the ornament
-    // reserves the MIRROR of where the numerals are: it protects blank paper and grows through the
-    // label. One entry point is the fix; this asserts there is only one answer to read.
-    const a = yearLabelSidePositions();
-    const b = yearLabelSidePositions();
-    expect([...a]).toEqual([...b]);
-    for (const [, side] of a) expect(['left', 'right']).toContain(side);
-  });
-});
+/* Two describes guarded the year labels here (the side rule, the gutter law, the label-collision
+ * floor) until 2026-07-23, when the years came off the timeline. They died with the feature; the
+ * rulings they encoded are recorded in the tombstone by the axis in CrossPathsTimeline.tsx, and
+ * the tests themselves are in this file's git history. */
 
 describe('the twist-fuse beginning: no spine above the junction', () => {
   it('the spine starts exactly at the junction and never rises above it', () => {
@@ -940,11 +756,11 @@ describe('the sepia colour lane', () => {
 
 /**
  * Clay's gongbi composer, grafted onto Daniel's spine as ornament (2026-07-16). The organs must
- * grow in the bands the DRAWING leaves free — a garland that buries a fork or a year numeral is
- * not ornament on structure, it is a second plant fighting the first.
+ * grow in the bands the DRAWING leaves free — a garland that buries a fork is not ornament on
+ * structure, it is a second plant fighting the first. (The year ticks and numerals were a second
+ * protected class until the years came off the page, 2026-07-23.)
  */
 describe('the spine garland: Clay organs on Daniel geometry', () => {
-  const YEARS = [2021, 2022, 2023, 2024, 2025];
   const spanY = (t: number) => CONV_JUNCTION_Y + t * (CONVERGE_Y - CONV_JUNCTION_Y);
 
   it('grows something (the graft is not silently empty)', () => {
@@ -963,15 +779,6 @@ describe('the spine garland: Clay organs on Daniel geometry', () => {
       const y = spanY(s.t);
       for (const c of CLUSTERS) {
         expect(Math.abs(y - yearToY(c.year))).toBeGreaterThanOrEqual(46);
-      }
-    }
-  });
-
-  it('never grows on a year tick or its numeral', () => {
-    for (const s of garlandStations()) {
-      const y = spanY(s.t);
-      for (const yr of YEARS) {
-        expect(Math.abs(y - yearToY(yr))).toBeGreaterThanOrEqual(40);
       }
     }
   });

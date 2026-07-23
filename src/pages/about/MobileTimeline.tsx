@@ -22,12 +22,13 @@
  * is deliberately the simpler path: this page's recorded bugs all lived in extra hand-rolled clocks
  * (the two-garland clock, the autoplay-drives-the-camera clock), and per-item IO sidesteps that class.
  * The twist glyph + spine grow on a single time beat ~450ms after the page reveals (a held-then-grow,
- * so title → questions → then the line arrives); every card/year/finale then reveals as it scrolls in.
+ * so title → questions → then the line arrives); every card and the finale then reveal on scroll.
  * Reduced motion renders the whole thing at rest, no observers, no delay.
  *
- * COLOUR LAW (viewport-independent, CLAUDE.md): STRUCTURE IS ALWAYS SEPIA — spine, ticks, year labels,
- * twist glyph, finale mark. The only colour besides sepia is the photographs' own; this lean tree
- * grows no gongbi ornament, so there is no pigment to police. Nothing is colour-coded by person.
+ * COLOUR LAW (viewport-independent, CLAUDE.md): STRUCTURE IS ALWAYS SEPIA — spine, twist glyph,
+ * finale mark. The only colour besides sepia is the photographs' own; this lean tree grows no gongbi
+ * ornament, so there is no pigment to police. Nothing is colour-coded by person. (The year headers
+ * were sepia structure too, until the years came off the timeline on 2026-07-23.)
  */
 import { useCallback, useEffect, useState, type ReactNode, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
@@ -60,21 +61,10 @@ export const LAID: readonly Cluster[] = [...CLUSTERS].sort((a, b) => a.year - b.
 const TIMELINE_IMAGES: Plate[] = LAID.flatMap((c) => c.nodes.map((n) => n.media)).filter((m) => !m.pending);
 const IMAGE_INDEX = new Map(TIMELINE_IMAGES.map((m, i) => [m.src, i]));
 
-/** The distinct year headers in the order the body emits them: the floor of each cluster's year, first
- *  occurrence only, walking `LAID`. Exported so the test can pin it to `YEAR_TICKS` — a header that
- *  drifts from the axis ticks is a year printed twice or a year missing, invisible without a render. */
-export function yearHeaderOrder(): number[] {
-  const out: number[] = [];
-  let last = NaN;
-  for (const c of LAID) {
-    const y = Math.floor(c.year);
-    if (y !== last) {
-      out.push(y);
-      last = y;
-    }
-  }
-  return out;
-}
+/* `yearHeaderOrder()` and the `YearNode` spine dots stood here until 2026-07-23, when the years
+ * came off the timeline (Clay's note; the desktop labels went in the same ruling — see the
+ * tombstone in CrossPathsTimeline.tsx). The clusters' `year` field still orders `LAID`; it is
+ * geometry's input now, not copy. */
 
 /** A card's visible caption. The drawn timeline shows NO captions — just images beside year labels —
  *  and inventing prose for the ~8 clusters whose `hint` is empty would be fabrication. So a caption
@@ -245,19 +235,6 @@ function FinaleLockup() {
   );
 }
 
-/** A year header on the spine: a centred dot + the mono year, between clusters. Unchanged treatment
- *  (Sai §4: "already reads correctly"), now revealing on scroll. */
-function YearNode({ year, reduced, armed }: { year: number; reduced: boolean; armed: boolean }) {
-  return (
-    <Reveal reduced={reduced} armed={armed} y={8} duration={0.4} className="relative z-10 my-8 flex items-center justify-center gap-2">
-      <span className="block h-2.5 w-2.5 flex-none rounded-full" style={{ background: INK_SEPIA }} />
-      <span className="font-mono text-[15px] font-semibold tracking-[0.06em]" style={{ color: INK_SEPIA_TEXT }}>
-        {year}
-      </span>
-    </Reveal>
-  );
-}
-
 /**
  * One cluster, off the spine. The card takes the half named by `cluster.side` and its plate hugs the
  * SPINE-side edge of that half (right edge for a left card, left edge for a right card) — reading as
@@ -270,8 +247,9 @@ function ClusterCard({ cluster, reduced, armed, onOpen }: { cluster: Cluster; re
   const isLeft = cluster.side === 'left';
   const primary = cluster.nodes[0];
   const extra = cluster.nodes.slice(1);
-  const year = Math.floor(cluster.year);
-  const label = (m: Plate) => `Open ${year}${cap ? ` — ${cap}` : `: ${m.alt.slice(0, 56)}`}`;
+  // No year in the label: the years came off the timeline (2026-07-23), and a screen reader should
+  // not hear a date the page no longer shows anyone else.
+  const label = (m: Plate) => `Open ${cap || m.alt.slice(0, 56)}`;
   // The half-column, pushed to its side of the spine, its contents aligned to the spine edge.
   const half = `flex w-1/2 flex-col gap-1.5 ${isLeft ? 'items-end pr-3' : 'ml-auto items-start pl-3'}`;
   return (
@@ -299,10 +277,10 @@ function ClusterCard({ cluster, reduced, armed, onOpen }: { cluster: Cluster; re
 }
 
 /**
- * The vertical timeline body: the centre spine, the twist-fuse at its head, the years and their cards,
- * and the mark lockup at its foot. The spine grows in and the twist glyph settles on ONE time beat
- * ~450ms after the page reveals (Sai's held-then-grow); everything else reveals on scroll. Reduced
- * motion renders it all at rest.
+ * The vertical timeline body: the centre spine, the twist-fuse at its head, the cluster cards in
+ * chronological order, and the mark lockup at its foot. The spine grows in and the twist glyph
+ * settles on ONE time beat ~450ms after the page reveals (Sai's held-then-grow); everything else
+ * reveals on scroll. Reduced motion renders it all at rest.
  */
 function TimelineBody({ reduced, revealed, onOpen }: { reduced: boolean; revealed: boolean; onOpen: (src: string) => void }) {
   // `grown` gates the twist glyph + spine (the time-based beat) AND arms the scroll reveals. Reduced
@@ -349,18 +327,9 @@ function TimelineBody({ reduced, revealed, onOpen }: { reduced: boolean; reveale
           )}
         </div>
 
-        {LAID.reduce<{ nodes: ReactNode[]; lastYear: number }>(
-          (acc, cluster) => {
-            const year = Math.floor(cluster.year);
-            if (year !== acc.lastYear) {
-              acc.nodes.push(<YearNode key={`y-${year}`} year={year} reduced={reduced} armed={grown} />);
-              acc.lastYear = year;
-            }
-            acc.nodes.push(<ClusterCard key={cluster.id} cluster={cluster} reduced={reduced} armed={grown} onOpen={onOpen} />);
-            return acc;
-          },
-          { nodes: [], lastYear: NaN },
-        ).nodes}
+        {LAID.map((cluster) => (
+          <ClusterCard key={cluster.id} cluster={cluster} reduced={reduced} armed={grown} onOpen={onOpen} />
+        ))}
 
         <Reveal reduced={reduced} armed={grown} y={16} scale={0.96} duration={0.45} className="relative z-10 pt-10">
           <FinaleLockup />

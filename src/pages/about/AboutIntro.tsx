@@ -25,23 +25,24 @@ const EASE_LINE = [0.16, 1, 0.3, 1] as const;
 const TRAVEL_S = 0.9;
 
 /**
- * THE SETUP LINE. The contrast IS the story: a new company, an old pursuit — and the payoff ("We've
- * been chasing it for five years.") is the TITLE itself, which enters big and settles into the
- * header, so the loading screen and the header are one thought.
+ * THE SETUP LINE. The contrast IS the story: a new company, an old pursuit — and the payoff ("The
+ * obsession is old.") is the TITLE itself, which enters big and settles into the header, so the
+ * loading screen and the header are one thought.
  *
- * Restored 2026-07-16. The beat had been cut and the payoff was left standing with nothing to pay
- * off. It reads:
+ * REWRITTEN 2026-07-23 on Clay's note to Daniel: the years come off the timeline, and the intro
+ * "instead just say[s] 'Bower is new… The obsession is old.'" It reads:
  *
- *     Bower is new.
- *     We've been chasing it for five years.
+ *     Bower is new…
+ *     The obsession is old.
  *
- * NOT the original "We built this in two weeks." — that is a claim with a shelf life, and it stops
- * being true the moment the site keeps getting worked on, which is exactly what has happened all
- * day. "Bower is new." carries the same reversal with nothing to go stale, and it rhymes with the
- * page's own coda ("The obsession is real, and it is old."): new company at the top, old obsession
- * at the foot, one idea opening and closing the page.
+ * The setup's trailing ellipsis hands into the payoff, so the two beats are one sentence in his
+ * exact wording. The prior payoff ("We've been chasing it for five years.") carried a count that
+ * ages — the same shelf-life problem as the original "We built this in two weeks." — and it went
+ * with the timeline's year numerals in the same ruling. The header now states plainly what the
+ * coda ("The obsession is real, and it is old.") argues at the foot: same idea opening and
+ * closing the page.
  */
-const SETUP = 'Bower is new.';
+const SETUP = 'Bower is new…';
 
 /** How long the setup takes to lift out. The title's fade waits exactly this long — see the timeline. */
 const SETUP_OUT_S = 0.36;
@@ -50,7 +51,7 @@ const SETUP_OUT_S = 0.36;
  * Timeline (ms): the setup reads, the title takes over, flies onto the header, the content reveals.
  *
  * NOT the original's numbers (title 1750, settle 2700, reveal 3350, done 3850). Those paced a
- * seven-word sentence; this is three words, and the rest of the sequence was tightened deliberately
+ * seven-word sentence; this is four words, and the rest of the sequence was tightened deliberately
  * since. Tuned by watching:
  *
  *   0     the setup rises in (550ms), legible from ~400
@@ -61,8 +62,8 @@ const SETUP_OUT_S = 0.36;
  *   3560  done
  *
  * THEY QUEUE, THEY DO NOT CROSS, and that is not a taste call. The setup and the title share ONE box
- * (see below), so both render at that box's TOP — a crossfade puts "Bower is new." directly on top of
- * "We've been chasing it for", and for ~360ms neither is readable. The original had the same overlap
+ * (see below), so both render at that box's TOP — a crossfade puts "Bower is new…" directly on top of
+ * "The obsession is old.", and for ~360ms neither is readable. The original had the same overlap
  * and got away with it because its lines were different lengths. The title's fade is delayed by
  * exactly the setup's exit, so the payoff arrives in a space that has just been vacated.
  *

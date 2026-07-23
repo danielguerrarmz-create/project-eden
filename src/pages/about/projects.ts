@@ -320,15 +320,27 @@ export const TEAM: TeamMember[] = [
        * KENYA STAYS CUT FROM THE BIO, on his round-10 note, and still reads in full on the Origami
        * project itself. The bio is not the only surface.
        */
+      /*
+       * FORSITE IS DESIGN WORK FIRST, 2026-07-23 — Clay's note to Daniel: "on the website you
+       * should also mention that you did in fact do actually design/detailing work for Forsite.
+       * Rn it just sounds like you built their AI ops layer."
+       *
+       * So TRAINED's "drafting" became "design and detailing work" (the Architectural Design
+       * Intern year — the resume's own title says design; "detailing" is Clay's word for the same
+       * stint, and at a design-build firm of eight the two are the same desk), and BUILT's AI
+       * operations layer is subordinated with "also" so it reads as an addition to the design
+       * work, not the whole of the Forsite relationship. The two-stints structure (design year in
+       * TRAINED, product-engineer stint in BUILT) is unchanged — see the provenance notes above.
+       */
       {
         label: 'Trained',
         value:
-          'Architecture, product design, and engineering at UT Austin. A year drafting at Forsite Studio, then seven months on civic and institutional work at Rogers Partners in New York.',
+          'Architecture, product design, and engineering at UT Austin. A year of design and detailing work at Forsite Studio, then seven months on civic and institutional work at Rogers Partners in New York.',
       },
       {
         label: 'Built',
         value:
-          'Now a product engineer at Forsite Studio, a design-build firm of eight, where one project runs from concept through contractors and subcontractors to construction on site and permitting. Built the studio’s AI operations layer.',
+          'Now a product engineer at Forsite Studio, a design-build firm of eight, where one project runs from concept through contractors and subcontractors to construction on site and permitting. Also built the studio’s AI operations layer.',
       },
       /*
        * ROUND 5 (2026-07-16) — THE DESK LAMP IS CLAY'S AND IS REMOVED. Daniel: "the desk lamp is
